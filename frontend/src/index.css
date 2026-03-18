@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-heading: "Manrope", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 0 100% 22%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 8% 93%;
+    --secondary-foreground: 0 0% 15%;
+
+    --muted: 0 4% 93%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 6% 90%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 60% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 60% 41%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 216 60% 34%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 100% 22%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 26%;
+    --sidebar-primary: 0 100% 22%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 4% 93%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 100% 22%;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 0 100% 22%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 21%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 52%;
+
+    --accent: 0 0% 21%;
+    --accent-foreground: 0 0% 96%;
+
+    --destructive: 0 65% 37%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 160 52% 48%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 54% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 216 53% 53%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 0 0% 21%;
+    --input: 0 0% 21%;
+    --ring: 0 100% 22%;
+
+    --sidebar-background: 0 0% 7%;
+    --sidebar-foreground: 0 0% 80%;
+    --sidebar-primary: 0 100% 22%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 21%;
+    --sidebar-ring: 0 100% 22%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
