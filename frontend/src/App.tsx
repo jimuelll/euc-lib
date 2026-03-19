@@ -28,7 +28,7 @@ import EditProfile from "./pages/public/EditProfile";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminHome from "./pages/admin/AdminHome";
 import AdminManage from "./pages/admin/AdminManage";
-import AdminCatalog from "./pages/admin/adminCatalog/index";
+import AdminCatalog from "./pages/admin/adminCatalog/Index";
 import AdminCirculation from "./pages/admin/AdminCirculation";
 import AdminPayment from "./pages/admin/AdminPayment";
 import AdminBackup from "./pages/admin/AdminBackup";

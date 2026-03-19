@@ -18,6 +18,7 @@ app.use(cors({
       "http://localhost:8080",
       "http://localhost:5173",
       "https://euc-lib.vercel.app/",
+      "https://euc-lib-git-master-jimuellls-projects.vercel.app/"
     ];
     if (!origin || allowed.includes(origin)) {
       callback(null, true);

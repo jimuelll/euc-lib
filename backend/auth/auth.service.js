@@ -15,13 +15,12 @@ async function loginUser(student_employee_id, password) {
     id: user.id,
     role: user.role,
     name: user.name,
-    must_change_password: user.must_change_password
+    must_change_password: user.must_change_password,
   };
 
   const token = signToken(payload);
-  const refreshToken = signRefreshToken({ id: user.id }); // minimal payload for refresh
+  const refreshToken = signRefreshToken({ id: user.id });
 
-  // if password must be changed
   if (user.must_change_password) {
     return { mustChangePassword: true, token, refreshToken };
   }
@@ -31,36 +30,45 @@ async function loginUser(student_employee_id, password) {
   return { token, refreshToken, role: user.role };
 }
 
-// Change password for a user
 async function changePassword(userId, oldPassword, newPassword) {
-  // Get user from DB
-  const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [userId]);
-  if (!rows.length) throw new Error("User not found");
-  const user = rows[0];
+  // Reuse the service layer instead of raw db.query
+  const user = await getUserByEmployeeID(userId);
+  if (!user) throw new Error("User not found");
+
+  // Validate new password before doing anything
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error("New password must be at least 8 characters");
+  }
+  if (oldPassword === newPassword) {
+    throw new Error("New password must be different from the old password");
+  }
 
   // Verify old password
   const match = await bcrypt.compare(oldPassword, user.password_hash);
   if (!match) throw new Error("Old password is incorrect");
 
-  // Hash new password
+  // Hash and update
   const newHash = await bcrypt.hash(newPassword, 12);
-
-  // Update password and reset must_change_password
   await db.query(
     "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
     [newHash, userId]
   );
 
+  // Issue both a new access token and a new refresh token
+  // so the old refresh token can no longer be used
   const token = signToken({
     id: user.id,
     role: user.role,
     name: user.name,
-    must_change_password: false, // ← was incorrectly re-reading old value
+    must_change_password: false,
   });
+
+  const refreshToken = signRefreshToken({ id: user.id });
 
   return {
     message: "Password changed successfully",
     token,
+    refreshToken, // route handler should set this as a new HTTP-only cookie
   };
 }
 
