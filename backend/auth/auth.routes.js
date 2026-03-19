@@ -1,8 +1,8 @@
-const express = require("express");                                        
-const { signToken } = require("./jwt.util");                              
+const express = require("express");
+const { signToken } = require("./jwt.util");
 const { loginUser } = require("./auth.service");
 const { verifyToken } = require("./jwt.util");
-const { getUserByEmployeeID } = require("../users/users.service");
+const { getUserByEmployeeID, getUserByID } = require("../users/users.service");
 const { loginLimiter } = require("../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
 const { handleChangePassword } = require("./auth.controller");
@@ -18,7 +18,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -36,14 +36,14 @@ router.post("/refresh", async (req, res) => {
     if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
 
     const payload = verifyToken(refreshToken);
-    const user = await getUserByEmployeeID(payload.id);
+    const user = await getUserByID(payload.id); 
     if (!user) throw new Error("User not found");
 
     const accessToken = signToken({
       id: user.id,
       role: user.role,
       name: user.name,
-      must_change_password: user.must_change_password
+      must_change_password: user.must_change_password,
     });
 
     res.json({ accessToken });
@@ -56,8 +56,9 @@ router.post("/logout", (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
   });
   res.json({ message: "Logged out" });
 });
+
 module.exports = router;

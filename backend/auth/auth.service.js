@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const { signToken, signRefreshToken } = require("./jwt.util");
 const db = require("../db");
-const { getUserByEmployeeID, updateUserPassword, updateLastLogin } = require("../users/users.service");
+const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../users/users.service");
 
 async function loginUser(student_employee_id, password) {
   const user = await getUserByEmployeeID(student_employee_id);
@@ -31,8 +31,7 @@ async function loginUser(student_employee_id, password) {
 }
 
 async function changePassword(userId, oldPassword, newPassword) {
-  // Reuse the service layer instead of raw db.query
-  const user = await getUserByEmployeeID(userId);
+  const user = await getUserByID(userId);
   if (!user) throw new Error("User not found");
 
   // Validate new password before doing anything

@@ -2,6 +2,7 @@ const express = require("express");
 const cors    = require("cors");
 const helmet  = require("helmet");
 const morgan  = require("morgan");
+const cookieParser = require("cookie-parser"); // ✅ add this
 
 const authRoutes    = require("./auth/auth.routes");
 const adminRoutes   = require("./admin/admin.routes");
@@ -30,6 +31,7 @@ app.use(cors({
 }));
 app.use(helmet());
 app.use(morgan("dev"));
+app.use(cookieParser()); 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
