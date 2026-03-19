@@ -3,7 +3,7 @@ import {
   Home, ShieldCheck, BookCopy, ArrowLeftRight, CreditCard, DatabaseBackup,
   FileBarChart, HelpCircle, Wifi, ClipboardCheck, PenSquare, LogOut, Library,
   CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock,
-  ChevronDown, Bell,
+  ChevronDown, Bell, ExternalLink,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -119,7 +119,6 @@ function AdminSidebar() {
             <p className="text-sm font-semibold text-foreground leading-tight">
               Hello, {user?.name?.split(" ")[0] ?? "Admin"}
             </p>
-            {/* show email if available, else role */}
             <p className="text-xs text-muted-foreground mt-0.5 capitalize">
               {user?.role?.replace("_", " ") ?? "Administrator"}
             </p>
@@ -254,6 +253,21 @@ export const AdminLayout = () => {
             </div>
 
             <div className="flex items-center gap-1">
+              {/* View public site */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                asChild
+              >
+                <a href="/" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">View Site</span>
+                </a>
+              </Button>
+
+              <div className="h-4 w-px bg-border mx-0.5" />
+
               {/* Notification bell with unread badge */}
               <Button
                 variant="ghost"
@@ -262,7 +276,6 @@ export const AdminLayout = () => {
                 aria-label="Notifications"
               >
                 <Bell className="h-4 w-4" />
-                {/* Red dot badge */}
                 <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
               </Button>
 

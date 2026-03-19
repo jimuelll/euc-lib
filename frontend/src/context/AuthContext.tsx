@@ -23,19 +23,30 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
+const decodeToken = (token: string): User | null => {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return null;
+  }
+};
+
+// ✅ decode stored refresh token immediately to pre-populate user before first render
+const getInitialUser = (): User | null => {
+  try {
+    const stored = localStorage.getItem("refreshToken");
+    if (!stored) return null;
+    return decodeToken(stored);
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(getInitialUser); // ✅ sync init, no flicker
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-
-  const decodeToken = (token: string): User | null => {
-    try {
-      return JSON.parse(atob(token.split(".")[1]));
-    } catch {
-      return null;
-    }
-  };
 
   const logout = useCallback(async () => {
     try {
@@ -43,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore — clear state regardless
     }
-    localStorage.removeItem("refreshToken"); // ✅ clear from localStorage
+    localStorage.removeItem("refreshToken");
     setUser(null);
     setAccessToken(null);
     setInMemoryToken(null);
@@ -53,14 +64,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshToken = useCallback(async () => {
     setLoading(true);
     try {
-      const storedRefreshToken = localStorage.getItem("refreshToken"); // ✅ read from localStorage
+      const storedRefreshToken = localStorage.getItem("refreshToken");
       if (!storedRefreshToken) {
         setLoading(false);
         return null;
       }
 
       const res = await axiosInstance.post("/auth/refresh", {
-        refreshToken: storedRefreshToken, // ✅ send in body
+        refreshToken: storedRefreshToken,
       });
 
       const token = res.data.accessToken;
@@ -73,8 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return token;
     } catch {
-      // No valid refresh token — guest user, silently clear state
-      localStorage.removeItem("refreshToken"); // ✅ clear invalid token
+      localStorage.removeItem("refreshToken");
       setUser(null);
       setAccessToken(null);
       setInMemoryToken(null);
@@ -97,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { token, refreshToken: newRefreshToken } = res.data;
 
-      localStorage.setItem("refreshToken", newRefreshToken); // ✅ store in localStorage
+      localStorage.setItem("refreshToken", newRefreshToken);
       setAccessToken(token);
       setInMemoryToken(token);
 
@@ -122,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await axiosInstance.post("/auth/change-password", { oldPassword, newPassword });
       const { token, refreshToken: newRefreshToken } = res.data;
 
-      localStorage.setItem("refreshToken", newRefreshToken); // ✅ rotate stored refresh token
+      localStorage.setItem("refreshToken", newRefreshToken);
       setAccessToken(token);
       setInMemoryToken(token);
 
