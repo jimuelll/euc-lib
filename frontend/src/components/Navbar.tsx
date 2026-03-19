@@ -30,7 +30,7 @@ const Navbar = () => {
 
   const showMyLibrary = role === "student";
   const showScannerTools = role === "scanner";
-  const showAdminReturn = role === "admin" || role === "super_admin";
+  const showAdminReturn = role === "admin" || role === "super_admin" || role === "staff";
 
   const getInitials = () => {
     if (!user?.name) return "?";

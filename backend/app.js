@@ -1,26 +1,24 @@
 const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
+const cors    = require("cors");
+const helmet  = require("helmet");
+const morgan  = require("morgan");
 
-const authRoutes = require("./auth/auth.routes");
-const adminRoutes = require("./admin/admin.routes");
+const authRoutes    = require("./auth/auth.routes");
+const adminRoutes   = require("./admin/admin.routes");
+const catalogRoutes = require("./catalog/catalog.routes");
 
-const { authMiddleware } = require("./auth/auth.middleware");
+const { authMiddleware }      = require("./auth/auth.middleware");
 const { forcePasswordChange } = require("./auth/forcePasswordChange.middleware");
 
 const app = express();
 
-// --- Middleware ---
 app.use(cors({
   origin: (origin, callback) => {
     const allowed = [
       "http://localhost:8080",
       "http://localhost:5173",
-      "https://euc-lib.vercel.app/", // ← your vercel URL
+      "https://euc-lib.vercel.app/",
     ];
-
-    // Allow requests with no origin (e.g. mobile apps, curl, Postman)
     if (!origin || allowed.includes(origin)) {
       callback(null, true);
     } else {
@@ -31,18 +29,18 @@ app.use(cors({
 }));
 app.use(helmet());
 app.use(morgan("dev"));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Public Routes (NO AUTH REQUIRED) ---
+// --- Public Routes ---
 app.use("/auth", authRoutes);
 
 // --- Global Protection ---
-app.use(authMiddleware());        // must be logged in
-app.use(forcePasswordChange);     // must have changed password
+app.use(authMiddleware());
+app.use(forcePasswordChange);
 
 // --- Protected Routes ---
 app.use("/admin", adminRoutes);
+app.use("/admin", catalogRoutes);
 
 module.exports = app;

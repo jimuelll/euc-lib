@@ -30,11 +30,10 @@ type User = {
 };
 
 const AdminManage = () => {
-  const { user } = useAuth(); // ← single source of truth
+  const { user } = useAuth();
   const [functionType, setFunctionType] = useState<"create" | "edit">("create");
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [id, setId] = useState("");
   const [address, setAddress] = useState("");
   const [contact, setContact] = useState("");
@@ -49,15 +48,13 @@ const AdminManage = () => {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // Derive allowed roles from AuthContext user, not localStorage
   useEffect(() => {
     if (!user) return;
     setAllowedRoles(roleHierarchy[user.role] || []);
   }, [user]);
 
   const resetForm = () => {
-    setFirstName("");
-    setLastName("");
+    setFullName("");
     setId("");
     setAddress("");
     setContact("");
@@ -68,7 +65,7 @@ const AdminManage = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!firstName || !lastName || !id || !role || !password || !rePassword) {
+    if (!fullName || !id || !role || !password || !rePassword) {
       toast.error("All required fields must be filled");
       return;
     }
@@ -80,7 +77,7 @@ const AdminManage = () => {
     try {
       const res = await axiosInstance.post("/admin/users", {
         student_employee_id: id,
-        name: `${firstName} ${lastName}`,
+        name: fullName,
         role,
         password,
         address,
@@ -120,7 +117,7 @@ const AdminManage = () => {
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
     const updates: any = {
-      name: `${firstName} ${lastName}`,
+      name: fullName,
       role,
       address,
       contact,
@@ -135,7 +132,7 @@ const AdminManage = () => {
     setLoading(true);
     try {
       const res = await axiosInstance.put(
-        `/admin/users/${selectedUser.student_employee_id}`,  // ← fixed missing /admin/users/ prefix
+        `/admin/users/${selectedUser.student_employee_id}`,
         updates
       );
       toast.success(res.data.message);
@@ -154,7 +151,7 @@ const AdminManage = () => {
     setLoading(true);
     try {
       const res = await axiosInstance.delete(
-        `/admin/users/${selectedUser.student_employee_id}` // ← fixed missing /admin/users/ prefix
+        `/admin/users/${selectedUser.student_employee_id}`
       );
       toast.success(res.data.message);
       resetForm();
@@ -170,9 +167,7 @@ const AdminManage = () => {
 
   const selectUserForEdit = (u: User) => {
     setSelectedUser(u);
-    const [fName, ...lName] = u.name.split(" ");
-    setFirstName(fName || "");
-    setLastName(lName.join(" ") || "");
+    setFullName(u.name);
     setId(u.student_employee_id);
     setAddress(u.address || "");
     setContact(u.contact || "");
@@ -203,15 +198,9 @@ const AdminManage = () => {
           className="mt-6 space-y-4 rounded-lg border bg-card p-6"
           onSubmit={(e) => { e.preventDefault(); handleCreateUser(); }}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>First Name</Label>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Last Name</Label>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
+          <div className="space-y-2">
+            <Label>Full Name</Label>
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>ID Number</Label>
@@ -265,9 +254,14 @@ const AdminManage = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create User"}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? "Creating..." : "Create User"}
+            </Button>
+            <Button type="button" variant="outline" onClick={resetForm} disabled={loading}>
+              Clear Form
+            </Button>
+          </div>
         </form>
       )}
 
@@ -321,15 +315,9 @@ const AdminManage = () => {
               onSubmit={(e) => { e.preventDefault(); handleUpdateUser(); }}
             >
               <h3 className="font-semibold text-foreground">Editing: {selectedUser.name}</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>First Name</Label>
-                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Last Name</Label>
-                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>ID Number</Label>
