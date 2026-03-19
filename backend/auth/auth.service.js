@@ -52,10 +52,10 @@ async function changePassword(userId, oldPassword, newPassword) {
   );
 
   const token = signToken({
-    id: userId,
+    id: user.id,
     role: user.role,
     name: user.name,
-    must_change_password: false,
+    must_change_password: false, // ← was incorrectly re-reading old value
   });
 
   return {

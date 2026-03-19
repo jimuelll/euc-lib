@@ -12,7 +12,10 @@ const { forcePasswordChange } = require("./auth/forcePasswordChange.middleware")
 const app = express();
 
 // --- Middleware ---
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:8080", // your frontend origin
+  credentials: true,               // allow cookies
+}));
 app.use(helmet());
 app.use(morgan("dev"));
 

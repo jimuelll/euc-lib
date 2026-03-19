@@ -1,12 +1,5 @@
 import { Navigate } from "react-router-dom";
-
-function decodeToken(token: string) {
-  try {
-    return JSON.parse(atob(token.split(".")[1]));
-  } catch {
-    return null;
-  }
-}
+import { useAuth } from "@/context/AuthContext";
 
 interface Props {
   children: React.ReactNode;
@@ -14,29 +7,19 @@ interface Props {
 }
 
 const ProtectedRoute = ({ children, roles = [] }: Props) => {
-  const token = localStorage.getItem("token");
+  const { user, loading } = useAuth();
 
-  // ❌ Not logged in
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  // Wait for auth to settle — prevents flicker
+  if (loading) return null;
 
-  const decoded = decodeToken(token);
+  // Not logged in
+  if (!user) return <Navigate to="/login" replace />;
 
-  // ❌ Invalid token
-  if (!decoded) {
-    return <Navigate to="/login" replace />;
-  }
+  // Logged in but must change password — lock them here no matter what
+  if (user.must_change_password) return <Navigate to="/change-password" replace />;
 
-  // 🚨 FORCE PASSWORD CHANGE (THIS IS YOUR GUARD)
-  if (decoded.must_change_password) {
-    return <Navigate to="/change-password" replace />;
-  }
-
-  // 🔐 Role check
-  if (roles.length && !roles.includes(decoded.role)) {
-    return <Navigate to="/" replace />;
-  }
+  // Role check
+  if (roles.length && !roles.includes(user.role)) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 };

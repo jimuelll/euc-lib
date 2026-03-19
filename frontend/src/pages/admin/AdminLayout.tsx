@@ -1,60 +1,28 @@
 import { Outlet, useLocation } from "react-router-dom";
 import {
-  Home,
-  ShieldCheck,
-  BookCopy,
-  ArrowLeftRight,
-  CreditCard,
-  DatabaseBackup,
-  FileBarChart,
-  HelpCircle,
-  Wifi,
-  ClipboardCheck,
-  PenSquare,
-  LogOut,
-  Library,
-  CalendarDays,
-  FileText,
-  GraduationCap,
-  ExternalLink,
-  CalendarOff,
-  ShieldAlert,
-  Clock,
+  Home, ShieldCheck, BookCopy, ArrowLeftRight, CreditCard, DatabaseBackup,
+  FileBarChart, HelpCircle, Wifi, ClipboardCheck, PenSquare, LogOut, Library,
+  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock,
   ChevronDown,
 } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarFooter,
-  SidebarHeader,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+  SidebarFooter, SidebarHeader, useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { useAuth } from "@/hooks/use-auth"; // ✅ your auth hook
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAuth } from "@/context/AuthContext"; // ← fix import
 
 interface SidebarSection {
   label: string;
   items: { title: string; url: string; icon: typeof Home }[];
 }
 
-// Sidebar sections
 const sidebarSections: SidebarSection[] = [
   {
     label: "Library Management",
@@ -102,15 +70,22 @@ const sidebarSections: SidebarSection[] = [
 
 const allItems = sidebarSections.flatMap((s) => s.items);
 
+// Get initials from full name
+function getInitials(name?: string): string {
+  if (!name) return "?";
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { logout } = useAuth(); // ✅ hook provides logout
+  const { user, logout } = useAuth(); // ← real user from context
 
   return (
     <Sidebar collapsible="icon" className="border-r">
-      {/* Header */}
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -137,9 +112,7 @@ function AdminSidebar() {
           return (
             <SidebarGroup key={section.label}>
               {!collapsed ? (
-                <Collapsible
-                  defaultOpen={sectionActive || section.label === "Library Management"}
-                >
+                <Collapsible defaultOpen={sectionActive || section.label === "Library Management"}>
                   <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors">
                     {section.label}
                     <ChevronDown className="h-3 w-3 transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
@@ -191,19 +164,22 @@ function AdminSidebar() {
         })}
       </SidebarContent>
 
-      {/* Footer */}
       <SidebarFooter className="p-3">
         <Separator className="mb-3" />
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 shrink-0">
             <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-              AD
+              {getInitials(user?.name)} {/* ← real initials */}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Admin User</p>
-              <p className="text-xs text-muted-foreground">Administrator</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                {user?.name ?? "Admin"} {/* ← real name */}
+              </p>
+              <p className="text-xs text-muted-foreground capitalize">
+                {user?.role?.replace("_", " ") ?? "Administrator"} {/* ← real role */}
+              </p>
             </div>
           )}
         </div>
@@ -214,7 +190,7 @@ function AdminSidebar() {
                 variant="ghost"
                 size="sm"
                 className="w-full gap-2 text-left"
-                onClick={logout} // ✅ logout properly
+                onClick={logout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 {!collapsed && <span>Logout</span>}

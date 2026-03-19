@@ -1,26 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Menu,
-  X,
-  Bell,
-  QrCode,
-  LogOut,
-  UserCog,
-  LayoutDashboard,
-  Baby,
+  Menu, X, Bell, QrCode, LogOut, UserCog, LayoutDashboard, Baby,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ThemeToggle from "@/components/ThemeToggle";
-import { useAuth } from "@/hooks/use-auth";
-import { jwtDecode } from "jwt-decode";
+import { useAuth } from "@/context/AuthContext"; // ← use context, not use-auth hook
 
 const navLinks = [
   { label: "Home", to: "/" },
@@ -30,50 +19,24 @@ const navLinks = [
   { label: "Bulletin", to: "/bulletin" },
 ];
 
-interface DecodedToken {
-  id: number;
-  role: string;
-  name: string;
-  must_change_password?: boolean;
-  exp?: number;
-}
-
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout, loading } = useAuth(); // ← single source of truth
 
-  const token = localStorage.getItem("token");
+  const role = user?.role ?? "guest";
+  const isLoggedIn = !!user && !loading;
 
-  // ✅ Decode token safely
-  const decoded: DecodedToken | null = useMemo(() => {
-    if (!token) return null;
-    try {
-      return jwtDecode<DecodedToken>(token);
-    } catch {
-      localStorage.removeItem("token");
-      return null;
-    }
-  }, [token]);
-
-  const role = decoded?.role ?? "guest";
-  const isLoggedIn = !!decoded;
-
-  // ✅ Role-based UI
   const showMyLibrary = role === "student";
   const showScannerTools = role === "scanner";
   const showAdminReturn = role === "admin" || role === "super_admin";
 
-  // ✅ Avatar initials (production-ready)
   const getInitials = () => {
-    if (!decoded?.name) return "?";
-
-    const parts = decoded.name.trim().split(" ").filter(Boolean);
-
+    if (!user?.name) return "?";
+    const parts = user.name.trim().split(" ").filter(Boolean);
     if (parts.length === 0) return "?";
     if (parts.length === 1) return parts[0][0].toUpperCase();
-
     return (parts[0][0] + parts[1][0]).toUpperCase();
   };
 
@@ -95,32 +58,24 @@ const Navbar = () => {
         <nav className="hidden items-center gap-6 md:flex">
           {navLinks.map((link) => {
             const active = location.pathname === link.to;
-
             return (
               <Link
                 key={link.to}
                 to={link.to}
                 className={`relative text-sm font-medium ${
-                  active
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                  active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {link.label}
-                <span
-                  className={`absolute -bottom-1 left-0 h-[2px] w-full bg-primary transition-opacity ${
-                    active ? "opacity-100" : "opacity-0"
-                  }`}
-                />
+                <span className={`absolute -bottom-1 left-0 h-[2px] w-full bg-primary transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`} />
               </Link>
             );
           })}
 
           {showMyLibrary && (
-            <Link
-              to="/my-library"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
+            <Link to="/my-library" className="text-sm text-muted-foreground hover:text-foreground">
               My Library
             </Link>
           )}
@@ -130,12 +85,8 @@ const Navbar = () => {
         <div className="flex items-center gap-1">
           {showScannerTools && (
             <>
-              <Button variant="ghost" size="icon">
-                <QrCode className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Baby className="h-5 w-5" />
-              </Button>
+              <Button variant="ghost" size="icon"><QrCode className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon"><Baby className="h-5 w-5" /></Button>
             </>
           )}
 
@@ -155,12 +106,12 @@ const Navbar = () => {
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent align="end">
-                  {/* Greeting */}
                   <div className="px-3 py-2">
-                    <p className="text-sm text-muted-foreground">
-                      Hello, {decoded?.name ?? role}
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{role}</p>
                   </div>
+
+                  <DropdownMenuSeparator />
 
                   {showAdminReturn && (
                     <DropdownMenuItem onClick={() => navigate("/admin")}>
@@ -169,19 +120,14 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   )}
 
-                  <DropdownMenuItem
-                    onClick={() => navigate("/edit-profile")}
-                  >
+                  <DropdownMenuItem onClick={() => navigate("/edit-profile")}>
                     <UserCog className="mr-2 h-4 w-4" />
                     Edit Profile
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
-                  <DropdownMenuItem
-                    onClick={logout}
-                    className="text-destructive"
-                  >
+                  <DropdownMenuItem onClick={logout} className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </DropdownMenuItem>
@@ -201,11 +147,7 @@ const Navbar = () => {
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
@@ -218,9 +160,7 @@ const Navbar = () => {
               to={link.to}
               onClick={() => setMobileOpen(false)}
               className={`block rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent ${
-                location.pathname === link.to
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                location.pathname === link.to ? "text-primary" : "text-muted-foreground"
               }`}
             >
               {link.label}
@@ -239,9 +179,7 @@ const Navbar = () => {
 
           {!isLoggedIn && (
             <Link to="/login" onClick={() => setMobileOpen(false)}>
-              <Button size="sm" className="mt-2 w-full">
-                Login
-              </Button>
+              <Button size="sm" className="mt-2 w-full">Login</Button>
             </Link>
           )}
         </nav>

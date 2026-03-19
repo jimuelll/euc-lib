@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 const ChangePassword = () => {
   const [showOld, setShowOld] = useState(false);
@@ -15,15 +15,7 @@ const ChangePassword = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { changePassword, mustChangePassword } = useAuth();
-  const navigate = useNavigate();
-
-  // ✅ Prevent leaving if still required
-  useEffect(() => {
-    if (!mustChangePassword) {
-      navigate("/");
-    }
-  }, [mustChangePassword, navigate]);
+  const { changePassword, user, loading: authLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +29,6 @@ const ChangePassword = () => {
     try {
       setLoading(true);
       await changePassword(oldPassword, newPassword);
-      // navigation handled by context after success
     } catch (err: any) {
       setError(err.message || "Failed to change password");
     } finally {
@@ -45,9 +36,15 @@ const ChangePassword = () => {
     }
   };
 
+  // Wait for auth to settle before rendering anything
+  if (authLoading) return null;
+
+  // Not logged in — send to login
+  if (!user) return <Navigate to="/login" replace />;
+
   return (
     <div className="min-h-screen bg-background relative">
-      {/* Background UI (locked visually) */}
+      {/* Blurred background */}
       <div className="pointer-events-none select-none opacity-40 blur-[2px]">
         <Navbar />
         <main className="flex items-center justify-center py-24 px-4">
@@ -56,11 +53,9 @@ const ChangePassword = () => {
         <Footer />
       </div>
 
-      {/* 🔒 FULLSCREEN LOCK MODAL */}
+      {/* Fullscreen modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
         <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-xl">
-          
-          {/* Header */}
           <div className="text-center">
             <Lock className="mx-auto h-10 w-10 text-primary" />
             <h1 className="mt-4 font-heading text-2xl font-bold text-foreground">
@@ -71,10 +66,7 @@ const ChangePassword = () => {
             </p>
           </div>
 
-          {/* Form */}
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            
-            {/* Old Password */}
             <div>
               <label className="text-sm">Current Password</label>
               <div className="relative mt-1.5">
@@ -94,7 +86,6 @@ const ChangePassword = () => {
               </div>
             </div>
 
-            {/* New Password */}
             <div>
               <label className="text-sm">New Password</label>
               <div className="relative mt-1.5">
@@ -114,7 +105,6 @@ const ChangePassword = () => {
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="text-sm">Confirm New Password</label>
               <input
@@ -125,9 +115,7 @@ const ChangePassword = () => {
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button className="w-full" size="lg" disabled={loading}>
               {loading ? "Updating..." : "Update Password"}

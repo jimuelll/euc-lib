@@ -1,5 +1,8 @@
-const express = require("express");
+const express = require("express");                                        
+const { signToken } = require("./jwt.util");                              
 const { loginUser } = require("./auth.service");
+const { verifyToken } = require("./jwt.util");
+const { getUserByEmployeeID } = require("../users/users.service");
 const { loginLimiter } = require("../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
 const { handleChangePassword } = require("./auth.controller");
@@ -50,7 +53,11 @@ router.post("/refresh", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  res.clearCookie("refreshToken", { httpOnly: true, sameSite: "strict" });
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
   res.json({ message: "Logged out" });
 });
 module.exports = router;

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { BookOpen, Eye, EyeOff, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -14,7 +15,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate();
+  const { login } = useAuth(); // ← use AuthContext, not raw fetch
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,40 +27,8 @@ const Login = () => {
     }
 
     setLoading(true);
-
     try {
-      const res = await fetch("http://localhost:4000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_employee_id: id, password }),
-      });
-
-      // Read the response as text first
-      const text = await res.text();
-
-      let data: any;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        // If text isn't JSON, show the raw message
-        throw new Error(text || "Server returned invalid response");
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.message || `Login failed: ${res.status}`);
-      }
-
-      // ✅ Store JWT token
-      localStorage.setItem("token", data.token);
-
-      // ✅ Handle forced password change
-      if (data.mustChangePassword) {
-        navigate("/change-password");
-        return;
-      }
-
-      // ✅ Normal login
-      navigate("/");
+      await login(id, password); // ← this sets user, inMemoryToken, and navigates
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
