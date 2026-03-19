@@ -2,7 +2,7 @@ const express = require("express");
 const { signToken } = require("./jwt.util");
 const { loginUser } = require("./auth.service");
 const { verifyToken } = require("./jwt.util");
-const { getUserByEmployeeID, getUserByID } = require("../users/users.service");
+const { getUserByID } = require("../users/users.service");
 const { loginLimiter } = require("../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
 const { handleChangePassword } = require("./auth.controller");
@@ -13,16 +13,7 @@ router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { student_employee_id, password } = req.body;
     const result = await loginUser(student_employee_id, password);
-
-    // Set refresh token in HTTP-only cookie
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "true",
-      sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    res.json(result);
+    res.json(result); // ✅ refreshToken is in the response body, frontend stores it in localStorage
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -32,21 +23,11 @@ router.post("/change-password", authMiddleware(), handleChangePassword);
 
 router.post("/refresh", async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
-    console.log("refreshToken from cookie:", refreshToken ? "present" : "MISSING");
+    const refreshToken = req.body.refreshToken; // ✅ read from body instead of cookie
     if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
 
-    let payload;
-    try {
-      payload = verifyToken(refreshToken);
-      console.log("payload:", payload);
-    } catch (verifyErr) {
-      console.log("verifyToken error:", verifyErr.message); // ← exact error
-      throw verifyErr;
-    }
-
+    const payload = verifyToken(refreshToken);
     const user = await getUserByID(payload.id);
-    console.log("getUserByID result:", user ? "found" : "NOT FOUND");
     if (!user) throw new Error("User not found");
 
     const accessToken = signToken({
@@ -63,11 +44,6 @@ router.post("/refresh", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "true",
-    sameSite: "none",
-  });
   res.json({ message: "Logged out" });
 });
 
