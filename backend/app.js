@@ -13,8 +13,21 @@ const app = express();
 
 // --- Middleware ---
 app.use(cors({
-  origin: "http://localhost:8080", // your frontend origin
-  credentials: true,               // allow cookies
+  origin: (origin, callback) => {
+    const allowed = [
+      "http://localhost:8080",
+      "http://localhost:5173",
+      "https://euc-lib-git-master-jimuellls-projects.vercel.app", // ← your vercel URL
+    ];
+
+    // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+    if (!origin || allowed.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
 }));
 app.use(helmet());
 app.use(morgan("dev"));
