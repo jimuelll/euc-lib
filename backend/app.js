@@ -2,7 +2,7 @@ const express = require("express");
 const cors    = require("cors");
 const helmet  = require("helmet");
 const morgan  = require("morgan");
-const cookieParser = require("cookie-parser"); // ✅ add this
+const cookieParser = require("cookie-parser");
 
 const authRoutes    = require("./auth/auth.routes");
 const adminRoutes   = require("./admin/admin.routes");

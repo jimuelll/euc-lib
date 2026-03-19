@@ -33,10 +33,20 @@ router.post("/change-password", authMiddleware(), handleChangePassword);
 router.post("/refresh", async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
+    console.log("refreshToken from cookie:", refreshToken ? "present" : "MISSING");
     if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
 
-    const payload = verifyToken(refreshToken);
-    const user = await getUserByID(payload.id); 
+    let payload;
+    try {
+      payload = verifyToken(refreshToken);
+      console.log("payload:", payload);
+    } catch (verifyErr) {
+      console.log("verifyToken error:", verifyErr.message); // ← exact error
+      throw verifyErr;
+    }
+
+    const user = await getUserByID(payload.id);
+    console.log("getUserByID result:", user ? "found" : "NOT FOUND");
     if (!user) throw new Error("User not found");
 
     const accessToken = signToken({
