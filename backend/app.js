@@ -17,7 +17,7 @@ app.use(cors({
     const allowed = [
       "http://localhost:8080",
       "http://localhost:5173",
-      "https://euc-lib-git-master-jimuellls-projects.vercel.app", // ← your vercel URL
+      "https://euc-lib.vercel.app/", // ← your vercel URL
     ];
 
     // Allow requests with no origin (e.g. mobile apps, curl, Postman)
