@@ -12,7 +12,7 @@ const { authMiddleware }      = require("./auth/auth.middleware");
 const { forcePasswordChange } = require("./auth/forcePasswordChange.middleware");
 
 const app = express();
-
+app.set("trust proxy", 1);
 app.use(cors({
   origin: (origin, callback) => {
     const allowed = [
