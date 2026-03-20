@@ -11,7 +11,7 @@ import {
   SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
-import { Trash2, Plus, Pencil, X, Check } from "lucide-react";
+import { Trash2, Plus, Pencil, X, Check, Eye, EyeOff } from "lucide-react";
 import { FormField, FieldType, FIELD_TYPES } from "./AdminCatalog.types";
 
 type Props = {
@@ -23,13 +23,14 @@ const toKey = (label: string) =>
   label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
 const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
-  const [newFieldLabel, setNewFieldLabel]     = useState("");
-  const [newFieldType, setNewFieldType]       = useState<FieldType>("text");
-  const [newFieldOptions, setNewFieldOptions] = useState("");
+  const [newFieldLabel, setNewFieldLabel]       = useState("");
+  const [newFieldType, setNewFieldType]         = useState<FieldType>("text");
+  const [newFieldOptions, setNewFieldOptions]   = useState("");
   const [newFieldRequired, setNewFieldRequired] = useState(false);
-  const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel]       = useState("");
-  const [saving, setSaving]                   = useState(false);
+  const [newFieldPublic, setNewFieldPublic]     = useState(true);
+  const [editingFieldKey, setEditingFieldKey]   = useState<string | null>(null);
+  const [editingLabel, setEditingLabel]         = useState("");
+  const [saving, setSaving]                     = useState(false);
 
   const sortedFields = [...fields].sort((a, b) => a.order - b.order);
 
@@ -54,10 +55,11 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
       ...fields,
       {
         key,
-        label: newFieldLabel.trim(),
-        type: newFieldType,
+        label:    newFieldLabel.trim(),
+        type:     newFieldType,
         required: newFieldRequired,
-        order: fields.length,
+        public:   newFieldPublic,
+        order:    fields.length,
         options:
           newFieldType === "select"
             ? newFieldOptions.split(",").map((o) => o.trim()).filter(Boolean)
@@ -68,9 +70,10 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     setNewFieldType("text");
     setNewFieldOptions("");
     setNewFieldRequired(false);
+    setNewFieldPublic(true);
   };
 
-  const handleDeleteField  = (key: string) =>
+  const handleDeleteField = (key: string) =>
     saveSchema(fields.filter((f) => f.key !== key));
 
   const handleSaveLabel = (key: string) => {
@@ -78,10 +81,13 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     setEditingFieldKey(null);
   };
 
+  const handleTogglePublic = (key: string, current: boolean) =>
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, public: !current } : f)));
+
   const handleMove = (key: string, dir: "up" | "down") => {
     const sorted = [...fields].sort((a, b) => a.order - b.order);
-    const idx     = sorted.findIndex((f) => f.key === key);
-    const swap    = dir === "up" ? idx - 1 : idx + 1;
+    const idx    = sorted.findIndex((f) => f.key === key);
+    const swap   = dir === "up" ? idx - 1 : idx + 1;
     if (swap < 0 || swap >= sorted.length) return;
     [sorted[idx].order, sorted[swap].order] = [sorted[swap].order, sorted[idx].order];
     saveSchema([...sorted]);
@@ -99,7 +105,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
               key={f.key}
               className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs"
             >
-              {/* Order */}
+              {/* Order arrows */}
               <div className="flex flex-col leading-none">
                 <button
                   onClick={() => handleMove(f.key, "up")}
@@ -146,7 +152,24 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                 </span>
               )}
 
-              {/* Actions */}
+              {/* Public toggle — available for all fields including locked */}
+              <button
+                onClick={() => handleTogglePublic(f.key, !!f.public)}
+                title={f.public ? "Visible in public catalogue" : "Hidden from public catalogue"}
+                className={`shrink-0 transition-colors ${
+                  f.public
+                    ? "text-primary hover:text-primary/70"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.public ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+              </button>
+
+              {/* Edit / delete — unlocked fields only */}
               {!f.locked && (
                 editingFieldKey === f.key ? (
                   <>
@@ -177,6 +200,10 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             </div>
           ))}
         </div>
+
+        <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+          <Eye className="h-3 w-3" /> = visible in public catalogue
+        </p>
       </div>
 
       {/* ── Right: add new field ── */}
@@ -218,15 +245,25 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <input
-              id="req-check"
-              type="checkbox"
-              checked={newFieldRequired}
-              onChange={(e) => setNewFieldRequired(e.target.checked)}
-              className="accent-primary"
-            />
-            <label htmlFor="req-check" className="text-xs text-foreground">Required field</label>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newFieldRequired}
+                onChange={(e) => setNewFieldRequired(e.target.checked)}
+                className="accent-primary"
+              />
+              Required
+            </label>
+            <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newFieldPublic}
+                onChange={(e) => setNewFieldPublic(e.target.checked)}
+                className="accent-primary"
+              />
+              Visible in catalogue
+            </label>
           </div>
 
           <Button size="sm" onClick={handleAddField} disabled={saving} className="w-full">

@@ -4,7 +4,7 @@ import { Heart, MessageCircle, BookOpen, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import PostModal from "@/components/PostModal";
-import type { BulletinPost } from "@/pages/public/Bulletin";
+import type { BulletinPost } from "@/pages/homepage/Bulletin";
 
 const latestPosts: BulletinPost[] = [
   {

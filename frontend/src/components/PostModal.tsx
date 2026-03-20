@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState } from "react";
-import type { BulletinPost } from "@/pages/public/Bulletin";
+import type { BulletinPost } from "@/pages/homepage/Bulletin";
 
 interface PostModalProps {
   post: BulletinPost | null;

@@ -40,7 +40,8 @@ const getBooks = async (req, res) => {
     if (!query?.trim()) {
       return res.status(400).json({ message: "Search query is required" });
     }
-    const books = await service.searchBooks(query.trim());
+    // req.publicCatalogue is set by the route when called from the public endpoint
+    const books = await service.searchBooks(query.trim(), !!req.publicCatalogue);
     res.json(books);
   } catch (err) {
     console.error("[catalog] getBooks:", err);

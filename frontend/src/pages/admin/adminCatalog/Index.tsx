@@ -14,7 +14,7 @@ const AdminCatalog = () => {
   const [loadingSchema, setLoadingSchema] = useState(true);
 
   useEffect(() => {
-    axiosInstance.get("/admin/catalog-schema")
+    axiosInstance.get("api/admin/catalog-schema")
       .then((res) => {
         const parsed = res.data.map((f: any) => ({
           ...f,

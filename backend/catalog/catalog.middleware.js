@@ -38,6 +38,7 @@ const validateSchemaPayload = (req, res, next) => {
     if (typeof f.order !== "number") {
       return res.status(400).json({ message: `Field "${f.key}" is missing a numeric order` });
     }
+    // public is optional boolean — no strict validation needed, coerced to 0/1 in service
   }
 
   next();

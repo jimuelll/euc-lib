@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
-      await axiosInstance.post("/auth/logout", {});
+      await axiosInstance.post("/api/auth/logout", {});
     } catch {
       // ignore — clear state regardless
     }
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      const res = await axiosInstance.post("/auth/refresh", {
+      const res = await axiosInstance.post("/api/auth/refresh", {
         refreshToken: storedRefreshToken,
       });
 
@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (employeeId: string, password: string) => {
     try {
-      const res = await axiosInstance.post("/auth/login", {
+      const res = await axiosInstance.post("/api/auth/login", {
         student_employee_id: employeeId,
         password,
       });
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error("Not logged in");
 
     try {
-      const res = await axiosInstance.post("/auth/change-password", { oldPassword, newPassword });
+      const res = await axiosInstance.post("/api/auth/change-password", { oldPassword, newPassword });
       const { token, refreshToken: newRefreshToken } = res.data;
 
       localStorage.setItem("refreshToken", newRefreshToken);

@@ -11,7 +11,8 @@ import {
   SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, UserX, UserCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 
 const roleHierarchy: Record<string, string[]> = {
@@ -33,20 +34,20 @@ const AdminManage = () => {
   const { user } = useAuth();
   const [functionType, setFunctionType] = useState<"create" | "edit">("create");
 
-  const [fullName, setFullName] = useState("");
-  const [id, setId] = useState("");
-  const [address, setAddress] = useState("");
-  const [contact, setContact] = useState("");
-  const [role, setRole] = useState("");
-  const [password, setPassword] = useState("");
+  const [fullName, setFullName]     = useState("");
+  const [id, setId]                 = useState("");
+  const [address, setAddress]       = useState("");
+  const [contact, setContact]       = useState("");
+  const [role, setRole]             = useState("");
+  const [password, setPassword]     = useState("");
   const [rePassword, setRePassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading]             = useState(false);
+  const [allowedRoles, setAllowedRoles]   = useState<string[]>([]);
+  const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser]   = useState<User | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -75,7 +76,7 @@ const AdminManage = () => {
     }
     setLoading(true);
     try {
-      const res = await axiosInstance.post("/admin/users", {
+      const res = await axiosInstance.post("/api/admin/users", {
         student_employee_id: id,
         name: fullName,
         role,
@@ -99,7 +100,7 @@ const AdminManage = () => {
     }
     setLoading(true);
     try {
-      const res = await axiosInstance.get("/admin/users", {
+      const res = await axiosInstance.get("/api/admin/users", {
         params: {
           student_employee_id: searchQuery || undefined,
           name: searchQuery || undefined,
@@ -116,12 +117,7 @@ const AdminManage = () => {
 
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
-    const updates: any = {
-      name: fullName,
-      role,
-      address,
-      contact,
-    };
+    const updates: any = { name: fullName, role, address, contact };
     if (password) {
       if (password !== rePassword) {
         toast.error("Passwords do not match");
@@ -132,7 +128,7 @@ const AdminManage = () => {
     setLoading(true);
     try {
       const res = await axiosInstance.put(
-        `/admin/users/${selectedUser.student_employee_id}`,
+        `/api/admin/users/${selectedUser.student_employee_id}`,
         updates
       );
       toast.success(res.data.message);
@@ -145,21 +141,53 @@ const AdminManage = () => {
     }
   };
 
-  const handleDeleteUser = async () => {
+  // Soft deactivate
+  const handleDeactivateUser = async () => {
     if (!selectedUser) return;
-    if (!confirm(`Are you sure you want to delete ${selectedUser.name}?`)) return;
+    if (!confirm(`Deactivate ${selectedUser.name}? They will no longer be able to log in.`)) return;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(
-        `/admin/users/${selectedUser.student_employee_id}`
+        `/api/admin/users/${selectedUser.student_employee_id}`
       );
       toast.success(res.data.message);
-      resetForm();
+      // Update the row in search results to reflect deactivated state
       setSearchResults((prev) =>
-        prev.filter((u) => u.student_employee_id !== selectedUser.student_employee_id)
+        prev.map((u) =>
+          u.student_employee_id === selectedUser.student_employee_id
+            ? { ...u, is_active: 0 }
+            : u
+        )
       );
+      resetForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Delete failed");
+      toast.error(err.response?.data?.message || err.message || "Deactivation failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reactivate a deactivated user
+  const handleReactivateUser = async () => {
+    if (!selectedUser) return;
+    if (!confirm(`Reactivate ${selectedUser.name}?`)) return;
+    setLoading(true);
+    try {
+      const res = await axiosInstance.put(
+        `/api/admin/users/${selectedUser.student_employee_id}`,
+        { is_active: 1 }
+      );
+      toast.success("User reactivated successfully");
+      setSearchResults((prev) =>
+        prev.map((u) =>
+          u.student_employee_id === selectedUser.student_employee_id
+            ? { ...u, is_active: 1 }
+            : u
+        )
+      );
+      resetForm();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Reactivation failed");
     } finally {
       setLoading(false);
     }
@@ -183,11 +211,11 @@ const AdminManage = () => {
       {/* Mode selector */}
       <div className="mt-4">
         <Label>Mode</Label>
-        <Select value={functionType} onValueChange={(v) => setFunctionType(v as any)}>
+        <Select value={functionType} onValueChange={(v) => { setFunctionType(v as any); resetForm(); }}>
           <SelectTrigger><SelectValue placeholder="Select mode" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="create">Create User</SelectItem>
-            <SelectItem value="edit">Edit / Search / Delete</SelectItem>
+            <SelectItem value="edit">Edit / Search / Deactivate</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -226,7 +254,7 @@ const AdminManage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -265,7 +293,7 @@ const AdminManage = () => {
         </form>
       )}
 
-      {/* Edit / Search / Delete */}
+      {/* Edit / Search / Deactivate */}
       {functionType === "edit" && (
         <>
           <div className="mt-6 flex gap-2">
@@ -281,14 +309,14 @@ const AdminManage = () => {
           </div>
 
           {searchResults.length > 0 && (
-            <div className="mt-4 overflow-x-auto rounded-lg border bg-card p-4">
+            <div className="mt-4 overflow-x-auto rounded-lg border bg-card">
               <table className="w-full text-left text-sm text-foreground">
-                <thead>
+                <thead className="border-b bg-muted/40">
                   <tr>
                     <th className="px-3 py-2">ID</th>
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Role</th>
-                    <th className="px-3 py-2">Active</th>
+                    <th className="px-3 py-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -300,8 +328,19 @@ const AdminManage = () => {
                     >
                       <td className="px-3 py-2">{u.student_employee_id}</td>
                       <td className="px-3 py-2">{u.name}</td>
-                      <td className="px-3 py-2">{u.role}</td>
-                      <td className="px-3 py-2">{u.is_active ? "Yes" : "No"}</td>
+                      <td className="px-3 py-2 capitalize">{u.role.replace("_", " ")}</td>
+                      <td className="px-3 py-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            u.is_active
+                              ? "bg-success/10 text-success border-success/20"
+                              : "bg-muted/50 text-muted-foreground border-border"
+                          }
+                        >
+                          {u.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -314,7 +353,22 @@ const AdminManage = () => {
               className="mt-6 space-y-4 rounded-lg border bg-card p-6"
               onSubmit={(e) => { e.preventDefault(); handleUpdateUser(); }}
             >
-              <h3 className="font-semibold text-foreground">Editing: {selectedUser.name}</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">
+                  Editing: {selectedUser.name}
+                </h3>
+                <Badge
+                  variant="outline"
+                  className={
+                    selectedUser.is_active
+                      ? "bg-success/10 text-success border-success/20"
+                      : "bg-muted/50 text-muted-foreground border-border"
+                  }
+                >
+                  {selectedUser.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+
               <div className="space-y-2">
                 <Label>Full Name</Label>
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
@@ -344,7 +398,7 @@ const AdminManage = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -373,18 +427,35 @@ const AdminManage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex gap-2">
+
+              <div className="flex gap-2 flex-wrap">
                 <Button type="submit" disabled={loading}>
                   {loading ? "Updating..." : "Update User"}
                 </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDeleteUser}
-                  disabled={loading}
-                >
-                  {loading ? "Deleting..." : "Delete User"}
-                </Button>
+
+                {selectedUser.is_active ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDeactivateUser}
+                    disabled={loading}
+                    className="gap-1.5"
+                  >
+                    <UserX className="h-4 w-4" />
+                    {loading ? "Deactivating..." : "Deactivate User"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleReactivateUser}
+                    disabled={loading}
+                    className="gap-1.5 border-success/40 text-success hover:bg-success/10"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {loading ? "Reactivating..." : "Reactivate User"}
+                  </Button>
+                )}
               </div>
             </form>
           )}

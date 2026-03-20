@@ -7,6 +7,7 @@ export type FormField = {
   options?: string[];
   required?: boolean;
   locked?: boolean;
+  public?: boolean;
   order: number;
 };
 
@@ -23,14 +24,14 @@ export type Book = {
 };
 
 export const DEFAULT_FIELDS: FormField[] = [
-  { key: "title",            label: "Book Title",       type: "text",   required: true, locked: true, order: 0 },
-  { key: "author",           label: "Author",           type: "text",   locked: true,   order: 1 },
-  { key: "isbn",             label: "ISBN",             type: "text",   locked: true,   order: 2 },
-  { key: "category",         label: "Category",         type: "select", locked: true,   order: 3,
+  { key: "title",            label: "Book Title",       type: "text",   required: true, locked: true, public: true, order: 0 },
+  { key: "author",           label: "Author",           type: "text",   locked: true,   public: true, order: 1 },
+  { key: "isbn",             label: "ISBN",             type: "text",   locked: true,   public: true, order: 2 },
+  { key: "category",         label: "Category",         type: "select", locked: true,   public: true, order: 3,
     options: ["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"] },
-  { key: "edition",          label: "Edition",          type: "text",   locked: true,   order: 4 },
-  { key: "publication_year", label: "Publication Year", type: "number", locked: true,   order: 5 },
-  { key: "copies",           label: "Copies",           type: "number", locked: true,   order: 6 },
+  { key: "edition",          label: "Edition",          type: "text",   locked: true,   public: true, order: 4 },
+  { key: "publication_year", label: "Publication Year", type: "number", locked: true,   public: true, order: 5 },
+  { key: "copies",           label: "Copies",           type: "number", locked: true,   public: true, order: 6 },
 ];
 
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [

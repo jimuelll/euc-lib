@@ -42,7 +42,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!validateRequired()) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.post("/admin/books", formValues);
+      const res = await axiosInstance.post("api/admin/books", formValues);
       toast.success(res.data.message);
       resetForm();
     } catch (err: any) {
@@ -54,7 +54,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!searchQuery.trim()) { toast.error("Enter a title, author, or ISBN"); return; }
     setLoading(true);
     try {
-      const res = await axiosInstance.get("/admin/books", { params: { query: searchQuery } });
+      const res = await axiosInstance.get("api/admin/books", { params: { query: searchQuery } });
       setSearchResults(res.data);
       if (!res.data.length) toast.info("No books found");
     } catch (err: any) {
@@ -66,7 +66,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!selectedBook || !validateRequired()) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.put(`/admin/books/${selectedBook.id}`, formValues);
+      const res = await axiosInstance.put(`api/admin/books/${selectedBook.id}`, formValues);
       toast.success(res.data.message);
       resetForm();
       setSearchResults([]);
@@ -80,7 +80,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!confirm(`Delete "${selectedBook.title}"?`)) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.delete(`/admin/books/${selectedBook.id}`);
+      const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
       toast.success(res.data.message);
       resetForm();
       setSearchResults((prev) => prev.filter((b) => b.id !== selectedBook.id));

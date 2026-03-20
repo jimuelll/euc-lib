@@ -17,7 +17,7 @@ const upsertSchema = async (fields) => {
     if (fields.length) {
       await conn.query(
         `INSERT INTO catalog_schema
-           (\`key\`, label, type, options, required, locked, \`order\`)
+           (\`key\`, label, type, options, required, locked, \`public\`, \`order\`)
          VALUES ?`,
         [
           fields.map((f) => [
@@ -27,6 +27,7 @@ const upsertSchema = async (fields) => {
             f.options ? JSON.stringify(f.options) : null,
             f.required ? 1 : 0,
             f.locked   ? 1 : 0,
+            f.public   ? 1 : 0,
             f.order,
           ]),
         ]
@@ -84,8 +85,32 @@ const dropColumnIfExists = async (key) => {
 
 // ─── Books CRUD ───────────────────────────────────────────────────────────────
 
-const searchBooks = async (query) => {
+const searchBooks = async (query, publicOnly = false) => {
   const like = `%${query}%`;
+
+  if (publicOnly) {
+    // Only return columns that are marked public in the schema
+    const schema = await getSchema();
+    const publicKeys = schema
+      .filter((f) => f.public)
+      .map((f) => f.key);
+
+    // Always include id so the frontend can key rows
+    const columns = ["id", ...publicKeys.filter((k) => k !== "id")];
+    const columnList = columns.map((c) => `\`${c}\``).join(", ");
+
+    const [rows] = await db.query(
+      `SELECT ${columnList} FROM books
+       WHERE title  LIKE ?
+          OR author LIKE ?
+          OR isbn   LIKE ?
+       ORDER BY title ASC
+       LIMIT 50`,
+      [like, like, like]
+    );
+    return rows;
+  }
+
   const [rows] = await db.query(
     `SELECT * FROM books
      WHERE title  LIKE ?
@@ -138,7 +163,6 @@ const updateBook = async (id, data) => {
   await db.query(`UPDATE books SET ${setClause} WHERE id = ?`, values);
 };
 
-// ← was missing entirely
 const deleteBook = async (id) => {
   await db.query("DELETE FROM books WHERE id = ?", [id]);
 };
