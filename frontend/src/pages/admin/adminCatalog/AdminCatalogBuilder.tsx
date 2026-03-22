@@ -37,7 +37,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const saveSchema = async (updated: FormField[]) => {
     setSaving(true);
     try {
-      await axiosInstance.put("/admin/catalog-schema", { fields: updated });
+      await axiosInstance.put("api/admin/catalog-schema", { fields: updated });
       toast.success("Schema saved");
       onFieldsChange(updated);
     } catch (err: any) {
