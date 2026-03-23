@@ -9,6 +9,7 @@ const adminRoutes       = require("./admin/admin.routes");
 const catalogRoutes     = require("./catalog/catalog.routes");
 const borrowingRoutes   = require("./borrowing/borrowing.routes");
 const reservationRoutes = require("./reservation/reservation.routes");
+const adminReservationRoutes = require("./reservation/adminReservation.routes");
 const circulationRoutes = require("./circulation/circulation.routes");
 
 const { authMiddleware }      = require("./auth/auth.middleware");
@@ -51,5 +52,6 @@ app.use("/api/admin",        catalogRoutes);
 app.use("/api/admin",        circulationRoutes);
 app.use("/api/borrowing",    borrowingRoutes);
 app.use("/api/reservations", reservationRoutes);
+app.use("/api/admin",        adminReservationRoutes);
 
 module.exports = app;

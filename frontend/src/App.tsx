@@ -29,6 +29,7 @@ import AdminHome           from "./pages/admin/AdminHome";
 import AdminManage         from "./pages/admin/AdminManage";
 import AdminCatalog        from "./pages/admin/adminCatalog/Index";
 import AdminCirculation    from "./pages/admin/adminCirculation/Index";
+import AdminReservations   from "./pages/admin/adminReservations/adminReservations";
 import AdminPayment        from "./pages/admin/AdminPayment";
 import AdminBackup         from "./pages/admin/AdminBackup";
 import AdminReport         from "./pages/admin/AdminReport";
@@ -99,7 +100,7 @@ const App = () => (
                   <Route path="internet"         element={<AdminInternet />} />
                   <Route path="clearance"        element={<AdminClearance />} />
                   <Route path="edit-homepage"    element={<AdminEditHomepage />} />
-                  <Route path="reservations"     element={<AdminHome />} />
+                  <Route path="reservations"     element={<AdminReservations />} />
                   <Route path="holidays"         element={<AdminManage />} />
                   <Route path="restrictions"     element={<AdminManage />} />
                   <Route path="bulletin"         element={<AdminEditHomepage />} />

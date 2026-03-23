@@ -16,7 +16,7 @@ const syncExpired = async () => {
   );
 };
 
-// ─── Reads ────────────────────────────────────────────────────────────────────
+// ─── User reads ───────────────────────────────────────────────────────────────
 
 const getActiveReservations = async (userId) => {
   await syncExpired();
@@ -78,7 +78,7 @@ const searchCatalogue = async (query) => {
   return rows;
 };
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
+// ─── User mutations ───────────────────────────────────────────────────────────
 
 /**
  * Create a reservation for a book.
@@ -163,11 +163,191 @@ const cancelReservation = async (reservationId, userId) => {
   }
 };
 
+// ─── Admin reads ──────────────────────────────────────────────────────────────
+
+/**
+ * Paginated list of all reservations across all users.
+ * Supports filtering by status and searching by book title, author,
+ * patron name, or student/employee ID.
+ */
+const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) => {
+  await syncExpired();
+
+  const offset     = (page - 1) * limit;
+  const conditions = [];
+  const params     = [];
+
+  if (status && status !== "all") {
+    conditions.push("r.status = ?");
+    params.push(status);
+  }
+
+  if (search?.trim()) {
+    conditions.push(`(
+      bk.title               LIKE ? OR
+      bk.author              LIKE ? OR
+      u.name                 LIKE ? OR
+      u.student_employee_id  LIKE ?
+    )`);
+    const like = `%${search.trim()}%`;
+    params.push(like, like, like, like);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const [[{ total }]] = await db.query(
+    `SELECT COUNT(*) AS total
+     FROM reservations r
+     JOIN books bk ON bk.id = r.book_id
+     JOIN users  u  ON u.id  = r.user_id
+     ${where}`,
+    params
+  );
+
+  const [rows] = await db.query(
+    `SELECT
+       r.id,
+       r.status,
+       r.reserved_at,
+       r.expires_at,
+       r.notes,
+       bk.title    AS book_title,
+       bk.author   AS book_author,
+       bk.location AS book_location,
+       u.name                AS user_name,
+       u.student_employee_id
+     FROM reservations r
+     JOIN books bk ON bk.id = r.book_id
+     JOIN users  u  ON u.id  = r.user_id
+     ${where}
+     ORDER BY r.reserved_at DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  return {
+    rows,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  };
+};
+
+// ─── Admin mutations ──────────────────────────────────────────────────────────
+
+/**
+ * Mark a pending reservation as ready for patron pickup.
+ */
+const markReservationReady = async (reservationId) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[row]] = await conn.query(
+      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      [reservationId]
+    );
+    if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
+    if (row.status !== "pending") {
+      throw Object.assign(
+        new Error("Only pending reservations can be marked ready"),
+        { status: 409 }
+      );
+    }
+
+    await conn.query(
+      "UPDATE reservations SET status = 'ready' WHERE id = ?",
+      [reservationId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+/**
+ * Fulfil a ready reservation — patron has collected the book.
+ */
+const fulfillReservation = async (reservationId) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[row]] = await conn.query(
+      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      [reservationId]
+    );
+    if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
+    if (row.status !== "ready") {
+      throw Object.assign(
+        new Error("Only ready reservations can be fulfilled"),
+        { status: 409 }
+      );
+    }
+
+    await conn.query(
+      "UPDATE reservations SET status = 'fulfilled', fulfilled_at = NOW() WHERE id = ?",
+      [reservationId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+/**
+ * Admin-side cancel — no ownership check.
+ */
+const cancelReservationAdmin = async (reservationId) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[row]] = await conn.query(
+      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      [reservationId]
+    );
+    if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
+    if (!["pending", "ready"].includes(row.status)) {
+      throw Object.assign(new Error("Reservation cannot be cancelled"), { status: 409 });
+    }
+
+    await conn.query(
+      "UPDATE reservations SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?",
+      [reservationId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
 module.exports = {
+  // helpers
   syncExpired,
+  // user reads
   getActiveReservations,
   getReservationHistory,
   searchCatalogue,
+  // user mutations
   reserveBook,
   cancelReservation,
+  // admin reads
+  getAdminReservations,
+  // admin mutations
+  markReservationReady,
+  fulfillReservation,
+  cancelReservationAdmin,
 };
