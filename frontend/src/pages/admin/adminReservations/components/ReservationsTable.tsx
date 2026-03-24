@@ -22,7 +22,7 @@ const ReservationsTable = ({
   <div className="rounded-lg border border-border overflow-hidden">
 
     {/* Column headers */}
-    <div className="hidden sm:grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2.5 bg-muted/40 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
+    <div className="hidden sm:grid grid-cols-[1fr_1fr_160px_180px] gap-4 px-4 py-2.5 bg-muted/40 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
       <span>Book</span>
       <span>Patron</span>
       <span>Status / Expiry</span>

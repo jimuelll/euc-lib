@@ -27,7 +27,7 @@ const ReservationRow = ({
 
   return (
     <div
-      className={`grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-x-4 gap-y-2 px-4 py-3.5 border-b last:border-0 border-border transition-colors hover:bg-muted/20 ${
+      className={`grid grid-cols-1 sm:grid-cols-[1fr_1fr_160px_180px] gap-x-4 gap-y-2 px-4 py-3.5 border-b last:border-0 border-border transition-colors hover:bg-muted/20 ${
         index % 2 !== 0 ? "bg-muted/10" : ""
       }`}
     >
