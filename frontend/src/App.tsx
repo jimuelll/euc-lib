@@ -14,7 +14,7 @@ import Index               from "./pages/homepage/Index";
 import About               from "./pages/homepage/About";
 import Services            from "./pages/homepage/Services";
 import Catalogue           from "./pages/homepage/Catalogue";
-import Bulletin            from "./pages/homepage/Bulletin";
+import Bulletin            from "./pages/homepage/bulletin/index";
 import Login               from "./pages/homepage/Login";
 import ChangePassword      from "./pages/homepage/ChangePassword";
 import NotFound            from "./pages/homepage/NotFound";
@@ -22,6 +22,7 @@ import LibraryServices     from "./pages/homepage/LibraryServices";
 import AcademicSubscriptions from "./pages/homepage/AcademicSubscriptions";
 import StudentDashboard    from "./pages/homepage/StudentDashboard";
 import EditProfile         from "./pages/homepage/EditProfile";
+
 
 // ─── Admin pages ──────────────────────────────────────────────────────────────
 import AdminLayout         from "./pages/admin/AdminLayout";
@@ -64,9 +65,7 @@ const App = () => (
                 <Route path="/bulletin"                element={<Bulletin />} />
                 <Route path="/login"                   element={<Login />} />
 
-                {/* Change password — auth required but bypasses must_change_password guard
-                    to avoid a redirect loop */}
-                <Route path="/change-password" element={<ChangePassword />} />
+                <Route path="/change-password"         element={<ChangePassword />} />
 
                 {/* ── Student ── */}
                 <Route path="/my-library" element={
