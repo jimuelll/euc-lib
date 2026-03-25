@@ -4,9 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ImagePlus, X, Loader2, AlertCircle, Pin } from "lucide-react";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useAuth } from "@/context/AuthContext";
@@ -25,17 +23,32 @@ interface FormState {
   is_pinned: boolean;
 }
 
-const MAX_EXCERPT = 200;
-const MAX_TITLE   = 120;
-const MAX_BYTES   = 5 * 1024 * 1024;
-const ACCEPTED    = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const CAN_PIN_ROLES = ["admin", "super_admin"];
+const MAX_EXCERPT    = 200;
+const MAX_TITLE      = 120;
+const MAX_BYTES      = 5 * 1024 * 1024;
+const ACCEPTED       = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const CAN_PIN_ROLES  = ["admin", "super_admin"];
 
 function validateImage(file: File | Blob): string | null {
   if (!ACCEPTED.includes(file.type)) return "Only JPEG, PNG, WebP, or GIF are allowed.";
   if (file.size > MAX_BYTES) return "Image must be 5 MB or smaller.";
   return null;
 }
+
+// ── Shared field label ────────────────────────────────────────────────────────
+const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
+  <label
+    className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+    style={{ fontFamily: "var(--font-heading)" }}
+  >
+    {children}
+    {required && <span className="text-destructive">*</span>}
+  </label>
+);
+
+// ── Shared input class ────────────────────────────────────────────────────────
+const inputBase =
+  "w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-0 transition-colors duration-150";
 
 export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalProps) {
   const { user } = useAuth();
@@ -139,91 +152,131 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const isBusy = uploading || submitting;
   const error  = submitError ?? uploadError;
 
-  const inputClass =
-    "w-full rounded-xl border border-border bg-muted/30 px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background focus:ring-2 focus:ring-primary/20 transition-all";
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="font-bold text-lg">New Bulletin Post</DialogTitle>
-        </DialogHeader>
+      <DialogContent
+        className="w-[calc(100vw-2rem)] max-w-lg max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
+        style={{ borderRadius: 0 }}
+      >
 
-        <div className="space-y-4 mt-1">
+        {/* ── Modal header band — same primary-band grammar ── */}
+        <div className="bg-primary relative overflow-hidden">
+          <div className="h-[3px] w-full bg-warning" />
+          <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
+          <div
+            className="absolute inset-0 opacity-[0.04] pointer-events-none"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+            }}
+          />
+          <div className="relative z-10 flex items-center justify-between px-5 py-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-px w-4 bg-warning shrink-0" />
+                <span
+                  className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Bulletin Board
+                </span>
+              </div>
+              <DialogHeader>
+                <DialogTitle
+                  className="text-base font-bold text-primary-foreground"
+                  style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em" }}
+                >
+                  New Post
+                </DialogTitle>
+              </DialogHeader>
+            </div>
+            <button
+              onClick={handleClose}
+              className="flex h-7 w-7 items-center justify-center text-primary-foreground/40 hover:text-primary-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Form body ── */}
+        <div className="divide-y divide-border">
 
           {/* Title */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-foreground">
-              Title <span className="text-destructive">*</span>
-            </label>
+          <div className="px-5 py-4">
+            <FieldLabel required>Title</FieldLabel>
             <input
               name="title"
               value={form.title}
               onChange={handleChange}
               maxLength={MAX_TITLE}
               placeholder="e.g. Library closed on April 5"
-              className={`${inputClass} h-10`}
+              className={`${inputBase} h-10`}
             />
-            <p className="mt-1 text-right text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-right text-[10px] text-muted-foreground/50 tabular-nums"
+              style={{ fontFamily: "var(--font-heading)" }}>
               {form.title.length}/{MAX_TITLE}
             </p>
           </div>
 
           {/* Excerpt */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-foreground">
-              Excerpt <span className="text-destructive">*</span>
-            </label>
+          <div className="px-5 py-4">
+            <FieldLabel required>Excerpt</FieldLabel>
             <textarea
               name="excerpt"
               value={form.excerpt}
               onChange={handleChange}
               maxLength={MAX_EXCERPT}
               rows={2}
-              placeholder="Short summary shown on cards…"
-              className={`${inputClass} py-2.5 resize-none`}
+              placeholder="Short summary shown on post cards…"
+              className={`${inputBase} py-2.5 resize-none`}
             />
-            <p className="mt-1 text-right text-[11px] text-muted-foreground">
+            <p className="mt-1.5 text-right text-[10px] text-muted-foreground/50 tabular-nums"
+              style={{ fontFamily: "var(--font-heading)" }}>
               {form.excerpt.length}/{MAX_EXCERPT}
             </p>
           </div>
 
-          {/* Content */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-foreground">
-              Full content <span className="text-destructive">*</span>
-            </label>
+          {/* Full content */}
+          <div className="px-5 py-4">
+            <FieldLabel required>Full Content</FieldLabel>
             <textarea
               name="content"
               value={form.content}
               onChange={handleChange}
               rows={6}
               placeholder="Full post body…"
-              className={`${inputClass} py-2.5 resize-none`}
+              className={`${inputBase} py-2.5 resize-none`}
             />
           </div>
 
           {/* Pin toggle — admins only */}
           {canPin && (
-            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <Pin className="h-4 w-4 text-muted-foreground" />
+            <div className="px-5 py-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Pin className="h-3.5 w-3.5 text-warning shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-foreground">Pin this post</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p
+                    className="text-[11px] font-bold uppercase tracking-[0.1em] text-foreground"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Pin this post
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     Pinned posts appear at the top of the board.
                   </p>
                 </div>
               </div>
+              {/* Toggle — sharp track, no rounded-full */}
               <button
                 type="button"
                 onClick={() => setForm((prev) => ({ ...prev, is_pinned: !prev.is_pinned }))}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
-                  form.is_pinned ? "bg-primary" : "bg-muted-foreground/30"
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                  form.is_pinned ? "bg-warning" : "bg-muted-foreground/25"
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
+                  className={`pointer-events-none inline-block h-4 w-4 bg-white shadow transform transition-transform duration-200 ${
                     form.is_pinned ? "translate-x-4" : "translate-x-0"
                   }`}
                 />
@@ -231,30 +284,35 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
             </div>
           )}
 
-          {/* Image */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-foreground">
-              Cover image{" "}
-              <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
+          {/* Cover image */}
+          <div className="px-5 py-4">
+            <FieldLabel>Cover Image <span className="normal-case font-normal text-muted-foreground tracking-normal">(optional)</span></FieldLabel>
 
             {previewSrc ? (
-              <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
+              <div className="relative overflow-hidden border border-border bg-muted/30">
                 <img
                   src={previewSrc}
                   alt="Preview"
                   className="w-full object-contain"
-                  style={{ maxHeight: "260px" }}
+                  style={{ maxHeight: "240px" }}
                 />
+                {/* Upload progress overlay */}
                 {uploading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-sm">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="text-xs font-medium">{progress}%</span>
-                    <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-primary transition-all duration-200"
-                        style={{ width: `${progress}%` }}
-                      />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        Uploading — {progress}%
+                      </span>
+                      <div className="h-[2px] w-32 bg-border overflow-hidden">
+                        <div
+                          className="h-full bg-warning transition-all duration-200"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -262,7 +320,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
                   <button
                     type="button"
                     onClick={clearImage}
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-black/60 text-white hover:bg-black/80 transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -272,13 +330,19 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-28 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 bg-muted/20 text-muted-foreground hover:border-primary/40 hover:bg-muted/40 transition-colors"
+                className="flex h-24 w-full flex-col items-center justify-center gap-2 border border-dashed border-border bg-muted/20 text-muted-foreground hover:border-primary/40 hover:bg-muted/40 transition-colors"
               >
-                <ImagePlus className="h-6 w-6" />
-                <span className="text-xs font-medium">Click to upload · or paste (Ctrl+V)</span>
-                <span className="text-xs opacity-50">JPEG, PNG, WebP · max 5 MB</span>
+                <ImagePlus className="h-5 w-5" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                  style={{ fontFamily: "var(--font-heading)" }}>
+                  Click to upload or paste (Ctrl+V)
+                </span>
+                <span className="text-[10px] text-muted-foreground/50">
+                  JPEG, PNG, WebP · max 5 MB
+                </span>
               </button>
             )}
+
             <input
               ref={fileInputRef}
               type="file"
@@ -288,34 +352,36 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
             />
           </div>
 
+          {/* Error */}
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              {error}
+            <div className="px-5 py-3 flex items-start gap-2.5 bg-destructive/[0.04] border-t border-destructive/20">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+              <p className="text-[11px] text-destructive leading-relaxed">{error}</p>
             </div>
           )}
         </div>
 
-        <DialogFooter className="mt-4 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl"
+        {/* ── Footer actions ── */}
+        <div className="flex border-t border-border">
+          <button
             onClick={handleClose}
             disabled={isBusy}
+            className="flex-1 h-11 flex items-center justify-center text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground border-r border-border hover:bg-secondary hover:text-foreground disabled:opacity-40 transition-colors"
+            style={{ fontFamily: "var(--font-heading)" }}
           >
             Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="rounded-xl"
+          </button>
+          <button
             onClick={handleSubmit}
             disabled={isBusy}
+            className="flex-1 h-11 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ fontFamily: "var(--font-heading)" }}
           >
-            {isBusy && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            {uploading ? "Uploading…" : submitting ? "Posting…" : "Publish post"}
-          </Button>
-        </DialogFooter>
+            {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {uploading ? "Uploading…" : submitting ? "Publishing…" : "Publish Post"}
+          </button>
+        </div>
+
       </DialogContent>
     </Dialog>
   );

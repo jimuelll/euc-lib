@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu, X, Bell, QrCode, LogOut, UserCog, LayoutDashboard, Baby, ChevronDown,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -12,8 +11,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 
 // ─── Nav links config ─────────────────────────────────────────────────────────
-// `matchPrefix: true` keeps the link highlighted for all child routes
-// e.g. /services/borrowing still highlights the "Services" link
 
 const navLinks = [
   { label: "Home",      to: "/",          matchPrefix: false },
@@ -32,11 +29,14 @@ const ROLES_WITH_ADMIN_PANEL = new Set(["admin", "super_admin", "staff"]);
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const AuthSkeleton = () => (
-  <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+  <div className="h-8 w-8 bg-primary/20 animate-pulse" />
 );
 
 const UserAvatar = ({ initials }: { initials: string }) => (
-  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">
+  <div
+    className="h-8 w-8 bg-primary-foreground/15 border border-primary-foreground/30 text-primary-foreground text-[11px] font-bold tracking-widest flex items-center justify-center"
+    style={{ fontFamily: "var(--font-heading)" }}
+  >
     {initials}
   </div>
 );
@@ -52,9 +52,24 @@ const Navbar = () => {
   const role       = user?.role ?? "guest";
   const isLoggedIn = !!user && !loading;
 
-  const showMyLibrary   = ROLES_WITH_MY_LIBRARY.has(role);
+  const showMyLibrary    = ROLES_WITH_MY_LIBRARY.has(role);
   const showScannerTools = ROLES_WITH_SCANNER.has(role);
-  const showAdminPanel  = ROLES_WITH_ADMIN_PANEL.has(role);
+  const showAdminPanel   = ROLES_WITH_ADMIN_PANEL.has(role);
+
+  // Close on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll while overlay is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
 
   const getInitials = () => {
     if (!user?.name) return "?";
@@ -66,7 +81,6 @@ const Navbar = () => {
 
   const isNavActive = (link: typeof navLinks[number]) => {
     if (!link.matchPrefix) return location.pathname === link.to;
-    // For home, only exact match to avoid matching everything
     if (link.to === "/") return location.pathname === "/";
     return location.pathname === link.to || location.pathname.startsWith(link.to + "/");
   };
@@ -74,90 +88,196 @@ const Navbar = () => {
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
-      <div className="container flex h-16 items-center justify-between gap-2">
+    <>
+      <header className="sticky top-0 z-50 bg-primary border-b border-primary-foreground/10">
+        {/* ── Gold rule ── */}
+        <div className="h-[3px] w-full bg-warning" />
 
-        {/* ── Logo ── */}
-        <Link
-          to="/"
-          className="flex shrink-0 items-center gap-2 font-heading text-lg font-semibold text-foreground"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary">
-            <img src="/aa1.ico" alt="Logo" className="h-5 w-5 object-contain" />
+        <div className="container flex h-14 items-center justify-between gap-2">
+
+          {/* ── Logo ── */}
+          <Link to="/" className="flex shrink-0 items-center gap-3 group">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center border"
+            style={{ background: "hsl(var(--sidebar-accent))", borderColor: "hsl(var(--sidebar-border))" }}>
+            <img
+              src="/aa1.ico"
+              alt="Logo"
+              className="h-8 w-8 object-contain opacity-90"
+            />
           </div>
-          <span className="whitespace-nowrap">EUC Library</span>
-        </Link>
-
-        {/* ── Desktop nav ── */}
-        <DesktopNav
-          links={navLinks}
-          isNavActive={isNavActive}
-          showMyLibrary={showMyLibrary}
-        />
-
-        {/* ── Right controls ── */}
-        <div className="flex items-center gap-1">
-          {showScannerTools && <ScannerTools />}
-
-          <ThemeToggle />
-
-          {loading ? (
-            <AuthSkeleton />
-          ) : isLoggedIn ? (
-            <>
-              <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5" />
-              </Button>
-
-              {/* Desktop avatar dropdown */}
-              <div className="hidden md:block">
-                <UserDropdown
-                  name={user?.name}
-                  role={role}
-                  initials={getInitials()}
-                  showAdminPanel={showAdminPanel}
-                  onNavigate={navigate}
-                  onLogout={logout}
-                />
-              </div>
-            </>
-          ) : (
-            <div className="hidden md:block">
-              <Link to="/login">
-                <Button size="sm">Login</Button>
-              </Link>
+            <div className="flex flex-col leading-none">
+              <span
+                className="text-primary-foreground text-[13px] font-bold tracking-[0.12em] uppercase"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                EUC Library
+              </span>
+              <span className="text-primary-foreground/50 text-[9px] tracking-[0.2em] uppercase">
+                Enverga-Candelaria Library
+              </span>
             </div>
-          )}
+          </Link>
 
-          {/* Burger */}
-          <button
-            className="md:hidden p-2 text-foreground"
-            onClick={() => setMobileOpen((o) => !o)}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          {/* ── Vertical separator ── */}
+          <div className="hidden md:block h-6 w-px bg-primary-foreground/15 mx-2" />
+
+          {/* ── Desktop nav ── */}
+          <DesktopNav links={navLinks} isNavActive={isNavActive} showMyLibrary={showMyLibrary} />
+
+          <div className="flex-1 hidden md:block" />
+
+          {/* ── Right controls ── */}
+          <div className="flex items-center gap-0.5">
+            {showScannerTools && <ScannerTools />}
+
+            <div className="text-primary-foreground/70 hover:text-primary-foreground transition-colors">
+              <ThemeToggle />
+            </div>
+
+            {loading ? (
+              <AuthSkeleton />
+            ) : isLoggedIn ? (
+              <>
+                <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                  <Bell className="h-4 w-4" />
+                </button>
+                <div className="hidden md:block ml-1">
+                  <UserDropdown
+                    name={user?.name}
+                    role={role}
+                    initials={getInitials()}
+                    showAdminPanel={showAdminPanel}
+                    onNavigate={navigate}
+                    onLogout={logout}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="hidden md:block ml-2">
+                <Link to="/login">
+                  <button
+                    className="px-4 py-1.5 text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Login
+                  </button>
+                </Link>
+              </div>
+            )}
+
+            {/* Burger */}
+            <button
+              className="md:hidden p-2 text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+              onClick={() => setMobileOpen((o) => !o)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* ── Mobile nav ── */}
+      {/* ── Mobile overlay — rendered outside header so it doesn't shift layout ── */}
       {mobileOpen && (
-        <MobileNav
-          links={navLinks}
-          isNavActive={isNavActive}
-          isLoggedIn={isLoggedIn}
-          loading={loading}
-          user={user}
-          role={role}
-          initials={getInitials()}
-          showMyLibrary={showMyLibrary}
-          showAdminPanel={showAdminPanel}
-          onNavigate={navigate}
-          onLogout={logout}
-          onClose={closeMobile}
-        />
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={closeMobile}
+            aria-hidden="true"
+          />
+
+          {/* Drawer — slides in from top, positioned just below the sticky header */}
+          <nav
+            className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 bg-primary border-b border-primary-foreground/10 shadow-xl md:hidden overflow-y-auto"
+            style={{ maxHeight: "calc(100dvh - 3px - 3.5rem)" }}
+          >
+            {/* User identity band */}
+            {isLoggedIn && (
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-primary-foreground/10 bg-primary-foreground/5">
+                <div
+                  className="h-8 w-8 border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground text-[11px] font-bold tracking-widest flex shrink-0 items-center justify-center"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {getInitials()}
+                </div>
+                <div>
+                  <p
+                    className="text-[12px] font-bold tracking-[0.08em] text-primary-foreground"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {user?.name}
+                  </p>
+                  <p className="text-[10px] text-primary-foreground/50 tracking-[0.15em] uppercase">{role}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Nav links */}
+            <div className="py-1">
+              {navLinks.map((link) => (
+                <MobileNavLink
+                  key={link.to}
+                  to={link.to}
+                  active={isNavActive(link)}
+                  onClick={closeMobile}
+                >
+                  {link.label}
+                </MobileNavLink>
+              ))}
+              {showMyLibrary && (
+                <MobileNavLink to="/my-library" onClick={closeMobile} gold>
+                  My Library
+                </MobileNavLink>
+              )}
+            </div>
+
+            {/* Logged-in actions */}
+            {isLoggedIn && (
+              <>
+                <div className="h-px bg-primary-foreground/10 my-1" />
+                {showAdminPanel && (
+                  <MobileActionButton
+                    icon={LayoutDashboard}
+                    onClick={() => { navigate("/admin"); closeMobile(); }}
+                  >
+                    Admin Dashboard
+                  </MobileActionButton>
+                )}
+                <MobileActionButton
+                  icon={UserCog}
+                  onClick={() => { navigate("/edit-profile"); closeMobile(); }}
+                >
+                  Edit Profile
+                </MobileActionButton>
+                <div className="h-px bg-primary-foreground/10 my-1" />
+                <MobileActionButton
+                  icon={LogOut}
+                  onClick={() => { logout(); closeMobile(); }}
+                  destructive
+                >
+                  Logout
+                </MobileActionButton>
+              </>
+            )}
+
+            {!loading && !isLoggedIn && (
+              <div className="px-4 pt-2 pb-3">
+                <Link to="/login" onClick={closeMobile}>
+                  <button
+                    className="w-full py-2.5 text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Login
+                  </button>
+                </Link>
+              </div>
+            )}
+          </nav>
+        </>
       )}
-    </header>
+    </>
   );
 };
 
@@ -172,31 +292,29 @@ const DesktopNav = ({
   isNavActive: (link: typeof navLinks[number]) => boolean;
   showMyLibrary: boolean;
 }) => (
-  <nav className="hidden items-center gap-6 md:flex">
+  <nav className="hidden items-center md:flex">
     {links.map((link) => {
       const active = isNavActive(link);
       return (
         <Link
           key={link.to}
           to={link.to}
-          className={`relative text-sm font-medium transition-colors ${
-            active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          className={`relative px-4 h-14 flex items-center text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-b-2 ${
+            active
+              ? "text-primary-foreground border-warning"
+              : "text-primary-foreground/55 hover:text-primary-foreground/90 border-transparent hover:border-primary-foreground/20"
           }`}
+          style={{ fontFamily: "var(--font-heading)" }}
         >
           {link.label}
-          <span
-            className={`absolute -bottom-1 left-0 h-[2px] w-full bg-primary transition-opacity ${
-              active ? "opacity-100" : "opacity-0"
-            }`}
-          />
         </Link>
       );
     })}
-
     {showMyLibrary && (
       <Link
         to="/my-library"
-        className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className="relative px-4 h-14 flex items-center text-[11px] font-bold tracking-[0.14em] uppercase text-warning/90 hover:text-warning border-b-2 border-transparent hover:border-warning/50 transition-colors"
+        style={{ fontFamily: "var(--font-heading)" }}
       >
         My Library
       </Link>
@@ -204,15 +322,10 @@ const DesktopNav = ({
   </nav>
 );
 
-// ─── User dropdown (desktop) ──────────────────────────────────────────────────
+// ─── User dropdown ────────────────────────────────────────────────────────────
 
 const UserDropdown = ({
-  name,
-  role,
-  initials,
-  showAdminPanel,
-  onNavigate,
-  onLogout,
+  name, role, initials, showAdminPanel, onNavigate, onLogout,
 }: {
   name?: string;
   role: string;
@@ -223,31 +336,36 @@ const UserDropdown = ({
 }) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <button className="flex items-center gap-1 rounded-full pl-1 pr-2 py-1 hover:bg-accent transition-colors">
+      <button className="flex items-center gap-2 px-2 py-1.5 hover:bg-primary-foreground/10 transition-colors">
         <UserAvatar initials={initials} />
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <ChevronDown className="h-3 w-3 text-primary-foreground/40" />
       </button>
     </DropdownMenuTrigger>
-
-    <DropdownMenuContent align="end">
-      <div className="px-3 py-2">
-        <p className="text-sm font-medium text-foreground">{name}</p>
-        <p className="text-xs text-muted-foreground capitalize">{role}</p>
+    <DropdownMenuContent align="end" className="rounded-none border-border/60 shadow-lg min-w-[200px]">
+      <div className="px-3 py-2.5 bg-primary border-b border-border/30">
+        <p
+          className="text-[12px] font-bold tracking-[0.1em] uppercase text-primary-foreground"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          {name}
+        </p>
+        <p className="text-[10px] text-primary-foreground/55 tracking-[0.15em] uppercase mt-0.5">{role}</p>
+      </div>
+      <div className="py-1">
+        {showAdminPanel && (
+          <DropdownMenuItem onClick={() => onNavigate("/admin")} className="rounded-none text-[12px] tracking-wide">
+            <LayoutDashboard className="mr-2.5 h-3.5 w-3.5" />
+            Admin Dashboard
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onNavigate("/edit-profile")} className="rounded-none text-[12px] tracking-wide">
+          <UserCog className="mr-2.5 h-3.5 w-3.5" />
+          Edit Profile
+        </DropdownMenuItem>
       </div>
       <DropdownMenuSeparator />
-      {showAdminPanel && (
-        <DropdownMenuItem onClick={() => onNavigate("/admin")}>
-          <LayoutDashboard className="mr-2 h-4 w-4" />
-          Admin Dashboard
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem onClick={() => onNavigate("/edit-profile")}>
-        <UserCog className="mr-2 h-4 w-4" />
-        Edit Profile
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={onLogout} className="text-destructive focus:text-destructive">
-        <LogOut className="mr-2 h-4 w-4" />
+      <DropdownMenuItem onClick={onLogout} className="rounded-none text-[12px] tracking-wide text-destructive focus:text-destructive">
+        <LogOut className="mr-2.5 h-3.5 w-3.5" />
         Logout
       </DropdownMenuItem>
     </DropdownMenuContent>
@@ -258,148 +376,44 @@ const UserDropdown = ({
 
 const ScannerTools = () => (
   <>
-    <Button variant="ghost" size="icon">
-      <QrCode className="h-5 w-5" />
-    </Button>
-    <Button variant="ghost" size="icon">
-      <Baby className="h-5 w-5" />
-    </Button>
+    <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+      <QrCode className="h-4 w-4" />
+    </button>
+    <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+      <Baby className="h-4 w-4" />
+    </button>
   </>
-);
-
-// ─── Mobile nav ───────────────────────────────────────────────────────────────
-
-const MobileNav = ({
-  links,
-  isNavActive,
-  isLoggedIn,
-  loading,
-  user,
-  role,
-  initials,
-  showMyLibrary,
-  showAdminPanel,
-  onNavigate,
-  onLogout,
-  onClose,
-}: {
-  links: typeof navLinks;
-  isNavActive: (link: typeof navLinks[number]) => boolean;
-  isLoggedIn: boolean;
-  loading: boolean;
-  user: { name?: string } | null;
-  role: string;
-  initials: string;
-  showMyLibrary: boolean;
-  showAdminPanel: boolean;
-  onNavigate: (path: string) => void;
-  onLogout: () => void;
-  onClose: () => void;
-}) => (
-  <nav className="border-t bg-background px-4 pb-4 md:hidden">
-
-    {/* User info */}
-    {isLoggedIn && (
-      <>
-        <div className="flex items-center gap-3 px-3 py-3">
-          <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex shrink-0 items-center justify-center">
-            {initials}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">{user?.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{role}</p>
-          </div>
-        </div>
-        <Divider />
-      </>
-    )}
-
-    {/* Nav links */}
-    {links.map((link) => (
-      <MobileNavLink
-        key={link.to}
-        to={link.to}
-        active={isNavActive(link)}
-        onClick={onClose}
-      >
-        {link.label}
-      </MobileNavLink>
-    ))}
-
-    {showMyLibrary && (
-      <MobileNavLink to="/my-library" onClick={onClose}>
-        My Library
-      </MobileNavLink>
-    )}
-
-    {/* Logged-in actions */}
-    {isLoggedIn && (
-      <>
-        <Divider />
-        {showAdminPanel && (
-          <MobileActionButton
-            icon={LayoutDashboard}
-            onClick={() => { onNavigate("/admin"); onClose(); }}
-          >
-            Admin Dashboard
-          </MobileActionButton>
-        )}
-        <MobileActionButton
-          icon={UserCog}
-          onClick={() => { onNavigate("/edit-profile"); onClose(); }}
-        >
-          Edit Profile
-        </MobileActionButton>
-        <Divider />
-        <MobileActionButton
-          icon={LogOut}
-          onClick={() => { onLogout(); onClose(); }}
-          destructive
-        >
-          Logout
-        </MobileActionButton>
-      </>
-    )}
-
-    {!loading && !isLoggedIn && (
-      <Link to="/login" onClick={onClose}>
-        <Button size="sm" className="mt-2 w-full">Login</Button>
-      </Link>
-    )}
-  </nav>
 );
 
 // ─── Mobile primitives ────────────────────────────────────────────────────────
 
-const Divider = () => <div className="my-1 h-px bg-border" />;
-
 const MobileNavLink = ({
-  to,
-  active,
-  onClick,
-  children,
+  to, active, gold, onClick, children,
 }: {
   to: string;
   active?: boolean;
+  gold?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) => (
   <Link
     to={to}
     onClick={onClick}
-    className={`block rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent ${
-      active ? "text-primary" : "text-muted-foreground"
+    className={`flex items-center px-4 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
+      active
+        ? "border-warning text-primary-foreground bg-primary-foreground/[0.08]"
+        : gold
+          ? "border-transparent text-warning/80 hover:text-warning hover:border-warning/50"
+          : "border-transparent text-primary-foreground/55 hover:text-primary-foreground/90 hover:bg-primary-foreground/5"
     }`}
+    style={{ fontFamily: "var(--font-heading)" }}
   >
     {children}
   </Link>
 );
 
 const MobileActionButton = ({
-  icon: Icon,
-  onClick,
-  destructive,
-  children,
+  icon: Icon, onClick, destructive, children,
 }: {
   icon: React.ElementType;
   onClick: () => void;
@@ -408,11 +422,14 @@ const MobileActionButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`flex w-full items-center rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent ${
-      destructive ? "text-destructive" : "text-muted-foreground"
+    className={`flex w-full items-center px-4 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 border-transparent hover:bg-primary-foreground/5 ${
+      destructive
+        ? "text-destructive-foreground/70 hover:border-destructive"
+        : "text-primary-foreground/55 hover:text-primary-foreground/90"
     }`}
+    style={{ fontFamily: "var(--font-heading)" }}
   >
-    <Icon className="mr-2 h-4 w-4" />
+    <Icon className="mr-3 h-3.5 w-3.5" />
     {children}
   </button>
 );

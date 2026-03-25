@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Heart, MessageCircle, Send, Loader2,
   Trash2, Download, X, ZoomIn, Pin, PinOff,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
 import { getInitials, formatDate } from "../utils";
@@ -24,6 +25,19 @@ interface PostModalProps {
 const CAN_DELETE_ROLES = ["admin", "super_admin"];
 const CAN_PIN_ROLES    = ["admin", "super_admin"];
 
+// ── Section label — same as page header grammar ───────────────────────────────
+const ModalSectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex items-center gap-3">
+    <div className="h-px w-4 bg-warning shrink-0" />
+    <span
+      className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </span>
+  </div>
+);
+
 export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinToggle }: PostModalProps) {
   const { user } = useAuth();
 
@@ -31,8 +45,8 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
   const [likeCount, setLikeCount] = useState(0);
   const [likeBusy, setLikeBusy]   = useState(false);
 
-  const [pinned, setPinned]     = useState(false);
-  const [pinBusy, setPinBusy]   = useState(false);
+  const [pinned, setPinned]   = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
 
   const [comments, setComments]               = useState<BulletinComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -140,9 +154,8 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
     } catch { window.open(post.image_url, "_blank"); }
   };
 
-  // ── Fixed zoom: stop outer-div close from swallowing image clicks ──
   const handleLightboxImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    e.stopPropagation(); // prevent backdrop close
+    e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width)  * 100;
     const yPct = ((e.clientY - rect.top)  / rect.height) * 100;
@@ -159,28 +172,116 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
   return (
     <>
       <Dialog open={!!post} onOpenChange={onClose}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 rounded-2xl border-border/60 shadow-2xl">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
+          style={{ borderRadius: 0 }}
+        >
 
+          {/* ── Header band ── */}
+          <div className="bg-primary relative overflow-hidden shrink-0">
+            <div className="h-[3px] w-full bg-warning" />
+            <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
+            <div
+              className="absolute inset-0 opacity-[0.04] pointer-events-none"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+              }}
+            />
+            <div className="relative z-10 flex items-start justify-between gap-4 px-5 py-4">
+              <div className="flex-1 min-w-0">
+                <ModalSectionLabel>Bulletin Board</ModalSectionLabel>
+
+                <DialogHeader className="mt-2">
+                  <DialogTitle
+                    className="text-base sm:text-lg font-bold leading-snug text-primary-foreground pr-4"
+                    style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em" }}
+                  >
+                    {post.title}
+                  </DialogTitle>
+                </DialogHeader>
+
+                {/* Author row */}
+                <div className="mt-3 flex items-center gap-2.5">
+                  <div
+                    className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary-foreground/15 border border-primary-foreground/25 text-primary-foreground text-[9px] font-bold"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {getInitials(post.author_name)}
+                  </div>
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.08em] text-primary-foreground/70"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {post.author_name}
+                  </span>
+                  <span className="text-[10px] text-primary-foreground/40">{post.date}</span>
+
+                  {/* Pinned badge */}
+                  {pinned && (
+                    <span
+                      className="ml-1 flex items-center gap-1 bg-warning px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      <Pin className="h-2.5 w-2.5" /> Pinned
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Header controls */}
+              <div className="flex items-center gap-1 shrink-0">
+                {canPin && (
+                  <button
+                    onClick={handlePin}
+                    disabled={pinBusy}
+                    title={pinned ? "Unpin post" : "Pin post"}
+                    className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-warning hover:bg-primary-foreground/10 transition-colors"
+                  >
+                    {pinBusy
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : pinned
+                        ? <PinOff className="h-3.5 w-3.5" />
+                        : <Pin className="h-3.5 w-3.5" />
+                    }
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Cover image ── */}
           {post.image_url && (
             <div
-              className="group relative w-full bg-muted cursor-zoom-in overflow-hidden"
+              className="group relative w-full bg-muted cursor-zoom-in overflow-hidden border-b border-border shrink-0"
               onClick={() => setLightboxOpen(true)}
             >
               <img
                 src={post.image_url.replace("/upload/", "/upload/q_auto,f_auto/")}
                 alt={post.title}
                 className="w-full object-contain"
-                style={{ maxHeight: "52vh" }}
+                style={{ maxHeight: "48vh" }}
                 loading="eager"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-              <div className="absolute inset-x-0 bottom-3 flex items-center justify-between px-3.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <span className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm">
-                  <ZoomIn className="h-3 w-3" /> Click to expand
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <span
+                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  <ZoomIn className="h-3 w-3" /> Expand
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDownload(); }}
-                  className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-black/70 transition-colors"
+                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white hover:bg-black/80 transition-colors"
+                  style={{ fontFamily: "var(--font-heading)" }}
                 >
                   <Download className="h-3 w-3" /> Download
                 </button>
@@ -188,111 +289,109 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
             </div>
           )}
 
-          <div className="flex flex-col gap-0">
+          {/* ── Body content ── */}
+          <div className="divide-y divide-border">
 
-            {/* Author + title */}
-            <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-border/40">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary ring-2 ring-primary/20">
-                  {getInitials(post.author_name)}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground leading-tight">{post.author_name}</p>
-                  <p className="text-xs text-muted-foreground">{post.date}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {pinned && (
-                    <span className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
-                      <Pin className="h-2.5 w-2.5" /> Pinned
-                    </span>
-                  )}
-                  {canPin && (
-                    <button
-                      onClick={handlePin}
-                      disabled={pinBusy}
-                      title={pinned ? "Unpin post" : "Pin post"}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-colors"
-                    >
-                      {pinBusy
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : pinned
-                          ? <PinOff className="h-3.5 w-3.5" />
-                          : <Pin className="h-3.5 w-3.5" />
-                      }
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <DialogHeader className="hidden">
-                <DialogTitle>{post.title}</DialogTitle>
-              </DialogHeader>
-
-              <h3 className="text-lg sm:text-xl font-bold text-foreground leading-snug">{post.title}</h3>
-            </div>
-
-            {/* Content */}
-            <div className="px-5 sm:px-6 py-4 border-b border-border/40">
-              <p className="text-sm sm:text-[15px] text-muted-foreground leading-relaxed whitespace-pre-line">
+            {/* Post content */}
+            <div className="px-5 sm:px-6 py-5">
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {post.content}
               </p>
             </div>
 
-            {/* Like / comment row */}
-            <div className="flex items-center gap-5 px-5 sm:px-6 py-3.5 border-b border-border/40 bg-muted/20">
+            {/* Engagement row */}
+            <div className="flex items-stretch border-b border-border">
+              {/* Like */}
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
-                className={`flex items-center gap-2 text-sm font-medium transition-colors rounded-lg px-3 py-1.5 hover:bg-muted active:scale-95 ${
-                  liked ? "text-rose-500" : "text-muted-foreground hover:text-foreground"
+                className={`flex flex-1 items-center justify-center gap-2.5 py-3 border-r border-border text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                  liked
+                    ? "bg-primary/[0.04] text-primary"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
+                style={{ fontFamily: "var(--font-heading)" }}
               >
-                <Heart className={`h-4 w-4 transition-all duration-200 ${liked ? "fill-rose-500 scale-110" : ""}`} />
+                <Heart className={`h-3.5 w-3.5 transition-all duration-150 ${liked ? "fill-current" : ""}`} />
                 <span>{likeCount}</span>
-                <span className="text-xs font-normal opacity-70">{liked ? "Liked" : "Like"}</span>
+                <span className="opacity-70">{liked ? "Liked" : "Like"}</span>
               </button>
-              <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MessageCircle className="h-4 w-4" />
+
+              {/* Comment count */}
+              <div
+                className="flex flex-1 items-center justify-center gap-2.5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
                 <span>{comments.length}</span>
-                <span className="text-xs opacity-70">Comments</span>
-              </span>
+                <span className="opacity-70">Comments</span>
+              </div>
             </div>
 
-            {/* Comments */}
-            <div className="px-5 sm:px-6 pt-4 pb-2 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Comments</h4>
+            {/* Comments section */}
+            <div className="px-5 sm:px-6 pt-5 pb-3">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px w-4 bg-border shrink-0" />
+                <span
+                  className="text-[9px] font-bold uppercase tracking-[0.28em] text-muted-foreground"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Comments
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
               {commentsLoading && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading comments…
+                <div className="flex items-center gap-2 py-3 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                    style={{ fontFamily: "var(--font-heading)" }}>
+                    Loading…
+                  </span>
                 </div>
               )}
+
               {!commentsLoading && comments.length === 0 && (
-                <p className="text-xs text-muted-foreground py-1">No comments yet. Be the first to leave one!</p>
+                <p className="py-2 text-[11px] text-muted-foreground/60">
+                  No comments yet. Be the first to leave one.
+                </p>
               )}
-              <div className="space-y-2.5">
+
+              {/* Comment list */}
+              <div className="space-y-0 divide-y divide-border border border-border">
                 {!commentsLoading && comments.map((c) => (
-                  <div key={c.id} className="flex gap-3 group/comment">
-                    <Avatar className="h-8 w-8 shrink-0 mt-0.5">
-                      <AvatarFallback className="bg-primary/10 text-primary text-[9px] font-bold">
+                  <div key={c.id} className="flex gap-0 group/comment hover:bg-secondary/30 transition-colors">
+                    {/* Left column */}
+                    <div className="w-10 shrink-0 flex flex-col items-center pt-3 border-r border-border gap-2">
+                      <div
+                        className="flex h-5 w-5 shrink-0 items-center justify-center bg-primary text-primary-foreground text-[8px] font-bold"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
                         {getInitials(c.author)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 rounded-xl bg-muted/50 px-3.5 py-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="text-[12px] font-semibold text-foreground">{c.author}</span>
-                          <span className="ml-2 text-[11px] text-muted-foreground">{c.date}</span>
+                      </div>
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 px-3.5 py-3">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-baseline gap-2">
+                          <span
+                            className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            {c.author}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">{c.date}</span>
                         </div>
                         {canDelete(c) && (
                           <button
                             onClick={() => handleDeleteComment(c.id)}
-                            className="hidden group-hover/comment:flex shrink-0 text-muted-foreground/50 hover:text-destructive transition-colors mt-0.5"
+                            className="hidden group-hover/comment:flex shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3 w-3" />
                           </button>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-foreground leading-relaxed">{c.text}</p>
+                      <p className="text-sm text-foreground/80 leading-relaxed">{c.text}</p>
                     </div>
                   </div>
                 ))}
@@ -300,46 +399,59 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
             </div>
 
             {/* Comment input */}
-            <div className="px-5 sm:px-6 pb-5 pt-3 space-y-2.5">
+            <div className="px-5 sm:px-6 py-4 space-y-3">
               {commentError && (
-                <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{commentError}</p>
+                <div className="flex gap-0">
+                  <div className="w-[3px] bg-destructive shrink-0" />
+                  <p className="px-3 py-2 text-[11px] text-destructive bg-destructive/[0.04]">{commentError}</p>
+                </div>
               )}
-              <p className="text-[11px] text-muted-foreground/60">
-                ⚠️ Comments are subject to school community guidelines.
+
+              <p
+                className="text-[10px] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
+              >
+                Comments are subject to school community guidelines.
               </p>
-              <div className="flex items-center gap-2.5">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="bg-muted text-muted-foreground text-[9px] font-bold">
+
+              <div className="flex gap-0 border border-border">
+                {/* Avatar cell */}
+                <div className="w-10 shrink-0 flex items-center justify-center border-r border-border bg-muted/30">
+                  <div
+                    className="flex h-5 w-5 items-center justify-center bg-primary text-primary-foreground text-[8px] font-bold"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
                     {user?.name ? getInitials(user.name) : "ME"}
-                  </AvatarFallback>
-                </Avatar>
+                  </div>
+                </div>
+                {/* Input */}
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleComment(); } }}
                   placeholder="Write a comment…"
                   maxLength={1000}
-                  className="h-10 flex-1 min-w-0 rounded-full border border-border bg-muted/40 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="flex-1 min-w-0 h-11 px-3.5 text-sm text-foreground bg-background outline-none placeholder:text-muted-foreground/40 focus:ring-0 border-0"
                 />
-                <Button
-                  size="icon"
-                  className="h-10 w-10 rounded-full shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground"
+                {/* Send button */}
+                <button
                   disabled={!commentText.trim() || commenting}
                   onClick={handleComment}
+                  className="w-11 h-11 flex items-center justify-center shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-border"
                 >
-                  {commenting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+                  {commenting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                </button>
               </div>
             </div>
-
           </div>
+
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox — backdrop closes only when not zoomed, image click zooms */}
+      {/* ── Lightbox ── */}
       {lightboxOpen && post.image_url && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-md"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95"
           onClick={() => { if (zoom === 1) setLightboxOpen(false); }}
         >
           <img
@@ -347,7 +459,7 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
             src={post.image_url.replace("/upload/", "/upload/q_auto,f_auto/")}
             alt={post.title}
             onClick={handleLightboxImageClick}
-            className="max-h-[90dvh] max-w-[92vw] rounded-xl object-contain shadow-2xl select-none"
+            className="max-h-[90dvh] max-w-[92vw] object-contain select-none"
             style={{
               cursor: zoom > 1 ? "zoom-out" : "zoom-in",
               transform: `scale(${zoom})`,
@@ -358,21 +470,21 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
           />
 
           <div
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-4 py-2 text-xs text-white/70 backdrop-blur-sm pointer-events-none transition-opacity duration-300"
-            style={{ opacity: zoom > 1 ? 0 : 1 }}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 px-4 py-2 text-[10px] text-white/60 pointer-events-none transition-opacity duration-300"
+            style={{ opacity: zoom > 1 ? 0 : 1, fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
           >
-            Click image to zoom · Click background to close
+            CLICK IMAGE TO ZOOM · CLICK BACKDROP TO CLOSE
           </div>
 
           <button
             onClick={() => setLightboxOpen(false)}
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 transition-colors z-10"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
           >
             <X className="h-4 w-4" />
           </button>
           <button
             onClick={handleDownload}
-            className="absolute right-4 top-16 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 transition-colors z-10"
+            className="absolute right-4 top-14 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
             title="Download full resolution"
           >
             <Download className="h-4 w-4" />

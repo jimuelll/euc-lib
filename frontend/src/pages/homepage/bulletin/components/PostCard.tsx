@@ -10,10 +10,11 @@ interface PostCardProps {
 }
 
 export const cardVariants = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 16 },
   visible: {
-    opacity: 1, y: 0,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const },
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
   },
 };
 
@@ -23,76 +24,119 @@ export function PostCard({ post, onClick, variant = "grid" }: PostCardProps) {
   return (
     <motion.button
       variants={cardVariants}
-      whileTap={{ scale: 0.985 }}
       onClick={onClick}
-      className={`group relative flex w-full text-left overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-        isList
-          ? "flex-row rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300"
-          : "flex-col rounded-2xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300"
-      }`}
+      className={`group relative flex w-full text-left bg-card border-b border-border transition-colors duration-150 hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${
+        isList ? "flex-row" : "flex-col"
+      } ${post.is_pinned ? "border-l-[3px] border-l-warning" : ""}`}
     >
-      {post.is_pinned && (
-        <span className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground shadow-sm">
-          <Pin className="h-2.5 w-2.5" /> Pinned
-        </span>
-      )}
-
+      {/* Image panel */}
       <div
         className={`relative overflow-hidden bg-muted/50 shrink-0 ${
-          isList ? "w-40 sm:w-52 md:w-60" : "w-full"
+          isList
+            ? "w-36 sm:w-48 md:w-56"
+            : "w-full"
         }`}
-        style={isList ? { minHeight: "160px" } : { aspectRatio: "16/10" }}
+        style={isList ? { minHeight: "140px" } : { aspectRatio: "16/9" }}
       >
         {post.image_url ? (
           <img
             src={post.image_url}
             alt={post.title}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <BookOpen className="h-8 w-8 text-muted-foreground/30" />
+          <div className="flex h-full w-full items-center justify-center min-h-[140px]">
+            <BookOpen className="h-6 w-6 text-muted-foreground/20" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+        {/* Pinned stamp — top-left corner tab */}
+        {post.is_pinned && (
+          <div
+            className="absolute top-0 left-0 flex items-center gap-1 bg-warning px-2 py-1"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            <Pin className="h-2.5 w-2.5 text-foreground/80" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80">
+              Pinned
+            </span>
+          </div>
+        )}
       </div>
 
+      {/* Content panel */}
       <div className={`flex flex-1 flex-col min-w-0 ${isList ? "p-4 sm:p-5" : "p-4"}`}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary ring-1 ring-primary/20">
+
+        {/* Author row */}
+        <div className="flex items-center gap-2.5 mb-3">
+          {/* Square avatar — no circles */}
+          <div
+            className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary text-primary-foreground text-[9px] font-bold"
+            style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.04em" }}
+          >
             {getInitials(post.author_name)}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[12px] font-semibold text-foreground leading-tight">{post.author_name}</p>
-            <p className="text-[11px] text-muted-foreground leading-tight">{post.date}</p>
+          </div>
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span
+              className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 truncate"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {post.author_name}
+            </span>
+            <span className="text-[10px] text-muted-foreground shrink-0">{post.date}</span>
           </div>
         </div>
 
-        <p className={`font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 ${
-          isList ? "text-base sm:text-lg" : "text-[13px] sm:text-sm"
-        }`}>
+        {/* Title */}
+        <p
+          className={`font-bold leading-snug text-foreground group-hover:text-primary transition-colors ${
+            isList ? "text-sm sm:text-base" : "text-sm"
+          }`}
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
           {post.title}
         </p>
 
+        {/* Excerpt — list only */}
         {isList && (
-          <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2 leading-relaxed">{post.excerpt}</p>
+          <p className="mt-2 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+            {post.excerpt}
+          </p>
         )}
 
-        <div className="mt-auto pt-3">
-          <div className="h-px w-full bg-border/40 mb-3" />
-          <div className="flex items-center gap-3">
-            <span className={`flex items-center gap-1.5 text-[12px] font-medium transition-colors ${
-              post.liked_by_me ? "text-rose-500" : "text-muted-foreground"
-            }`}>
-              <Heart className={`h-3.5 w-3.5 transition-all duration-200 ${post.liked_by_me ? "fill-rose-500 scale-110" : ""}`} />
-              {post.likes}
-            </span>
-            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <MessageCircle className="h-3.5 w-3.5" />
-              {post.comment_count}
-            </span>
-          </div>
+        {/* Footer — stats */}
+        <div className="mt-auto pt-3 border-t border-border/50 flex items-center gap-4">
+          <span
+            className={`flex items-center gap-1.5 text-[11px] font-bold transition-colors ${
+              post.liked_by_me ? "text-primary" : "text-muted-foreground"
+            }`}
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {/* Square filled dot instead of heart icon */}
+            <span
+              className={`inline-block w-[5px] h-[5px] shrink-0 transition-colors ${
+                post.liked_by_me ? "bg-warning" : "bg-border"
+              }`}
+            />
+            {post.likes}
+          </span>
+
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            <MessageCircle className="h-3 w-3" />
+            {post.comment_count}
+          </span>
+
+          {/* Read arrow — appears on hover */}
+          <span
+            className="ml-auto text-[10px] font-bold uppercase tracking-[0.15em] text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Read →
+          </span>
         </div>
       </div>
     </motion.button>

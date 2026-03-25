@@ -7,101 +7,110 @@
     --font-heading: "Manrope", system-ui, sans-serif;
     --font-body: "Inter", system-ui, sans-serif;
 
-    --background: 0 0% 98%;
-    --foreground: 0 0% 10%;
+    /* Parchment white — breathing room, not decoration */
+    --background: 36 20% 97%;
+    --foreground: 10 30% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card: 36 15% 99%;
+    --card-foreground: 10 30% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover: 36 15% 99%;
+    --popover-foreground: 10 30% 10%;
 
-    --primary: 0 100% 22%;
-    --primary-foreground: 0 0% 100%;
+    /* Crimson-maroon — the dominant structural field */
+    --primary: 348 72% 24%;
+    --primary-foreground: 36 30% 97%;
 
-    --secondary: 0 8% 93%;
-    --secondary-foreground: 0 0% 15%;
+    /* Warm muted clay — secondary surfaces */
+    --secondary: 18 15% 91%;
+    --secondary-foreground: 10 20% 18%;
 
-    --muted: 0 4% 93%;
-    --muted-foreground: 0 0% 40%;
+    --muted: 24 10% 90%;
+    --muted-foreground: 10 10% 42%;
 
-    --accent: 0 6% 90%;
-    --accent-foreground: 0 0% 10%;
+    /* Subtle warm tone for accents */
+    --accent: 30 12% 88%;
+    --accent-foreground: 10 25% 12%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 4 70% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 60% 36%;
+    --success: 158 52% 32%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 36 60% 41%;
+    /* Gold — restrained, articulating, like brass on mahogany */
+    --warning: 42 78% 38%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 216 60% 34%;
+    --info: 214 52% 32%;
     --info-foreground: 0 0% 100%;
 
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 0 100% 22%;
+    --border: 24 12% 84%;
+    --input: 24 12% 84%;
+    --ring: 348 72% 24%;
 
-    --radius: 0.625rem;
+    /* Slightly tighter radius — rectilinear authority */
+    --radius: 0.25rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 0 0% 26%;
-    --sidebar-primary: 0 100% 22%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 4% 93%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 0 100% 22%;
+    --sidebar-background: 348 30% 18%;
+    --sidebar-foreground: 36 25% 88%;
+    --sidebar-primary: 42 78% 48%;
+    --sidebar-primary-foreground: 10 30% 10%;
+    --sidebar-accent: 348 25% 24%;
+    --sidebar-accent-foreground: 36 20% 92%;
+    --sidebar-border: 348 20% 28%;
+    --sidebar-ring: 42 78% 48%;
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 96%;
+    /* Deep laterite — not black, but earthen dark */
+    --background: 10 18% 8%;
+    --foreground: 36 20% 93%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 96%;
+    --card: 10 15% 13%;
+    --card-foreground: 36 20% 93%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 10 15% 13%;
+    --popover-foreground: 36 20% 93%;
 
-    --primary: 0 100% 22%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary holds — maroon is sovereign in both modes */
+    --primary: 348 65% 36%;
+    --primary-foreground: 36 25% 97%;
 
-    --secondary: 0 0% 21%;
-    --secondary-foreground: 0 0% 96%;
+    --secondary: 10 12% 22%;
+    --secondary-foreground: 36 15% 90%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 52%;
+    --muted: 10 10% 17%;
+    --muted-foreground: 24 8% 54%;
 
-    --accent: 0 0% 21%;
-    --accent-foreground: 0 0% 96%;
+    --accent: 10 12% 22%;
+    --accent-foreground: 36 15% 90%;
 
-    --destructive: 0 65% 37%;
+    --destructive: 4 60% 40%;
     --destructive-foreground: 0 0% 98%;
 
-    --success: 160 52% 48%;
+    --success: 158 45% 44%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 36 54% 50%;
-    --warning-foreground: 0 0% 100%;
+    /* Gold glows warmer against dark laterite */
+    --warning: 42 72% 52%;
+    --warning-foreground: 10 30% 10%;
 
-    --info: 216 53% 53%;
+    --info: 214 48% 50%;
     --info-foreground: 0 0% 100%;
 
-    --border: 0 0% 21%;
-    --input: 0 0% 21%;
-    --ring: 0 100% 22%;
+    --border: 10 12% 22%;
+    --input: 10 12% 22%;
+    --ring: 348 65% 36%;
 
-    --sidebar-background: 0 0% 7%;
-    --sidebar-foreground: 0 0% 80%;
-    --sidebar-primary: 0 100% 22%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 96%;
-    --sidebar-border: 0 0% 21%;
-    --sidebar-ring: 0 100% 22%;
+    --sidebar-background: 10 20% 6%;
+    --sidebar-foreground: 36 20% 78%;
+    --sidebar-primary: 42 72% 52%;
+    --sidebar-primary-foreground: 10 30% 10%;
+    --sidebar-accent: 10 15% 14%;
+    --sidebar-accent-foreground: 36 15% 90%;
+    --sidebar-border: 10 15% 18%;
+    --sidebar-ring: 42 72% 52%;
   }
 }
 

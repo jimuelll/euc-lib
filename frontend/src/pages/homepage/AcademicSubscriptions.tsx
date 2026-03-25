@@ -1,7 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Globe, ExternalLink, BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const subscriptions = [
   {
@@ -58,68 +57,147 @@ const AcademicSubscriptions = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
       <main className="py-16">
-        <div className="container max-w-4xl">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Globe className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="font-heading text-2xl font-bold text-foreground">Academic Subscriptions</h1>
-              <p className="text-sm text-muted-foreground">
-                Access scholarly databases and digital resources
-              </p>
+        <div className="container max-w-4xl px-4 sm:px-6">
+
+          {/* ── Page header band ──────────────────────────────────────────── */}
+          <div className="bg-primary relative overflow-hidden">
+            <div className="h-[3px] w-full bg-warning" />
+            <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
+            <div
+              className="absolute inset-0 opacity-[0.04] pointer-events-none"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+              }}
+            />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-black/30" />
+
+            <div className="relative z-10 px-6 sm:px-8 py-7">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px w-4 bg-warning shrink-0" />
+                <span
+                  className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Enverga-Candelaria Library
+                </span>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <Globe className="h-5 w-5 text-primary-foreground/40 shrink-0 mt-1" />
+                <div>
+                  <h1
+                    className="text-xl font-bold text-primary-foreground leading-tight"
+                    style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em" }}
+                  >
+                    Academic Subscriptions
+                  </h1>
+                  <p className="mt-1.5 text-[12px] text-primary-foreground/45 leading-relaxed max-w-xl">
+                    Full access to the following databases is available 24/7 with your student credentials.
+                    Click any resource to visit the platform.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <p className="mt-6 text-sm text-muted-foreground leading-relaxed max-w-2xl">
-            Full access to the following academic databases is available 24/7 with your student credentials. Click on any resource to visit the platform.
-          </p>
+          {/* ── Subscription count label ──────────────────────────────────── */}
+          <div className="border border-border border-t-0 px-6 sm:px-8 py-3 bg-muted/30 flex items-center justify-between">
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {subscriptions.length} Active Databases
+            </span>
+            <div className="h-px flex-1 mx-4 bg-border" />
+            <span
+              className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              24/7 Access
+            </span>
+          </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {subscriptions.map((sub) => (
+          {/* ── Grid of subscription cards ────────────────────────────────── */}
+          <div className="border border-border border-t-0 grid sm:grid-cols-2 divide-y divide-border sm:divide-x sm:divide-y-0 sm:[&>*:nth-child(n+3)]:border-t sm:[&>*:nth-child(n+3)]:border-border">
+            {subscriptions.map((sub, index) => (
               <a
                 key={sub.id}
                 href={sub.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group rounded-lg border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-sm"
+                className="group relative bg-card hover:bg-muted/20 transition-colors flex flex-col gap-0 overflow-hidden"
               >
-                {/* Placeholder image */}
-                <div className="flex h-28 items-center justify-center rounded-md bg-muted mb-4">
-                  <BookOpen className="h-8 w-8 text-muted-foreground/40" />
+                {/* Gold left accent on hover */}
+                <div className="absolute left-0 inset-y-0 w-[3px] bg-transparent group-hover:bg-warning transition-colors" />
+
+                {/* Placeholder thumbnail area */}
+                <div className="relative flex items-center justify-center h-24 bg-muted/40 border-b border-border overflow-hidden">
+                  {/* Index number — ghosted monumental */}
+                  <span
+                    className="absolute right-3 bottom-1 text-[48px] font-bold text-foreground/[0.04] select-none leading-none"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                    aria-hidden="true"
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <BookOpen className="h-7 w-7 text-muted-foreground/20 relative z-10" />
                 </div>
 
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="font-heading text-base font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                      {sub.title}
-                    </h2>
-                    <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {sub.category}
-                    </span>
+                {/* Card body */}
+                <div className="flex-1 px-5 pt-4 pb-5">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <h2
+                        className="text-[13px] font-bold text-foreground group-hover:text-primary transition-colors truncate leading-tight"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {sub.title}
+                      </h2>
+                      {/* Category — sharp rectangular pill */}
+                      <span
+                        className="mt-1.5 inline-block border border-border bg-muted px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {sub.category}
+                      </span>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-primary transition-colors mt-0.5" />
                   </div>
-                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors mt-1" />
-                </div>
 
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground line-clamp-3">
-                  {sub.description}
-                </p>
+                  <p className="text-[12px] leading-relaxed text-muted-foreground line-clamp-3">
+                    {sub.description}
+                  </p>
 
-                <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  Visit Platform <ExternalLink className="h-3 w-3" />
+                  {/* Visit label — appears on hover */}
+                  <div className="mt-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="h-px w-3 bg-warning" />
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      Visit Platform
+                    </span>
+                    <ExternalLink className="h-2.5 w-2.5 text-primary" />
+                  </div>
                 </div>
               </a>
             ))}
           </div>
 
-          <div className="mt-10 rounded-lg border border-dashed bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
+          {/* ── Footer notice ─────────────────────────────────────────────── */}
+          <div className="mt-0 border border-border border-t-0 border-dashed bg-card px-6 py-4 flex items-center gap-3">
+            <div className="h-px w-4 bg-border shrink-0" />
+            <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
               This list is managed by the library administration and will be updated as new subscriptions are added.
             </p>
           </div>
+
         </div>
       </main>
+
       <Footer />
     </div>
   );

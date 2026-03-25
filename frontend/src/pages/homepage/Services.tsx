@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, GraduationCap, Lock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 
 const services = [
@@ -25,71 +24,137 @@ const services = [
   },
 ];
 
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex items-center gap-3 mb-6">
+    <div className="h-px w-6 bg-warning shrink-0" />
+    <p
+      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </p>
+  </div>
+);
+
 const Services = () => {
   const { isLoggedIn } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="py-16">
-        <div className="container max-w-3xl">
-          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+
+      {/* ── Page header band ── */}
+      <div className="bg-primary relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        <div className="relative z-10 h-[3px] w-full bg-warning" />
+        <div
+          className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+          }}
+        />
+        <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
+        <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
+
+        <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-px w-6 bg-warning shrink-0" />
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Enverga-Candelaria Library
+            </span>
+          </div>
+          <h1
+            className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight text-primary-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
             Library Services
           </h1>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-primary-foreground/50 max-w-lg leading-relaxed">
             Explore the services we offer to support your academic journey.
           </p>
+        </div>
+      </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2">
-            {services.map((s) => {
-              const Icon = s.icon;
-              const needsAuth = s.requiresLogin && !isLoggedIn;
-              const href = needsAuth ? "/login" : (s.link ?? "/");
+      <main className="bg-background">
+        <div className="border-b border-border">
+          <div className="container px-4 sm:px-6">
+            <div
+              className="border-l border-t border-border"
+              style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))" }}
+            >
+              {services.map((s, index) => {
+                const Icon = s.icon;
+                const needsAuth = s.requiresLogin && !isLoggedIn;
+                const href = needsAuth ? "/login" : (s.link ?? "/");
 
-              return (
-                <div
-                  key={s.title}
-                  className="flex flex-col rounded-xl border bg-card p-6 gap-4"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <Icon className="h-5 w-5 text-primary" />
+                return (
+                  <div
+                    key={s.title}
+                    className="border-r border-b border-border bg-background flex flex-col"
+                    style={{ padding: "3rem 3.5rem" }}
+                  >
+                    <div className="flex items-start justify-between mb-8">
+                      <div className="flex h-11 w-11 items-center justify-center bg-primary border border-primary/20 shrink-0">
+                        <Icon className="h-4 w-4 text-primary-foreground" />
+                      </div>
+                      <span
+                        className="text-[10px] font-bold tracking-[0.2em] text-border"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 border-t border-border pt-7">
+                      <SectionLabel>{s.requiresLogin ? "Requires Login" : "Open Access"}</SectionLabel>
+                      <h2 className="text-xl font-bold tracking-tight text-foreground mb-4" style={{ fontFamily: "var(--font-heading)" }}>
+                        {s.title}
+                      </h2>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                      {s.note && <p className="mt-3 text-xs text-muted-foreground/60 italic">{s.note}</p>}
+                    </div>
+
+                    <div className="border-t border-border mt-8 pt-6">
+                      <Link to={href}>
+                        <button
+                          className="group flex w-full items-center justify-between px-5 py-3.5 border text-xs font-bold uppercase tracking-[0.15em] transition-colors duration-150"
+                          style={{
+                            fontFamily: "var(--font-heading)",
+                            ...(needsAuth
+                              ? { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))", backgroundColor: "transparent" }
+                              : { borderColor: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", backgroundColor: "hsl(var(--primary))" }),
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = needsAuth
+                              ? "hsl(var(--secondary))"
+                              : "hsl(var(--primary) / 0.85)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = needsAuth
+                              ? "transparent"
+                              : "hsl(var(--primary))";
+                          }}
+                        >
+                          <span>{needsAuth ? "Login to Access" : "View Service"}</span>
+                          {needsAuth
+                            ? <Lock className="h-3.5 w-3.5" />
+                            : <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+                          }
+                        </button>
+                      </Link>
+                    </div>
                   </div>
-
-                  <div className="flex-1">
-                    <h2 className="font-heading text-lg font-semibold text-foreground">
-                      {s.title}
-                    </h2>
-                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                      {s.description}
-                    </p>
-                    {s.note && (
-                      <p className="mt-2 text-xs text-muted-foreground/60 italic">
-                        {s.note}
-                      </p>
-                    )}
-                  </div>
-
-                  <Link to={href} className="mt-auto">
-                    <Button size="sm" variant="outline" className="gap-1.5 w-full justify-center">
-                      {needsAuth ? (
-                        <>
-                          <Lock className="h-3.5 w-3.5" />
-                          Login to Access
-                        </>
-                      ) : (
-                        <>
-                          View Service
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </>
-                      )}
-                    </Button>
-                  </Link>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </main>
+
       <Footer />
     </div>
   );

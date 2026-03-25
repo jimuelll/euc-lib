@@ -13,8 +13,6 @@ import {
 import { NavLink } from "@/components/NavLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -28,43 +26,43 @@ const sidebarSections: SidebarSection[] = [
   {
     label: "Library Management",
     items: [
-      { title: "Home", url: "/admin", icon: Home },
-      { title: "Catalog", url: "/admin/catalog", icon: BookCopy },
-      { title: "Circulation", url: "/admin/circulation", icon: ArrowLeftRight },
+      { title: "Home",         url: "/admin",              icon: Home         },
+      { title: "Catalog",      url: "/admin/catalog",      icon: BookCopy     },
+      { title: "Circulation",  url: "/admin/circulation",  icon: ArrowLeftRight },
       { title: "Reservations", url: "/admin/reservations", icon: CalendarDays },
     ],
   },
   {
     label: "Administration",
     items: [
-      { title: "User Management", url: "/admin/manage", icon: ShieldCheck },
-      { title: "Holidays", url: "/admin/holidays", icon: CalendarOff },
-      { title: "Restrictions", url: "/admin/restrictions", icon: ShieldAlert },
-      { title: "Clearance", url: "/admin/clearance", icon: ClipboardCheck },
+      { title: "User Management", url: "/admin/manage",       icon: ShieldCheck  },
+      { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff  },
+      { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert  },
+      { title: "Clearance",       url: "/admin/clearance",    icon: ClipboardCheck },
     ],
   },
   {
     label: "Content Management",
     items: [
-      { title: "Bulletin Posts", url: "/admin/bulletin", icon: FileText },
-      { title: "Edit Homepage", url: "/admin/edit-homepage", icon: PenSquare },
-      { title: "Subscriptions", url: "/admin/subscriptions", icon: GraduationCap },
+      { title: "Bulletin Posts", url: "/admin/bulletin",       icon: FileText     },
+      { title: "Edit Homepage",  url: "/admin/edit-homepage",  icon: PenSquare    },
+      { title: "Subscriptions",  url: "/admin/subscriptions",  icon: GraduationCap },
     ],
   },
   {
     label: "Reports",
     items: [
-      { title: "Circulation Report", url: "/admin/report", icon: FileBarChart },
-      { title: "Attendance Report", url: "/admin/attendance", icon: Clock },
+      { title: "Circulation Report", url: "/admin/report",      icon: FileBarChart },
+      { title: "Attendance Report",  url: "/admin/attendance",  icon: Clock        },
     ],
   },
   {
     label: "System",
     items: [
-      { title: "Payment", url: "/admin/payment", icon: CreditCard },
-      { title: "Backup", url: "/admin/backup", icon: DatabaseBackup },
-      { title: "Internet Access", url: "/admin/internet", icon: Wifi },
-      { title: "Query Tools", url: "/admin/query", icon: HelpCircle },
+      { title: "Payment",         url: "/admin/payment",   icon: CreditCard    },
+      { title: "Backup",          url: "/admin/backup",    icon: DatabaseBackup },
+      { title: "Internet Access", url: "/admin/internet",  icon: Wifi          },
+      { title: "Query Tools",     url: "/admin/query",     icon: HelpCircle    },
     ],
   },
 ];
@@ -78,83 +76,169 @@ function getInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/* ─────────────────────────── sidebar ─────────────────────────── */
 function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { user, logout } = useAuth();
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar
+      collapsible="icon"
+      className="border-r-0"
+      style={{ background: "hsl(var(--sidebar-background))" }}
+    >
+      {/* ── Brand header ────────────────────────────────────────────── */}
+      <SidebarHeader className="p-0">
+        {/* Gold top bar */}
+        <div className="h-[3px] w-full" style={{ background: "hsl(var(--sidebar-primary))" }} />
 
-      {/* ── Brand header ── */}
-      <SidebarHeader className="px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-            <Library className="h-4 w-4" />
+        <div className={cn("flex items-center gap-3 px-4 py-4", collapsed && "justify-center px-3")}>
+          {/* Brand mark */}
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center border"
+            style={{
+              background: "hsl(var(--primary) / 0.18)",
+              borderColor: "hsl(var(--primary) / 0.35)",
+            }}
+          >
+            <Library className="h-4 w-4" style={{ color: "hsl(var(--primary-foreground))" }} />
           </div>
+
           {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-foreground tracking-tight leading-none">
+            <div className="flex flex-col min-w-0">
+              <span
+                className="text-[11px] font-bold uppercase tracking-[0.18em] leading-none truncate"
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
+              >
                 Admin Dashboard
               </span>
-              <span className="text-[10px] text-muted-foreground mt-0.5 tracking-wide">
+              <span
+                className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em]"
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
+              >
                 Library System
               </span>
             </div>
           )}
         </div>
+
+        {/* Separator rule */}
+        <div className="h-px mx-0" style={{ background: "hsl(var(--sidebar-border))" }} />
+
+        {/* ── Profile card ──────────────────────────────────────────── */}
+        {!collapsed ? (
+          <div className="px-4 py-4 flex items-center gap-3">
+            <Avatar className="h-9 w-9 shrink-0 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
+              <AvatarFallback
+                className="text-[11px] font-bold"
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  background: "hsl(var(--sidebar-primary) / 0.15)",
+                  color: "hsl(var(--sidebar-primary))",
+                }}
+              >
+                {getInitials(user?.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p
+                className="text-[12px] font-bold truncate leading-tight"
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
+              >
+                {user?.name ?? "Administrator"}
+              </p>
+              <p
+                className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] capitalize"
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
+              >
+                {user?.role?.replace("_", " ") ?? "Administrator"}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center py-3">
+            <Avatar className="h-7 w-7 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
+              <AvatarFallback
+                className="text-[10px] font-bold"
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  background: "hsl(var(--sidebar-primary) / 0.15)",
+                  color: "hsl(var(--sidebar-primary))",
+                }}
+              >
+                {getInitials(user?.name)}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        )}
+
+        <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
       </SidebarHeader>
 
-      <Separator />
-
-      {/* ── Profile card — sits just below brand, above nav ── */}
-      {!collapsed && (
-        <div className="px-4 py-4 flex flex-col items-center text-center gap-2">
-          <Avatar className="h-14 w-14 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
-            <AvatarFallback className="bg-primary/10 text-primary text-base font-bold">
-              {getInitials(user?.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-sm font-semibold text-foreground leading-tight">
-              Hello, {user?.name?.split(" ")[0] ?? "Admin"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-              {user?.role?.replace("_", " ") ?? "Administrator"}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!collapsed && <Separator />}
-
-      {/* ── Nav ── */}
-      <SidebarContent className="px-2 py-2">
+      {/* ── Nav ─────────────────────────────────────────────────────── */}
+      <SidebarContent className="px-0 py-2">
         {sidebarSections.map((section, sectionIndex) => (
           <SidebarGroup key={section.label} className="p-0">
-            {sectionIndex > 0 && !collapsed && (
-              <div className="mx-2 my-1.5 h-px bg-border/50" />
+
+            {/* Section divider between groups */}
+            {sectionIndex > 0 && (
+              <div
+                className="mx-3 my-1"
+                style={{ height: "1px", background: "hsl(var(--sidebar-border))" }}
+              />
             )}
 
             {!collapsed ? (
-              <Collapsible defaultOpen={true}>
-                <CollapsibleTrigger className="group flex w-full items-center justify-between px-2 py-1.5 rounded-sm text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground hover:bg-accent/30 transition-colors">
-                  {section.label}
-                  <ChevronDown className="h-3 w-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              <Collapsible defaultOpen>
+                {/* Section label trigger */}
+                <CollapsibleTrigger
+                  className="group flex w-full items-center justify-between px-4 py-2 transition-colors"
+                  style={{ color: "hsl(var(--sidebar-foreground) / 0.35)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-px w-2 shrink-0"
+                      style={{ background: "hsl(var(--sidebar-primary) / 0.5)" }}
+                    />
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-[0.25em]"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {section.label}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className="h-3 w-3 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                  />
                 </CollapsibleTrigger>
+
                 <CollapsibleContent>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {section.items.map((item) => (
-                        <SidebarMenuItem key={item.title}>
+                        <SidebarMenuItem key={item.title} className="px-2">
                           <SidebarMenuButton asChild>
                             <NavLink
                               to={item.url}
                               end={item.url === "/admin"}
-                              className="hover:bg-accent/50"
-                              activeClassName="bg-primary/10 text-primary font-medium"
+                              className={cn(
+                                "flex items-center gap-2.5 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors",
+                              )}
+                              style={({ isActive }: { isActive: boolean }) => ({
+                                fontFamily: "var(--font-heading)",
+                                color: isActive
+                                  ? "hsl(var(--sidebar-primary))"
+                                  : "hsl(var(--sidebar-foreground) / 0.65)",
+                                background: isActive
+                                  ? "hsl(var(--sidebar-primary) / 0.12)"
+                                  : "transparent",
+                                borderLeft: isActive
+                                  ? "2px solid hsl(var(--sidebar-primary))"
+                                  : "2px solid transparent",
+                              })}
                             >
-                              <item.icon className="mr-2 h-4 w-4" />
+                              <item.icon className="h-3.5 w-3.5 shrink-0" />
                               <span>{item.title}</span>
                             </NavLink>
                           </SidebarMenuButton>
@@ -165,19 +249,27 @@ function AdminSidebar() {
                 </CollapsibleContent>
               </Collapsible>
             ) : (
+              /* Collapsed — icons only */
               <SidebarGroupContent>
                 <SidebarMenu>
                   {section.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
+                    <SidebarMenuItem key={item.title} className="px-1.5">
                       <SidebarMenuButton asChild>
                         <NavLink
                           to={item.url}
                           end={item.url === "/admin"}
                           title={item.title}
-                          className="hover:bg-accent/50"
-                          activeClassName="bg-primary/10 text-primary font-medium"
+                          className="flex items-center justify-center py-2 transition-colors"
+                          style={({ isActive }: { isActive: boolean }) => ({
+                            color: isActive
+                              ? "hsl(var(--sidebar-primary))"
+                              : "hsl(var(--sidebar-foreground) / 0.5)",
+                            background: isActive
+                              ? "hsl(var(--sidebar-primary) / 0.12)"
+                              : "transparent",
+                          })}
                         >
-                          <item.icon className="mr-2 h-4 w-4" />
+                          <item.icon className="h-4 w-4 shrink-0" />
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -189,39 +281,32 @@ function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      {/* ── Footer — logout only, no duplicate user card ── */}
-      <SidebarFooter className="p-3">
-        <Separator className="mb-3" />
+      {/* ── Footer — logout ──────────────────────────────────────────── */}
+      <SidebarFooter className="p-0">
+        <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
 
-        {/* Collapsed state: show avatar so user knows who's logged in */}
-        {collapsed && (
-          <div className="flex justify-center mb-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                {getInitials(user?.name)}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full gap-2 text-muted-foreground hover:text-foreground",
-                  collapsed ? "justify-center" : "justify-start"
-                )}
-                onClick={logout}
-              >
-                <LogOut className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>Logout</span>}
-              </Button>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className={cn("p-3", collapsed && "flex justify-center")}>
+          <button
+            onClick={logout}
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors",
+              collapsed ? "justify-center" : "w-full"
+            )}
+            style={{
+              fontFamily: "var(--font-heading)",
+              color: "hsl(var(--sidebar-foreground) / 0.4)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "hsl(var(--destructive))";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-foreground) / 0.4)";
+            }}
+          >
+            <LogOut className="h-3.5 w-3.5 shrink-0" />
+            {!collapsed && <span>Logout</span>}
+          </button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
@@ -240,49 +325,78 @@ export const AdminLayout = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar />
+
         <div className="flex-1 flex flex-col min-w-0">
 
-          {/* ── Topbar ── */}
-          <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/80 backdrop-blur-md px-4">
+          {/* ── Topbar ──────────────────────────────────────────────── */}
+          <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/90 backdrop-blur-md px-4">
+
+            {/* Left — trigger + breadcrumb */}
             <div className="flex items-center gap-3">
-              <SidebarTrigger />
-              <div className="h-5 w-px bg-border" />
-              <h1 className="font-heading text-sm font-semibold text-foreground">
-                {current?.title ?? "Admin"}
-              </h1>
+              <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
+
+              <div className="h-4 w-px bg-border" />
+
+              {/* Section label */}
+              {current && (
+                <div className="flex items-center gap-2">
+                  <div className="h-px w-3 bg-warning shrink-0" />
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hidden sm:block"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {
+                      sidebarSections.find((s) =>
+                        s.items.some((i) => i.url === current.url)
+                      )?.label
+                    }
+                  </span>
+                  <span className="text-muted-foreground/30 hidden sm:block text-xs">/</span>
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {current.title}
+                  </span>
+                </div>
+              )}
             </div>
 
+            {/* Right — actions */}
             <div className="flex items-center gap-1">
+
               {/* View public site */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground gap-1.5"
-                asChild
+              <a
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 h-8 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-colors"
+                style={{ fontFamily: "var(--font-heading)" }}
               >
-                <a href="/" target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">View Site</span>
-                </a>
-              </Button>
+                <ExternalLink className="h-3 w-3" />
+                <span className="hidden sm:inline">View Site</span>
+              </a>
 
               <div className="h-4 w-px bg-border mx-0.5" />
 
-              {/* Notification bell with unread badge */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
+              {/* Notification bell */}
+              <button
+                className="relative flex items-center justify-center h-8 w-8 text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Notifications"
               >
-                <Bell className="h-4 w-4" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
-              </Button>
+                <Bell className="h-3.5 w-3.5" />
+                {/* Unread dot — gold, not destructive, maintains institutional warmth */}
+                <span
+                  className="absolute top-1.5 right-1.5 h-1.5 w-1.5 ring-2 ring-background"
+                  style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
+                />
+              </button>
 
               <ThemeToggle />
             </div>
           </header>
 
+          {/* ── Page content ────────────────────────────────────────── */}
           <main className="flex-1 p-6">
             <Outlet />
           </main>

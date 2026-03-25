@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ChevronLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { PostCard, cardVariants } from "./components/PostCard";
@@ -15,9 +14,22 @@ import type { BulletinPost } from "./types";
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
 
+// ── Shared section-label primitive ───────────────────────────────────────────
+const SectionLabel = ({ children, light = false }: { children: React.ReactNode; light?: boolean }) => (
+  <div className="flex items-center gap-3">
+    <div className={`h-px w-6 shrink-0 ${light ? "bg-warning" : "bg-warning"}`} />
+    <span
+      className={`text-[10px] font-bold uppercase tracking-[0.28em] ${light ? "text-warning" : "text-warning"}`}
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </span>
+  </div>
+);
+
 export function BulletinPage() {
   const { user } = useAuth();
-  const canPost  = CAN_POST_ROLES.includes(user?.role ?? "");
+  const canPost = CAN_POST_ROLES.includes(user?.role ?? "");
 
   const {
     posts, loading, error, currentPage, totalPages,
@@ -25,7 +37,7 @@ export function BulletinPage() {
   } = useBulletinPosts({ limit: POSTS_PER_PAGE });
 
   const [selectedPost, setSelectedPost] = useState<BulletinPost | null>(null);
-  const [showCreate, setShowCreate]     = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const handleLikeToggle = useCallback((postId: number, liked: boolean, total: number) => {
     updatePost(postId, { liked_by_me: liked, likes: total });
@@ -50,90 +62,156 @@ export function BulletinPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="py-14">
-        <div className="container">
 
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4">
+      {/* ── Page header band ── */}
+      <div className="bg-primary relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+        {/* Louvered texture */}
+        <div
+          className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+          }}
+        />
+        {/* Gold top rule */}
+        <div className="relative z-10 h-[3px] w-full bg-warning" />
+        {/* Gold left rule */}
+        <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
+        {/* Bottom separator */}
+        <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
+
+        <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+          <SectionLabel light>Enverga-Candelaria Library</SectionLabel>
+
+          <div className="mt-5 flex items-start justify-between gap-6 flex-wrap">
             <div>
-              <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+              <h1
+                className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight text-primary-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
                 Bulletin Board
               </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Library posts, announcements, and upcoming events.
+              <p className="mt-3 text-sm text-primary-foreground/50 max-w-lg leading-relaxed">
+                Library announcements, notices, and upcoming events.
               </p>
             </div>
+
             {canPost && (
-              <Button
-                size="sm"
+              <button
                 onClick={() => setShowCreate(true)}
-                className="rounded-xl shrink-0"
+                className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 border border-warning/50 text-warning hover:bg-warning/10 transition-colors duration-150"
+                style={{ fontFamily: "var(--font-heading)" }}
               >
-                <Plus className="mr-1.5 h-4 w-4" />
-                New Post
-              </Button>
+                <Plus className="h-3.5 w-3.5" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.15em]">New Post</span>
+              </button>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Policy notice */}
-          <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5">
-            <p className="text-xs text-primary/80">
-              ⚠️ Please comment responsibly. All interactions are subject to school rules and policies.
+      <main className="bg-background">
+        <div className="container px-4 sm:px-6 py-10">
+
+          {/* Policy notice — structural left-bar treatment */}
+          <div className="flex gap-0 border border-primary/20 bg-primary/[0.03] mb-10">
+            <div className="w-[3px] bg-warning shrink-0" />
+            <p
+              className="px-4 py-3 text-[11px] text-primary/70 leading-relaxed"
+              style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
+            >
+              Please comment responsibly. All interactions are subject to school rules and policies.
             </p>
           </div>
 
-          <div className="mt-8 flex flex-col gap-8 lg:flex-row">
+          {/* ── Two-column layout ── */}
+          <div className="flex flex-col lg:flex-row lg:items-start gap-8">
 
-            {/* Main */}
+            {/* ── Main posts column ── */}
             <div className="flex-1 min-w-0">
 
+              {/* Loading state */}
               {loading && (
-                <div className="flex items-center justify-center py-20 text-muted-foreground">
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  <span className="text-sm">Loading posts…</span>
+                <div className="flex items-center justify-center gap-3 py-20 border border-border">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Loading posts…
+                  </span>
                 </div>
               )}
 
+              {/* Error state */}
               {error && !loading && (
-                <div className="flex flex-col items-center gap-3 py-16 text-center">
-                  <p className="text-sm text-destructive">{error}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl"
+                <div className="flex flex-col items-center gap-5 py-16 border border-destructive/20 bg-destructive/[0.02]">
+                  <div className="flex gap-0">
+                    <div className="w-[3px] bg-destructive shrink-0" />
+                    <p
+                      className="px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-destructive"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {error}
+                    </p>
+                  </div>
+                  <button
                     onClick={() => fetchPosts(currentPage)}
+                    className="px-5 py-2.5 border border-border text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Retry
-                  </Button>
+                  </button>
                 </div>
               )}
 
+              {/* Empty state */}
               {!loading && !error && posts.length === 0 && (
-                <div className="flex flex-col items-center py-20 text-muted-foreground">
-                  <p className="text-sm">No posts yet.</p>
+                <div className="flex flex-col items-center py-20 border border-dashed border-border gap-5">
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    No posts yet
+                  </p>
                   {canPost && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-4 rounded-xl"
+                    <button
                       onClick={() => setShowCreate(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                      style={{ fontFamily: "var(--font-heading)" }}
                     >
-                      <Plus className="mr-1.5 h-4 w-4" /> Create the first post
-                    </Button>
+                      <Plus className="h-3.5 w-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.15em]">
+                        Create the first post
+                      </span>
+                    </button>
                   )}
                 </div>
               )}
 
+              {/* Post list */}
               {!loading && !error && posts.length > 0 && (
                 <>
+                  {/* Count bar */}
+                  <div className="flex items-center justify-between pb-4 mb-0 border-b border-border">
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {posts.length} post{posts.length !== 1 ? "s" : ""} — Page {currentPage} of {totalPages}
+                    </span>
+                  </div>
+
+                  {/* Cards — flush list, single wrapping border */}
                   <motion.div
                     initial="hidden"
                     animate="visible"
                     variants={{
                       hidden: {},
-                      visible: { transition: { staggerChildren: 0.07 } },
+                      visible: { transition: { staggerChildren: 0.06 } },
                     }}
-                    className="space-y-4"
+                    className="border-x border-border"
                   >
                     {posts.map((post) => (
                       <motion.div key={post.id} variants={cardVariants}>
@@ -146,43 +224,48 @@ export function BulletinPage() {
                     ))}
                   </motion.div>
 
+                  {/* Pagination — flush bordered strip */}
                   {totalPages > 1 && (
-                    <div className="mt-8 flex items-center justify-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl"
+                    <div className="flex border border-border">
+                      <button
                         disabled={currentPage === 1}
                         onClick={() => setCurrentPage(currentPage - 1)}
+                        className="h-10 w-10 flex items-center justify-center border-r border-border text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors shrink-0"
                       >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <Button
-                          key={i + 1}
-                          variant={currentPage === i + 1 ? "default" : "outline"}
-                          size="sm"
-                          className="w-9 rounded-xl"
-                          onClick={() => setCurrentPage(i + 1)}
-                        >
-                          {i + 1}
-                        </Button>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl"
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </button>
+
+                      <div className="flex flex-1 overflow-x-auto">
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <button
+                            key={i + 1}
+                            onClick={() => setCurrentPage(i + 1)}
+                            className={`h-10 min-w-[2.5rem] flex-1 flex items-center justify-center border-r border-border text-[11px] font-bold tracking-[0.1em] transition-colors ${
+                              currentPage === i + 1
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            }`}
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
                         disabled={currentPage === totalPages}
                         onClick={() => setCurrentPage(currentPage + 1)}
+                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors shrink-0"
                       >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   )}
                 </>
               )}
             </div>
 
+            {/* ── Sidebar ── */}
             <BulletinSidebar />
           </div>
         </div>
