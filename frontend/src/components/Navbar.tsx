@@ -10,8 +10,6 @@ import {
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 
-// ─── Nav links config ─────────────────────────────────────────────────────────
-
 const navLinks = [
   { label: "Home",      to: "/",          matchPrefix: false },
   { label: "About",     to: "/about",     matchPrefix: true  },
@@ -20,13 +18,9 @@ const navLinks = [
   { label: "Bulletin",  to: "/bulletin",  matchPrefix: true  },
 ];
 
-// ─── Role helpers ─────────────────────────────────────────────────────────────
-
 const ROLES_WITH_MY_LIBRARY  = new Set(["student", "scanner", "staff", "admin", "super_admin"]);
 const ROLES_WITH_SCANNER     = new Set(["scanner"]);
 const ROLES_WITH_ADMIN_PANEL = new Set(["admin", "super_admin", "staff"]);
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const AuthSkeleton = () => (
   <div className="h-8 w-8 bg-primary/20 animate-pulse" />
@@ -41,12 +35,10 @@ const UserAvatar = ({ initials }: { initials: string }) => (
   </div>
 );
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
   const { user, logout, loading } = useAuth();
 
   const role       = user?.role ?? "guest";
@@ -56,18 +48,10 @@ const Navbar = () => {
   const showScannerTools = ROLES_WITH_SCANNER.has(role);
   const showAdminPanel   = ROLES_WITH_ADMIN_PANEL.has(role);
 
-  // Close on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  // Lock body scroll while overlay is open
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
@@ -90,21 +74,18 @@ const Navbar = () => {
   return (
     <>
       <header className="sticky top-0 z-50 bg-primary border-b border-primary-foreground/10">
-        {/* ── Gold rule ── */}
+        {/* Gold rule */}
         <div className="h-[3px] w-full bg-warning" />
 
         <div className="container flex h-14 items-center justify-between gap-2">
 
-          {/* ── Logo ── */}
+          {/* Logo */}
           <Link to="/" className="flex shrink-0 items-center gap-3 group">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center border"
-            style={{ background: "hsl(var(--sidebar-accent))", borderColor: "hsl(var(--sidebar-border))" }}>
             <img
               src="/aa1.ico"
               alt="Logo"
-              className="h-8 w-8 object-contain opacity-90"
+              className="h-8 w-8 object-contain opacity-90 shrink-0"
             />
-          </div>
             <div className="flex flex-col leading-none">
               <span
                 className="text-primary-foreground text-[13px] font-bold tracking-[0.12em] uppercase"
@@ -112,22 +93,27 @@ const Navbar = () => {
               >
                 EUC Library
               </span>
-              <span className="text-primary-foreground/50 text-[9px] tracking-[0.2em] uppercase">
+              <span className="text-primary-foreground/50 text-[9px] tracking-[0.2em] uppercase hidden sm:block">
                 Enverga-Candelaria Library
               </span>
             </div>
           </Link>
 
-          {/* ── Vertical separator ── */}
-          <div className="hidden md:block h-6 w-px bg-primary-foreground/15 mx-2" />
+          {/* Vertical separator */}
+          <div className="hidden md:block h-6 w-px bg-primary-foreground/15 mx-2 shrink-0" />
 
-          {/* ── Desktop nav ── */}
+          {/* Desktop nav */}
           <DesktopNav links={navLinks} isNavActive={isNavActive} showMyLibrary={showMyLibrary} />
 
           <div className="flex-1 hidden md:block" />
 
           {/* ── Right controls ── */}
-          <div className="flex items-center gap-0.5">
+          {/*
+            Key fix: `shrink-0` on the container prevents it from being
+            squeezed by the logo or nav. The burger is always last and has
+            an explicit `h-9 w-9` so it can never be pushed out of view.
+          */}
+          <div className="flex items-center gap-0.5 shrink-0">
             {showScannerTools && <ScannerTools />}
 
             <div className="text-primary-foreground/70 hover:text-primary-foreground transition-colors">
@@ -138,9 +124,11 @@ const Navbar = () => {
               <AuthSkeleton />
             ) : isLoggedIn ? (
               <>
+                {/* Bell — visible on both mobile and desktop */}
                 <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
                   <Bell className="h-4 w-4" />
                 </button>
+                {/* User dropdown — desktop only, never takes mobile space */}
                 <div className="hidden md:block ml-1">
                   <UserDropdown
                     name={user?.name}
@@ -153,6 +141,7 @@ const Navbar = () => {
                 </div>
               </>
             ) : (
+              /* Login button — desktop only */
               <div className="hidden md:block ml-2">
                 <Link to="/login">
                   <button
@@ -165,9 +154,9 @@ const Navbar = () => {
               </div>
             )}
 
-            {/* Burger */}
+            {/* Burger — fixed dimensions, always last, can never be squeezed */}
             <button
-              className="md:hidden p-2 text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+              className="md:hidden flex items-center justify-center h-9 w-9 shrink-0 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
@@ -178,17 +167,15 @@ const Navbar = () => {
         </div>
       </header>
 
-      {/* ── Mobile overlay — rendered outside header so it doesn't shift layout ── */}
+      {/* Mobile overlay */}
       {mobileOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40 bg-black/50 md:hidden"
             onClick={closeMobile}
             aria-hidden="true"
           />
 
-          {/* Drawer — slides in from top, positioned just below the sticky header */}
           <nav
             className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 bg-primary border-b border-primary-foreground/10 shadow-xl md:hidden overflow-y-auto"
             style={{ maxHeight: "calc(100dvh - 3px - 3.5rem)" }}
@@ -281,12 +268,10 @@ const Navbar = () => {
   );
 };
 
-// ─── Desktop nav ──────────────────────────────────────────────────────────────
+// ── Desktop nav ───────────────────────────────────────────────────────────────
 
 const DesktopNav = ({
-  links,
-  isNavActive,
-  showMyLibrary,
+  links, isNavActive, showMyLibrary,
 }: {
   links: typeof navLinks;
   isNavActive: (link: typeof navLinks[number]) => boolean;
@@ -322,7 +307,7 @@ const DesktopNav = ({
   </nav>
 );
 
-// ─── User dropdown ────────────────────────────────────────────────────────────
+// ── User dropdown ─────────────────────────────────────────────────────────────
 
 const UserDropdown = ({
   name, role, initials, showAdminPanel, onNavigate, onLogout,
@@ -372,7 +357,7 @@ const UserDropdown = ({
   </DropdownMenu>
 );
 
-// ─── Scanner tools ────────────────────────────────────────────────────────────
+// ── Scanner tools ─────────────────────────────────────────────────────────────
 
 const ScannerTools = () => (
   <>
@@ -385,7 +370,7 @@ const ScannerTools = () => (
   </>
 );
 
-// ─── Mobile primitives ────────────────────────────────────────────────────────
+// ── Mobile primitives ─────────────────────────────────────────────────────────
 
 const MobileNavLink = ({
   to, active, gold, onClick, children,
