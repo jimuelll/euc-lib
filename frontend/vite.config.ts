@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     hmr: {
+      host: "localhost",  
+      port: 8080,        
       overlay: false,
     },
     proxy: {

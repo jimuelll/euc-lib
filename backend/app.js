@@ -4,17 +4,18 @@ const helmet  = require("helmet");
 const morgan  = require("morgan");
 const cookieParser = require("cookie-parser");
 
-const authRoutes        = require("./auth/auth.routes");
-const adminRoutes       = require("./admin/admin.routes");
-const catalogRoutes     = require("./catalog/catalog.routes");
-const borrowingRoutes   = require("./borrowing/borrowing.routes");
-const reservationRoutes = require("./reservation/reservation.routes");
-const adminReservationRoutes = require("./reservation/adminReservation.routes");
-const circulationRoutes = require("./circulation/circulation.routes");
-const bulletinRoutes    = require("./bulletin/bulletin.routes");
+const authRoutes        = require("./modules/auth/auth.routes");
+const adminRoutes       = require("./modules/admin/admin.routes");
+const catalogRoutes     = require("./modules/catalog/catalog.routes");
+const borrowingRoutes   = require("./modules/borrowing/borrowing.routes");
+const reservationRoutes = require("./modules/reservation/reservation.routes");
+const adminReservationRoutes = require("./modules/reservation/adminReservation.routes");
+const circulationRoutes = require("./modules/circulation/circulation.routes");
+const bulletinRoutes    = require("./modules/bulletin/bulletin.routes");
+const aboutRoutes       = require("./modules/about/about.routes");
 
-const { authMiddleware }      = require("./auth/auth.middleware");
-const { forcePasswordChange } = require("./auth/forcePasswordChange.middleware");
+const { authMiddleware }      = require("./modules/auth/auth.middleware");
+const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -43,6 +44,7 @@ app.use(express.urlencoded({ extended: true }));
 // --- Public Routes ---
 app.use("/api/auth",     authRoutes);
 app.use("/api/bulletin", bulletinRoutes); // read-only endpoints are unauthenticated
+app.use("/api/about",    aboutRoutes);
 
 // --- Global Protection ---
 app.use(authMiddleware());
@@ -55,5 +57,6 @@ app.use("/api/admin",        circulationRoutes);
 app.use("/api/borrowing",    borrowingRoutes);
 app.use("/api/reservations", reservationRoutes);
 app.use("/api/admin",        adminReservationRoutes);
+app.use("/api/admin/about",  aboutRoutes);
 
 module.exports = app;

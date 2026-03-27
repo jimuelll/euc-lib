@@ -1,5 +1,5 @@
 const bcrypt = require("bcryptjs");
-const db = require("../db");
+const db = require("../../db");
 
 // Role hierarchy map
 const roleHierarchy = {

@@ -11,7 +11,7 @@ import { AuthProvider } from "./context/AuthContext";
 
 // ─── Public pages ─────────────────────────────────────────────────────────────
 import Index               from "./pages/homepage/Index";
-import About               from "./pages/homepage/About";
+import About               from "./pages/homepage/about/index";
 import Services            from "./pages/homepage/Services";
 import Catalogue           from "./pages/homepage/Catalogue";
 import Bulletin            from "./pages/homepage/bulletin/index";
@@ -25,7 +25,7 @@ import EditProfile         from "./pages/homepage/EditProfile";
 
 
 // ─── Admin pages ──────────────────────────────────────────────────────────────
-import AdminLayout         from "./pages/admin/AdminLayout";
+import AdminLayout         from "./pages/admin/adminLayout/Index";
 import AdminHome           from "./pages/admin/AdminHome";
 import AdminManage         from "./pages/admin/AdminManage";
 import AdminCatalog        from "./pages/admin/adminCatalog/Index";
@@ -37,7 +37,7 @@ import AdminReport         from "./pages/admin/AdminReport";
 import AdminQuery          from "./pages/admin/AdminQuery";
 import AdminInternet       from "./pages/admin/AdminInternet";
 import AdminClearance      from "./pages/admin/AdminClearance";
-import AdminEditHomepage   from "./pages/admin/AdminEditHomepage";
+import AdminEditAbout      from "./pages/admin/adminAbout/Index";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -98,13 +98,13 @@ const App = () => (
                   <Route path="query"            element={<AdminQuery />} />
                   <Route path="internet"         element={<AdminInternet />} />
                   <Route path="clearance"        element={<AdminClearance />} />
-                  <Route path="edit-homepage"    element={<AdminEditHomepage />} />
                   <Route path="reservations"     element={<AdminReservations />} />
                   <Route path="holidays"         element={<AdminManage />} />
                   <Route path="restrictions"     element={<AdminManage />} />
-                  <Route path="bulletin"         element={<AdminEditHomepage />} />
-                  <Route path="subscriptions"    element={<AdminEditHomepage />} />
+                  <Route path="bulletin"         element={<AdminEditAbout />} />
+                  <Route path="subscriptions"    element={<AdminEditAbout />} />
                   <Route path="attendance"       element={<AdminReport />} />
+                  <Route path="edit-about"       element={<AdminEditAbout />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

@@ -2,8 +2,8 @@ const express = require("express");
 const { signToken } = require("./jwt.util");
 const { loginUser } = require("./auth.service");
 const { verifyToken } = require("./jwt.util");
-const { getUserByID } = require("../users/users.service");
-const { loginLimiter } = require("../middlewares/rateLimiter");
+const { getUserByID } = require("../../users/users.service");
+const { loginLimiter } = require("../../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
 const { handleChangePassword } = require("./auth.controller");
 

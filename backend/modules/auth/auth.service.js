@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const { signToken, signRefreshToken } = require("./jwt.util");
-const db = require("../db");
-const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../users/users.service");
+const db = require("../../db");
+const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
 
 async function loginUser(student_employee_id, password) {
   const user = await getUserByEmployeeID(student_employee_id);

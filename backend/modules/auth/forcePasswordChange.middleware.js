@@ -1,4 +1,4 @@
-const db = require("../db");
+const db = require("../../db");
 
 async function forcePasswordChange(req, res, next) {
   if (!req.user) return res.status(401).json({ message: "Unauthorized" });
