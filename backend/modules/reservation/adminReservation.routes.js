@@ -6,7 +6,7 @@ const { authMiddleware } = require("../auth/auth.middleware");
 // Mounted at /api/admin in app.js — mirrors how circulation.routes.js works
 // Full paths become: /api/admin/reservations, /api/admin/reservations/:id/ready, etc.
 
-const adminOnly = authMiddleware(["admin", "super_admin"]);
+const adminOnly = authMiddleware(["admin", "super_admin", "staff"]);
 
 router.get ("/reservations",                          adminOnly, controller.getAdminReservations);
 router.post("/reservations/:reservationId/ready",     adminOnly, controller.markReservationReady);
