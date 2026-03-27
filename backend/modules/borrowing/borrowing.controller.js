@@ -156,6 +156,21 @@ const getCopyByBarcode = async (req, res) => {
   }
 };
 
+const lookupUser = async (req, res) => {
+  try {
+    const { student_employee_id } = req.query;
+    if (!student_employee_id?.trim()) {
+      return res.status(400).json({ message: "student_employee_id is required" });
+    }
+    const result = await service.lookupUserWithBorrows(student_employee_id.trim());
+    if (!result) return res.status(404).json({ message: "User not found" });
+    res.json(result);
+  } catch (err) {
+    console.error("[borrowing] lookupUser:", err);
+    res.status(500).json({ message: "Failed to look up user" });
+  }
+};
+
 module.exports = {
   getActiveBorrows,
   getBorrowHistory,
@@ -165,4 +180,5 @@ module.exports = {
   scanBorrow,
   scanReturn,
   getCopyByBarcode,
+  lookupUser,
 };

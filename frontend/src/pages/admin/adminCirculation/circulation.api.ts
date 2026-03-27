@@ -35,7 +35,7 @@ export interface CirculationLogResult {
 }
 
 export const lookupUser = async (studentEmployeeId: string): Promise<LookupUserResult> => {
-  const res = await axiosInstance.get("/api/admin/users/lookup", {
+  const res = await axiosInstance.get("/api/borrowing/scan/user", {
     params: { student_employee_id: studentEmployeeId },
   });
   return { user: res.data.user, activeBorrows: res.data.activeBorrows ?? [] };

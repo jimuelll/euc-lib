@@ -20,6 +20,7 @@ router.post("/borrows/:borrowingId/return",   controller.returnBook);
 // ─── Barcode scan — book copy preview ────────────────────────────────────────
 // NOTE: must be defined BEFORE any :barcode-style wildcard if you add more later
 router.get ("/scan/copy/:barcode",            scannerOrAbove, controller.getCopyByBarcode);
+router.get("/scan/user",                      scannerOrAbove, controller.lookupUser);
 
 // ─── Barcode scan — borrow / return at the desk ───────────────────────────────
 router.post("/scan/borrow",                   scannerOrAbove, controller.scanBorrow);

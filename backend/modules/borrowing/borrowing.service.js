@@ -272,6 +272,28 @@ const returnBook = async (borrowingId, userId) => {
   }
 };
 
+const lookupUserWithBorrows = async (studentEmployeeId) => {
+  const [[user]] = await db.query(
+    `SELECT id, name, role, student_employee_id, barcode
+     FROM users
+     WHERE student_employee_id = ? AND is_active = 1
+     LIMIT 1`,
+    [studentEmployeeId]
+  );
+  if (!user) return null;
+
+  const [activeBorrows] = await db.query(
+    `SELECT b.id, b.book_id, bk.title, bk.author, b.due_date, b.status
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id
+     WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
+     ORDER BY b.due_date ASC`,
+    [user.id]
+  );
+
+  return { user, activeBorrows };
+};
+
 module.exports = {
   getActiveBorrows,
   getBorrowHistory,
@@ -281,4 +303,5 @@ module.exports = {
   getActiveBorrowingByCopyBarcode,
   borrowBook,
   returnBook,
+  lookupUserWithBorrows,
 };

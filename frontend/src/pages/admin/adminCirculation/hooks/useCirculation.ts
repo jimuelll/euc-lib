@@ -61,26 +61,26 @@ export const useCirculation = () => {
     }
   };
 
-  const handleLookupCopy = async () => {
-    if (!copyBarcode.trim() || !foundUser) return;
-    setLookingUpCopy(true);
-    try {
-      const copy = await apiLookupCopy(copyBarcode.trim());
-      setFoundCopy(copy);
+const handleLookupCopy = async () => {
+  if (!copyBarcode.trim() || !foundUser) return;
+  setLookingUpCopy(true);
+  try {
+    const copy = await apiLookupCopy(copyBarcode.trim());
+    setFoundCopy(copy);
 
-      if (type === "return") {
-        const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
-        setMatchedBorrow(match);
-        if (!match) toast.error("No active borrow found for this copy and user");
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Copy not found");
-      setFoundCopy(null);
-      setMatchedBorrow(null);
-    } finally {
-      setLookingUpCopy(false);
+    if (type === "return") {
+      const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
+      setMatchedBorrow(match);
+      if (!match) toast.error("No active borrow found for this copy and user");
     }
-  };
+  } catch (err: any) {
+    toast.error(err.response?.data?.message ?? "Copy not found");
+    setFoundCopy(null);
+    setMatchedBorrow(null);
+  } finally {
+    setLookingUpCopy(false);
+  }
+};
 
   const resetForm = () => {
     setStudentId("");
