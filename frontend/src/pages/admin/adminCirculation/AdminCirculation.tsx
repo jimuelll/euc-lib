@@ -1,5 +1,5 @@
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useCirculation } from "./hooks/useCirculation";
@@ -11,12 +11,12 @@ import CirculationLog from "./components/CirculationLog";
 
 const AdminCirculation = () => {
   const {
-    type, studentId, isbn, dueDate,
-    lookingUp, submitting,
-    foundUser, foundBook, activeBorrows, matchedBorrow,
+    type, studentId, copyBarcode, daysAllowed,
+    lookingUpUser, lookingUpCopy, submitting,
+    foundUser, foundCopy, activeBorrows, matchedBorrow,
     canSubmit,
-    setStudentId, setIsbn, setDueDate,
-    handleTypeChange, handleLookupUser, handleLookupBook, handleSubmit,
+    setStudentId, setCopyBarcode, setDaysAllowed,
+    handleTypeChange, handleLookupUser, handleLookupCopy, handleSubmit,
   } = useCirculation();
 
   const cfg  = TRANSACTION_CONFIG[type];
@@ -26,7 +26,7 @@ const AdminCirculation = () => {
     <div className="max-w-2xl">
       <h2 className="font-heading text-lg font-bold text-foreground">Circulation</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Process book borrowing, returning, and renewals.
+        Process book borrowing and returns.
       </p>
 
       <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
@@ -36,31 +36,33 @@ const AdminCirculation = () => {
           studentId={studentId}
           onStudentIdChange={setStudentId}
           onLookup={handleLookupUser}
-          lookingUp={lookingUp}
+          lookingUp={lookingUpUser}
           foundUser={foundUser}
           activeBorrows={activeBorrows}
           type={type}
         />
 
         <BookLookup
-          isbn={isbn}
-          onIsbnChange={setIsbn}
-          onLookup={handleLookupBook}
-          lookingUp={lookingUp}
+          copyBarcode={copyBarcode}
+          onCopyBarcodeChange={setCopyBarcode}
+          onLookup={handleLookupCopy}
+          lookingUp={lookingUpCopy}
           disabled={!foundUser}
-          foundBook={foundBook}
+          foundCopy={foundCopy}
           matchedBorrow={matchedBorrow}
           type={type}
         />
 
-        {(type === "borrow" || type === "renew") && (
+        {type === "borrow" && (
           <div className="space-y-2">
-            <Label>{type === "renew" ? "New Due Date" : "Due Date"}</Label>
+            <Label>Loan Duration (days)</Label>
             <Input
-              type="date"
-              value={dueDate}
-              min={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setDueDate(e.target.value)}
+              type="number"
+              min={1}
+              max={60}
+              value={daysAllowed}
+              onChange={(e) => setDaysAllowed(Number(e.target.value))}
+              className="w-32"
             />
           </div>
         )}
@@ -69,9 +71,7 @@ const AdminCirculation = () => {
           type="submit"
           disabled={!canSubmit}
           className={`w-full gap-2 ${
-            type === "return" ? "bg-success hover:bg-success/90 text-white" :
-            type === "renew"  ? "bg-warning hover:bg-warning/90 text-white"  :
-            ""
+            type === "return" ? "bg-success hover:bg-success/90 text-white" : ""
           }`}
         >
           {submitting
@@ -81,7 +81,6 @@ const AdminCirculation = () => {
         </Button>
       </form>
 
-      {/* ── Circulation log ── */}
       <CirculationLog />
     </div>
   );

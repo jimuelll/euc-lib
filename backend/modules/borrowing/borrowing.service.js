@@ -2,10 +2,6 @@ const db = require("../../db");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Sync overdue status: any borrowed row past due_date becomes overdue.
- * Called before reads so the frontend always sees fresh status.
- */
 const syncOverdue = async () => {
   await db.query(
     `UPDATE borrowings
@@ -15,9 +11,6 @@ const syncOverdue = async () => {
   );
 };
 
-/**
- * Count how many copies of a book are currently out (borrowed or overdue).
- */
 const borrowedCopies = async (bookId, conn = db) => {
   const [rows] = await conn.query(
     `SELECT COUNT(*) AS cnt FROM borrowings
@@ -33,9 +26,11 @@ const getActiveBorrows = async (userId) => {
   await syncOverdue();
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
-            b.borrowed_at, b.due_date, b.status, b.notes
+            b.borrowed_at, b.due_date, b.status, b.notes,
+            bc.barcode AS copy_barcode, bc.condition AS copy_condition
      FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id
+     JOIN books bk      ON bk.id = b.book_id
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id
      WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
      ORDER BY b.due_date ASC`,
     [userId]
@@ -46,9 +41,11 @@ const getActiveBorrows = async (userId) => {
 const getBorrowHistory = async (userId) => {
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
-            b.borrowed_at, b.returned_at, b.due_date, b.status
+            b.borrowed_at, b.returned_at, b.due_date, b.status,
+            bc.barcode AS copy_barcode
      FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id
+     JOIN books bk      ON bk.id = b.book_id
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id
      WHERE b.user_id = ? AND b.status = 'returned'
      ORDER BY b.returned_at DESC
      LIMIT 50`,
@@ -58,8 +55,7 @@ const getBorrowHistory = async (userId) => {
 };
 
 /**
- * Catalogue search for the services page — includes live availability.
- * availability = copies - currently borrowed/overdue count
+ * Catalogue search — includes live availability calculated from book_copies.
  */
 const searchCatalogueWithAvailability = async (query) => {
   await syncOverdue();
@@ -73,10 +69,17 @@ const searchCatalogueWithAvailability = async (query) => {
        bk.isbn,
        bk.copies,
        bk.location,
-       GREATEST(0, bk.copies - COUNT(br.id)) AS available
+       COUNT(DISTINCT bc.id)                                      AS total_copies,
+       GREATEST(0,
+         COUNT(DISTINCT bc.id) -
+         COUNT(DISTINCT CASE
+           WHEN br.status IN ('borrowed','overdue') THEN br.id
+         END)
+       )                                                           AS available
      FROM books bk
-     LEFT JOIN borrowings br
-       ON br.book_id = bk.id AND br.status IN ('borrowed', 'overdue')
+     LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1
+     LEFT JOIN borrowings   br ON br.copy_id  = bc.id
+                               AND br.status IN ('borrowed','overdue')
      WHERE bk.title  LIKE ?
         OR bk.author LIKE ?
         OR bk.isbn   LIKE ?
@@ -88,35 +91,124 @@ const searchCatalogueWithAvailability = async (query) => {
   return rows;
 };
 
+/**
+ * Look up a user by their barcode or student_employee_id.
+ * Used by the scanner role to identify who is checking in/out.
+ */
+const resolveUserByBarcode = async (scannedValue) => {
+  const [[user]] = await db.query(
+    `SELECT id, name, role, student_employee_id, barcode
+     FROM users
+     WHERE barcode = ? OR student_employee_id = ?
+     LIMIT 1`,
+    [scannedValue, scannedValue]
+  );
+  return user ?? null;
+};
+
+/**
+ * Look up a book copy by its barcode.
+ */
+const resolveCopyByBarcode = async (barcode) => {
+  const [[copy]] = await db.query(
+    `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active,
+            bk.title, bk.author, bk.copies
+     FROM book_copies bc
+     JOIN books bk ON bk.id = bc.book_id
+     WHERE bc.barcode = ?`,
+    [barcode]
+  );
+  return copy ?? null;
+};
+
+/**
+ * Find the active borrowing record for a given copy barcode.
+ * Used by scanReturn to identify what to mark as returned.
+ */
+const getActiveBorrowingByCopyBarcode = async (barcode) => {
+  const [[row]] = await db.query(
+    `SELECT b.id, b.user_id
+     FROM borrowings b
+     JOIN book_copies bc ON bc.id = b.copy_id
+     WHERE bc.barcode = ? AND b.status IN ('borrowed','overdue')
+     LIMIT 1`,
+    [barcode.trim()]
+  );
+  return row ?? null;
+};
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 /**
- * Issue a borrow. Fails if no copies are available.
- * issuedBy = staff/admin user id who logged the borrow.
- * daysAllowed defaults to 7 if not provided.
+ * Issue a borrow by scanning a copy barcode.
+ * Accepts either a copy barcode string OR a numeric copyId.
  */
-const borrowBook = async (userId, bookId, issuedBy, daysAllowed = 7) => {
+const borrowBook = async (
+  userId,
+  bookIdOrCopyBarcode,
+  issuedBy,
+  daysAllowed = 7,
+  { isCopyBarcode = false, ipAddress = null } = {}
+) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    // Lock the book row
-    const [[book]] = await conn.query(
-      "SELECT id, copies FROM books WHERE id = ? FOR UPDATE",
-      [bookId]
-    );
-    if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
+    let copy = null;
 
-    const out = await borrowedCopies(bookId, conn);
-    if (out >= book.copies) {
-      throw Object.assign(new Error("No copies available"), { status: 409 });
+    if (isCopyBarcode) {
+      // Barcode scan path: resolve copy → book
+      const [[c]] = await conn.query(
+        `SELECT bc.id, bc.book_id, bc.barcode, bc.is_active,
+                bk.copies
+         FROM book_copies bc
+         JOIN books bk ON bk.id = bc.book_id
+         WHERE bc.barcode = ?
+         FOR UPDATE`,
+        [bookIdOrCopyBarcode]
+      );
+      if (!c) throw Object.assign(new Error("Copy barcode not found"), { status: 404 });
+      if (!c.is_active) throw Object.assign(new Error("This copy is not available"), { status: 409 });
+      copy = c;
+    } else {
+      // Legacy numeric book_id path — pick any available active copy
+      const [[book]] = await conn.query(
+        "SELECT id, copies FROM books WHERE id = ? FOR UPDATE",
+        [bookIdOrCopyBarcode]
+      );
+      if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
+
+      const [copies] = await conn.query(
+        `SELECT bc.id, bc.barcode FROM book_copies bc
+         WHERE bc.book_id = ? AND bc.is_active = 1
+           AND bc.id NOT IN (
+             SELECT copy_id FROM borrowings
+             WHERE status IN ('borrowed','overdue') AND copy_id IS NOT NULL
+           )
+         LIMIT 1`,
+        [bookIdOrCopyBarcode]
+      );
+      if (!copies.length) {
+        throw Object.assign(new Error("No copies available"), { status: 409 });
+      }
+      copy = { ...copies[0], book_id: bookIdOrCopyBarcode };
     }
 
-    // Check user doesn't already have this book out
+    // Check the chosen copy isn't already out
+    const [[activeLoan]] = await conn.query(
+      `SELECT id FROM borrowings
+       WHERE copy_id = ? AND status IN ('borrowed','overdue')`,
+      [copy.id]
+    );
+    if (activeLoan) {
+      throw Object.assign(new Error("This copy is already borrowed"), { status: 409 });
+    }
+
+    // Check user doesn't already have ANY copy of this book out
     const [[existing]] = await conn.query(
       `SELECT id FROM borrowings
-       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed', 'overdue')`,
-      [userId, bookId]
+       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed','overdue')`,
+      [userId, copy.book_id]
     );
     if (existing) {
       throw Object.assign(new Error("User already has this book borrowed"), { status: 409 });
@@ -127,13 +219,15 @@ const borrowBook = async (userId, bookId, issuedBy, daysAllowed = 7) => {
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
     const [result] = await conn.query(
-      `INSERT INTO borrowings (user_id, book_id, due_date, status, issued_by)
-       VALUES (?, ?, ?, 'borrowed', ?)`,
-      [userId, bookId, dueDateStr, issuedBy ?? null]
+      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, status, issued_by)
+       VALUES (?, ?, ?, ?, 'borrowed', ?)`,
+      [userId, copy.book_id, copy.id, dueDateStr, issuedBy ?? null]
     );
 
+    const borrowingId = result.insertId;
+
     await conn.commit();
-    return { borrowingId: result.insertId, dueDate: dueDateStr };
+    return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate: dueDateStr };
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -143,8 +237,7 @@ const borrowBook = async (userId, bookId, issuedBy, daysAllowed = 7) => {
 };
 
 /**
- * Return a book. Only the issuing staff or an admin should call this,
- * but user_id is checked so a student can't return someone else's book.
+ * Return a book.
  */
 const returnBook = async (borrowingId, userId) => {
   const conn = await db.getConnection();
@@ -152,7 +245,9 @@ const returnBook = async (borrowingId, userId) => {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      `SELECT id, user_id, status FROM borrowings WHERE id = ? FOR UPDATE`,
+      `SELECT b.id, b.user_id, b.status
+       FROM borrowings b
+       WHERE b.id = ? FOR UPDATE`,
       [borrowingId]
     );
     if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
@@ -181,6 +276,9 @@ module.exports = {
   getActiveBorrows,
   getBorrowHistory,
   searchCatalogueWithAvailability,
+  resolveUserByBarcode,
+  resolveCopyByBarcode,
+  getActiveBorrowingByCopyBarcode,
   borrowBook,
   returnBook,
 };

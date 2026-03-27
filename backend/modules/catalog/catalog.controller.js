@@ -1,3 +1,4 @@
+const bwipjs  = require("bwip-js");
 const service = require("./catalog.service");
 
 const getSchema = async (req, res) => {
@@ -40,7 +41,6 @@ const getBooks = async (req, res) => {
     if (!query?.trim()) {
       return res.status(400).json({ message: "Search query is required" });
     }
-    // req.publicCatalogue is set by the route when called from the public endpoint
     const books = await service.searchBooks(query.trim(), !!req.publicCatalogue);
     res.json(books);
   } catch (err) {
@@ -55,7 +55,7 @@ const createBook = async (req, res) => {
     res.status(201).json({ message: "Book added successfully", id });
   } catch (err) {
     console.error("[catalog] createBook:", err);
-    res.status(500).json({ message: "Failed to create book" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book" });
   }
 };
 
@@ -65,7 +65,7 @@ const updateBook = async (req, res) => {
     res.json({ message: "Book updated successfully" });
   } catch (err) {
     console.error("[catalog] updateBook:", err);
-    res.status(500).json({ message: "Failed to update book" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book" });
   }
 };
 
@@ -75,8 +75,68 @@ const deleteBook = async (req, res) => {
     res.json({ message: "Book deleted successfully" });
   } catch (err) {
     console.error("[catalog] deleteBook:", err);
-    res.status(500).json({ message: "Failed to delete book" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book" });
   }
 };
 
-module.exports = { getSchema, updateSchema, getBooks, createBook, updateBook, deleteBook };
+const getBookCopies = async (req, res) => {
+  try {
+    const copies = await service.getBookCopies(req.params.id);
+    res.json(copies);
+  } catch (err) {
+    console.error("[catalog] getBookCopies:", err);
+    res.status(500).json({ message: "Failed to fetch book copies" });
+  }
+};
+
+/**
+ * GET /copies/:barcode/barcode-png
+ * Returns a CODE128 barcode as a PNG image — pipe directly to <img src="...">
+ */
+const getBarcodePng = async (req, res) => {
+  try {
+    const png = await bwipjs.toBuffer({
+      bcid:        "code128",
+      text:        req.params.barcode,
+      scale:       3,
+      height:      12,       // mm
+      includetext: true,
+      textxalign:  "center",
+    });
+
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); // barcodes never change
+    res.send(png);
+  } catch (err) {
+    console.error("[catalog] getBarcodePng:", err);
+    res.status(500).json({ message: "Failed to generate barcode" });
+  }
+};
+
+/**
+ * GET /copies/:barcode
+ * Looks up a physical copy by barcode — used after a ZXing scan at the desk.
+ * Returns copy details + parent book info.
+ */
+const getCopyByBarcode = async (req, res) => {
+  try {
+    const copy = await service.getCopyByBarcode(req.params.barcode);
+    if (!copy) return res.status(404).json({ message: "Copy not found" });
+    res.json(copy);
+  } catch (err) {
+    console.error("[catalog] getCopyByBarcode:", err);
+    res.status(500).json({ message: "Failed to look up copy" });
+  }
+};
+
+module.exports = {
+  getSchema,
+  updateSchema,
+  getBooks,
+  createBook,
+  updateBook,
+  deleteBook,
+  getBookCopies,
+  getBarcodePng,
+  getCopyByBarcode,
+};

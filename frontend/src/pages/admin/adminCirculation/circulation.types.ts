@@ -1,20 +1,24 @@
-import { BookOpen, RotateCcw, CalendarDays } from "lucide-react";
+import { BookOpen, RotateCcw } from "lucide-react";
 import type { ElementType } from "react";
 
-export type TransactionType = "borrow" | "return" | "renew";
+export type TransactionType = "borrow" | "return";
 
 export interface BookInfo {
-  id: number;
+  id: number;       // copy id (bc.id)
+  book_id: number;
   title: string;
   author: string;
   copies: number;
-  available: number;
+  barcode: string;
+  condition: string;
+  is_active: boolean;
 }
 
 export interface UserInfo {
   id: number;
   name: string;
   student_employee_id: string;
+  barcode: string;
   role: string;
 }
 
@@ -47,12 +51,6 @@ export const TRANSACTION_CONFIG: Record<TransactionType, TransactionConfig> = {
     icon:  RotateCcw,
     color: "text-success",
     bg:    "bg-success/10 border-success/20",
-  },
-  renew: {
-    label: "Renew",
-    icon:  CalendarDays,
-    color: "text-warning",
-    bg:    "bg-warning/10 border-warning/20",
   },
 };
 

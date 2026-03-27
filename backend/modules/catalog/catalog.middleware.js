@@ -2,6 +2,9 @@ const ALLOWED_ROLES   = ["admin", "super_admin"];
 const VALID_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
 const VALID_TYPES     = ["text", "textarea", "number", "date", "select"];
 
+// Matches LIB-000001-001 format exactly
+const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
+
 const requireAdminRole = (req, res, next) => {
   if (!req.user || !ALLOWED_ROLES.includes(req.user.role)) {
     return res.status(403).json({ message: "Access denied" });
@@ -38,7 +41,6 @@ const validateSchemaPayload = (req, res, next) => {
     if (typeof f.order !== "number") {
       return res.status(400).json({ message: `Field "${f.key}" is missing a numeric order` });
     }
-    // public is optional boolean — no strict validation needed, coerced to 0/1 in service
   }
 
   next();
@@ -53,4 +55,11 @@ const validateBookId = (req, res, next) => {
   next();
 };
 
-module.exports = { requireAdminRole, validateSchemaPayload, validateBookId };
+const validateBarcode = (req, res, next) => {
+  if (!BARCODE_REGEX.test(req.params.barcode)) {
+    return res.status(400).json({ message: "Invalid barcode format" });
+  }
+  next();
+};
+
+module.exports = { requireAdminRole, validateSchemaPayload, validateBookId, validateBarcode };

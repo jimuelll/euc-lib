@@ -5,20 +5,23 @@ const {
   requireAdminRole,
   validateSchemaPayload,
   validateBookId,
+  validateBarcode,
 } = require("./catalog.middleware");
-
-// Note: authMiddleware() is applied globally in app.js
 
 router.get   ("/catalog-schema",                                          controller.getSchema);
 router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
 
-// Admin book routes — full data
 router.get   ("/books",                                                   controller.getBooks);
 router.post  ("/books",          requireAdminRole,                        controller.createBook);
 router.put   ("/books/:id",      requireAdminRole, validateBookId,        controller.updateBook);
 router.delete("/books/:id",      requireAdminRole, validateBookId,        controller.deleteBook);
 
-// Public catalogue search — only returns fields marked public: true in schema
+router.get   ("/books/:id/copies",           requireAdminRole, validateBookId,  controller.getBookCopies);
+
+// Barcode image + copy lookup (used at the desk / scanner)
+router.get   ("/copies/:barcode/barcode-png", requireAdminRole, validateBarcode, controller.getBarcodePng);
+router.get   ("/copies/:barcode",             requireAdminRole, validateBarcode, controller.getCopyByBarcode);
+
 router.get("/catalogue/search", (req, res, next) => {
   req.publicCatalogue = true;
   next();

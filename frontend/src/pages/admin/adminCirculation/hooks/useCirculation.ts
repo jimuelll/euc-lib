@@ -2,109 +2,103 @@ import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 import {
   lookupUser as apiLookupUser,
-  lookupBook as apiLookupBook,
+  lookupCopy as apiLookupCopy,
   processBorrow,
   processReturn,
-  processRenew,
 } from "../circulation.api";
 import { DEFAULT_LOAN_DAYS } from "../circulation.types";
 import type { TransactionType, UserInfo, BookInfo, ActiveBorrow } from "../circulation.types";
 
-const defaultDueDate = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + DEFAULT_LOAN_DAYS);
-  return d.toISOString().slice(0, 10);
-};
-
 export const useCirculation = () => {
   const [type, setType]                   = useState<TransactionType>("borrow");
   const [studentId, setStudentId]         = useState("");
-  const [isbn, setIsbn]                   = useState("");
-  const [dueDate, setDueDate]             = useState(defaultDueDate);
-  const [lookingUp, setLookingUp]         = useState(false);
+  const [copyBarcode, setCopyBarcode]     = useState("");
+  const [daysAllowed, setDaysAllowed]     = useState(DEFAULT_LOAN_DAYS);
+
+  const [lookingUpUser, setLookingUpUser] = useState(false);
+  const [lookingUpCopy, setLookingUpCopy] = useState(false);
   const [submitting, setSubmitting]       = useState(false);
+
   const [foundUser, setFoundUser]         = useState<UserInfo | null>(null);
-  const [foundBook, setFoundBook]         = useState<BookInfo | null>(null);
+  const [foundCopy, setFoundCopy]         = useState<BookInfo | null>(null);
   const [activeBorrows, setActiveBorrows] = useState<ActiveBorrow[]>([]);
   const [matchedBorrow, setMatchedBorrow] = useState<ActiveBorrow | null>(null);
 
-  // Reset book state when transaction type changes
+  // Reset copy state when type changes
   useEffect(() => {
-    setFoundBook(null);
+    setFoundCopy(null);
     setMatchedBorrow(null);
-    setIsbn("");
+    setCopyBarcode("");
   }, [type]);
 
-  // Reset user state when student ID is cleared
+  // Reset everything below user when student ID is cleared
   useEffect(() => {
     if (!studentId.trim()) {
       setFoundUser(null);
       setActiveBorrows([]);
       setMatchedBorrow(null);
+      setFoundCopy(null);
+      setCopyBarcode("");
     }
   }, [studentId]);
 
-  const handleTypeChange = (t: TransactionType) => {
-    setType(t);
-  };
-
   const handleLookupUser = async () => {
     if (!studentId.trim()) return;
-    setLookingUp(true);
+    setLookingUpUser(true);
     try {
       const { user, activeBorrows } = await apiLookupUser(studentId.trim());
       setFoundUser(user);
       setActiveBorrows(activeBorrows);
       setMatchedBorrow(null);
-      setFoundBook(null);
-      setIsbn("");
+      setFoundCopy(null);
+      setCopyBarcode("");
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "User not found");
       setFoundUser(null);
       setActiveBorrows([]);
     } finally {
-      setLookingUp(false);
+      setLookingUpUser(false);
     }
   };
 
-  const handleLookupBook = async () => {
-    if (!isbn.trim() || !foundUser) return;
-    setLookingUp(true);
+  const handleLookupCopy = async () => {
+    if (!copyBarcode.trim() || !foundUser) return;
+    setLookingUpCopy(true);
     try {
-      const book = await apiLookupBook(isbn.trim());
-      setFoundBook(book);
+      const copy = await apiLookupCopy(copyBarcode.trim());
+      setFoundCopy(copy);
 
-      if (type === "return" || type === "renew") {
-        const match = activeBorrows.find((b) => b.title === book.title) ?? null;
+      if (type === "return") {
+        const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
         setMatchedBorrow(match);
-        if (!match) toast.error("No active borrow found for this book and user");
+        if (!match) toast.error("No active borrow found for this copy and user");
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Book not found");
-      setFoundBook(null);
+      toast.error(err.response?.data?.message ?? "Copy not found");
+      setFoundCopy(null);
       setMatchedBorrow(null);
     } finally {
-      setLookingUp(false);
+      setLookingUpCopy(false);
     }
   };
 
   const resetForm = () => {
     setStudentId("");
-    setIsbn("");
+    setCopyBarcode("");
     setFoundUser(null);
-    setFoundBook(null);
+    setFoundCopy(null);
     setActiveBorrows([]);
     setMatchedBorrow(null);
-    setDueDate(defaultDueDate());
+    setDaysAllowed(DEFAULT_LOAN_DAYS);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!foundUser || !foundBook) {
-      toast.error("Look up both the user and book first");
+    if (!foundUser || !foundCopy) {
+      toast.error("Look up both the user and the copy first");
       return;
     }
-    if ((type === "return" || type === "renew") && !matchedBorrow) {
+    if (type === "return" && !matchedBorrow) {
       toast.error("No matching active borrow found");
       return;
     }
@@ -112,20 +106,13 @@ export const useCirculation = () => {
     setSubmitting(true);
     try {
       if (type === "borrow") {
-        if (!dueDate) { toast.error("Due date is required"); return; }
-        await processBorrow(foundUser.id, foundBook.id, dueDate);
-        toast.success(`"${foundBook.title}" borrowed by ${foundUser.name}`);
-
+        // Backend expects a barcode OR student_employee_id as userBarcode
+        await processBorrow(studentId.trim(), copyBarcode.trim(), daysAllowed);
+        toast.success(`"${foundCopy.title}" borrowed by ${foundUser.name}`);
       } else if (type === "return") {
-        await processReturn(matchedBorrow!.id);
-        toast.success(`"${foundBook.title}" returned by ${foundUser.name}`);
-
-      } else if (type === "renew") {
-        if (!dueDate) { toast.error("New due date is required"); return; }
-        await processRenew(matchedBorrow!.id, dueDate);
-        toast.success(`"${foundBook.title}" renewed — new due date: ${dueDate}`);
+        await processReturn(copyBarcode.trim());
+        toast.success(`"${foundCopy.title}" returned by ${foundUser.name}`);
       }
-
       resetForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "Transaction failed");
@@ -137,22 +124,19 @@ export const useCirculation = () => {
   const canSubmit =
     !submitting &&
     !!foundUser &&
-    !!foundBook &&
-    !((type === "return" || type === "renew") && !matchedBorrow) &&
-    !(type === "borrow" && foundBook?.available === 0);
+    !!foundCopy &&
+    foundCopy.is_active &&
+    !(type === "return" && !matchedBorrow);
 
   return {
-    // state
-    type, studentId, isbn, dueDate,
-    lookingUp, submitting,
-    foundUser, foundBook, activeBorrows, matchedBorrow,
+    type, studentId, copyBarcode, daysAllowed,
+    lookingUpUser, lookingUpCopy, submitting,
+    foundUser, foundCopy, activeBorrows, matchedBorrow,
     canSubmit,
-    // setters
-    setStudentId, setIsbn, setDueDate,
-    // handlers
-    handleTypeChange,
+    setStudentId, setCopyBarcode, setDaysAllowed,
+    handleTypeChange: setType,
     handleLookupUser,
-    handleLookupBook,
+    handleLookupCopy,
     handleSubmit,
   };
 };
