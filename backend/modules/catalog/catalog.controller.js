@@ -1,4 +1,4 @@
-const bwipjs  = require("bwip-js");
+const qr = require("qrcode");
 const service = require("./catalog.service");
 
 const getSchema = async (req, res) => {
@@ -95,21 +95,19 @@ const getBookCopies = async (req, res) => {
  */
 const getBarcodePng = async (req, res) => {
   try {
-    const png = await bwipjs.toBuffer({
-      bcid:        "code128",
-      text:        req.params.barcode,
-      scale:       3,
-      height:      12,       // mm
-      includetext: true,
-      textxalign:  "center",
+    const png = await qr.toBuffer(req.params.barcode, {
+      type: "png",
+      width: 300,        // explicit pixel size instead of scale
+      margin: 2,         // quiet zone around the QR
+      errorCorrectionLevel: "M",  // H = more robust but denser, L = smaller
     });
 
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable"); // barcodes never change
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.send(png);
   } catch (err) {
     console.error("[catalog] getBarcodePng:", err);
-    res.status(500).json({ message: "Failed to generate barcode" });
+    res.status(500).json({ message: "Failed to generate QR code" });
   }
 };
 

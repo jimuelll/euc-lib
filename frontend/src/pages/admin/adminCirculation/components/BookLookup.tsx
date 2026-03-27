@@ -20,14 +20,14 @@ const BookLookup = ({
   foundCopy, matchedBorrow, type,
 }: Props) => (
   <div className="space-y-2">
-    <Label>Book Copy Barcode</Label>
+    <Label>Book Copy QR Code</Label>
     <BarcodeInput
       value={copyBarcode}
       onChange={onCopyBarcodeChange}
       onSubmit={onLookup}
       loading={lookingUp}
       disabled={disabled}
-      placeholder="Scan book barcode or type it"
+      placeholder="Scan book QR code or type it"
     />
 
     {foundCopy && (
