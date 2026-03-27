@@ -152,8 +152,10 @@ export function AdminSidebar() {
                 <CollapsibleContent>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {section.items.map((item) => (
-                        <SidebarMenuItem key={item.title} className="px-2">
+                      {section.items
+                      .filter(item => !item.roles || item.roles.includes(user?.role ?? ""))
+                      .map((item) => (
+                      <SidebarMenuItem key={item.title} className="px-2">
                           <SidebarMenuButton asChild>
                             <NavLink
                               to={item.url}
@@ -188,7 +190,9 @@ export function AdminSidebar() {
               /* Collapsed — icons only */
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {section.items.map((item) => (
+                  {section.items
+                    .filter(item => !item.roles || item.roles.includes(user?.role ?? ""))
+                    .map((item) => (
                     <SidebarMenuItem key={item.title} className="px-1.5">
                       <SidebarMenuButton asChild>
                         <NavLink

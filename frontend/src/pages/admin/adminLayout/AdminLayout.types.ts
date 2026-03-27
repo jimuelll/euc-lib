@@ -4,6 +4,7 @@ export interface SidebarItem {
   title: string;
   url:   string;
   icon:  typeof Home;
+  roles?: string[];
 }
 
 export interface SidebarSection {

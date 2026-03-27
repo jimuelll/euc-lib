@@ -11,7 +11,7 @@ import {
   SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
-import { Eye, EyeOff, UserX, UserCheck } from "lucide-react";
+import { Eye, EyeOff, UserX, UserCheck, QrCode, Download, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 
@@ -29,6 +29,57 @@ type User = {
   contact?: string;
   is_active?: number;
 };
+
+// ── QR Modal ─────────────────────────────────────────────────────────────────
+const QrModal = ({
+  studentId,
+  name,
+  onClose,
+}: {
+  studentId: string;
+  name: string;
+  onClose: () => void;
+}) => {
+  const src = `/api/admin/users/${encodeURIComponent(studentId)}/barcode-png`;
+
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = `qr-${studentId}.png`;
+    a.click();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="relative rounded-xl border bg-card p-6 shadow-xl flex flex-col items-center gap-4 w-72"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <p className="font-semibold text-foreground text-center">{name}</p>
+        <p className="text-xs text-muted-foreground">{studentId}</p>
+        <img
+          src={src}
+          alt={`QR code for ${studentId}`}
+          className="h-48 w-48 rounded-lg border"
+        />
+        <Button onClick={handleDownload} variant="outline" className="gap-1.5 w-full">
+          <Download className="h-4 w-4" />
+          Download PNG
+        </Button>
+      </div>
+    </div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 const AdminManage = () => {
   const { user } = useAuth();
@@ -48,6 +99,9 @@ const AdminManage = () => {
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedUser, setSelectedUser]   = useState<User | null>(null);
+
+  // QR modal state
+  const [qrTarget, setQrTarget] = useState<{ studentId: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -85,6 +139,8 @@ const AdminManage = () => {
         contact,
       });
       toast.success(res.data.message);
+      // Show QR immediately after creation
+      setQrTarget({ studentId: id, name: fullName });
       resetForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to create user");
@@ -141,7 +197,6 @@ const AdminManage = () => {
     }
   };
 
-  // Soft deactivate
   const handleDeactivateUser = async () => {
     if (!selectedUser) return;
     if (!confirm(`Deactivate ${selectedUser.name}? They will no longer be able to log in.`)) return;
@@ -151,7 +206,6 @@ const AdminManage = () => {
         `/api/admin/users/${selectedUser.student_employee_id}`
       );
       toast.success(res.data.message);
-      // Update the row in search results to reflect deactivated state
       setSearchResults((prev) =>
         prev.map((u) =>
           u.student_employee_id === selectedUser.student_employee_id
@@ -167,13 +221,12 @@ const AdminManage = () => {
     }
   };
 
-  // Reactivate a deactivated user
   const handleReactivateUser = async () => {
     if (!selectedUser) return;
     if (!confirm(`Reactivate ${selectedUser.name}?`)) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.put(
+      await axiosInstance.put(
         `/api/admin/users/${selectedUser.student_employee_id}`,
         { is_active: 1 }
       );
@@ -206,6 +259,15 @@ const AdminManage = () => {
 
   return (
     <div className="max-w-3xl">
+      {/* QR Modal */}
+      {qrTarget && (
+        <QrModal
+          studentId={qrTarget.studentId}
+          name={qrTarget.name}
+          onClose={() => setQrTarget(null)}
+        />
+      )}
+
       <h2 className="font-heading text-lg font-bold text-foreground">User Management</h2>
 
       {/* Mode selector */}
@@ -431,6 +493,22 @@ const AdminManage = () => {
               <div className="flex gap-2 flex-wrap">
                 <Button type="submit" disabled={loading}>
                   {loading ? "Updating..." : "Update User"}
+                </Button>
+
+                {/* View QR button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() =>
+                    setQrTarget({
+                      studentId: selectedUser.student_employee_id,
+                      name: selectedUser.name,
+                    })
+                  }
+                >
+                  <QrCode className="h-4 w-4" />
+                  View QR
                 </Button>
 
                 {selectedUser.is_active ? (

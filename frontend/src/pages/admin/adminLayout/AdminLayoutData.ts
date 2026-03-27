@@ -5,6 +5,9 @@ import {
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
 
+
+const ROLES_WITH_ABOUT_SECTION = new Set(["admin", "super_admin"]);
+
 export const sidebarSections: SidebarSection[] = [
   {
     label: "Library Management",
@@ -28,7 +31,7 @@ export const sidebarSections: SidebarSection[] = [
     label: "Content Management",
     items: [
       { title: "Bulletin Posts",      url: "/admin/bulletin",      icon: FileText      },
-      { title: "Edit About Section",  url: "/admin/edit-about",    icon: PenSquare     },
+      { title: "Edit About Section", url: "/admin/edit-about", icon: PenSquare, roles: [...ROLES_WITH_ABOUT_SECTION] },
       { title: "Subscriptions",       url: "/admin/subscriptions", icon: GraduationCap },
     ],
   },
@@ -36,7 +39,7 @@ export const sidebarSections: SidebarSection[] = [
     label: "Reports",
     items: [
       { title: "Circulation Report", url: "/admin/report",     icon: FileBarChart },
-      { title: "Attendance Report",  url: "/admin/attendance", icon: Clock        },
+      { title: "Attendance Logs",  url: "/admin/attendance-logs", icon: Clock        },
     ],
   },
   {

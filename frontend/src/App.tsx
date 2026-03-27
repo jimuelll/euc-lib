@@ -22,6 +22,7 @@ import LibraryServices     from "./pages/homepage/LibraryServices";
 import AcademicSubscriptions from "./pages/homepage/AcademicSubscriptions";
 import StudentDashboard    from "./pages/homepage/StudentDashboard";
 import EditProfile         from "./pages/homepage/EditProfile";
+import ScanQR              from "./pages/homepage/ScanQR";
 
 
 // ─── Admin pages ──────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ import AdminQuery          from "./pages/admin/AdminQuery";
 import AdminInternet       from "./pages/admin/AdminInternet";
 import AdminClearance      from "./pages/admin/AdminClearance";
 import AdminEditAbout      from "./pages/admin/adminAbout/Index";
+import AdminAttendanceLogs from "./pages/admin/AdminAttendanceLogs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -64,7 +66,7 @@ const App = () => (
                 <Route path="/catalogue"               element={<Catalogue />} />
                 <Route path="/bulletin"                element={<Bulletin />} />
                 <Route path="/login"                   element={<Login />} />
-
+                <Route path="/scan-qr"                 element={<ScanQR />} />
                 <Route path="/change-password"         element={<ChangePassword />} />
 
                 {/* ── Student ── */}
@@ -103,8 +105,12 @@ const App = () => (
                   <Route path="restrictions"     element={<AdminManage />} />
                   <Route path="bulletin"         element={<AdminEditAbout />} />
                   <Route path="subscriptions"    element={<AdminEditAbout />} />
-                  <Route path="attendance"       element={<AdminReport />} />
-                  <Route path="edit-about"       element={<AdminEditAbout />} />
+                  <Route path="attendance-logs"  element={<AdminAttendanceLogs />} />
+                  <Route path="edit-about" element={
+                    <ProtectedRoute roles={["admin", "super_admin"]}>
+                      <AdminEditAbout />
+                    </ProtectedRoute>
+                  } />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

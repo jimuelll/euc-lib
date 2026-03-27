@@ -114,7 +114,7 @@ const Navbar = () => {
             an explicit `h-9 w-9` so it can never be pushed out of view.
           */}
           <div className="flex items-center gap-0.5 shrink-0">
-            {showScannerTools && <ScannerTools />}
+            {showScannerTools && <ScannerTools onNavigate={navigate} />}
 
             <div className="text-primary-foreground/70 hover:text-primary-foreground transition-colors">
               <ThemeToggle />
@@ -359,12 +359,18 @@ const UserDropdown = ({
 
 // ── Scanner tools ─────────────────────────────────────────────────────────────
 
-const ScannerTools = () => (
+const ScannerTools = ({ onNavigate }: { onNavigate: (path: string) => void }) => (
   <>
-    <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+    <button
+      className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+      onClick={() => onNavigate("/scan-qr")}
+    >
       <QrCode className="h-4 w-4" />
     </button>
-    <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+    <button
+      className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+      onClick={() => onNavigate("/scan-qr")}
+    >
       <Baby className="h-4 w-4" />
     </button>
   </>

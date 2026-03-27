@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const db = require("../../db");
+const qr = require("qrcode");
 
 // Role hierarchy map
 const roleHierarchy = {
@@ -18,20 +19,23 @@ async function createUser({ student_employee_id, name, role, password, address, 
     "SELECT * FROM users WHERE student_employee_id = ?",
     [student_employee_id]
   );
-  if (existing.length) {
-    throw new Error("User already exists");
-  }
+  if (existing.length) throw new Error("User already exists");
 
   const password_hash = await bcrypt.hash(password, 12);
 
-  await db.query(
+  const [result] = await db.query(
     `INSERT INTO users 
       (student_employee_id, name, password_hash, role, is_active, must_change_password, address, contact)
       VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
-    [student_employee_id, name, password_hash, role, address || null, contact || null]
+    [student_employee_id, name, password_hash, role, address || "", contact || ""]
   );
 
-  return { message: "User created successfully" };
+  const userId = result.insertId;
+  const barcode = `LIB-USER-${String(userId).padStart(6, "0")}`;
+
+  await db.query("UPDATE users SET barcode = ? WHERE id = ?", [barcode, userId]);
+
+  return { message: "User created successfully", barcode };
 }
 
 // DELETE USER (soft delete — sets is_active = 0, preserves borrowing history)
