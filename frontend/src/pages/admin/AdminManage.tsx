@@ -40,13 +40,54 @@ const QrModal = ({
   name: string;
   onClose: () => void;
 }) => {
-  const src = `/api/admin/users/${encodeURIComponent(studentId)}/barcode-png`;
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleDownload = () => {
-    const a = document.createElement("a");
-    a.href = src;
-    a.download = `qr-${studentId}.png`;
-    a.click();
+  useEffect(() => {
+    let objectUrl: string | null = null;
+
+    const loadQr = async () => {
+      try {
+        const res = await axiosInstance.get(
+          `/api/admin/users/${encodeURIComponent(studentId)}/barcode-png`,
+          { responseType: "blob" }
+        );
+
+        objectUrl = URL.createObjectURL(res.data);
+        setQrUrl(objectUrl);
+      } catch (err) {
+        console.error("Failed to load QR", err);
+        toast.error("Failed to load QR code");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadQr();
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [studentId]);
+
+  const handleDownload = async () => {
+    try {
+      const res = await axiosInstance.get(
+        `/api/admin/users/${encodeURIComponent(studentId)}/barcode-png`,
+        { responseType: "blob" }
+      );
+
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qr-${studentId}.png`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed", err);
+      toast.error("Failed to download QR code");
+    }
   };
 
   return (
@@ -64,14 +105,31 @@ const QrModal = ({
         >
           <X className="h-4 w-4" />
         </button>
+
         <p className="font-semibold text-foreground text-center">{name}</p>
         <p className="text-xs text-muted-foreground">{studentId}</p>
-        <img
-          src={src}
-          alt={`QR code for ${studentId}`}
-          className="h-48 w-48 rounded-lg border"
-        />
-        <Button onClick={handleDownload} variant="outline" className="gap-1.5 w-full">
+
+        {loading ? (
+          <div className="h-48 w-48 flex items-center justify-center text-sm text-muted-foreground">
+            Loading...
+          </div>
+        ) : qrUrl ? (
+          <img
+            src={qrUrl}
+            alt={`QR code for ${studentId}`}
+            className="h-48 w-48 rounded-lg border"
+          />
+        ) : (
+          <div className="h-48 w-48 flex items-center justify-center text-sm text-destructive">
+            Failed to load
+          </div>
+        )}
+
+        <Button
+          onClick={handleDownload}
+          variant="outline"
+          className="gap-1.5 w-full"
+        >
           <Download className="h-4 w-4" />
           Download PNG
         </Button>

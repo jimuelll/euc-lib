@@ -32,7 +32,7 @@ interface AttendanceResult {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** How long to show the success screen before auto-resetting (ms) */
-const AUTO_RESET_DELAY = 3000;
+const AUTO_RESET_DELAY = 5000;
 
 // ─── ZXing hook ───────────────────────────────────────────────────────────────
 
@@ -372,6 +372,7 @@ const ScanQR = () => {
                     <video
                       ref={videoRef}
                       className="absolute inset-0 w-full h-full object-cover"
+                      style={{ transform: "scaleX(-1)" }}
                       muted
                       playsInline
                     />

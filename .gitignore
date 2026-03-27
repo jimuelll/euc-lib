@@ -29,3 +29,4 @@ dist-ssr
 backend/.env
 backend/db.js
 frontend/.env
+backend/db.js
