@@ -19,7 +19,7 @@ import Login               from "./pages/homepage/Login";
 import ChangePassword      from "./pages/homepage/ChangePassword";
 import NotFound            from "./pages/homepage/NotFound";
 import LibraryServices     from "./pages/homepage/LibraryServices";
-import AcademicSubscriptions from "./pages/homepage/AcademicSubscriptions";
+import AcademicSubscriptions from "./pages/homepage/academicSubscriptions/AcademicSubscriptions";
 import StudentDashboard    from "./pages/homepage/StudentDashboard";
 import EditProfile         from "./pages/homepage/EditProfile";
 import ScanQR              from "./pages/homepage/scanqr/index";
@@ -40,6 +40,7 @@ import AdminInternet       from "./pages/admin/AdminInternet";
 import AdminClearance      from "./pages/admin/AdminClearance";
 import AdminEditAbout      from "./pages/admin/adminAbout/Index";
 import AdminAttendanceLogs from "./pages/admin/adminAttendanceLogs/Index";
+import AdminSubscriptions  from "./pages/admin/adminSubscriptions/index";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ const App = () => (
                   <Route path="holidays"         element={<AdminManage />} />
                   <Route path="restrictions"     element={<AdminManage />} />
                   <Route path="bulletin"         element={<AdminEditAbout />} />
-                  <Route path="subscriptions"    element={<AdminEditAbout />} />
+                  <Route path="subscriptions"    element={<AdminSubscriptions />} />
                   <Route path="attendance-logs"  element={<AdminAttendanceLogs />} />
                   <Route path="edit-about" element={
                     <ProtectedRoute roles={["admin", "super_admin"]}>

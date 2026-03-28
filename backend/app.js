@@ -14,6 +14,7 @@ const circulationRoutes = require("./modules/circulation/circulation.routes");
 const bulletinRoutes    = require("./modules/bulletin/bulletin.routes");
 const aboutRoutes       = require("./modules/about/about.routes");
 const attendanceRoutes  = require("./modules/attendance/attendance.routes");
+const subscriptionsRoutes = require("./modules/subscriptions/subscriptions.routes");
 
 const { authMiddleware }      = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -48,6 +49,7 @@ app.use("/api/auth",     authRoutes);
 app.use("/api/bulletin", bulletinRoutes);
 app.use("/api/about",    aboutRoutes);
 app.use("/api/admin/users", require("./modules/admin/barcode.routes"));
+app.use("/api", subscriptionsRoutes);
 
 // --- Global Protection ---
 app.use(authMiddleware());
@@ -62,5 +64,6 @@ app.use("/api/reservations", reservationRoutes);
 app.use("/api/admin",        adminReservationRoutes);
 app.use("/api/admin/about",  aboutRoutes);
 app.use("/api/attendance",   attendanceRoutes);
+
 
 module.exports = app;
