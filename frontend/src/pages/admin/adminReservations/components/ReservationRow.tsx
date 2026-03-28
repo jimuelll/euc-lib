@@ -1,5 +1,4 @@
 import { BookMarked, User, CalendarClock, MapPin } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { RESERVATION_STATUS_CONFIG } from "../reservations.types";
 import type { AdminReservation } from "../reservations.types";
 import ReservationRowActions from "./ReservationRowActions";
@@ -14,76 +13,96 @@ interface ReservationRowProps {
 }
 
 const ReservationRow = ({
-  reservation: r,
-  isActing,
-  index,
-  onMarkReady,
-  onFulfill,
-  onCancel,
+  reservation: r, isActing, index,
+  onMarkReady, onFulfill, onCancel,
 }: ReservationRowProps) => {
   const cfg        = RESERVATION_STATUS_CONFIG[r.status];
   const StatusIcon = cfg.icon;
   const showExpiry = r.expires_at && (r.status === "pending" || r.status === "ready");
 
+  // Status-based left accent bar color
+  const accentColor =
+    r.status === "ready"     ? "bg-success/60"     :
+    r.status === "pending"   ? "bg-warning/60"      :
+    r.status === "fulfilled" ? "bg-info/40"         :
+    "bg-border";
+
   return (
-    <div
-      className={`grid grid-cols-1 sm:grid-cols-[1fr_1fr_160px_180px] gap-x-4 gap-y-2 px-4 py-3.5 border-b last:border-0 border-border transition-colors hover:bg-muted/20 ${
-        index % 2 !== 0 ? "bg-muted/10" : ""
-      }`}
-    >
-      {/* Book column */}
-      <div className="min-w-0">
+    <tr className={`group border-b border-border last:border-0 hover:bg-muted/15 transition-colors ${
+      index % 2 !== 0 ? "bg-muted/[0.06]" : ""
+    }`}>
+
+      {/* Status accent — narrow left cell */}
+      <td className="w-[3px] p-0">
+        <div className={`h-full w-[3px] min-h-[56px] ${accentColor}`} />
+      </td>
+
+      {/* Book */}
+      <td className="px-4 py-3 min-w-0">
         <div className="flex items-start gap-2">
-          <BookMarked className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+          <BookMarked className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{r.book_title}</p>
-            <p className="text-xs text-muted-foreground truncate">{r.book_author}</p>
+            <p
+              className="text-[13px] font-bold text-foreground truncate leading-tight"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {r.book_title}
+            </p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground/60 truncate"
+              style={{ fontFamily: "var(--font-heading)" }}>
+              {r.book_author}
+            </p>
             {r.book_location && (
-              <p className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-0.5">
-                <MapPin className="h-3 w-3" />
+              <p className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground/50">
+                <MapPin className="h-2.5 w-2.5 shrink-0" />
                 {r.book_location}
               </p>
             )}
           </div>
         </div>
-      </div>
+      </td>
 
-      {/* Patron column */}
-      <div className="min-w-0">
+      {/* Patron */}
+      <td className="px-4 py-3 min-w-0 hidden sm:table-cell">
         <div className="flex items-start gap-2">
-          <User className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+          <User className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{r.user_name}</p>
-            <p className="text-xs text-muted-foreground font-mono">{r.student_employee_id}</p>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-0.5">
-              <CalendarClock className="h-3 w-3" />
+            <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/60">{r.student_employee_id}</p>
+            <p className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground/50">
+              <CalendarClock className="h-2.5 w-2.5 shrink-0" />
               {new Date(r.reserved_at).toLocaleDateString([], {
                 month: "short", day: "numeric", year: "numeric",
               })}
             </p>
           </div>
         </div>
-      </div>
+      </td>
 
-      {/* Status + expiry column */}
-      <div className="flex flex-col gap-1.5 justify-center">
-        <Badge variant="outline" className={`w-fit text-xs ${cfg.className}`}>
-          <StatusIcon className="mr-1 h-3 w-3" />
-          {cfg.label}
-        </Badge>
-        {showExpiry && (
-          <p className="text-xs text-muted-foreground">
-            Exp.{" "}
-            {new Date(r.expires_at!).toLocaleString([], {
-              month: "short", day: "numeric",
-              hour: "2-digit", minute: "2-digit",
-            })}
-          </p>
-        )}
-      </div>
+      {/* Status + expiry */}
+      <td className="px-4 py-3 hidden md:table-cell">
+        <div className="flex flex-col gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] w-fit ${cfg.className}`}
+            style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
+          >
+            <StatusIcon className="h-3 w-3 shrink-0" />
+            {cfg.label}
+          </span>
+          {showExpiry && (
+            <p className="text-[10px] text-muted-foreground/50">
+              Exp.{" "}
+              {new Date(r.expires_at!).toLocaleString([], {
+                month: "short", day: "numeric",
+                hour: "2-digit", minute: "2-digit",
+              })}
+            </p>
+          )}
+        </div>
+      </td>
 
-      {/* Actions column */}
-      <div className="flex items-center">
+      {/* Actions */}
+      <td className="px-4 py-3">
         <ReservationRowActions
           id={r.id}
           title={r.book_title}
@@ -93,8 +112,8 @@ const ReservationRow = ({
           onFulfill={onFulfill}
           onCancel={onCancel}
         />
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 };
 

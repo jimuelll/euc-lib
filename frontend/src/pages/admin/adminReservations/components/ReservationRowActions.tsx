@@ -1,32 +1,51 @@
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import type { ReservationStatus } from "../reservations.types";
 
 interface ReservationRowActionsProps {
-  id:        number;
-  title:     string;
-  status:    ReservationStatus;
-  isActing:  boolean;
+  id:          number;
+  title:       string;
+  status:      ReservationStatus;
+  isActing:    boolean;
   onMarkReady: (id: number, title: string) => void;
   onFulfill:   (id: number, title: string) => void;
   onCancel:    (id: number, title: string) => void;
 }
 
+const ActionBtn = ({
+  onClick, disabled, variant, children,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  variant: "primary" | "success" | "danger";
+  children: React.ReactNode;
+}) => {
+  const colors = {
+    primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+    success: "bg-success text-success-foreground hover:bg-success/90",
+    danger:  "border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex items-center gap-1.5 h-7 px-3 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors disabled:opacity-40 ${colors[variant]}`}
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </button>
+  );
+};
+
 const ReservationRowActions = ({
-  id,
-  title,
-  status,
-  isActing,
-  onMarkReady,
-  onFulfill,
-  onCancel,
+  id, title, status, isActing,
+  onMarkReady, onFulfill, onCancel,
 }: ReservationRowActionsProps) => {
+
   if (status === "pending") {
     return (
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button
-          size="sm"
-          className="h-7 px-2.5 text-xs bg-success hover:bg-success/90 text-white gap-1"
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <ActionBtn
+          variant="success"
           disabled={isActing}
           onClick={() => onMarkReady(id, title)}
         >
@@ -35,27 +54,24 @@ const ReservationRowActions = ({
             : <CheckCircle2 className="h-3 w-3" />
           }
           Mark Ready
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+        </ActionBtn>
+        <ActionBtn
+          variant="danger"
           disabled={isActing}
           onClick={() => onCancel(id, title)}
         >
           <XCircle className="h-3 w-3" />
           Cancel
-        </Button>
+        </ActionBtn>
       </div>
     );
   }
 
   if (status === "ready") {
     return (
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button
-          size="sm"
-          className="h-7 px-2.5 text-xs gap-1"
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <ActionBtn
+          variant="primary"
           disabled={isActing}
           onClick={() => onFulfill(id, title)}
         >
@@ -64,23 +80,21 @@ const ReservationRowActions = ({
             : <CheckCircle2 className="h-3 w-3" />
           }
           Fulfil
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+        </ActionBtn>
+        <ActionBtn
+          variant="danger"
           disabled={isActing}
           onClick={() => onCancel(id, title)}
         >
           <XCircle className="h-3 w-3" />
           Cancel
-        </Button>
+        </ActionBtn>
       </div>
     );
   }
 
-  // fulfilled / cancelled / expired — read-only
-  return <span className="text-xs text-muted-foreground/50 italic">—</span>;
+  // fulfilled / cancelled / expired
+  return <span className="text-muted-foreground/25">—</span>;
 };
 
 export default ReservationRowActions;

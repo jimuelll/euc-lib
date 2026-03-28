@@ -5,16 +5,78 @@ import { toast } from "@/components/ui/sonner";
 import {
   Input,
   Label,
-  Button,
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
 } from "@/components/ui";
-import { Badge } from "@/components/ui/badge";
 import type { User, UserFormState, QrTarget } from "../AdminManage.types";
 import { formatRole } from "../AdminManage.data";
+
+// ─── Primitives ───────────────────────────────────────────────────────────────
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex items-center gap-3 mb-5">
+    <div className="h-px w-6 bg-warning shrink-0" />
+    <p
+      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </p>
+  </div>
+);
+
+const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+  <p
+    className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60 mb-1.5"
+    style={{ fontFamily: "var(--font-heading)" }}
+  >
+    {children}
+  </p>
+);
+
+// Square primary-filled action button
+const ActionButton = ({
+  children,
+  onClick,
+  type = "button",
+  disabled,
+  variant = "primary",
+  className = "",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  variant?: "primary" | "ghost" | "danger" | "success";
+  className?: string;
+}) => {
+  const base =
+    "inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] border transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
+    primary:
+      "bg-primary border-primary text-primary-foreground hover:bg-primary/85",
+    ghost:
+      "bg-transparent border-border text-muted-foreground hover:bg-secondary hover:text-foreground",
+    danger:
+      "bg-transparent border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
+    success:
+      "bg-transparent border-success/40 text-success hover:bg-success hover:text-success-foreground",
+  };
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`${base} ${variants[variant]} ${className}`}
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </button>
+  );
+};
 
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
 
@@ -24,12 +86,11 @@ interface QrModalProps {
 }
 
 export const QrModal = ({ target, onClose }: QrModalProps) => {
-  const [qrUrl, setQrUrl]   = useState<string | null>(null);
+  const [qrUrl, setQrUrl]     = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let objectUrl: string | null = null;
-
     const loadQr = async () => {
       try {
         const res = await axiosInstance.get(
@@ -45,7 +106,6 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         setLoading(false);
       }
     };
-
     loadQr();
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [target.studentId]);
@@ -70,49 +130,69 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
       <div
-        className="relative rounded-xl border bg-card p-6 shadow-xl flex flex-col items-center gap-4 w-72"
+        className="relative bg-card border border-border shadow-2xl flex flex-col items-center w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        <p className="font-semibold text-foreground text-center">{target.name}</p>
-        <p className="text-xs text-muted-foreground">{target.studentId}</p>
-
-        {loading ? (
-          <div className="h-48 w-48 flex items-center justify-center text-sm text-muted-foreground">
-            Loading...
+        {/* Header band */}
+        <div className="w-full bg-primary relative">
+          <div className="h-[3px] w-full bg-warning" />
+          <div className="px-5 py-4 flex items-start justify-between">
+            <div>
+              <p
+                className="text-[13px] font-bold tracking-tight text-primary-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {target.name}
+              </p>
+              <p className="text-[10px] tracking-[0.15em] text-primary-foreground/50 mt-0.5 uppercase"
+                style={{ fontFamily: "var(--font-heading)" }}>
+                {target.studentId}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-primary-foreground/40 hover:text-primary-foreground transition-colors mt-0.5"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-        ) : qrUrl ? (
-          <img
-            src={qrUrl}
-            alt={`QR code for ${target.studentId}`}
-            className="h-48 w-48 rounded-lg border"
-          />
-        ) : (
-          <div className="h-48 w-48 flex items-center justify-center text-sm text-destructive">
-            Failed to load
-          </div>
-        )}
+        </div>
 
-        <Button onClick={handleDownload} variant="outline" className="gap-1.5 w-full">
-          <Download className="h-4 w-4" />
-          Download PNG
-        </Button>
+        {/* QR area */}
+        <div className="p-6 flex flex-col items-center gap-5 w-full">
+          {loading ? (
+            <div className="h-48 w-48 border border-border flex items-center justify-center">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40"
+                style={{ fontFamily: "var(--font-heading)" }}>Loading…</p>
+            </div>
+          ) : qrUrl ? (
+            <img
+              src={qrUrl}
+              alt={`QR code for ${target.studentId}`}
+              className="h-48 w-48 border border-border"
+            />
+          ) : (
+            <div className="h-48 w-48 border border-destructive/30 flex items-center justify-center">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-destructive"
+                style={{ fontFamily: "var(--font-heading)" }}>Failed to load</p>
+            </div>
+          )}
+
+          <ActionButton onClick={handleDownload} className="w-full justify-center">
+            <Download className="h-3.5 w-3.5" />
+            Download PNG
+          </ActionButton>
+        </div>
       </div>
     </div>
   );
 };
 
-// ─── Shared: Password Field ───────────────────────────────────────────────────
+// ─── Password Field ───────────────────────────────────────────────────────────
 
 interface PasswordFieldProps {
   label: string;
@@ -124,27 +204,23 @@ interface PasswordFieldProps {
 }
 
 export const PasswordField = ({
-  label,
-  value,
-  showPassword,
-  placeholder,
-  onChange,
-  onToggle,
+  label, value, showPassword, placeholder, onChange, onToggle,
 }: PasswordFieldProps) => (
-  <div className="space-y-2">
-    <Label>{label}</Label>
+  <div>
+    <FieldLabel>{label}</FieldLabel>
     <div className="relative">
       <Input
         type={showPassword ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        className="rounded-none"
       />
       {onToggle && (
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
         >
           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
@@ -153,7 +229,7 @@ export const PasswordField = ({
   </div>
 );
 
-// ─── Shared: Role Select ──────────────────────────────────────────────────────
+// ─── Role Select ──────────────────────────────────────────────────────────────
 
 interface RoleSelectProps {
   value: string;
@@ -162,13 +238,13 @@ interface RoleSelectProps {
 }
 
 export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) => (
-  <div className="space-y-2">
-    <Label>Role</Label>
+  <div>
+    <FieldLabel>Role</FieldLabel>
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-      <SelectContent>
+      <SelectTrigger className="rounded-none"><SelectValue placeholder="Select role" /></SelectTrigger>
+      <SelectContent className="rounded-none">
         {allowedRoles.map((r) => (
-          <SelectItem key={r} value={r}>{formatRole(r)}</SelectItem>
+          <SelectItem key={r} value={r} className="rounded-none">{formatRole(r)}</SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -178,16 +254,16 @@ export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) =
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 export const StatusBadge = ({ isActive }: { isActive?: number }) => (
-  <Badge
-    variant="outline"
-    className={
+  <span
+    className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] border ${
       isActive
-        ? "bg-success/10 text-success border-success/20"
+        ? "bg-success/10 text-success border-success/30"
         : "bg-muted/50 text-muted-foreground border-border"
-    }
+    }`}
+    style={{ fontFamily: "var(--font-heading)" }}
   >
     {isActive ? "Active" : "Inactive"}
-  </Badge>
+  </span>
 );
 
 // ─── Create Form ──────────────────────────────────────────────────────────────
@@ -204,58 +280,65 @@ interface CreateFormProps {
 }
 
 export const CreateForm = ({
-  form,
-  showPassword,
-  allowedRoles,
-  loading,
-  onField,
-  onTogglePassword,
-  onSubmit,
-  onReset,
+  form, showPassword, allowedRoles, loading,
+  onField, onTogglePassword, onSubmit, onReset,
 }: CreateFormProps) => (
   <form
-    className="mt-6 space-y-4 rounded-lg border bg-card p-6"
+    className="mt-6 border border-border bg-background"
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    <div className="space-y-2">
-      <Label>Full Name</Label>
-      <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} />
+    {/* Form header */}
+    <div className="border-b border-border px-6 py-4 bg-secondary/30">
+      <SectionLabel>New User Details</SectionLabel>
     </div>
-    <div className="space-y-2">
-      <Label>ID Number</Label>
-      <Input value={form.id} onChange={(e) => onField("id", e.target.value)} />
+
+    <div className="p-6 space-y-5">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <FieldLabel>Full Name</FieldLabel>
+          <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} className="rounded-none" />
+        </div>
+        <div>
+          <FieldLabel>ID Number</FieldLabel>
+          <Input value={form.id} onChange={(e) => onField("id", e.target.value)} className="rounded-none" />
+        </div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <FieldLabel>Address</FieldLabel>
+          <Input value={form.address} onChange={(e) => onField("address", e.target.value)} className="rounded-none" />
+        </div>
+        <div>
+          <FieldLabel>Contact</FieldLabel>
+          <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} className="rounded-none" />
+        </div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <PasswordField
+          label="Password"
+          value={form.password}
+          showPassword={showPassword}
+          onChange={(v) => onField("password", v)}
+          onToggle={onTogglePassword}
+        />
+        <PasswordField
+          label="Re-Type Password"
+          value={form.rePassword}
+          showPassword={showPassword}
+          onChange={(v) => onField("rePassword", v)}
+        />
+      </div>
+      <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
-    <div className="space-y-2">
-      <Label>Address</Label>
-      <Input value={form.address} onChange={(e) => onField("address", e.target.value)} />
-    </div>
-    <div className="space-y-2">
-      <Label>Contact</Label>
-      <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} />
-    </div>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <PasswordField
-        label="Password"
-        value={form.password}
-        showPassword={showPassword}
-        onChange={(v) => onField("password", v)}
-        onToggle={onTogglePassword}
-      />
-      <PasswordField
-        label="Re-Type Password"
-        value={form.rePassword}
-        showPassword={showPassword}
-        onChange={(v) => onField("rePassword", v)}
-      />
-    </div>
-    <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
-    <div className="flex gap-2">
-      <Button type="submit" disabled={loading}>
-        {loading ? "Creating..." : "Create User"}
-      </Button>
-      <Button type="button" variant="outline" onClick={onReset} disabled={loading}>
+
+    {/* Action bar */}
+    <div className="border-t border-border px-6 py-4 flex gap-2">
+      <ActionButton type="submit" disabled={loading}>
+        {loading ? "Creating…" : "Create User"}
+      </ActionButton>
+      <ActionButton type="button" variant="ghost" onClick={onReset} disabled={loading}>
         Clear Form
-      </Button>
+      </ActionButton>
     </div>
   </form>
 );
@@ -270,16 +353,17 @@ interface SearchBarProps {
 }
 
 export const SearchBar = ({ value, loading, onChange, onSearch }: SearchBarProps) => (
-  <div className="mt-6 flex gap-2">
+  <div className="mt-6 flex gap-0">
     <Input
       placeholder="Search by ID or Name"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => e.key === "Enter" && onSearch()}
+      className="rounded-none flex-1 border-r-0"
     />
-    <Button onClick={onSearch} disabled={loading}>
-      {loading ? "Searching..." : "Search"}
-    </Button>
+    <ActionButton onClick={onSearch} disabled={loading}>
+      {loading ? "Searching…" : "Search"}
+    </ActionButton>
   </div>
 );
 
@@ -291,27 +375,39 @@ interface SearchResultsTableProps {
 }
 
 export const SearchResultsTable = ({ results, onSelect }: SearchResultsTableProps) => (
-  <div className="mt-4 overflow-x-auto rounded-lg border bg-card">
-    <table className="w-full text-left text-sm text-foreground">
-      <thead className="border-b bg-muted/40">
+  <div className="mt-4 border border-border overflow-x-auto">
+    <table className="w-full text-left text-sm">
+      <thead className="border-b border-border bg-secondary/40">
         <tr>
-          <th className="px-3 py-2">ID</th>
-          <th className="px-3 py-2">Name</th>
-          <th className="px-3 py-2">Role</th>
-          <th className="px-3 py-2">Status</th>
+          {["ID", "Name", "Role", "Status"].map((h) => (
+            <th
+              key={h}
+              className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {h}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
-        {results.map((u) => (
+        {results.map((u, i) => (
           <tr
             key={u.student_employee_id}
-            className="border-t cursor-pointer hover:bg-accent/20"
+            className={`border-t border-border cursor-pointer transition-colors hover:bg-secondary/50 ${
+              i % 2 === 0 ? "bg-background" : "bg-secondary/20"
+            }`}
             onClick={() => onSelect(u)}
           >
-            <td className="px-3 py-2">{u.student_employee_id}</td>
-            <td className="px-3 py-2">{u.name}</td>
-            <td className="px-3 py-2 capitalize">{u.role.replace("_", " ")}</td>
-            <td className="px-3 py-2"><StatusBadge isActive={u.is_active} /></td>
+            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{u.student_employee_id}</td>
+            <td className="px-4 py-3 text-xs font-medium text-foreground">{u.name}</td>
+            <td
+              className="px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {u.role.replace("_", " ")}
+            </td>
+            <td className="px-4 py-3"><StatusBadge isActive={u.is_active} /></td>
           </tr>
         ))}
       </tbody>
@@ -336,94 +432,97 @@ interface EditFormProps {
 }
 
 export const EditForm = ({
-  selectedUser,
-  form,
-  showPassword,
-  allowedRoles,
-  loading,
-  onField,
-  onTogglePassword,
-  onSubmit,
-  onViewQr,
-  onDeactivate,
-  onReactivate,
+  selectedUser, form, showPassword, allowedRoles, loading,
+  onField, onTogglePassword, onSubmit, onViewQr, onDeactivate, onReactivate,
 }: EditFormProps) => (
   <form
-    className="mt-6 space-y-4 rounded-lg border bg-card p-6"
+    className="mt-6 border border-border bg-background"
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    <div className="flex items-center justify-between">
-      <h3 className="font-semibold text-foreground">Editing: {selectedUser.name}</h3>
-      <StatusBadge isActive={selectedUser.is_active} />
+    {/* Form header band */}
+    <div className="bg-primary relative overflow-hidden">
+      <div className="h-[3px] w-full bg-warning" />
+      <div className="px-6 py-4 flex items-center justify-between">
+        <div>
+          <p
+            className="text-[13px] font-bold tracking-tight text-primary-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {selectedUser.name}
+          </p>
+          <p
+            className="text-[10px] uppercase tracking-[0.15em] text-primary-foreground/50 mt-0.5"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {selectedUser.student_employee_id}
+          </p>
+        </div>
+        <StatusBadge isActive={selectedUser.is_active} />
+      </div>
     </div>
 
-    <div className="space-y-2">
-      <Label>Full Name</Label>
-      <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} />
+    <div className="p-6 space-y-5">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <FieldLabel>Full Name</FieldLabel>
+          <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} className="rounded-none" />
+        </div>
+        <div>
+          <FieldLabel>ID Number</FieldLabel>
+          <Input value={form.id} disabled className="rounded-none opacity-50" />
+        </div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <FieldLabel>Address</FieldLabel>
+          <Input value={form.address} onChange={(e) => onField("address", e.target.value)} className="rounded-none" />
+        </div>
+        <div>
+          <FieldLabel>Contact</FieldLabel>
+          <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} className="rounded-none" />
+        </div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <PasswordField
+          label="New Password"
+          value={form.password}
+          showPassword={showPassword}
+          placeholder="Leave empty to keep current"
+          onChange={(v) => onField("password", v)}
+          onToggle={onTogglePassword}
+        />
+        <PasswordField
+          label="Re-Type Password"
+          value={form.rePassword}
+          showPassword={showPassword}
+          placeholder="Leave empty to keep current"
+          onChange={(v) => onField("rePassword", v)}
+        />
+      </div>
+      <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
-    <div className="space-y-2">
-      <Label>ID Number</Label>
-      <Input value={form.id} disabled />
-    </div>
-    <div className="space-y-2">
-      <Label>Address</Label>
-      <Input value={form.address} onChange={(e) => onField("address", e.target.value)} />
-    </div>
-    <div className="space-y-2">
-      <Label>Contact</Label>
-      <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} />
-    </div>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <PasswordField
-        label="New Password"
-        value={form.password}
-        showPassword={showPassword}
-        placeholder="Leave empty to keep current"
-        onChange={(v) => onField("password", v)}
-        onToggle={onTogglePassword}
-      />
-      <PasswordField
-        label="Re-Type Password"
-        value={form.rePassword}
-        showPassword={showPassword}
-        placeholder="Leave empty to keep current"
-        onChange={(v) => onField("rePassword", v)}
-      />
-    </div>
-    <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
 
-    <div className="flex gap-2 flex-wrap">
-      <Button type="submit" disabled={loading}>
-        {loading ? "Updating..." : "Update User"}
-      </Button>
+    {/* Action bar */}
+    <div className="border-t border-border px-6 py-4 flex gap-2 flex-wrap">
+      <ActionButton type="submit" disabled={loading}>
+        {loading ? "Updating…" : "Update User"}
+      </ActionButton>
 
-      <Button type="button" variant="outline" className="gap-1.5" onClick={onViewQr}>
-        <QrCode className="h-4 w-4" />
+      <ActionButton type="button" variant="ghost" onClick={onViewQr}>
+        <QrCode className="h-3.5 w-3.5" />
         View QR
-      </Button>
+      </ActionButton>
 
       {selectedUser.is_active ? (
-        <Button
-          type="button"
-          variant="destructive"
-          onClick={onDeactivate}
-          disabled={loading}
-          className="gap-1.5"
-        >
-          <UserX className="h-4 w-4" />
-          {loading ? "Deactivating..." : "Deactivate User"}
-        </Button>
+        <ActionButton type="button" variant="danger" onClick={onDeactivate} disabled={loading}>
+          <UserX className="h-3.5 w-3.5" />
+          {loading ? "Deactivating…" : "Deactivate"}
+        </ActionButton>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onReactivate}
-          disabled={loading}
-          className="gap-1.5 border-success/40 text-success hover:bg-success/10"
-        >
-          <UserCheck className="h-4 w-4" />
-          {loading ? "Reactivating..." : "Reactivate User"}
-        </Button>
+        <ActionButton type="button" variant="success" onClick={onReactivate} disabled={loading}>
+          <UserCheck className="h-3.5 w-3.5" />
+          {loading ? "Reactivating…" : "Reactivate"}
+        </ActionButton>
       )}
     </div>
   </form>

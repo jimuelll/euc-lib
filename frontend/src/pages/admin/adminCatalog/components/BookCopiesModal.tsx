@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { X, ScanLine, Loader2, Download } from "lucide-react";
+import { X, ScanLine, Loader2, Download, BookOpen } from "lucide-react";
 
 type Copy = {
   id: number;
@@ -22,13 +21,17 @@ type Props = {
   onClose: () => void;
 };
 
-const CONDITION_COLORS: Record<string, string> = {
-  good:    "bg-green-100 text-green-700",
-  damaged: "bg-yellow-100 text-yellow-700",
-  lost:    "bg-red-100 text-red-700",
+const CONDITION_CONFIG: Record<string, { label: string; className: string }> = {
+  good:    { label: "Good",    className: "border-success/30 text-success bg-success/5"           },
+  damaged: { label: "Damaged", className: "border-warning/40 text-warning bg-warning/5"           },
+  lost:    { label: "Lost",    className: "border-destructive/30 text-destructive bg-destructive/5" },
 };
 
-// Fetch barcode PNG via axios (handles auth headers) and return an object URL
+const STATUS_CONFIG = {
+  available: { label: "Available", className: "border-success/30 text-success bg-success/5"           },
+  borrowed:  { label: "Borrowed",  className: "border-destructive/30 text-destructive bg-destructive/5" },
+};
+
 const fetchBarcodeObjectUrl = async (barcode: string): Promise<string> => {
   const res = await axiosInstance.get(
     `api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`,
@@ -37,17 +40,42 @@ const fetchBarcodeObjectUrl = async (barcode: string): Promise<string> => {
   return URL.createObjectURL(res.data);
 };
 
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+const Badge = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <span
+    className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${className ?? ""}`}
+    style={{ fontFamily: "var(--font-heading)" }}
+  >
+    {children}
+  </span>
+);
+
+// ─── Detail row (scan result grid) ───────────────────────────────────────────
+
+const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <>
+    <dt
+      className="py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground border-b border-border/50"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {label}
+    </dt>
+    <dd className="py-2 text-sm text-foreground border-b border-border/50">{value}</dd>
+  </>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
-  const [copies, setCopies]               = useState<Copy[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [scanning, setScanning]           = useState(false);
-  const [scannedCopy, setScannedCopy]     = useState<(Copy & { title?: string; author?: string }) | null>(null);
-  // map barcode → object URL so each image only loads once
-  const [barcodeUrls, setBarcodeUrls]     = useState<Record<string, string>>({});
+  const [copies, setCopies]           = useState<Copy[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [scanning, setScanning]       = useState(false);
+  const [scannedCopy, setScannedCopy] = useState<(Copy & { title?: string; author?: string }) | null>(null);
+  const [barcodeUrls, setBarcodeUrls] = useState<Record<string, string>>({});
   const videoRef    = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
 
-  // ── Fetch copies ────────────────────────────────────────────────────────────
   useEffect(() => {
     axiosInstance
       .get(`api/admin/books/${bookId}/copies`)
@@ -56,28 +84,21 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
       .finally(() => setLoading(false));
   }, [bookId]);
 
-  // ── Load barcode images as blob URLs (bypasses cross-origin download block) ─
   useEffect(() => {
     if (!copies.length) return;
     copies.forEach(async (copy) => {
-      if (barcodeUrls[copy.barcode]) return; // already loaded
+      if (barcodeUrls[copy.barcode]) return;
       try {
         const url = await fetchBarcodeObjectUrl(copy.barcode);
         setBarcodeUrls((prev) => ({ ...prev, [copy.barcode]: url }));
-      } catch {
-        // image will just not render — onError handles it
-      }
+      } catch { /* silent */ }
     });
   }, [copies]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Revoke object URLs on unmount to avoid memory leaks
   useEffect(() => {
-    return () => {
-      Object.values(barcodeUrls).forEach((url) => URL.revokeObjectURL(url));
-    };
+    return () => { Object.values(barcodeUrls).forEach(URL.revokeObjectURL); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── ZXing scanner ───────────────────────────────────────────────────────────
   const stopScanner = useCallback(() => {
     controlsRef.current?.stop();
     controlsRef.current = null;
@@ -91,9 +112,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
 
   useEffect(() => {
     if (!scanning || !videoRef.current) return;
-
     const reader = new BrowserMultiFormatReader();
-
     reader
       .decodeFromVideoDevice(undefined, videoRef.current, async (result, err) => {
         if (result) {
@@ -102,71 +121,114 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
           try {
             const res = await axiosInstance.get(`api/admin/copies/${encodeURIComponent(barcode)}`);
             setScannedCopy(res.data);
-            // Pre-load barcode image for scan result too
             if (!barcodeUrls[barcode]) {
               const url = await fetchBarcodeObjectUrl(barcode);
               setBarcodeUrls((prev) => ({ ...prev, [barcode]: url }));
             }
-          } catch {
-            toast.error(`Copy not found: ${barcode}`);
-          }
+          } catch { toast.error(`Copy not found: ${barcode}`); }
         }
-        if (err && err.name !== "NotFoundException") {
-          console.warn("[ZXing]", err.message);
-        }
+        if (err && err.name !== "NotFoundException") console.warn("[ZXing]", err.message);
       })
       .then((controls) => { controlsRef.current = controls; })
-      .catch((e) => {
-        toast.error("Camera error: " + e.message);
-        stopScanner();
-      });
-
-    return () => {
-      controlsRef.current?.stop();
-      controlsRef.current = null;
-    };
+      .catch((e) => { toast.error("Camera error: " + e.message); stopScanner(); });
+    return () => { controlsRef.current?.stop(); controlsRef.current = null; };
   }, [scanning, stopScanner]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Blob download (fixes about:blank blocked) ───────────────────────────────
   const handleDownload = (barcode: string) => {
     const url = barcodeUrls[barcode];
     if (!url) { toast.error("Barcode not loaded yet"); return; }
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${barcode}.png`;
-    a.click();
+    a.href = url; a.download = `${barcode}.png`; a.click();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-2xl rounded-xl border bg-background shadow-xl">
+  const available = copies.filter((c) => c.status === "available" && c.is_active).length;
+  const borrowed  = copies.filter((c) => c.status === "borrowed").length;
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Book Copies</p>
-            <h3 className="text-sm font-semibold text-foreground truncate max-w-[380px]">
-              {bookTitle}
-            </h3>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="relative w-full max-w-2xl border border-border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+        {/* Gold top rule */}
+        <div className="h-[3px] w-full bg-warning shrink-0" />
+
+        {/* ── Modal header ──────────────────────────────────────────── */}
+        <div className="bg-primary shrink-0">
+          <div className="flex items-start justify-between gap-4 px-5 py-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <BookOpen className="h-4 w-4 text-primary-foreground/40 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p
+                  className="text-[9px] font-bold uppercase tracking-[0.25em] text-primary-foreground/45 mb-0.5"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Book Copies
+                </p>
+                <h3
+                  className="text-[15px] font-bold text-primary-foreground leading-snug"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {bookTitle}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={scanning ? stopScanner : startScanner}
+                className="flex items-center gap-1.5 border border-primary-foreground/30 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground/70 hover:border-warning hover:text-warning transition-colors"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                <ScanLine className="h-3.5 w-3.5" />
+                {scanning ? "Stop Scan" : "Scan"}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-1.5 text-primary-foreground/40 hover:text-primary-foreground transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={scanning ? stopScanner : startScanner}>
-              <ScanLine className="mr-1.5 h-3.5 w-3.5" />
-              {scanning ? "Stop Scan" : "Scan Barcode"}
-            </Button>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+
+          {/* Summary strip — available/borrowed counts */}
+          {!loading && copies.length > 0 && (
+            <div className="flex divide-x divide-primary-foreground/10 border-t border-primary-foreground/10">
+              {[
+                { label: "Total",     value: copies.length },
+                { label: "Available", value: available     },
+                { label: "Borrowed",  value: borrowed      },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex-1 px-5 py-2.5 text-center">
+                  <p
+                    className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary-foreground/40"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className="mt-0.5 text-lg font-bold text-primary-foreground leading-none"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-4">
+        {/* ── Scrollable body ────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
 
           {/* Scanner view */}
           {scanning && (
-            <div className="rounded-lg overflow-hidden border">
-              <video ref={videoRef} className="w-full" />
-              <p className="py-2 text-center text-xs text-muted-foreground">
+            <div className="border-b border-border bg-black">
+              <video ref={videoRef} className="w-full max-h-56 object-cover" />
+              <p
+                className="py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
                 Point camera at a book barcode
               </p>
             </div>
@@ -174,124 +236,160 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
 
           {/* Scan result */}
           {scannedCopy && (
-            <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
-              <p className="text-sm font-semibold text-foreground mb-3">Scan Result</p>
-              <div className="flex gap-4 items-start">
+            <div className="border-b border-border">
+              <div className="flex items-center gap-2.5 px-5 py-2.5 bg-primary/5 border-b border-primary/15">
+                <div className="h-px w-4 bg-warning shrink-0" />
+                <p
+                  className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  Scan Result
+                </p>
+              </div>
+              <div className="flex gap-5 items-start p-5">
                 {barcodeUrls[scannedCopy.barcode] && (
                   <img
                     src={barcodeUrls[scannedCopy.barcode]}
                     alt={scannedCopy.barcode}
-                    className="h-14 w-auto rounded border bg-white p-1"
+                    className="h-16 w-auto border border-border bg-white p-1.5 shrink-0"
                   />
                 )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs flex-1">
-                  <span className="text-muted-foreground">Barcode</span>
-                  <span className="font-mono">{scannedCopy.barcode}</span>
-                  {scannedCopy.title && (
-                    <>
-                      <span className="text-muted-foreground">Book</span>
-                      <span>{scannedCopy.title}</span>
-                    </>
-                  )}
-                  <span className="text-muted-foreground">Status</span>
-                  <span className={scannedCopy.status === "borrowed" ? "text-destructive" : "text-green-600"}>
-                    {scannedCopy.status}
-                  </span>
-                  <span className="text-muted-foreground">Condition</span>
-                  <span>{scannedCopy.condition}</span>
-                  {scannedCopy.borrower_name && (
-                    <>
-                      <span className="text-muted-foreground">Borrower</span>
-                      <span>{scannedCopy.borrower_name}</span>
-                      <span className="text-muted-foreground">Due</span>
-                      <span>{scannedCopy.due_date}</span>
-                    </>
-                  )}
-                </div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-6 text-sm flex-1">
+                  <DetailRow label="Barcode" value={<span className="font-mono text-sm">{scannedCopy.barcode}</span>} />
+                  {scannedCopy.title       && <DetailRow label="Book"     value={scannedCopy.title}        />}
+                  <DetailRow label="Status"    value={scannedCopy.status}    />
+                  <DetailRow label="Condition" value={scannedCopy.condition} />
+                  {scannedCopy.borrower_name && <DetailRow label="Borrower" value={scannedCopy.borrower_name} />}
+                  {scannedCopy.due_date      && <DetailRow label="Due"      value={scannedCopy.due_date}      />}
+                </dl>
               </div>
             </div>
           )}
 
-          {/* Copies list */}
+          {/* ── Copies list ──────────────────────────────────────────── */}
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
+              <p
+                className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                Loading copies…
+              </p>
             </div>
           ) : copies.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">No copies found.</p>
-          ) : (
-            <div className="space-y-3">
-              {copies.map((copy) => (
-                <div
-                  key={copy.id}
-                  className={`rounded-lg border p-3 ${!copy.is_active ? "opacity-50" : ""}`}
-                >
-                  <div className="flex items-start gap-4">
-
-                    {/* Barcode image */}
-                    {barcodeUrls[copy.barcode] ? (
-                      <img
-                        src={barcodeUrls[copy.barcode]}
-                        alt={copy.barcode}
-                        className="h-14 w-auto rounded border bg-white p-1 shrink-0"
-                      />
-                    ) : (
-                      <div className="h-14 w-28 shrink-0 rounded border bg-muted flex items-center justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    )}
-
-                    {/* Copy details */}
-                    <div className="min-w-0 flex-1 space-y-1 text-xs">
-                      <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className="font-mono font-medium text-foreground">
-                          {copy.barcode}
-                        </span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                            copy.status === "borrowed"
-                              ? "bg-destructive/10 text-destructive"
-                              : "bg-green-100 text-green-700"
-                          }`}
-                        >
-                          {copy.status}
-                        </span>
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${CONDITION_COLORS[copy.condition]}`}>
-                          {copy.condition}
-                        </span>
-                        {!copy.is_active && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            inactive
-                          </span>
-                        )}
-                      </div>
-                      {copy.borrower_name && (
-                        <p className="text-muted-foreground">
-                          Borrowed by{" "}
-                          <span className="text-foreground font-medium">{copy.borrower_name}</span>
-                          {copy.due_date && <> · due {copy.due_date}</>}
-                        </p>
-                      )}
-                      {copy.notes && (
-                        <p className="text-muted-foreground italic">{copy.notes}</p>
-                      )}
-                    </div>
-
-                    {/* Download button — uses blob URL, no about:blank block */}
-                    <button
-                      onClick={() => handleDownload(copy.barcode)}
-                      disabled={!barcodeUrls[copy.barcode]}
-                      title="Download barcode"
-                      className="shrink-0 rounded border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground transition-colors disabled:opacity-40 flex items-center gap-1"
-                    >
-                      <Download className="h-3 w-3" />
-                      Download
-                    </button>
-
-                  </div>
-                </div>
-              ))}
+            <div className="flex flex-col items-center py-16 gap-3">
+              <BookOpen className="h-8 w-8 text-muted-foreground/15" />
+              <p
+                className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                No copies found
+              </p>
             </div>
+          ) : (
+            <table className="w-full text-sm">
+              {/* Table head */}
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-border bg-muted/50">
+                  {["#", "Barcode", "Status", "Condition", "Borrower / Notes", ""].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-2.5 text-left"
+                    >
+                      <span
+                        className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {h}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {copies.map((copy, i) => (
+                  <tr
+                    key={copy.id}
+                    className={`hover:bg-muted/20 transition-colors ${!copy.is_active ? "opacity-40" : ""}`}
+                  >
+                    {/* Index */}
+                    <td className="px-4 py-3 w-8">
+                      <span
+                        className="text-[10px] font-bold tracking-[0.1em] text-muted-foreground/30"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                    </td>
+
+                    {/* Barcode image + code */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {barcodeUrls[copy.barcode] ? (
+                          <img
+                            src={barcodeUrls[copy.barcode]}
+                            alt={copy.barcode}
+                            className="h-10 w-auto border border-border bg-white p-1 shrink-0"
+                          />
+                        ) : (
+                          <div className="h-10 w-20 shrink-0 border border-border bg-muted flex items-center justify-center">
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />
+                          </div>
+                        )}
+                        <span className="font-mono text-xs text-foreground">{copy.barcode}</span>
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <Badge className={STATUS_CONFIG[copy.status].className}>
+                        {STATUS_CONFIG[copy.status].label}
+                      </Badge>
+                      {!copy.is_active && (
+                        <Badge className="ml-1 border-border text-muted-foreground/50">Inactive</Badge>
+                      )}
+                    </td>
+
+                    {/* Condition */}
+                    <td className="px-4 py-3">
+                      <Badge className={CONDITION_CONFIG[copy.condition]?.className}>
+                        {CONDITION_CONFIG[copy.condition]?.label ?? copy.condition}
+                      </Badge>
+                    </td>
+
+                    {/* Borrower / notes */}
+                    <td className="px-4 py-3 max-w-[180px]">
+                      {copy.borrower_name ? (
+                        <div>
+                          <p className="text-sm font-medium text-foreground truncate">{copy.borrower_name}</p>
+                          {copy.due_date && (
+                            <p className="text-xs text-muted-foreground">Due {copy.due_date}</p>
+                          )}
+                        </div>
+                      ) : copy.notes ? (
+                        <p className="text-xs text-muted-foreground/60 italic truncate">{copy.notes}</p>
+                      ) : (
+                        <span className="text-muted-foreground/25">—</span>
+                      )}
+                    </td>
+
+                    {/* Download */}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDownload(copy.barcode)}
+                        disabled={!barcodeUrls[copy.barcode]}
+                        className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        <Download className="h-3 w-3" />
+                        Export
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

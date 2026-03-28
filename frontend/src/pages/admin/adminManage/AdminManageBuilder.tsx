@@ -4,7 +4,6 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-  Label,
 } from "@/components/ui";
 import type { FunctionType, User, UserFormState, QrTarget } from "./AdminManage.types";
 import {
@@ -20,7 +19,6 @@ import {
 interface AdminManageBuilderProps {
   functionType: FunctionType;
   onFunctionTypeChange: (v: FunctionType) => void;
-
   form: UserFormState;
   showPassword: boolean;
   allowedRoles: string[];
@@ -28,25 +26,21 @@ interface AdminManageBuilderProps {
   onField: <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
   onResetForm: () => void;
-
   searchQuery: string;
   onSearchQueryChange: (v: string) => void;
   searchResults: User[];
   onSearch: () => void;
-
   selectedUser: User | null;
   onSelectUser: (u: User) => void;
-
   onCreateUser: () => void;
   onUpdateUser: () => void;
   onDeactivateUser: () => void;
   onReactivateUser: () => void;
-
   qrTarget: QrTarget | null;
   onSetQrTarget: (v: QrTarget | null) => void;
 }
 
-// ─── Builder (pure presentational) ───────────────────────────────────────────
+// ─── Builder ─────────────────────────────────────────────────────────────────
 
 const AdminManageBuilder = ({
   functionType,
@@ -73,29 +67,54 @@ const AdminManageBuilder = ({
 }: AdminManageBuilderProps) => (
   <div className="max-w-3xl">
 
-    {/* QR Modal */}
     {qrTarget && (
       <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} />
     )}
 
-    <h2 className="font-heading text-lg font-bold text-foreground">User Management</h2>
-
-    {/* Mode selector */}
-    <div className="mt-4">
-      <Label>Mode</Label>
-      <Select
-        value={functionType}
-        onValueChange={(v) => onFunctionTypeChange(v as FunctionType)}
+    {/* ── Section heading ── */}
+    <div className="flex items-center gap-3 mb-1">
+      <div className="h-px w-6 bg-warning shrink-0" />
+      <p
+        className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+        style={{ fontFamily: "var(--font-heading)" }}
       >
-        <SelectTrigger><SelectValue placeholder="Select mode" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="create">Create User</SelectItem>
-          <SelectItem value="edit">Edit / Search / Deactivate</SelectItem>
-        </SelectContent>
-      </Select>
+        Administration
+      </p>
+    </div>
+    <h2
+      className="text-xl font-bold tracking-tight text-foreground mb-6"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      User Management
+    </h2>
+
+    {/* ── Mode selector ── */}
+    <div className="border border-border bg-background">
+      <div className="border-b border-border px-5 py-3 bg-secondary/30 flex items-center gap-3">
+        <p
+          className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          Mode
+        </p>
+      </div>
+      <div className="px-5 py-4">
+        <Select
+          value={functionType}
+          onValueChange={(v) => onFunctionTypeChange(v as FunctionType)}
+        >
+          <SelectTrigger className="rounded-none max-w-xs">
+            <SelectValue placeholder="Select mode" />
+          </SelectTrigger>
+          <SelectContent className="rounded-none">
+            <SelectItem value="create" className="rounded-none">Create User</SelectItem>
+            <SelectItem value="edit" className="rounded-none">Edit / Search / Deactivate</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
 
-    {/* Create mode */}
+    {/* ── Create mode ── */}
     {functionType === "create" && (
       <CreateForm
         form={form}
@@ -109,7 +128,7 @@ const AdminManageBuilder = ({
       />
     )}
 
-    {/* Edit / Search / Deactivate mode */}
+    {/* ── Edit / Search / Deactivate mode ── */}
     {functionType === "edit" && (
       <>
         <SearchBar

@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Loader2, Search, QrCode, X, CheckCircle2 } from "lucide-react";
 import { useZxingScanner } from "@/hooks/useZxingScanner";
 
@@ -18,7 +16,7 @@ const BarcodeInput = ({
   loading, disabled, placeholder = "Type or scan QR code",
 }: Props) => {
   const [scanning, setScanning] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success,  setSuccess]  = useState(false);
 
   const handleResult = (text: string) => {
     onChange(text);
@@ -32,78 +30,97 @@ const BarcodeInput = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <Input
+
+      {/* ── Input row ──────────────────────────────────────────────── */}
+      <div className="flex gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors">
+        <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSubmit())}
           placeholder={placeholder}
           disabled={disabled || scanning}
-          className={success ? "border-green-500 transition-colors duration-300" : ""}
+          className={`flex-1 h-9 px-3.5 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none disabled:opacity-50 transition-colors ${
+            success ? "bg-success/5" : ""
+          }`}
         />
-        <Button
+
+        {/* Scan toggle */}
+        <button
           type="button"
-          variant={scanning ? "destructive" : "outline"}
-          className="shrink-0"
           disabled={disabled || loading}
           onClick={() => setScanning((s) => !s)}
           title={scanning ? "Stop scanning" : "Scan QR code"}
+          className={`flex items-center justify-center h-9 w-9 border-l border-border shrink-0 transition-colors ${
+            scanning
+              ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+              : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/40"
+          } disabled:opacity-40`}
         >
-          {scanning ? <X className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
-        </Button>
-        <Button
+          {scanning ? <X className="h-3.5 w-3.5" /> : <QrCode className="h-3.5 w-3.5" />}
+        </button>
+
+        {/* Submit */}
+        <button
           type="button"
-          variant="outline"
-          className="shrink-0"
           disabled={disabled || loading || !value.trim() || scanning}
           onClick={onSubmit}
+          className="flex items-center justify-center h-9 w-9 border-l border-border bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 disabled:opacity-40 transition-colors"
         >
           {loading
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <Search className="h-4 w-4" />}
-        </Button>
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <Search className="h-3.5 w-3.5" />
+          }
+        </button>
       </div>
 
-      {/* Success indicator */}
+      {/* ── Success indicator ──────────────────────────────────────── */}
       {success && (
-        <div className="flex items-center gap-2 text-green-500 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-          <CheckCircle2 className="h-4 w-4" />
-          <span>QR code scanned successfully</span>
+        <div className="flex items-center gap-2 text-success">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.15em]"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            QR code scanned successfully
+          </span>
         </div>
       )}
 
+      {/* ── Scanner viewport ───────────────────────────────────────── */}
       {scanning && (
         <div className="flex flex-col items-center gap-2">
-          <div className="relative w-64 h-64 bg-black rounded-xl overflow-hidden">
-            {/* Mirrored video */}
+          <div className="relative w-64 h-64 bg-black overflow-hidden border border-border">
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
               style={{ transform: "scaleX(-1)" }}
             />
 
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/40" />
+            {/* Dark vignette */}
+            <div className="absolute inset-0 bg-black/35" />
 
-            {/* Corner brackets */}
+            {/* Sharp corner brackets — no border-radius */}
             {[
-              "top-3 left-3 border-t-2 border-l-2 rounded-tl",
-              "top-3 right-3 border-t-2 border-r-2 rounded-tr",
-              "bottom-3 left-3 border-b-2 border-l-2 rounded-bl",
-              "bottom-3 right-3 border-b-2 border-r-2 rounded-br",
+              "top-3 left-3 border-t-2 border-l-2",
+              "top-3 right-3 border-t-2 border-r-2",
+              "bottom-3 left-3 border-b-2 border-l-2",
+              "bottom-3 right-3 border-b-2 border-r-2",
             ].map((cls, i) => (
-              <div key={i} className={`absolute w-6 h-6 border-primary ${cls}`} />
+              <div key={i} className={`absolute w-5 h-5 border-warning ${cls}`} />
             ))}
 
             {/* Animated scan line */}
             <div
-              className="absolute left-4 right-4 h-0.5 bg-primary opacity-80 rounded-full"
+              className="absolute left-4 right-4 h-px bg-warning opacity-70"
               style={{ animation: "qr-scan 2s ease-in-out infinite" }}
             />
 
             {/* Label */}
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center">
-              <span className="text-[10px] text-white/60 tracking-widest uppercase">
+            <div className="absolute bottom-3 inset-x-0 flex justify-center">
+              <span
+                className="text-[9px] text-white/50 tracking-[0.25em] uppercase"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
                 Align QR code
               </span>
             </div>
@@ -119,7 +136,14 @@ const BarcodeInput = ({
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p
+          className="text-[11px] text-destructive"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 };

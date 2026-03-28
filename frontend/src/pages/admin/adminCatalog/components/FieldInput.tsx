@@ -15,6 +15,10 @@ type Props = {
   onChange: (key: string, value: any) => void;
 };
 
+// Slightly taller inputs for admin readability — h-9 instead of h-8
+const inputClass =
+  "rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors h-9";
+
 const FieldInput = ({ field, value, onChange }: Props) => {
   switch (field.type) {
     case "textarea":
@@ -22,16 +26,21 @@ const FieldInput = ({ field, value, onChange }: Props) => {
         <Textarea
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
-          rows={3}
+          rows={4}
+          className="rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors resize-none leading-relaxed"
         />
       );
     case "select":
       return (
         <Select value={value ?? ""} onValueChange={(v) => onChange(field.key, v)}>
-          <SelectTrigger><SelectValue placeholder={`Select ${field.label}`} /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className={inputClass}>
+            <SelectValue placeholder={`Select ${field.label}`} />
+          </SelectTrigger>
+          <SelectContent className="rounded-none border-border">
             {(field.options ?? []).map((o) => (
-              <SelectItem key={o} value={o}>{o}</SelectItem>
+              <SelectItem key={o} value={o} className="rounded-none text-sm">
+                {o}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -43,6 +52,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
           min={field.key === "copies" ? 0 : undefined}
+          className={inputClass}
         />
       );
     case "date":
@@ -51,6 +61,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
           type="date"
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
+          className={inputClass}
         />
       );
     default:
@@ -58,6 +69,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
         <Input
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
+          className={inputClass}
         />
       );
   }

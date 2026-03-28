@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
 import {
-  Input, Label, Button,
+  Input,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
 import { FormField, Book } from "./AdminCatalog.types";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
-import { Library, Loader2 } from "lucide-react";
+import { Library, Loader2, Search, Trash2, RefreshCw } from "lucide-react";
 
 type Copy = {
   id: number;
@@ -20,7 +20,6 @@ type Copy = {
 
 type Props = { fields: FormField[] };
 
-// Fetch a barcode PNG through axios (handles auth) → blob object URL
 const loadBarcodeUrl = async (barcode: string): Promise<string> => {
   const res = await axiosInstance.get(
     `api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`,
@@ -29,20 +28,45 @@ const loadBarcodeUrl = async (barcode: string): Promise<string> => {
   return URL.createObjectURL(res.data);
 };
 
-// Small inline strip showing barcodes for a book's copies
+// ─── Shared primitives ────────────────────────────────────────────────────────
+
+const PanelLabel = ({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) => (
+  <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border bg-muted/30">
+    <div className="flex items-center gap-2.5">
+      <div className="h-px w-4 bg-warning shrink-0" />
+      <p
+        className="text-[10px] font-bold uppercase tracking-[0.25em] text-foreground"
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        {children}
+      </p>
+    </div>
+    {action}
+  </div>
+);
+
+const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
+  <label
+    className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70 mb-1.5"
+    style={{ fontFamily: "var(--font-heading)" }}
+  >
+    {children}
+    {required && <span className="ml-1 text-destructive">*</span>}
+  </label>
+);
+
+// ─── Barcode strip ────────────────────────────────────────────────────────────
+
 const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
-  const [copies, setCopies]         = useState<Copy[]>([]);
-  const [urls, setUrls]             = useState<Record<string, string>>({});
-  const [loadingCopies, setLoading] = useState(true);
+  const [copies,  setCopies]  = useState<Copy[]>([]);
+  const [urls,    setUrls]    = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    setCopies([]);
-    setUrls({});
-    axiosInstance
-      .get(`api/admin/books/${bookId}/copies`)
+    setLoading(true); setCopies([]); setUrls({});
+    axiosInstance.get(`api/admin/books/${bookId}/copies`)
       .then((res) => setCopies(res.data))
-      .catch(() => {/* silently skip */})
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [bookId]);
 
@@ -52,10 +76,9 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
       try {
         const url = await loadBarcodeUrl(copy.barcode);
         setUrls((prev) => ({ ...prev, [copy.barcode]: url }));
-      } catch { /* skip */ }
+      } catch {}
     });
     return () => {
-      // revoke on unmount / book change
       setUrls((prev) => {
         Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
         return {};
@@ -63,54 +86,49 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
     };
   }, [copies]);
 
-  if (loadingCopies) {
-    return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-        <Loader2 className="h-3 w-3 animate-spin" /> Loading barcodes…
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="mt-5 flex items-center gap-2 py-4 text-muted-foreground border border-border px-4">
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/40" />
+      <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/50"
+        style={{ fontFamily: "var(--font-heading)" }}>
+        Loading copies…
+      </span>
+    </div>
+  );
 
   if (!copies.length) return null;
 
   return (
-    <div className="mt-4 rounded-lg border bg-muted/30 p-3">
-      <p className="mb-2 text-xs font-semibold text-foreground">
-        Physical Copies &amp; Barcodes
-      </p>
-      <div className="flex flex-wrap gap-3">
+    <div className="mt-5 border border-border">
+      <PanelLabel>Physical Copies &amp; Barcodes</PanelLabel>
+      <div className="flex flex-wrap divide-x divide-border">
         {copies.map((copy) => (
           <div
             key={copy.id}
-            className={`flex flex-col items-center gap-1 rounded border bg-background p-2 ${
-              !copy.is_active ? "opacity-50" : ""
-            }`}
+            className={`flex flex-col items-center gap-2 p-4 bg-background min-w-[100px] ${!copy.is_active ? "opacity-40" : ""}`}
           >
             {urls[copy.barcode] ? (
               <img
                 src={urls[copy.barcode]}
                 alt={copy.barcode}
-                className="h-12 w-auto rounded bg-white"
+                className="h-10 w-auto bg-white border border-border p-1"
               />
             ) : (
-              <div className="h-12 w-24 rounded bg-muted flex items-center justify-center">
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              <div className="h-10 w-24 border border-border bg-muted flex items-center justify-center">
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/30" />
               </div>
             )}
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {copy.barcode}
+            <span className="font-mono text-[10px] text-muted-foreground/50">{copy.barcode}</span>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-[0.12em] border px-2 py-0.5 ${
+                copy.status === "borrowed"
+                  ? "border-destructive/30 text-destructive bg-destructive/5"
+                  : "border-success/30 text-success bg-success/5"
+              }`}
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {copy.status}
             </span>
-            <div className="flex gap-1">
-              <span
-                className={`rounded px-1 py-0.5 text-[9px] font-medium ${
-                  copy.status === "borrowed"
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-green-100 text-green-700"
-                }`}
-              >
-                {copy.status}
-              </span>
-            </div>
           </div>
         ))}
       </div>
@@ -121,20 +139,17 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields }: Props) => {
-  const [catalogMode, setCatalogMode]     = useState<"create" | "edit">("create");
-  const [formValues, setFormValues]       = useState<Record<string, any>>({});
-  const [loading, setLoading]             = useState(false);
-  const [searchQuery, setSearchQuery]     = useState("");
+  const [catalogMode,   setCatalogMode]   = useState<"create" | "edit">("create");
+  const [formValues,    setFormValues]    = useState<Record<string, any>>({});
+  const [loading,       setLoading]       = useState(false);
+  const [searchQuery,   setSearchQuery]   = useState("");
   const [searchResults, setSearchResults] = useState<Book[]>([]);
-  const [selectedBook, setSelectedBook]   = useState<Book | null>(null);
-  const [copiesBook, setCopiesBook]       = useState<Book | null>(null);
+  const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
+  const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
 
   const sortedFields = [...fields].sort((a, b) => a.order - b.order);
-
-  const setField  = (key: string, value: any) =>
-    setFormValues((prev) => ({ ...prev, [key]: value }));
-
-  const resetForm = () => { setFormValues({}); setSelectedBook(null); };
+  const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
+  const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
 
   const validateRequired = () => {
     for (const f of fields.filter((f) => f.required)) {
@@ -148,8 +163,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.post("api/admin/books", formValues);
-      toast.success(res.data.message);
-      resetForm();
+      toast.success(res.data.message); resetForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to add book");
     } finally { setLoading(false); }
@@ -172,9 +186,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.put(`api/admin/books/${selectedBook.id}`, formValues);
-      toast.success(res.data.message);
-      resetForm();
-      setSearchResults([]);
+      toast.success(res.data.message); resetForm(); setSearchResults([]);
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Update failed");
     } finally { setLoading(false); }
@@ -186,8 +198,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
-      toast.success(res.data.message);
-      resetForm();
+      toast.success(res.data.message); resetForm();
       setSearchResults((prev) => prev.filter((b) => b.id !== selectedBook.id));
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Delete failed");
@@ -203,7 +214,6 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   return (
     <>
-      {/* Copies modal */}
       {copiesBook && (
         <BookCopiesModal
           bookId={copiesBook.id}
@@ -212,89 +222,129 @@ const AdminCatalogData = ({ fields }: Props) => {
         />
       )}
 
-      {/* Sub-mode */}
-      <div className="mt-4">
-        <Label className="text-xs">Mode</Label>
-        <Select value={catalogMode} onValueChange={(v) => { setCatalogMode(v as any); resetForm(); }}>
-          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="create">Add Book</SelectItem>
-            <SelectItem value="edit">Edit / Search / Delete</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* ── Mode selector ── */}
+      <div className="mt-5 flex items-center gap-0 border border-border">
+        {(["create", "edit"] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => { setCatalogMode(mode); resetForm(); setSearchResults([]); }}
+            className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors border-r last:border-r-0 border-border ${
+              catalogMode === mode
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            }`}
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {mode === "create" ? "Add Book" : "Edit / Search / Delete"}
+          </button>
+        ))}
       </div>
 
-      {/* ── Create ── */}
+      {/* ── Create ────────────────────────────────────────────────────── */}
       {catalogMode === "create" && (
-        <form
-          className="mt-4 rounded-lg border bg-card p-4"
-          onSubmit={(e) => { e.preventDefault(); handleCreateBook(); }}
-        >
-          <div className="grid gap-3 sm:grid-cols-2">
-            {sortedFields.map((f) => (
-              <div key={f.key} className={`space-y-1 ${f.type === "textarea" ? "sm:col-span-2" : ""}`}>
-                <Label className="text-xs">
-                  {f.label}
-                  {f.required && <span className="ml-1 text-destructive">*</span>}
-                </Label>
-                <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
-              </div>
-            ))}
+        <div className="mt-5 border border-border">
+          <PanelLabel>New Book Entry</PanelLabel>
+          <div className="p-5">
+            <div className="grid gap-5 sm:grid-cols-2">
+              {sortedFields.map((f) => (
+                <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+                  <FieldLabel required={f.required}>{f.label}</FieldLabel>
+                  <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex gap-2.5 border-t border-border pt-5">
+              <button
+                onClick={handleCreateBook}
+                disabled={loading}
+                className="flex items-center gap-2 bg-primary h-9 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {loading
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Adding…</>
+                  : <><Library className="h-3.5 w-3.5" /> Add Book</>
+                }
+              </button>
+              <button
+                onClick={resetForm}
+                disabled={loading}
+                className="flex items-center gap-2 border border-border h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Clear
+              </button>
+            </div>
           </div>
-          <div className="mt-4 flex gap-2">
-            <Button size="sm" type="submit" disabled={loading}>
-              {loading ? "Adding..." : "Add Book"}
-            </Button>
-            <Button size="sm" type="button" variant="outline" onClick={resetForm} disabled={loading}>
-              Clear
-            </Button>
-          </div>
-        </form>
+        </div>
       )}
 
-      {/* ── Edit / Search / Delete ── */}
+      {/* ── Edit / Search / Delete ─────────────────────────────────── */}
       {catalogMode === "edit" && (
         <>
-          <div className="mt-4 flex gap-2">
-            <Input
-              className="h-8 text-sm"
-              placeholder="Search by title, author, or ISBN"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearchBooks()}
-            />
-            <Button size="sm" onClick={handleSearchBooks} disabled={loading}>
-              {loading ? "Searching..." : "Search"}
-            </Button>
+          {/* Search bar */}
+          <div className="mt-5 flex gap-0 border border-border">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 pointer-events-none" />
+              <input
+                className="w-full h-10 pl-10 pr-4 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none border-r border-border focus:border-r-primary transition-colors"
+                placeholder="Search by title, author, or ISBN…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearchBooks()}
+              />
+            </div>
+            <button
+              onClick={handleSearchBooks}
+              disabled={loading}
+              className="flex items-center gap-2 px-5 h-10 text-[10px] font-bold uppercase tracking-[0.18em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {loading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <><Search className="h-3.5 w-3.5" /> Search</>
+              }
+            </button>
           </div>
 
+          {/* Results table */}
           {searchResults.length > 0 && (
-            <div className="mt-3 overflow-x-auto rounded-lg border bg-card">
-              <table className="w-full text-left text-xs text-foreground">
-                <thead className="border-b bg-muted/40">
-                  <tr>
-                    <th className="px-3 py-2">Title</th>
-                    <th className="px-3 py-2">Author</th>
-                    <th className="px-3 py-2">Category</th>
-                    <th className="px-3 py-2">Copies</th>
-                    <th className="px-3 py-2"></th>
+            <div className="mt-4 border border-border overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    {["Title", "Author", "Category", "Copies", ""].map((h) => (
+                      <th key={h} className="px-4 py-3">
+                        <span
+                          className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                          style={{ fontFamily: "var(--font-heading)" }}
+                        >
+                          {h}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {searchResults.map((b) => (
-                    <tr key={b.id} className="border-t hover:bg-accent/20">
-                      <td className="px-3 py-2 cursor-pointer" onClick={() => selectBookForEdit(b)}>{b.title}</td>
-                      <td className="px-3 py-2 cursor-pointer" onClick={() => selectBookForEdit(b)}>{b.author || "—"}</td>
-                      <td className="px-3 py-2 cursor-pointer" onClick={() => selectBookForEdit(b)}>{b.category || "—"}</td>
-                      <td className="px-3 py-2 cursor-pointer" onClick={() => selectBookForEdit(b)}>{b.copies ?? "—"}</td>
-                      <td className="px-3 py-2">
+                    <tr
+                      key={b.id}
+                      onClick={() => selectBookForEdit(b)}
+                      className={`cursor-pointer hover:bg-muted/20 transition-colors ${
+                        selectedBook?.id === b.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium text-sm text-foreground max-w-[200px] truncate">{b.title}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.author || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.category || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.copies ?? "—"}</td>
+                      <td className="px-4 py-3">
                         <button
                           onClick={(e) => { e.stopPropagation(); setCopiesBook(b); }}
-                          title="View copies & barcodes"
-                          className="flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+                          className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                          style={{ fontFamily: "var(--font-heading)" }}
                         >
-                          <Library className="h-3 w-3" />
-                          Copies
+                          <Library className="h-3 w-3" /> Copies
                         </button>
                       </td>
                     </tr>
@@ -304,38 +354,63 @@ const AdminCatalogData = ({ fields }: Props) => {
             </div>
           )}
 
+          {/* Edit form */}
           {selectedBook && (
-            <form
-              className="mt-4 rounded-lg border bg-card p-4"
-              onSubmit={(e) => { e.preventDefault(); handleUpdateBook(); }}
-            >
-              <p className="mb-3 text-xs font-semibold text-foreground">
-                Editing: <span className="text-muted-foreground">{selectedBook.title}</span>
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {sortedFields.map((f) => (
-                  <div key={f.key} className={`space-y-1 ${f.type === "textarea" ? "sm:col-span-2" : ""}`}>
-                    <Label className="text-xs">
-                      {f.label}
-                      {f.required && <span className="ml-1 text-destructive">*</span>}
-                    </Label>
-                    <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
-                  </div>
-                ))}
-              </div>
+            <div className="mt-5 border border-border">
+              <PanelLabel
+                action={
+                  <span className="text-[10px] text-muted-foreground/50 truncate max-w-[220px]">
+                    {selectedBook.title}
+                  </span>
+                }
+              >
+                Editing
+              </PanelLabel>
 
-              {/* Barcode strip — shown while editing */}
-              <BookBarcodeStrip bookId={selectedBook.id} />
+              <div className="p-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {sortedFields.map((f) => (
+                    <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+                      <FieldLabel required={f.required}>{f.label}</FieldLabel>
+                      <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
+                    </div>
+                  ))}
+                </div>
 
-              <div className="mt-4 flex gap-2">
-                <Button size="sm" type="submit" disabled={loading}>
-                  {loading ? "Updating..." : "Update Book"}
-                </Button>
-                <Button size="sm" type="button" variant="destructive" onClick={handleDeleteBook} disabled={loading}>
-                  {loading ? "Deleting..." : "Delete Book"}
-                </Button>
+                <BookBarcodeStrip bookId={selectedBook.id} />
+
+                <div className="mt-6 flex gap-2.5 border-t border-border pt-5">
+                  <button
+                    onClick={handleUpdateBook}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-primary h-9 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {loading
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating…</>
+                      : "Update Book"
+                    }
+                  </button>
+                  <button
+                    onClick={handleDeleteBook}
+                    disabled={loading}
+                    className="flex items-center gap-2 border border-destructive/40 h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {loading ? "Deleting…" : "Delete Book"}
+                  </button>
+                  <button
+                    onClick={resetForm}
+                    disabled={loading}
+                    className="flex items-center gap-2 border border-border h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors ml-auto"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Deselect
+                  </button>
+                </div>
               </div>
-            </form>
+            </div>
           )}
         </>
       )}

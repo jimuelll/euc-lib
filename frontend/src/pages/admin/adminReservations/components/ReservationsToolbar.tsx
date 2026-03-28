@@ -1,50 +1,44 @@
-import { Search, Filter, RefreshCw } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Search, RefreshCw } from "lucide-react";
 import { FILTER_OPTIONS } from "../reservations.types";
 
 interface ReservationsToolbarProps {
-  search:       string;
-  statusFilter: string;
-  loading:      boolean;
+  search:         string;
+  statusFilter:   string;
+  loading:        boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
-  onRefresh:    () => void;
+  onRefresh:      () => void;
 }
 
 const ReservationsToolbar = ({
-  search,
-  statusFilter,
-  loading,
-  onSearchChange,
-  onStatusChange,
-  onRefresh,
+  search, statusFilter, loading,
+  onSearchChange, onStatusChange, onRefresh,
 }: ReservationsToolbarProps) => (
-  <div className="flex flex-col sm:flex-row gap-3">
+  <div className="flex flex-col sm:flex-row gap-0 border border-border">
 
-    {/* Search input */}
+    {/* Search */}
     <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-      <Input
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/35 pointer-events-none" />
+      <input
         placeholder="Search by student ID, name, or book title…"
-        className="pl-9 h-9 text-sm"
+        className="w-full h-9 pl-10 pr-4 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none border-b sm:border-b-0 sm:border-r border-border focus:border-primary transition-colors"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
       />
     </div>
 
-    {/* Status filter pills */}
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      {FILTER_OPTIONS.map((opt) => (
+    {/* Status filter — fused pill row */}
+    <div className="flex items-center gap-0 overflow-x-auto border-b sm:border-b-0 sm:border-r border-border">
+      {FILTER_OPTIONS.map((opt, i) => (
         <button
           key={opt.value}
           onClick={() => onStatusChange(opt.value)}
-          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+          className={`h-9 px-3.5 text-[10px] font-bold uppercase tracking-[0.12em] shrink-0 border-r last:border-r-0 border-border transition-colors ${
             statusFilter === opt.value
-              ? "bg-foreground text-background border-foreground"
-              : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+              ? "bg-primary text-primary-foreground"
+              : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           }`}
+          style={{ fontFamily: "var(--font-heading)" }}
         >
           {opt.label}
         </button>
@@ -52,15 +46,14 @@ const ReservationsToolbar = ({
     </div>
 
     {/* Refresh */}
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-9 shrink-0"
+    <button
       onClick={onRefresh}
       disabled={loading}
+      className="flex items-center justify-center h-9 w-full sm:w-9 border-t sm:border-t-0 border-border text-muted-foreground/50 hover:text-foreground hover:bg-muted/30 disabled:opacity-40 transition-colors"
+      title="Refresh"
     >
       <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-    </Button>
+    </button>
   </div>
 );
 
