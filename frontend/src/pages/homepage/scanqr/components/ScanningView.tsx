@@ -14,6 +14,7 @@ interface ScanningViewProps {
 const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: ScanningViewProps) => {
   const [manualMode, setManualMode] = useState(false);
   const [manualInput, setManualInput] = useState("");
+  const [videoReady, setVideoReady] = useState(false); // <-- NEW
   const manualInputRef = useRef<HTMLInputElement>(null);
 
   const isProcessing = scanMode === "processing";
@@ -23,6 +24,13 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
       setTimeout(() => manualInputRef.current?.focus(), 100);
     }
   }, [manualMode]);
+
+  // Reset videoReady whenever camera mode is re-entered
+  useEffect(() => {
+    if (!manualMode && scanMode === "scanning") {
+      setVideoReady(false);
+    }
+  }, [manualMode, scanMode]);
 
   const { videoRef, cameraError } = useZxingScanner({
     onResult: onScanned,
@@ -72,18 +80,32 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
 
         {/* Camera feed */}
         {!manualMode && (
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
-          />
+          <>
+            {/* Placeholder shown while stream loads */}
+            {!videoReady && !cameraError && (
+              <div className="absolute inset-0 bg-background flex items-center justify-center z-10">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+              </div>
+            )}
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              onPlaying={() => setVideoReady(true)} // <-- KEY FIX: only show once stream is live
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: "scaleX(-1)",
+                // Keep video in the DOM (for zxing to read) but invisible until ready
+                opacity: videoReady ? 1 : 0,
+                transition: "opacity 0.2s ease",
+              }}
+            />
+          </>
         )}
 
         {/* Scanning line */}
-        {scanMode === "scanning" && !manualMode && (
+        {scanMode === "scanning" && !manualMode && videoReady && (
           <motion.div
             className="absolute left-0 right-0 h-px bg-warning/70 z-10"
             animate={{ top: ["12%", "88%", "12%"] }}
