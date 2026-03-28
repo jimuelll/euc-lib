@@ -22,13 +22,13 @@ import LibraryServices     from "./pages/homepage/LibraryServices";
 import AcademicSubscriptions from "./pages/homepage/AcademicSubscriptions";
 import StudentDashboard    from "./pages/homepage/StudentDashboard";
 import EditProfile         from "./pages/homepage/EditProfile";
-import ScanQR              from "./pages/homepage/ScanQR";
+import ScanQR              from "./pages/homepage/scanqr/index";
 
 
 // ─── Admin pages ──────────────────────────────────────────────────────────────
 import AdminLayout         from "./pages/admin/adminLayout/Index";
 import AdminHome           from "./pages/admin/AdminHome";
-import AdminManage         from "./pages/admin/AdminManage";
+import AdminManage         from "./pages/admin/adminManage/Index";
 import AdminCatalog        from "./pages/admin/adminCatalog/Index";
 import AdminCirculation    from "./pages/admin/adminCirculation/Index";
 import AdminReservations   from "./pages/admin/adminReservations/AdminReservations";
@@ -39,7 +39,7 @@ import AdminQuery          from "./pages/admin/AdminQuery";
 import AdminInternet       from "./pages/admin/AdminInternet";
 import AdminClearance      from "./pages/admin/AdminClearance";
 import AdminEditAbout      from "./pages/admin/adminAbout/Index";
-import AdminAttendanceLogs from "./pages/admin/AdminAttendanceLogs";
+import AdminAttendanceLogs from "./pages/admin/adminAttendanceLogs/Index";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
