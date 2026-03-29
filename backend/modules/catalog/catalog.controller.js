@@ -41,7 +41,11 @@ const getBooks = async (req, res) => {
     if (!query?.trim()) {
       return res.status(400).json({ message: "Search query is required" });
     }
-    const books = await service.searchBooks(query.trim(), !!req.publicCatalogue);
+    const books = await service.searchBooks(
+      query.trim(),
+      !!req.publicCatalogue,
+      !req.publicCatalogue && req.query.archived === "true"
+    );
     res.json(books);
   } catch (err) {
     console.error("[catalog] getBooks:", err);
@@ -71,7 +75,7 @@ const updateBook = async (req, res) => {
 
 const deleteBook = async (req, res) => {
   try {
-    await service.deleteBook(req.params.id);
+    await service.deleteBook(req.params.id, req.user.id);
     res.json({ message: "Book deleted successfully" });
   } catch (err) {
     console.error("[catalog] deleteBook:", err);
@@ -127,6 +131,16 @@ const getCopyByBarcode = async (req, res) => {
   }
 };
 
+const restoreBook = async (req, res) => {
+  try {
+    const result = await service.restoreBook(req.params.id);
+    res.json(result);
+  } catch (err) {
+    console.error("[catalog] restoreBook:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to restore book" });
+  }
+};
+
 module.exports = {
   getSchema,
   updateSchema,
@@ -137,4 +151,5 @@ module.exports = {
   getBookCopies,
   getBarcodePng,
   getCopyByBarcode,
+  restoreBook,
 };

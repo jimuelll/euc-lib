@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/sonner";
 import { FormField, Book } from "./AdminCatalog.types";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
-import { Library, Loader2, Search, Trash2, RefreshCw } from "lucide-react";
+import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive } from "lucide-react";
 
 type Copy = {
   id: number;
@@ -146,6 +146,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
+  const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
 
   const sortedFields = [...fields].sort((a, b) => a.order - b.order);
   const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
@@ -169,16 +170,29 @@ const AdminCatalogData = ({ fields }: Props) => {
     } finally { setLoading(false); }
   };
 
-  const handleSearchBooks = async () => {
+  const handleSearchBooks = async (archivedOverride?: boolean) => {
     if (!searchQuery.trim()) { toast.error("Enter a title, author, or ISBN"); return; }
     setLoading(true);
+    const archived = archivedOverride ?? showArchived;
     try {
-      const res = await axiosInstance.get("api/admin/books", { params: { query: searchQuery } });
+      const res = await axiosInstance.get("api/admin/books", {
+        params: { query: searchQuery, ...(archived && { archived: "true" }) },
+      });
       setSearchResults(res.data);
-      if (!res.data.length) toast.info("No books found");
+      if (!res.data.length) toast.info(archived ? "No archived books found" : "No books found");
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Search failed");
     } finally { setLoading(false); }
+  };
+
+  // ── Toggle archived view and re-run search if results are showing ──
+  const handleToggleArchived = () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    setSelectedBook(null);
+    if (searchResults.length || searchQuery.trim()) {
+      handleSearchBooks(next);
+    }
   };
 
   const handleUpdateBook = async () => {
@@ -194,7 +208,7 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   const handleDeleteBook = async () => {
     if (!selectedBook) return;
-    if (!confirm(`Delete "${selectedBook.title}"?`)) return;
+    if (!confirm(`Archive "${selectedBook.title}"? It can be restored later.`)) return;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
@@ -202,6 +216,20 @@ const AdminCatalogData = ({ fields }: Props) => {
       setSearchResults((prev) => prev.filter((b) => b.id !== selectedBook.id));
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Delete failed");
+    } finally { setLoading(false); }
+  };
+
+  // ── NEW: Restore a soft-deleted book ──────────────────────────────
+  const handleRestoreBook = async (book: Book) => {
+    if (!confirm(`Restore "${book.title}"?`)) return;
+    setLoading(true);
+    try {
+      const res = await axiosInstance.post(`api/admin/books/${book.id}/restore`);
+      toast.success(res.data.message);
+      setSearchResults((prev) => prev.filter((b) => b.id !== book.id));
+      if (selectedBook?.id === book.id) resetForm();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Restore failed");
     } finally { setLoading(false); }
   };
 
@@ -227,7 +255,7 @@ const AdminCatalogData = ({ fields }: Props) => {
         {(["create", "edit"] as const).map((mode) => (
           <button
             key={mode}
-            onClick={() => { setCatalogMode(mode); resetForm(); setSearchResults([]); }}
+            onClick={() => { setCatalogMode(mode); resetForm(); setSearchResults([]); setShowArchived(false); }}
             className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors border-r last:border-r-0 border-border ${
               catalogMode === mode
                 ? "bg-primary text-primary-foreground"
@@ -282,7 +310,7 @@ const AdminCatalogData = ({ fields }: Props) => {
       {/* ── Edit / Search / Delete ─────────────────────────────────── */}
       {catalogMode === "edit" && (
         <>
-          {/* Search bar */}
+          {/* Search bar + archived toggle */}
           <div className="mt-5 flex gap-0 border border-border">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 pointer-events-none" />
@@ -294,8 +322,24 @@ const AdminCatalogData = ({ fields }: Props) => {
                 onKeyDown={(e) => e.key === "Enter" && handleSearchBooks()}
               />
             </div>
+
+            {/* ── Archived toggle ── */}
             <button
-              onClick={handleSearchBooks}
+              onClick={handleToggleArchived}
+              title={showArchived ? "Showing archived — click for active" : "Show archived books"}
+              className={`flex items-center gap-2 px-4 h-10 text-[10px] font-bold uppercase tracking-[0.15em] border-r border-border shrink-0 transition-colors ${
+                showArchived
+                  ? "bg-warning/10 text-warning border-warning/30 hover:bg-warning/20"
+                  : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+              }`}
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {showArchived ? "Archived" : "Active"}
+            </button>
+
+            <button
+              onClick={() => handleSearchBooks()}
               disabled={loading}
               className="flex items-center gap-2 px-5 h-10 text-[10px] font-bold uppercase tracking-[0.18em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
               style={{ fontFamily: "var(--font-heading)" }}
@@ -306,6 +350,17 @@ const AdminCatalogData = ({ fields }: Props) => {
               }
             </button>
           </div>
+
+          {/* Archived banner */}
+          {showArchived && (
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-warning/5 border border-t-0 border-warning/20">
+              <Archive className="h-3 w-3 text-warning/60 shrink-0" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-warning/70"
+                style={{ fontFamily: "var(--font-heading)" }}>
+                Showing archived books — restore to make them active again
+              </p>
+            </div>
+          )}
 
           {/* Results table */}
           {searchResults.length > 0 && (
@@ -329,23 +384,38 @@ const AdminCatalogData = ({ fields }: Props) => {
                   {searchResults.map((b) => (
                     <tr
                       key={b.id}
-                      onClick={() => selectBookForEdit(b)}
-                      className={`cursor-pointer hover:bg-muted/20 transition-colors ${
-                        selectedBook?.id === b.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
-                      }`}
+                      onClick={() => !showArchived && selectBookForEdit(b)}
+                      className={`transition-colors ${
+                        showArchived
+                          ? "opacity-70"
+                          : "cursor-pointer hover:bg-muted/20"
+                      } ${selectedBook?.id === b.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
                     >
                       <td className="px-4 py-3 font-medium text-sm text-foreground max-w-[200px] truncate">{b.title}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.author || "—"}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.category || "—"}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.copies ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setCopiesBook(b); }}
-                          className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                          style={{ fontFamily: "var(--font-heading)" }}
-                        >
-                          <Library className="h-3 w-3" /> Copies
-                        </button>
+                        {showArchived ? (
+                          // ── Restore button ──
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRestoreBook(b); }}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-50 transition-colors"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            <ArchiveRestore className="h-3 w-3" /> Restore
+                          </button>
+                        ) : (
+                          // ── Copies button ──
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCopiesBook(b); }}
+                            className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            <Library className="h-3 w-3" /> Copies
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -354,8 +424,8 @@ const AdminCatalogData = ({ fields }: Props) => {
             </div>
           )}
 
-          {/* Edit form */}
-          {selectedBook && (
+          {/* Edit form — only shown in active mode */}
+          {selectedBook && !showArchived && (
             <div className="mt-5 border border-border">
               <PanelLabel
                 action={
@@ -398,7 +468,7 @@ const AdminCatalogData = ({ fields }: Props) => {
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    {loading ? "Deleting…" : "Delete Book"}
+                    {loading ? "Archiving…" : "Archive Book"}
                   </button>
                   <button
                     onClick={resetForm}

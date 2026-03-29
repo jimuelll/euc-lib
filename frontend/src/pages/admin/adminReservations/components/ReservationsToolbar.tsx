@@ -5,13 +5,14 @@ interface ReservationsToolbarProps {
   search:         string;
   statusFilter:   string;
   loading:        boolean;
+  showArchived:   boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onRefresh:      () => void;
 }
 
 const ReservationsToolbar = ({
-  search, statusFilter, loading,
+  search, statusFilter, loading, showArchived,
   onSearchChange, onStatusChange, onRefresh,
 }: ReservationsToolbarProps) => (
   <div className="flex flex-col sm:flex-row gap-0 border border-border">
@@ -27,23 +28,25 @@ const ReservationsToolbar = ({
       />
     </div>
 
-    {/* Status filter — fused pill row */}
-    <div className="flex items-center gap-0 overflow-x-auto border-b sm:border-b-0 sm:border-r border-border">
-      {FILTER_OPTIONS.map((opt, i) => (
-        <button
-          key={opt.value}
-          onClick={() => onStatusChange(opt.value)}
-          className={`h-9 px-3.5 text-[10px] font-bold uppercase tracking-[0.12em] shrink-0 border-r last:border-r-0 border-border transition-colors ${
-            statusFilter === opt.value
-              ? "bg-primary text-primary-foreground"
-              : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-          }`}
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
+    {/* Status filter — hidden in archived mode (all archived records are terminal) */}
+    {!showArchived && (
+      <div className="flex items-center gap-0 overflow-x-auto border-b sm:border-b-0 sm:border-r border-border">
+        {FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onStatusChange(opt.value)}
+            className={`h-9 px-3.5 text-[10px] font-bold uppercase tracking-[0.12em] shrink-0 border-r last:border-r-0 border-border transition-colors ${
+              statusFilter === opt.value
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            }`}
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    )}
 
     {/* Refresh */}
     <button

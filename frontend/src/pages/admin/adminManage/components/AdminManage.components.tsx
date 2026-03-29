@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, UserX, UserCheck, QrCode, Download, X } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, X, Archive, ArchiveRestore } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import {
   Input,
-  Label,
   Select,
   SelectTrigger,
   SelectValue,
@@ -37,7 +36,6 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   </p>
 );
 
-// Square primary-filled action button
 const ActionButton = ({
   children,
   onClick,
@@ -46,24 +44,21 @@ const ActionButton = ({
   variant = "primary",
   className = "",
 }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  type?: "button" | "submit";
-  disabled?: boolean;
-  variant?: "primary" | "ghost" | "danger" | "success";
+  children:   React.ReactNode;
+  onClick?:   () => void;
+  type?:      "button" | "submit";
+  disabled?:  boolean;
+  variant?:   "primary" | "ghost" | "danger" | "success" | "warning";
   className?: string;
 }) => {
   const base =
     "inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] border transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none";
-  const variants = {
-    primary:
-      "bg-primary border-primary text-primary-foreground hover:bg-primary/85",
-    ghost:
-      "bg-transparent border-border text-muted-foreground hover:bg-secondary hover:text-foreground",
-    danger:
-      "bg-transparent border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-    success:
-      "bg-transparent border-success/40 text-success hover:bg-success hover:text-success-foreground",
+  const variants: Record<string, string> = {
+    primary: "bg-primary border-primary text-primary-foreground hover:bg-primary/85",
+    ghost:   "bg-transparent border-border text-muted-foreground hover:bg-secondary hover:text-foreground",
+    danger:  "bg-transparent border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
+    success: "bg-transparent border-success/40 text-success hover:bg-success hover:text-success-foreground",
+    warning: "bg-transparent border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground",
   };
   return (
     <button
@@ -81,12 +76,12 @@ const ActionButton = ({
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
 
 interface QrModalProps {
-  target: QrTarget;
+  target:  QrTarget;
   onClose: () => void;
 }
 
 export const QrModal = ({ target, onClose }: QrModalProps) => {
-  const [qrUrl, setQrUrl]     = useState<string | null>(null);
+  const [qrUrl,   setQrUrl]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,8 +112,8 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         { responseType: "blob" }
       );
       const url = URL.createObjectURL(res.data);
-      const a = document.createElement("a");
-      a.href = url;
+      const a   = document.createElement("a");
+      a.href     = url;
       a.download = `qr-${target.studentId}.png`;
       a.click();
       URL.revokeObjectURL(url);
@@ -137,7 +132,6 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         className="relative bg-card border border-border shadow-2xl flex flex-col items-center w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header band */}
         <div className="w-full bg-primary relative">
           <div className="h-[3px] w-full bg-warning" />
           <div className="px-5 py-4 flex items-start justify-between">
@@ -162,7 +156,6 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
           </div>
         </div>
 
-        {/* QR area */}
         <div className="p-6 flex flex-col items-center gap-5 w-full">
           {loading ? (
             <div className="h-48 w-48 border border-border flex items-center justify-center">
@@ -170,18 +163,13 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
                 style={{ fontFamily: "var(--font-heading)" }}>Loading…</p>
             </div>
           ) : qrUrl ? (
-            <img
-              src={qrUrl}
-              alt={`QR code for ${target.studentId}`}
-              className="h-48 w-48 border border-border"
-            />
+            <img src={qrUrl} alt={`QR code for ${target.studentId}`} className="h-48 w-48 border border-border" />
           ) : (
             <div className="h-48 w-48 border border-destructive/30 flex items-center justify-center">
               <p className="text-[10px] uppercase tracking-[0.2em] text-destructive"
                 style={{ fontFamily: "var(--font-heading)" }}>Failed to load</p>
             </div>
           )}
-
           <ActionButton onClick={handleDownload} className="w-full justify-center">
             <Download className="h-3.5 w-3.5" />
             Download PNG
@@ -195,12 +183,12 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
 // ─── Password Field ───────────────────────────────────────────────────────────
 
 interface PasswordFieldProps {
-  label: string;
-  value: string;
+  label:        string;
+  value:        string;
   showPassword: boolean;
   placeholder?: string;
-  onChange: (v: string) => void;
-  onToggle?: () => void;
+  onChange:     (v: string) => void;
+  onToggle?:    () => void;
 }
 
 export const PasswordField = ({
@@ -232,9 +220,9 @@ export const PasswordField = ({
 // ─── Role Select ──────────────────────────────────────────────────────────────
 
 interface RoleSelectProps {
-  value: string;
+  value:        string;
   allowedRoles: string[];
-  onChange: (v: string) => void;
+  onChange:     (v: string) => void;
 }
 
 export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) => (
@@ -253,30 +241,31 @@ export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) =
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-export const StatusBadge = ({ isActive }: { isActive?: number }) => (
+export const StatusBadge = ({ isArchived }: { isArchived: boolean }) => (
   <span
-    className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] border ${
-      isActive
-        ? "bg-success/10 text-success border-success/30"
-        : "bg-muted/50 text-muted-foreground border-border"
+    className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] border ${
+      isArchived
+        ? "bg-warning/10 text-warning border-warning/30"
+        : "bg-success/10 text-success border-success/30"
     }`}
     style={{ fontFamily: "var(--font-heading)" }}
   >
-    {isActive ? "Active" : "Inactive"}
+    {isArchived ? <Archive className="h-2.5 w-2.5" /> : null}
+    {isArchived ? "Archived" : "Active"}
   </span>
 );
 
 // ─── Create Form ──────────────────────────────────────────────────────────────
 
 interface CreateFormProps {
-  form: UserFormState;
-  showPassword: boolean;
-  allowedRoles: string[];
-  loading: boolean;
-  onField: <K extends keyof UserFormState>(key: K, value: string) => void;
+  form:             UserFormState;
+  showPassword:     boolean;
+  allowedRoles:     string[];
+  loading:          boolean;
+  onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
-  onSubmit: () => void;
-  onReset: () => void;
+  onSubmit:         () => void;
+  onReset:          () => void;
 }
 
 export const CreateForm = ({
@@ -287,7 +276,6 @@ export const CreateForm = ({
     className="mt-6 border border-border bg-background"
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    {/* Form header */}
     <div className="border-b border-border px-6 py-4 bg-secondary/30">
       <SectionLabel>New User Details</SectionLabel>
     </div>
@@ -331,7 +319,6 @@ export const CreateForm = ({
       <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
 
-    {/* Action bar */}
     <div className="border-t border-border px-6 py-4 flex gap-2">
       <ActionButton type="submit" disabled={loading}>
         {loading ? "Creating…" : "Create User"}
@@ -346,35 +333,81 @@ export const CreateForm = ({
 // ─── Search Bar ───────────────────────────────────────────────────────────────
 
 interface SearchBarProps {
-  value: string;
-  loading: boolean;
-  onChange: (v: string) => void;
-  onSearch: () => void;
+  value:            string;
+  loading:          boolean;
+  showArchived:     boolean;
+  onChange:         (v: string) => void;
+  onSearch:         () => void;
+  onToggleArchived: () => void;
 }
 
-export const SearchBar = ({ value, loading, onChange, onSearch }: SearchBarProps) => (
-  <div className="mt-6 flex gap-0">
-    <Input
-      placeholder="Search by ID or Name"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => e.key === "Enter" && onSearch()}
-      className="rounded-none flex-1 border-r-0"
-    />
-    <ActionButton onClick={onSearch} disabled={loading}>
-      {loading ? "Searching…" : "Search"}
-    </ActionButton>
+export const SearchBar = ({
+  value, loading, showArchived, onChange, onSearch, onToggleArchived,
+}: SearchBarProps) => (
+  <div className="mt-6 space-y-0">
+    {/* Section header with toggle */}
+    <div className="flex items-center justify-between border border-border border-b-0 px-4 py-2.5 bg-muted/30">
+      <div className="flex items-center gap-2.5">
+        <div className="h-px w-4 bg-warning shrink-0" />
+        <span
+          className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          {showArchived ? "Archived Users" : "Active Users"}
+        </span>
+      </div>
+      <button
+        onClick={onToggleArchived}
+        className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
+          showArchived
+            ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
+            : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
+        }`}
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        <Archive className="h-3 w-3" />
+        {showArchived ? "Archived" : "Active"}
+      </button>
+    </div>
+
+    {/* Archived banner */}
+    {showArchived && (
+      <div className="flex items-center gap-2.5 px-4 py-2 bg-warning/5 border border-t-0 border-warning/20">
+        <Archive className="h-3 w-3 text-warning/60 shrink-0" />
+        <p
+          className="text-[10px] font-bold uppercase tracking-[0.15em] text-warning/70"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          Showing archived users — restore to make them active again
+        </p>
+      </div>
+    )}
+
+    {/* Input */}
+    <div className="flex gap-0">
+      <Input
+        placeholder="Search by ID or name…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSearch()}
+        className="rounded-none flex-1 border-r-0"
+      />
+      <ActionButton onClick={onSearch} disabled={loading}>
+        {loading ? "Searching…" : "Search"}
+      </ActionButton>
+    </div>
   </div>
 );
 
 // ─── Search Results Table ─────────────────────────────────────────────────────
 
 interface SearchResultsTableProps {
-  results: User[];
-  onSelect: (u: User) => void;
+  results:      User[];
+  showArchived: boolean;
+  onSelect:     (u: User) => void;
 }
 
-export const SearchResultsTable = ({ results, onSelect }: SearchResultsTableProps) => (
+export const SearchResultsTable = ({ results, showArchived, onSelect }: SearchResultsTableProps) => (
   <div className="mt-4 border border-border overflow-x-auto">
     <table className="w-full text-left text-sm">
       <thead className="border-b border-border bg-secondary/40">
@@ -395,8 +428,8 @@ export const SearchResultsTable = ({ results, onSelect }: SearchResultsTableProp
           <tr
             key={u.student_employee_id}
             className={`border-t border-border cursor-pointer transition-colors hover:bg-secondary/50 ${
-              i % 2 === 0 ? "bg-background" : "bg-secondary/20"
-            }`}
+              showArchived ? "opacity-70" : ""
+            } ${i % 2 === 0 ? "bg-background" : "bg-secondary/20"}`}
             onClick={() => onSelect(u)}
           >
             <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{u.student_employee_id}</td>
@@ -407,7 +440,9 @@ export const SearchResultsTable = ({ results, onSelect }: SearchResultsTableProp
             >
               {u.role.replace("_", " ")}
             </td>
-            <td className="px-4 py-3"><StatusBadge isActive={u.is_active} /></td>
+            <td className="px-4 py-3">
+              <StatusBadge isArchived={showArchived} />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -418,28 +453,29 @@ export const SearchResultsTable = ({ results, onSelect }: SearchResultsTableProp
 // ─── Edit Form ────────────────────────────────────────────────────────────────
 
 interface EditFormProps {
-  selectedUser: User;
-  form: UserFormState;
-  showPassword: boolean;
-  allowedRoles: string[];
-  loading: boolean;
-  onField: <K extends keyof UserFormState>(key: K, value: string) => void;
+  selectedUser:     User;
+  form:             UserFormState;
+  showPassword:     boolean;
+  allowedRoles:     string[];
+  loading:          boolean;
+  showArchived:     boolean;
+  onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
-  onSubmit: () => void;
-  onViewQr: () => void;
-  onDeactivate: () => void;
-  onReactivate: () => void;
+  onSubmit:         () => void;
+  onViewQr:         () => void;
+  onArchive:        () => void;
+  onRestore:        () => void;
 }
 
 export const EditForm = ({
-  selectedUser, form, showPassword, allowedRoles, loading,
-  onField, onTogglePassword, onSubmit, onViewQr, onDeactivate, onReactivate,
+  selectedUser, form, showPassword, allowedRoles, loading, showArchived,
+  onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore,
 }: EditFormProps) => (
   <form
     className="mt-6 border border-border bg-background"
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    {/* Form header band */}
+    {/* Header band */}
     <div className="bg-primary relative overflow-hidden">
       <div className="h-[3px] w-full bg-warning" />
       <div className="px-6 py-4 flex items-center justify-between">
@@ -457,7 +493,7 @@ export const EditForm = ({
             {selectedUser.student_employee_id}
           </p>
         </div>
-        <StatusBadge isActive={selectedUser.is_active} />
+        <StatusBadge isArchived={showArchived} />
       </div>
     </div>
 
@@ -465,7 +501,12 @@ export const EditForm = ({
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <FieldLabel>Full Name</FieldLabel>
-          <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} className="rounded-none" />
+          <Input
+            value={form.fullName}
+            onChange={(e) => onField("fullName", e.target.value)}
+            className="rounded-none"
+            disabled={showArchived}
+          />
         </div>
         <div>
           <FieldLabel>ID Number</FieldLabel>
@@ -475,54 +516,78 @@ export const EditForm = ({
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <FieldLabel>Address</FieldLabel>
-          <Input value={form.address} onChange={(e) => onField("address", e.target.value)} className="rounded-none" />
+          <Input
+            value={form.address}
+            onChange={(e) => onField("address", e.target.value)}
+            className="rounded-none"
+            disabled={showArchived}
+          />
         </div>
         <div>
           <FieldLabel>Contact</FieldLabel>
-          <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} className="rounded-none" />
+          <Input
+            value={form.contact}
+            onChange={(e) => onField("contact", e.target.value)}
+            className="rounded-none"
+            disabled={showArchived}
+          />
         </div>
       </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <PasswordField
-          label="New Password"
-          value={form.password}
-          showPassword={showPassword}
-          placeholder="Leave empty to keep current"
-          onChange={(v) => onField("password", v)}
-          onToggle={onTogglePassword}
-        />
-        <PasswordField
-          label="Re-Type Password"
-          value={form.rePassword}
-          showPassword={showPassword}
-          placeholder="Leave empty to keep current"
-          onChange={(v) => onField("rePassword", v)}
-        />
-      </div>
-      <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
+
+      {/* Password + role only editable in active mode */}
+      {!showArchived && (
+        <>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <PasswordField
+              label="New Password"
+              value={form.password}
+              showPassword={showPassword}
+              placeholder="Leave empty to keep current"
+              onChange={(v) => onField("password", v)}
+              onToggle={onTogglePassword}
+            />
+            <PasswordField
+              label="Re-Type Password"
+              value={form.rePassword}
+              showPassword={showPassword}
+              placeholder="Leave empty to keep current"
+              onChange={(v) => onField("rePassword", v)}
+            />
+          </div>
+          <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
+        </>
+      )}
     </div>
 
     {/* Action bar */}
     <div className="border-t border-border px-6 py-4 flex gap-2 flex-wrap">
-      <ActionButton type="submit" disabled={loading}>
-        {loading ? "Updating…" : "Update User"}
-      </ActionButton>
-
-      <ActionButton type="button" variant="ghost" onClick={onViewQr}>
-        <QrCode className="h-3.5 w-3.5" />
-        View QR
-      </ActionButton>
-
-      {selectedUser.is_active ? (
-        <ActionButton type="button" variant="danger" onClick={onDeactivate} disabled={loading}>
-          <UserX className="h-3.5 w-3.5" />
-          {loading ? "Deactivating…" : "Deactivate"}
+      {showArchived ? (
+        <ActionButton type="button" variant="warning" onClick={onRestore} disabled={loading}>
+          <ArchiveRestore className="h-3.5 w-3.5" />
+          {loading ? "Restoring…" : "Restore User"}
         </ActionButton>
       ) : (
-        <ActionButton type="button" variant="success" onClick={onReactivate} disabled={loading}>
-          <UserCheck className="h-3.5 w-3.5" />
-          {loading ? "Reactivating…" : "Reactivate"}
-        </ActionButton>
+        <>
+          <ActionButton type="submit" disabled={loading}>
+            {loading ? "Updating…" : "Update User"}
+          </ActionButton>
+
+          <ActionButton type="button" variant="ghost" onClick={onViewQr}>
+            <QrCode className="h-3.5 w-3.5" />
+            View QR
+          </ActionButton>
+
+          <ActionButton
+            type="button"
+            variant="ghost"
+            onClick={onArchive}
+            disabled={loading}
+            className="ml-auto border-border/50 text-muted-foreground/50 hover:border-warning/40 hover:text-warning"
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Archive
+          </ActionButton>
+        </>
       )}
     </div>
   </form>

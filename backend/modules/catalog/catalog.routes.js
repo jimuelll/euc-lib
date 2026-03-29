@@ -27,4 +27,6 @@ router.get("/catalogue/search", (req, res, next) => {
   next();
 }, controller.getBooks);
 
+router.post("/books/:id/restore", requireAdminRole, validateBookId, controller.restoreBook);
+
 module.exports = router;

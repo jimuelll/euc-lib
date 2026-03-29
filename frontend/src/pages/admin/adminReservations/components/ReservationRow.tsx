@@ -7,30 +7,32 @@ interface ReservationRowProps {
   reservation: AdminReservation;
   isActing:    boolean;
   index:       number;
+  showArchived: boolean;
   onMarkReady: (id: number, title: string) => void;
   onFulfill:   (id: number, title: string) => void;
   onCancel:    (id: number, title: string) => void;
+  onArchive:   (id: number, title: string) => void;
+  onRestore:   (id: number, title: string) => void;
 }
 
 const ReservationRow = ({
-  reservation: r, isActing, index,
-  onMarkReady, onFulfill, onCancel,
+  reservation: r, isActing, index, showArchived,
+  onMarkReady, onFulfill, onCancel, onArchive, onRestore,
 }: ReservationRowProps) => {
   const cfg        = RESERVATION_STATUS_CONFIG[r.status];
   const StatusIcon = cfg.icon;
   const showExpiry = r.expires_at && (r.status === "pending" || r.status === "ready");
 
-  // Status-based left accent bar color
   const accentColor =
-    r.status === "ready"     ? "bg-success/60"     :
-    r.status === "pending"   ? "bg-warning/60"      :
-    r.status === "fulfilled" ? "bg-info/40"         :
+    r.status === "ready"     ? "bg-success/60"  :
+    r.status === "pending"   ? "bg-warning/60"   :
+    r.status === "fulfilled" ? "bg-info/40"      :
     "bg-border";
 
   return (
     <tr className={`group border-b border-border last:border-0 hover:bg-muted/15 transition-colors ${
       index % 2 !== 0 ? "bg-muted/[0.06]" : ""
-    }`}>
+    } ${showArchived ? "opacity-70" : ""}`}>
 
       {/* Status accent — narrow left cell */}
       <td className="w-[3px] p-0">
@@ -108,9 +110,12 @@ const ReservationRow = ({
           title={r.book_title}
           status={r.status}
           isActing={isActing}
+          showArchived={showArchived}
           onMarkReady={onMarkReady}
           onFulfill={onFulfill}
           onCancel={onCancel}
+          onArchive={onArchive}
+          onRestore={onRestore}
         />
       </td>
     </tr>

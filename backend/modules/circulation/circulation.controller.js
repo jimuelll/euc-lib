@@ -11,7 +11,7 @@ const lookupUser = async (req, res) => {
 
     const [[user]] = await db.query(
       `SELECT id, name, student_employee_id, role, is_active
-       FROM users WHERE student_employee_id = ?`,
+       FROM users WHERE student_employee_id = ? AND deleted_at IS NULL`,
       [student_employee_id.trim()]
     );
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -52,7 +52,7 @@ const lookupBook = async (req, res) => {
        FROM books bk
        LEFT JOIN borrowings br
          ON br.book_id = bk.id AND br.status IN ('borrowed', 'overdue')
-       WHERE bk.isbn = ?
+       WHERE bk.isbn = ? AND bk.deleted_at IS NULL
        GROUP BY bk.id`,
       [isbn.trim()]
     );

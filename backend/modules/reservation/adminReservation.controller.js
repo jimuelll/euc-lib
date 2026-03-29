@@ -1,4 +1,5 @@
 const service = require("../reservation/reservation.service");
+const db      = require("../../db");
 
 const getAdminReservations = async (req, res) => {
   try {
@@ -57,9 +58,53 @@ const cancelReservationAdmin = async (req, res) => {
   }
 };
 
+const deleteReservationAdmin = async (req, res) => {
+  try {
+    const reservationId = parseInt(req.params.reservationId, 10);
+    if (isNaN(reservationId) || reservationId < 1) {
+      return res.status(400).json({ message: "Invalid reservation ID" });
+    }
+
+    // Only terminal reservations (cancelled, expired, fulfilled) can be soft-deleted
+    const [[row]] = await db.query(
+      "SELECT status FROM reservations WHERE id = ? AND deleted_at IS NULL",
+      [reservationId]
+    );
+    if (!row) return res.status(404).json({ message: "Reservation not found" });
+    if (["pending", "ready"].includes(row.status)) {
+      return res.status(409).json({ message: "Cancel or fulfil the reservation before archiving it" });
+    }
+
+    await db.query(
+      "UPDATE reservations SET deleted_at = NOW(), deleted_by = ? WHERE id = ?",
+      [req.user.id, reservationId]
+    );
+    res.json({ message: "Reservation archived successfully" });
+  } catch (err) {
+    console.error("[admin/reservations] deleteReservationAdmin:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
+  }
+};
+
+const restoreReservationAdmin = async (req, res) => {
+  try {
+    const reservationId = parseInt(req.params.reservationId, 10);
+    if (isNaN(reservationId) || reservationId < 1) {
+      return res.status(400).json({ message: "Invalid reservation ID" });
+    }
+    await service.restoreReservation(reservationId);
+    res.json({ message: "Reservation restored successfully" });
+  } catch (err) {
+    console.error("[admin/reservations] restoreReservationAdmin:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
+  }
+};
+
 module.exports = {
   getAdminReservations,
   markReservationReady,
   fulfillReservation,
   cancelReservationAdmin,
+  deleteReservationAdmin,
+  restoreReservationAdmin,
 };

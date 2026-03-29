@@ -16,10 +16,6 @@ export const getAdminReservations = async (
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
-/**
- * Mark a pending reservation as ready for pickup.
- * Backend: sets status = 'ready'
- */
 export const markReservationReady = async (
   reservationId: number
 ): Promise<AdminReservation> => {
@@ -29,10 +25,6 @@ export const markReservationReady = async (
   return res.data;
 };
 
-/**
- * Fulfil a ready reservation — patron has collected the book.
- * Backend: sets status = 'fulfilled', fulfilled_at = NOW()
- */
 export const fulfillReservation = async (
   reservationId: number
 ): Promise<AdminReservation> => {
@@ -42,10 +34,6 @@ export const fulfillReservation = async (
   return res.data;
 };
 
-/**
- * Cancel any active (pending / ready) reservation from the admin side.
- * Backend: sets status = 'cancelled', cancelled_at = NOW()
- */
 export const cancelReservationAdmin = async (
   reservationId: number
 ): Promise<AdminReservation> => {
@@ -53,4 +41,20 @@ export const cancelReservationAdmin = async (
     `/api/admin/reservations/${reservationId}/cancel`
   );
   return res.data;
+};
+
+/**
+ * Soft-delete a terminal reservation (cancelled / expired / fulfilled).
+ * Backend: sets deleted_at = NOW(), deleted_by = req.user.id
+ */
+export const archiveReservation = async (reservationId: number): Promise<void> => {
+  await axiosInstance.delete(`/api/admin/reservations/${reservationId}`);
+};
+
+/**
+ * Restore a soft-deleted reservation.
+ * Backend: clears deleted_at and deleted_by
+ */
+export const restoreReservation = async (reservationId: number): Promise<void> => {
+  await axiosInstance.patch(`/api/admin/reservations/${reservationId}/restore`);
 };

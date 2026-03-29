@@ -8,9 +8,11 @@ const { authMiddleware } = require("../auth/auth.middleware");
 
 const adminOnly = authMiddleware(["admin", "super_admin", "staff"]);
 
-router.get ("/reservations",                          adminOnly, controller.getAdminReservations);
-router.post("/reservations/:reservationId/ready",     adminOnly, controller.markReservationReady);
-router.post("/reservations/:reservationId/fulfill",   adminOnly, controller.fulfillReservation);
-router.post("/reservations/:reservationId/cancel",    adminOnly, controller.cancelReservationAdmin);
+router.get ("/reservations",                              adminOnly, controller.getAdminReservations);
+router.post("/reservations/:reservationId/ready",         adminOnly, controller.markReservationReady);
+router.post("/reservations/:reservationId/fulfill",       adminOnly, controller.fulfillReservation);
+router.post("/reservations/:reservationId/cancel",        adminOnly, controller.cancelReservationAdmin);
+router.delete("/reservations/:reservationId",             adminOnly, controller.deleteReservationAdmin);
+router.patch("/reservations/:reservationId/restore",      adminOnly, controller.restoreReservationAdmin);
 
 module.exports = router;

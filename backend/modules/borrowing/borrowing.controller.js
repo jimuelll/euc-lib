@@ -171,6 +171,52 @@ const lookupUser = async (req, res) => {
   }
 };
 
+// ─── Admin borrowing management ───────────────────────────────────────────────
+
+const adminGetBorrowings = async (req, res) => {
+  try {
+    const page         = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit        = Math.min(50, parseInt(req.query.limit, 10) || 20);
+    const search       = req.query.search ?? "";
+    const status       = req.query.status ?? "all";
+    const showArchived = req.query.archived === "true";
+
+    const result = await service.adminGetBorrowings({ search, status, showArchived, page, limit });
+    res.json(result);
+  } catch (err) {
+    console.error("[borrowing] adminGetBorrowings:", err);
+    res.status(500).json({ message: "Failed to fetch borrowings" });
+  }
+};
+
+const adminDeleteBorrowing = async (req, res) => {
+  try {
+    const borrowingId = parseInt(req.params.borrowingId, 10);
+    if (isNaN(borrowingId) || borrowingId < 1) {
+      return res.status(400).json({ message: "Invalid borrowing ID" });
+    }
+    await service.adminDeleteBorrowing(borrowingId, req.user.id);
+    res.json({ message: "Borrowing record archived successfully" });
+  } catch (err) {
+    console.error("[borrowing] adminDeleteBorrowing:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to archive borrowing" });
+  }
+};
+
+const adminRestoreBorrowing = async (req, res) => {
+  try {
+    const borrowingId = parseInt(req.params.borrowingId, 10);
+    if (isNaN(borrowingId) || borrowingId < 1) {
+      return res.status(400).json({ message: "Invalid borrowing ID" });
+    }
+    await service.adminRestoreBorrowing(borrowingId);
+    res.json({ message: "Borrowing record restored successfully" });
+  } catch (err) {
+    console.error("[borrowing] adminRestoreBorrowing:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to restore borrowing" });
+  }
+};
+
 module.exports = {
   getActiveBorrows,
   getBorrowHistory,
@@ -181,4 +227,7 @@ module.exports = {
   scanReturn,
   getCopyByBarcode,
   lookupUser,
+  adminGetBorrowings,
+  adminDeleteBorrowing,
+  adminRestoreBorrowing,
 };

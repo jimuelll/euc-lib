@@ -4,6 +4,7 @@ const {
   handleDeleteUser,
   handleUpdateUser,
   handleSearchUsers,
+  handleRestoreUser,
 } = require("./admin.controller");
 const { authMiddleware } = require("../auth/auth.middleware");
 
@@ -15,5 +16,6 @@ router.post("/users", adminOnly, handleCreateUser);
 router.delete("/users/:student_employee_id", adminOnly, handleDeleteUser);
 router.put("/users/:student_employee_id", adminOnly, handleUpdateUser);
 router.get("/users", adminOnly, handleSearchUsers);
+router.patch("/users/:student_employee_id/restore", adminOnly, handleRestoreUser);
 
 module.exports = router;

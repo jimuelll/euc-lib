@@ -1,4 +1,4 @@
-const { createUser, deleteUser, updateUser, searchUsers } = require("./admin.service");
+const { createUser, deleteUser, restoreUser, updateUser, searchUsers } = require("./admin.service");
 const qr = require("qrcode");
 const db = require("../../db");
 
@@ -16,7 +16,18 @@ async function handleCreateUser(req, res) {
 async function handleDeleteUser(req, res) {
   try {
     const { student_employee_id } = req.params;
-    const result = await deleteUser(student_employee_id, req.user.role);
+    const result = await deleteUser(student_employee_id, req.user.role, req.user.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+// RESTORE
+async function handleRestoreUser(req, res) {
+  try {
+    const { student_employee_id } = req.params;
+    const result = await restoreUser(student_employee_id, req.user.role);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -48,7 +59,7 @@ async function handleSearchUsers(req, res) {
 async function handleGetBarcodePng(req, res) {
   try {
     const [[user]] = await db.query(
-      "SELECT barcode FROM users WHERE student_employee_id = ?",
+      "SELECT barcode FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
       [req.params.student_employee_id]
     );
     if (!user?.barcode) {
@@ -74,6 +85,7 @@ async function handleGetBarcodePng(req, res) {
 module.exports = {
   handleCreateUser,
   handleDeleteUser,
+  handleRestoreUser,
   handleUpdateUser,
   handleSearchUsers,
   handleGetBarcodePng,

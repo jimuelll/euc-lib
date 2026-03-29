@@ -18,6 +18,7 @@ export interface CirculationLogEntry {
   returned_at: string | null;
   status: "borrowed" | "overdue" | "returned";
   issued_by_name: string | null;
+  deleted_at: string | null;   // ← NEW: present when archived
 }
 
 export interface CirculationLogFilters {
@@ -25,6 +26,7 @@ export interface CirculationLogFilters {
   search?: string;
   page?: number;
   limit?: number;
+  archived?: boolean;          // ← NEW
 }
 
 export interface CirculationLogResult {
@@ -67,6 +69,16 @@ export const processReturn = async (copyBarcode: string) => {
 export const getCirculationLog = async (
   filters: CirculationLogFilters = {}
 ): Promise<CirculationLogResult> => {
-  const res = await axiosInstance.get("/api/admin/circulation/log", { params: filters });
+  const res = await axiosInstance.get("/api/borrowing/admin/borrows", { params: filters });
   return res.data;
+};
+
+// ── NEW: Soft delete / restore ────────────────────────────────────────────────
+
+export const archiveBorrowing = async (id: number): Promise<void> => {
+  await axiosInstance.delete(`/api/borrowing/admin/borrows/${id}`);
+};
+
+export const restoreBorrowing = async (id: number): Promise<void> => {
+  await axiosInstance.patch(`/api/borrowing/admin/borrows/${id}/restore`);
 };

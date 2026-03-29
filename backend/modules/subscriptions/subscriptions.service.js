@@ -1,11 +1,6 @@
-// subscriptions/subscriptions.service.js
-const pool = require("../../db"); // adjust to your DB pool path
+const pool = require("../../db");
 const { v2: cloudinary } = require("cloudinary");
 
-/**
- * Delete an image from Cloudinary by its public_id.
- * Fails silently — a failed delete should not block the DB operation.
- */
 const deleteFromCloudinary = async (publicId) => {
   try {
     await cloudinary.uploader.destroy(publicId);
@@ -16,23 +11,28 @@ const deleteFromCloudinary = async (publicId) => {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-const getAllSubscriptions = async () => {
+const getAllSubscriptions = async (showArchived = false) => {
+  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
   const [rows] = await pool.query(
-    `SELECT * FROM academic_subscriptions ORDER BY sort_order ASC, id ASC`
+    `SELECT * FROM academic_subscriptions
+     WHERE deleted_at ${deletedFilter}
+     ORDER BY sort_order ASC, id ASC`
   );
   return rows;
 };
 
 const getActiveSubscriptions = async () => {
   const [rows] = await pool.query(
-    `SELECT * FROM academic_subscriptions WHERE is_active = 1 ORDER BY sort_order ASC, id ASC`
+    `SELECT * FROM academic_subscriptions
+     WHERE is_active = 1 AND deleted_at IS NULL
+     ORDER BY sort_order ASC, id ASC`
   );
   return rows;
 };
 
 const getSubscriptionById = async (id) => {
   const [rows] = await pool.query(
-    `SELECT * FROM academic_subscriptions WHERE id = ?`,
+    `SELECT * FROM academic_subscriptions WHERE id = ? AND deleted_at IS NULL`,
     [id]
   );
   return rows.length ? rows[0] : null;
@@ -84,7 +84,7 @@ const updateSubscription = async (id, dto) => {
 
   values.push(id);
   await pool.query(
-    `UPDATE academic_subscriptions SET ${fields.join(", ")} WHERE id = ?`,
+    `UPDATE academic_subscriptions SET ${fields.join(", ")} WHERE id = ? AND deleted_at IS NULL`,
     values
   );
 
@@ -96,16 +96,33 @@ const updateSubscription = async (id, dto) => {
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 const deleteSubscription = async (id) => {
-  // Fetch public_id first so we can clean up Cloudinary
   const sub = await getSubscriptionById(id);
+
+  await pool.query(
+    `UPDATE academic_subscriptions SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL`,
+    [id]
+  );
+
   if (sub?.image_public_id) {
     await deleteFromCloudinary(sub.image_public_id);
   }
+};
 
-  await pool.query(
-    `DELETE FROM academic_subscriptions WHERE id = ?`,
+// ─── Restore ──────────────────────────────────────────────────────────────────
+
+const restoreSubscription = async (id) => {
+  const [rows] = await pool.query(
+    `SELECT * FROM academic_subscriptions WHERE id = ? AND deleted_at IS NOT NULL`,
     [id]
   );
+  if (!rows.length) throw Object.assign(new Error("Archived subscription not found"), { status: 404 });
+
+  await pool.query(
+    `UPDATE academic_subscriptions SET deleted_at = NULL, deleted_by = NULL WHERE id = ?`,
+    [id]
+  );
+
+  return getSubscriptionById(id);
 };
 
 // ─── Reorder ──────────────────────────────────────────────────────────────────
@@ -116,7 +133,8 @@ const reorderSubscriptions = async (orderedIds, updatedBy) => {
     await conn.beginTransaction();
     for (let i = 0; i < orderedIds.length; i++) {
       await conn.query(
-        `UPDATE academic_subscriptions SET sort_order = ?, updated_by = ? WHERE id = ?`,
+        `UPDATE academic_subscriptions SET sort_order = ?, updated_by = ?
+         WHERE id = ? AND deleted_at IS NULL`,
         [i + 1, updatedBy ?? null, orderedIds[i]]
       );
     }
@@ -137,5 +155,6 @@ module.exports = {
   createSubscription,
   updateSubscription,
   deleteSubscription,
+  restoreSubscription,
   reorderSubscriptions,
 };

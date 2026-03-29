@@ -6,22 +6,23 @@ export type UserRole = "super_admin" | "admin" | "staff" | "scanner" | "student"
 
 export interface User {
   student_employee_id: string;
-  name: string;
-  role: string;
-  address?: string;
-  contact?: string;
-  is_active?: number;
+  name:                string;
+  role:                string;
+  address?:            string;
+  contact?:            string;
+  is_active?:          number;
+  deleted_at?:         string | null;   // ← new: present when user is archived
 }
 
 // ─── Form State ───────────────────────────────────────────────────────────────
 
 export interface UserFormState {
-  fullName: string;
-  id: string;
-  address: string;
-  contact: string;
-  role: string;
-  password: string;
+  fullName:   string;
+  id:         string;
+  address:    string;
+  contact:    string;
+  role:       string;
+  password:   string;
   rePassword: string;
 }
 
@@ -29,5 +30,5 @@ export interface UserFormState {
 
 export interface QrTarget {
   studentId: string;
-  name: string;
+  name:      string;
 }

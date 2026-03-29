@@ -14,7 +14,6 @@ import type { BulletinPost } from "./types";
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
 
-// ── Shared section-label primitive ───────────────────────────────────────────
 const SectionLabel = ({ children, light = false }: { children: React.ReactNode; light?: boolean }) => (
   <div className="flex items-center gap-3">
     <div className={`h-px w-6 shrink-0 ${light ? "bg-warning" : "bg-warning"}`} />
@@ -33,11 +32,11 @@ export function BulletinPage() {
 
   const {
     posts, loading, error, currentPage, totalPages,
-    fetchPosts, setCurrentPage, updatePost,
+    fetchPosts, setCurrentPage, updatePost, removePost,
   } = useBulletinPosts({ limit: POSTS_PER_PAGE });
 
   const [selectedPost, setSelectedPost] = useState<BulletinPost | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate]     = useState(false);
 
   const handleLikeToggle = useCallback((postId: number, liked: boolean, total: number) => {
     updatePost(postId, { liked_by_me: liked, likes: total });
@@ -53,11 +52,18 @@ export function BulletinPage() {
   }, [updatePost, posts]);
 
   const handlePinToggle = useCallback((postId: number, pinned: boolean) => {
+    // Unpin all others in local state first (mirrors backend single-pin enforcement)
+    posts.forEach((p) => { if (p.id !== postId && p.is_pinned) updatePost(p.id, { is_pinned: false }); });
     updatePost(postId, { is_pinned: pinned });
     setSelectedPost((prev) =>
       prev?.id === postId ? { ...prev, is_pinned: pinned } : prev
     );
-  }, [updatePost]);
+  }, [updatePost, posts]);
+
+  const handleArchived = useCallback((postId: number) => {
+    removePost(postId);
+    setSelectedPost((prev) => (prev?.id === postId ? null : prev));
+  }, [removePost]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -66,7 +72,6 @@ export function BulletinPage() {
       {/* ── Page header band ── */}
       <div className="bg-primary relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        {/* Louvered texture */}
         <div
           className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
           style={{
@@ -74,11 +79,8 @@ export function BulletinPage() {
               "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
           }}
         />
-        {/* Gold top rule */}
         <div className="relative z-10 h-[3px] w-full bg-warning" />
-        {/* Gold left rule */}
         <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
-        {/* Bottom separator */}
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
         <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
@@ -114,7 +116,6 @@ export function BulletinPage() {
       <main className="bg-background">
         <div className="container px-4 sm:px-6 py-10">
 
-          {/* Policy notice — structural left-bar treatment */}
           <div className="flex gap-0 border border-primary/20 bg-primary/[0.03] mb-10">
             <div className="w-[3px] bg-warning shrink-0" />
             <p
@@ -125,13 +126,11 @@ export function BulletinPage() {
             </p>
           </div>
 
-          {/* ── Two-column layout ── */}
           <div className="flex flex-col lg:flex-row lg:items-start gap-8">
 
             {/* ── Main posts column ── */}
             <div className="flex-1 min-w-0">
 
-              {/* Loading state */}
               {loading && (
                 <div className="flex items-center justify-center gap-3 py-20 border border-border">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -144,7 +143,6 @@ export function BulletinPage() {
                 </div>
               )}
 
-              {/* Error state */}
               {error && !loading && (
                 <div className="flex flex-col items-center gap-5 py-16 border border-destructive/20 bg-destructive/[0.02]">
                   <div className="flex gap-0">
@@ -166,7 +164,6 @@ export function BulletinPage() {
                 </div>
               )}
 
-              {/* Empty state */}
               {!loading && !error && posts.length === 0 && (
                 <div className="flex flex-col items-center py-20 border border-dashed border-border gap-5">
                   <p
@@ -190,10 +187,8 @@ export function BulletinPage() {
                 </div>
               )}
 
-              {/* Post list */}
               {!loading && !error && posts.length > 0 && (
                 <>
-                  {/* Count bar */}
                   <div className="flex items-center justify-between pb-4 mb-0 border-b border-border">
                     <span
                       className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
@@ -203,7 +198,6 @@ export function BulletinPage() {
                     </span>
                   </div>
 
-                  {/* Cards — flush list, single wrapping border */}
                   <motion.div
                     initial="hidden"
                     animate="visible"
@@ -219,12 +213,12 @@ export function BulletinPage() {
                           post={post}
                           variant="list"
                           onClick={() => setSelectedPost(post)}
+                          onArchived={handleArchived}
                         />
                       </motion.div>
                     ))}
                   </motion.div>
 
-                  {/* Pagination — flush bordered strip */}
                   {totalPages > 1 && (
                     <div className="flex border border-border">
                       <button
@@ -277,6 +271,7 @@ export function BulletinPage() {
         onLikeToggle={handleLikeToggle}
         onCommentAdded={handleCommentAdded}
         onPinToggle={handlePinToggle}
+        onArchived={handleArchived}
       />
 
       <CreatePostModal

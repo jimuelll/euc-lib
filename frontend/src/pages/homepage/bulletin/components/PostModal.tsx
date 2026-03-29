@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Heart, MessageCircle, Send, Loader2,
-  Trash2, Download, X, ZoomIn, Pin, PinOff,
+  Trash2, Download, X, ZoomIn, Pin, PinOff, Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -20,8 +20,11 @@ interface PostModalProps {
   onLikeToggle: (postId: number, liked: boolean, total: number) => void;
   onCommentAdded: (postId: number) => void;
   onPinToggle?: (postId: number, pinned: boolean) => void;
+  /** Called after a post is archived so the list can remove it */
+  onArchived?: (postId: number) => void;
 }
 
+const ADMIN_ROLES      = ["admin", "super_admin"];
 const CAN_DELETE_ROLES = ["admin", "super_admin"];
 const CAN_PIN_ROLES    = ["admin", "super_admin"];
 
@@ -38,7 +41,14 @@ const ModalSectionLabel = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinToggle }: PostModalProps) {
+export function PostModal({
+  post,
+  onClose,
+  onLikeToggle,
+  onCommentAdded,
+  onPinToggle,
+  onArchived,
+}: PostModalProps) {
   const { user } = useAuth();
 
   const [liked, setLiked]         = useState(false);
@@ -47,6 +57,9 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
 
   const [pinned, setPinned]   = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+
+  const [archiveBusy, setArchiveBusy]       = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
 
   const [comments, setComments]               = useState<BulletinComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -68,6 +81,7 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
     setCommentText("");
     setCommentError(null);
     setLightboxOpen(false);
+    setArchiveConfirm(false);
     loadComments(post.id);
   }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,6 +126,18 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
       onPinToggle?.(post.id, next);
     } catch { setPinned(!next); }
     finally { setPinBusy(false); }
+  };
+
+  const handleArchive = async () => {
+    if (!post || archiveBusy) return;
+    if (!archiveConfirm) { setArchiveConfirm(true); return; }
+    setArchiveBusy(true);
+    try {
+      await axiosInstance.delete(`/api/bulletin/${post.id}`);
+      onArchived?.(post.id);
+      onClose();
+    } catch { /* silent — could show a toast */ }
+    finally { setArchiveBusy(false); setArchiveConfirm(false); }
   };
 
   const handleComment = async () => {
@@ -163,17 +189,23 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
     else           { setZoom(2.5); setOrigin({ x: xPct, y: yPct }); }
   };
 
-  const canDelete = (c: BulletinComment) =>
+  const canDeleteComment = (c: BulletinComment) =>
     user?.id === c.author_id || CAN_DELETE_ROLES.includes(user?.role ?? "");
-  const canPin = CAN_PIN_ROLES.includes(user?.role ?? "");
+  const canPin     = CAN_PIN_ROLES.includes(user?.role ?? "");
+  const canArchive = ADMIN_ROLES.includes(user?.role ?? "")
+    || user?.id === post?.author_id; // owner can also archive their own post
 
   if (!post) return null;
 
   return (
     <>
+      {/*
+        The `[&>button]:hidden` class suppresses shadcn's auto-injected close
+        button so we only show our own custom X in the header band.
+      */}
       <Dialog open={!!post} onOpenChange={onClose}>
         <DialogContent
-          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
+          className="[&>button]:hidden w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
           style={{ borderRadius: 0 }}
         >
 
@@ -202,7 +234,7 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                 </DialogHeader>
 
                 {/* Author row */}
-                <div className="mt-3 flex items-center gap-2.5">
+                <div className="mt-3 flex items-center gap-2.5 flex-wrap">
                   <div
                     className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary-foreground/15 border border-primary-foreground/25 text-primary-foreground text-[9px] font-bold"
                     style={{ fontFamily: "var(--font-heading)" }}
@@ -217,10 +249,9 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                   </span>
                   <span className="text-[10px] text-primary-foreground/40">{post.date}</span>
 
-                  {/* Pinned badge */}
                   {pinned && (
                     <span
-                      className="ml-1 flex items-center gap-1 bg-warning px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80"
+                      className="flex items-center gap-1 bg-warning px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       <Pin className="h-2.5 w-2.5" /> Pinned
@@ -229,14 +260,15 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                 </div>
               </div>
 
-              {/* Header controls */}
+              {/* Header action buttons */}
               <div className="flex items-center gap-1 shrink-0">
+                {/* Pin toggle */}
                 {canPin && (
                   <button
                     onClick={handlePin}
                     disabled={pinBusy}
                     title={pinned ? "Unpin post" : "Pin post"}
-                    className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-warning hover:bg-primary-foreground/10 transition-colors"
+                    className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-warning hover:bg-primary-foreground/10 transition-colors disabled:opacity-40"
                   >
                     {pinBusy
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -246,6 +278,35 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                     }
                   </button>
                 )}
+
+                {/* Archive */}
+                {canArchive && (
+                  <button
+                    onClick={handleArchive}
+                    disabled={archiveBusy}
+                    title={archiveConfirm ? "Click again to confirm archive" : "Archive post"}
+                    className={`flex h-8 items-center justify-center gap-1.5 px-2 transition-colors disabled:opacity-40 ${
+                      archiveConfirm
+                        ? "bg-destructive/20 text-destructive hover:bg-destructive/30"
+                        : "text-primary-foreground/40 hover:text-destructive hover:bg-primary-foreground/10"
+                    }`}
+                  >
+                    {archiveBusy
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Archive className="h-3.5 w-3.5" />
+                    }
+                    {archiveConfirm && (
+                      <span
+                        className="text-[9px] font-bold uppercase tracking-[0.15em]"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        Confirm?
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                {/* Close */}
                 <button
                   onClick={onClose}
                   className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
@@ -269,7 +330,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                 style={{ maxHeight: "48vh" }}
                 loading="eager"
               />
-              {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 pointer-events-none" />
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <span
@@ -289,7 +349,7 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
             </div>
           )}
 
-          {/* ── Body content ── */}
+          {/* ── Body ── */}
           <div className="divide-y divide-border">
 
             {/* Post content */}
@@ -301,7 +361,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
 
             {/* Engagement row */}
             <div className="flex items-stretch border-b border-border">
-              {/* Like */}
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
@@ -317,7 +376,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                 <span className="opacity-70">{liked ? "Liked" : "Like"}</span>
               </button>
 
-              {/* Comment count */}
               <div
                 className="flex flex-1 items-center justify-center gap-2.5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
@@ -357,11 +415,9 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                 </p>
               )}
 
-              {/* Comment list */}
               <div className="space-y-0 divide-y divide-border border border-border">
                 {!commentsLoading && comments.map((c) => (
                   <div key={c.id} className="flex gap-0 group/comment hover:bg-secondary/30 transition-colors">
-                    {/* Left column */}
                     <div className="w-10 shrink-0 flex flex-col items-center pt-3 border-r border-border gap-2">
                       <div
                         className="flex h-5 w-5 shrink-0 items-center justify-center bg-primary text-primary-foreground text-[8px] font-bold"
@@ -370,7 +426,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                         {getInitials(c.author)}
                       </div>
                     </div>
-                    {/* Content */}
                     <div className="flex-1 min-w-0 px-3.5 py-3">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-baseline gap-2">
@@ -382,7 +437,7 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                           </span>
                           <span className="text-[10px] text-muted-foreground">{c.date}</span>
                         </div>
-                        {canDelete(c) && (
+                        {canDeleteComment(c) && (
                           <button
                             onClick={() => handleDeleteComment(c.id)}
                             className="hidden group-hover/comment:flex shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors"
@@ -415,7 +470,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
               </p>
 
               <div className="flex gap-0 border border-border">
-                {/* Avatar cell */}
                 <div className="w-10 shrink-0 flex items-center justify-center border-r border-border bg-muted/30">
                   <div
                     className="flex h-5 w-5 items-center justify-center bg-primary text-primary-foreground text-[8px] font-bold"
@@ -424,7 +478,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                     {user?.name ? getInitials(user.name) : "ME"}
                   </div>
                 </div>
-                {/* Input */}
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -433,7 +486,6 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
                   maxLength={1000}
                   className="flex-1 min-w-0 h-11 px-3.5 text-sm text-foreground bg-background outline-none placeholder:text-muted-foreground/40 focus:ring-0 border-0"
                 />
-                {/* Send button */}
                 <button
                   disabled={!commentText.trim() || commenting}
                   onClick={handleComment}
@@ -468,14 +520,12 @@ export function PostModal({ post, onClose, onLikeToggle, onCommentAdded, onPinTo
             }}
             draggable={false}
           />
-
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 px-4 py-2 text-[10px] text-white/60 pointer-events-none transition-opacity duration-300"
             style={{ opacity: zoom > 1 ? 0 : 1, fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
           >
             CLICK IMAGE TO ZOOM · CLICK BACKDROP TO CLOSE
           </div>
-
           <button
             onClick={() => setLightboxOpen(false)}
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"

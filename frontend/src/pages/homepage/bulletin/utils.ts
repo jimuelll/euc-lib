@@ -28,6 +28,7 @@ export function toPost(raw: ApiPost): BulletinPost {
     likes:         raw.likes,
     liked_by_me:   Boolean(raw.liked_by_me),
     comment_count: raw.comment_count,
+    author_id:     raw.author_id,
     author_name:   raw.author_name,
     author_role:   raw.author_role,
     comments:      [],

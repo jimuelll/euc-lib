@@ -16,7 +16,7 @@ async function createUser({ student_employee_id, name, role, password, address, 
   }
 
   const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ?",
+    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
     [student_employee_id]
   );
   if (existing.length) throw new Error("User already exists");
@@ -38,10 +38,10 @@ async function createUser({ student_employee_id, name, role, password, address, 
   return { message: "User created successfully", barcode };
 }
 
-// DELETE USER (soft delete — sets is_active = 0, preserves borrowing history)
-async function deleteUser(student_employee_id, requesterRole) {
+// DELETE USER (soft delete — sets deleted_at + is_active = 0, preserves borrowing history)
+async function deleteUser(student_employee_id, requesterRole, requesterId) {
   const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ?",
+    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
     [student_employee_id]
   );
   if (!existing.length) throw new Error("User not found");
@@ -56,7 +56,6 @@ async function deleteUser(student_employee_id, requesterRole) {
     throw new Error("User is already deactivated");
   }
 
-  // Block deactivation if user has unreturned books
   const [[{ active_count }]] = await db.query(
     `SELECT COUNT(*) AS active_count FROM borrowings
      WHERE user_id = ? AND status IN ('borrowed', 'overdue')`,
@@ -69,16 +68,37 @@ async function deleteUser(student_employee_id, requesterRole) {
   }
 
   await db.query(
-    "UPDATE users SET is_active = 0 WHERE student_employee_id = ?",
-    [student_employee_id]
+    "UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ? WHERE student_employee_id = ?",
+    [requesterId, student_employee_id]
   );
   return { message: "User deactivated successfully" };
+}
+
+// RESTORE USER
+async function restoreUser(student_employee_id, requesterRole) {
+  const [existing] = await db.query(
+    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NOT NULL",
+    [student_employee_id]
+  );
+  if (!existing.length) throw new Error("Archived user not found");
+
+  const user = existing[0];
+
+  if (!roleHierarchy[requesterRole]?.includes(user.role)) {
+    throw new Error("You are not allowed to restore this user");
+  }
+
+  await db.query(
+    "UPDATE users SET deleted_at = NULL, deleted_by = NULL, is_active = 1 WHERE student_employee_id = ?",
+    [student_employee_id]
+  );
+  return { message: "User restored successfully" };
 }
 
 // UPDATE USER
 async function updateUser(student_employee_id, updates, requesterRole) {
   const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ?",
+    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
     [student_employee_id]
   );
   if (!existing.length) throw new Error("User not found");
@@ -121,7 +141,6 @@ async function updateUser(student_employee_id, updates, requesterRole) {
     values.push(updates.contact);
   }
 
-  // Allow re-activating a deactivated user via update
   if (updates.is_active !== undefined) {
     fields.push("is_active = ?");
     values.push(updates.is_active ? 1 : 0);
@@ -132,7 +151,7 @@ async function updateUser(student_employee_id, updates, requesterRole) {
   values.push(student_employee_id);
 
   await db.query(
-    `UPDATE users SET ${fields.join(", ")} WHERE student_employee_id = ?`,
+    `UPDATE users SET ${fields.join(", ")} WHERE student_employee_id = ? AND deleted_at IS NULL`,
     values
   );
 
@@ -141,7 +160,9 @@ async function updateUser(student_employee_id, updates, requesterRole) {
 
 // SEARCH USERS
 async function searchUsers(query) {
-  let sql = "SELECT student_employee_id, name, role, is_active, address, contact FROM users WHERE 1=1";
+  const showArchived = query.archived === "true";
+  let sql = `SELECT student_employee_id, name, role, is_active, address, contact, deleted_at
+             FROM users WHERE deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`;
   const values = [];
 
   if (query.student_employee_id && query.name) {
@@ -167,4 +188,4 @@ async function searchUsers(query) {
   return results;
 }
 
-module.exports = { createUser, deleteUser, updateUser, searchUsers };
+module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers };

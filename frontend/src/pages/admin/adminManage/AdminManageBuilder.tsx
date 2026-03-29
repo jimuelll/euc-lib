@@ -17,27 +17,29 @@ import {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface AdminManageBuilderProps {
-  functionType: FunctionType;
+  functionType:         FunctionType;
   onFunctionTypeChange: (v: FunctionType) => void;
-  form: UserFormState;
-  showPassword: boolean;
-  allowedRoles: string[];
-  loading: boolean;
-  onField: <K extends keyof UserFormState>(key: K, value: string) => void;
-  onTogglePassword: () => void;
-  onResetForm: () => void;
-  searchQuery: string;
-  onSearchQueryChange: (v: string) => void;
-  searchResults: User[];
-  onSearch: () => void;
-  selectedUser: User | null;
-  onSelectUser: (u: User) => void;
-  onCreateUser: () => void;
-  onUpdateUser: () => void;
-  onDeactivateUser: () => void;
-  onReactivateUser: () => void;
-  qrTarget: QrTarget | null;
-  onSetQrTarget: (v: QrTarget | null) => void;
+  form:                 UserFormState;
+  showPassword:         boolean;
+  allowedRoles:         string[];
+  loading:              boolean;
+  onField:              <K extends keyof UserFormState>(key: K, value: string) => void;
+  onTogglePassword:     () => void;
+  onResetForm:          () => void;
+  searchQuery:          string;
+  onSearchQueryChange:  (v: string) => void;
+  searchResults:        User[];
+  onSearch:             () => void;
+  showArchived:         boolean;
+  onToggleArchived:     () => void;
+  selectedUser:         User | null;
+  onSelectUser:         (u: User) => void;
+  onCreateUser:         () => void;
+  onUpdateUser:         () => void;
+  onArchiveUser:        () => void;
+  onRestoreUser:        () => void;
+  qrTarget:             QrTarget | null;
+  onSetQrTarget:        (v: QrTarget | null) => void;
 }
 
 // ─── Builder ─────────────────────────────────────────────────────────────────
@@ -56,12 +58,14 @@ const AdminManageBuilder = ({
   onSearchQueryChange,
   searchResults,
   onSearch,
+  showArchived,
+  onToggleArchived,
   selectedUser,
   onSelectUser,
   onCreateUser,
   onUpdateUser,
-  onDeactivateUser,
-  onReactivateUser,
+  onArchiveUser,
+  onRestoreUser,
   qrTarget,
   onSetQrTarget,
 }: AdminManageBuilderProps) => (
@@ -108,7 +112,7 @@ const AdminManageBuilder = ({
           </SelectTrigger>
           <SelectContent className="rounded-none">
             <SelectItem value="create" className="rounded-none">Create User</SelectItem>
-            <SelectItem value="edit" className="rounded-none">Edit / Search / Deactivate</SelectItem>
+            <SelectItem value="edit"   className="rounded-none">Edit / Search</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -128,18 +132,24 @@ const AdminManageBuilder = ({
       />
     )}
 
-    {/* ── Edit / Search / Deactivate mode ── */}
+    {/* ── Edit / Search mode ── */}
     {functionType === "edit" && (
       <>
         <SearchBar
           value={searchQuery}
           loading={loading}
+          showArchived={showArchived}
           onChange={onSearchQueryChange}
           onSearch={onSearch}
+          onToggleArchived={onToggleArchived}
         />
 
         {searchResults.length > 0 && (
-          <SearchResultsTable results={searchResults} onSelect={onSelectUser} />
+          <SearchResultsTable
+            results={searchResults}
+            showArchived={showArchived}
+            onSelect={onSelectUser}
+          />
         )}
 
         {selectedUser && (
@@ -149,15 +159,16 @@ const AdminManageBuilder = ({
             showPassword={showPassword}
             allowedRoles={allowedRoles}
             loading={loading}
+            showArchived={showArchived}
             onField={onField}
             onTogglePassword={onTogglePassword}
             onSubmit={onUpdateUser}
             onViewQr={() => onSetQrTarget({
               studentId: selectedUser.student_employee_id,
-              name: selectedUser.name,
+              name:      selectedUser.name,
             })}
-            onDeactivate={onDeactivateUser}
-            onReactivate={onReactivateUser}
+            onArchive={onArchiveUser}
+            onRestore={onRestoreUser}
           />
         )}
       </>

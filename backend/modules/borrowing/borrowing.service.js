@@ -29,8 +29,8 @@ const getActiveBorrows = async (userId) => {
             b.borrowed_at, b.due_date, b.status, b.notes,
             bc.barcode AS copy_barcode, bc.condition AS copy_condition
      FROM borrowings b
-     JOIN books bk      ON bk.id = b.book_id
-     LEFT JOIN book_copies bc ON bc.id = b.copy_id
+     JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
      ORDER BY b.due_date ASC`,
     [userId]
@@ -44,8 +44,8 @@ const getBorrowHistory = async (userId) => {
             b.borrowed_at, b.returned_at, b.due_date, b.status,
             bc.barcode AS copy_barcode
      FROM borrowings b
-     JOIN books bk      ON bk.id = b.book_id
-     LEFT JOIN book_copies bc ON bc.id = b.copy_id
+     JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status = 'returned'
      ORDER BY b.returned_at DESC
      LIMIT 50`,
@@ -77,12 +77,13 @@ const searchCatalogueWithAvailability = async (query) => {
          END)
        )                                                           AS available
      FROM books bk
-     LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1
+     LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
      LEFT JOIN borrowings   br ON br.copy_id  = bc.id
                                AND br.status IN ('borrowed','overdue')
-     WHERE bk.title  LIKE ?
+     WHERE bk.deleted_at IS NULL
+       AND (bk.title  LIKE ?
         OR bk.author LIKE ?
-        OR bk.isbn   LIKE ?
+        OR bk.isbn   LIKE ?)
      GROUP BY bk.id
      ORDER BY bk.title ASC
      LIMIT 50`,
@@ -93,13 +94,13 @@ const searchCatalogueWithAvailability = async (query) => {
 
 /**
  * Look up a user by their barcode or student_employee_id.
- * Used by the scanner role to identify who is checking in/out.
  */
 const resolveUserByBarcode = async (scannedValue) => {
   const [[user]] = await db.query(
     `SELECT id, name, role, student_employee_id, barcode
      FROM users
-     WHERE barcode = ? OR student_employee_id = ?
+     WHERE (barcode = ? OR student_employee_id = ?)
+       AND deleted_at IS NULL
      LIMIT 1`,
     [scannedValue, scannedValue]
   );
@@ -114,8 +115,8 @@ const resolveCopyByBarcode = async (barcode) => {
     `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active,
             bk.title, bk.author, bk.copies
      FROM book_copies bc
-     JOIN books bk ON bk.id = bc.book_id
-     WHERE bc.barcode = ?`,
+     JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
+     WHERE bc.barcode = ? AND bc.deleted_at IS NULL`,
     [barcode]
   );
   return copy ?? null;
@@ -123,13 +124,12 @@ const resolveCopyByBarcode = async (barcode) => {
 
 /**
  * Find the active borrowing record for a given copy barcode.
- * Used by scanReturn to identify what to mark as returned.
  */
 const getActiveBorrowingByCopyBarcode = async (barcode) => {
   const [[row]] = await db.query(
     `SELECT b.id, b.user_id
      FROM borrowings b
-     JOIN book_copies bc ON bc.id = b.copy_id
+     JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE bc.barcode = ? AND b.status IN ('borrowed','overdue')
      LIMIT 1`,
     [barcode.trim()]
@@ -157,13 +157,12 @@ const borrowBook = async (
     let copy = null;
 
     if (isCopyBarcode) {
-      // Barcode scan path: resolve copy → book
       const [[c]] = await conn.query(
         `SELECT bc.id, bc.book_id, bc.barcode, bc.is_active,
                 bk.copies
          FROM book_copies bc
-         JOIN books bk ON bk.id = bc.book_id
-         WHERE bc.barcode = ?
+         JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
+         WHERE bc.barcode = ? AND bc.deleted_at IS NULL
          FOR UPDATE`,
         [bookIdOrCopyBarcode]
       );
@@ -171,16 +170,15 @@ const borrowBook = async (
       if (!c.is_active) throw Object.assign(new Error("This copy is not available"), { status: 409 });
       copy = c;
     } else {
-      // Legacy numeric book_id path — pick any available active copy
       const [[book]] = await conn.query(
-        "SELECT id, copies FROM books WHERE id = ? FOR UPDATE",
+        "SELECT id, copies FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
         [bookIdOrCopyBarcode]
       );
       if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
 
       const [copies] = await conn.query(
         `SELECT bc.id, bc.barcode FROM book_copies bc
-         WHERE bc.book_id = ? AND bc.is_active = 1
+         WHERE bc.book_id = ? AND bc.is_active = 1 AND bc.deleted_at IS NULL
            AND bc.id NOT IN (
              SELECT copy_id FROM borrowings
              WHERE status IN ('borrowed','overdue') AND copy_id IS NOT NULL
@@ -194,7 +192,6 @@ const borrowBook = async (
       copy = { ...copies[0], book_id: bookIdOrCopyBarcode };
     }
 
-    // Check the chosen copy isn't already out
     const [[activeLoan]] = await conn.query(
       `SELECT id FROM borrowings
        WHERE copy_id = ? AND status IN ('borrowed','overdue')`,
@@ -204,7 +201,6 @@ const borrowBook = async (
       throw Object.assign(new Error("This copy is already borrowed"), { status: 409 });
     }
 
-    // Check user doesn't already have ANY copy of this book out
     const [[existing]] = await conn.query(
       `SELECT id FROM borrowings
        WHERE user_id = ? AND book_id = ? AND status IN ('borrowed','overdue')`,
@@ -276,7 +272,7 @@ const lookupUserWithBorrows = async (studentEmployeeId) => {
   const [[user]] = await db.query(
     `SELECT id, name, role, student_employee_id, barcode
      FROM users
-     WHERE student_employee_id = ? AND is_active = 1
+     WHERE student_employee_id = ? AND is_active = 1 AND deleted_at IS NULL
      LIMIT 1`,
     [studentEmployeeId]
   );
@@ -285,13 +281,114 @@ const lookupUserWithBorrows = async (studentEmployeeId) => {
   const [activeBorrows] = await db.query(
     `SELECT b.id, b.book_id, bk.title, bk.author, b.due_date, b.status
      FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id
+     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
      ORDER BY b.due_date ASC`,
     [user.id]
   );
 
   return { user, activeBorrows };
+};
+
+// ─── Admin soft-delete / restore ──────────────────────────────────────────────
+
+/**
+ * Admin: soft-delete a borrowing record.
+ * Only returned borrowings can be deleted — active/overdue ones must be resolved first.
+ */
+const adminDeleteBorrowing = async (borrowingId, deletedBy) => {
+  const [[row]] = await db.query(
+    "SELECT id, status FROM borrowings WHERE id = ? AND deleted_at IS NULL",
+    [borrowingId]
+  );
+  if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
+
+  if (["borrowed", "overdue"].includes(row.status)) {
+    throw Object.assign(
+      new Error("Cannot delete an active borrowing — return the book first"),
+      { status: 409 }
+    );
+  }
+
+  await db.query(
+    "UPDATE borrowings SET deleted_at = NOW(), deleted_by = ? WHERE id = ?",
+    [deletedBy, borrowingId]
+  );
+};
+
+/**
+ * Admin: restore a soft-deleted borrowing record.
+ */
+const adminRestoreBorrowing = async (borrowingId) => {
+  const [[row]] = await db.query(
+    "SELECT id FROM borrowings WHERE id = ? AND deleted_at IS NOT NULL",
+    [borrowingId]
+  );
+  if (!row) throw Object.assign(new Error("Archived borrowing record not found"), { status: 404 });
+
+  await db.query(
+    "UPDATE borrowings SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
+    [borrowingId]
+  );
+};
+
+/**
+ * Admin: list borrowings with optional archived filter + search.
+ */
+const adminGetBorrowings = async ({ search = "", status, showArchived = false, page = 1, limit = 20 }) => {
+  await syncOverdue();
+
+  const offset     = (page - 1) * limit;
+  const conditions = [`b.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`];
+  const params     = [];
+
+  if (status && status !== "all") {
+    conditions.push("b.status = ?");
+    params.push(status);
+  }
+
+  if (search.trim()) {
+    conditions.push("(bk.title LIKE ? OR u.name LIKE ? OR u.student_employee_id LIKE ?)");
+    const like = `%${search.trim()}%`;
+    params.push(like, like, like);
+  }
+
+  const where = `WHERE ${conditions.join(" AND ")}`;
+
+  const [[{ total }]] = await db.query(
+    `SELECT COUNT(*) AS total
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id
+     JOIN users  u  ON u.id  = b.user_id
+     ${where}`,
+    params
+  );
+
+  const [rows] = await db.query(
+    `SELECT
+       b.id,
+       b.status,
+       b.borrowed_at,
+       b.due_date,
+       b.returned_at,
+       b.deleted_at,
+       b.notes,
+       bk.title  AS book_title,
+       bk.author AS book_author,
+       u.name                AS user_name,
+       u.student_employee_id,
+       bc.barcode            AS copy_barcode
+     FROM borrowings b
+     JOIN books bk      ON bk.id = b.book_id
+     JOIN users  u      ON u.id  = b.user_id
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id
+     ${where}
+     ORDER BY b.borrowed_at DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  return { rows, total, page, totalPages: Math.ceil(total / limit) };
 };
 
 module.exports = {
@@ -304,4 +401,7 @@ module.exports = {
   borrowBook,
   returnBook,
   lookupUserWithBorrows,
+  adminDeleteBorrowing,
+  adminRestoreBorrowing,
+  adminGetBorrowings,
 };

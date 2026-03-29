@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Search, ChevronLeft, ChevronRight, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { getCirculationLog } from "../circulation.api";
+import { toast } from "@/components/ui/sonner";
+import { getCirculationLog, archiveBorrowing, restoreBorrowing } from "../circulation.api";
 import type { CirculationLogEntry } from "../circulation.api";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -12,9 +13,9 @@ const statusConfig: Record<
   CirculationLogEntry["status"],
   { label: string; className: string }
 > = {
-  borrowed: { label: "Active",   className: "border-info/30 text-info bg-info/5"               },
+  borrowed: { label: "Active",   className: "border-info/30 text-info bg-info/5"                     },
   overdue:  { label: "Overdue",  className: "border-destructive/30 text-destructive bg-destructive/5" },
-  returned: { label: "Returned", className: "border-success/30 text-success bg-success/5"       },
+  returned: { label: "Returned", className: "border-success/30 text-success bg-success/5"             },
 };
 
 const Badge = ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -38,13 +39,15 @@ const ColHeader = ({ children }: { children: React.ReactNode }) => (
 );
 
 const CirculationLog = () => {
-  const [rows,       setRows]       = useState<CirculationLogEntry[]>([]);
-  const [total,      setTotal]      = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [page,       setPage]       = useState(1);
-  const [status,     setStatus]     = useState("all");
-  const [search,     setSearch]     = useState("");
-  const [loading,    setLoading]    = useState(false);
+  const [rows,         setRows]         = useState<CirculationLogEntry[]>([]);
+  const [total,        setTotal]        = useState(0);
+  const [totalPages,   setTotalPages]   = useState(1);
+  const [page,         setPage]         = useState(1);
+  const [status,       setStatus]       = useState("all");
+  const [search,       setSearch]       = useState("");
+  const [loading,      setLoading]      = useState(false);
+  const [showArchived, setShowArchived] = useState(false);  // ← NEW
+  const [actionId,     setActionId]     = useState<number | null>(null); // tracks which row is mid-action
 
   const debouncedSearch = useDebounce(search, 400);
 
@@ -52,10 +55,11 @@ const CirculationLog = () => {
     setLoading(true);
     try {
       const result = await getCirculationLog({
-        status: status === "all" ? undefined : status,
-        search: debouncedSearch || undefined,
+        status:   status === "all" ? undefined : status,
+        search:   debouncedSearch || undefined,
         page,
-        limit:  20,
+        limit:    20,
+        archived: showArchived || undefined,
       });
       setRows(result.rows);
       setTotal(result.total);
@@ -65,10 +69,50 @@ const CirculationLog = () => {
     } finally {
       setLoading(false);
     }
-  }, [status, debouncedSearch, page]);
+  }, [status, debouncedSearch, page, showArchived]);
 
   useEffect(() => { fetchLog(); }, [fetchLog]);
-  useEffect(() => { setPage(1); }, [status, debouncedSearch]);
+  useEffect(() => { setPage(1); }, [status, debouncedSearch, showArchived]);
+
+  // ── Toggle archived — resets page & clears selection ─────────────────────
+  const handleToggleArchived = () => {
+    setShowArchived((prev) => !prev);
+    setPage(1);
+  };
+
+  // ── Archive a returned borrowing record ───────────────────────────────────
+  const handleArchive = async (row: CirculationLogEntry) => {
+    if (!confirm(`Archive this borrowing record for "${row.book_title}"? It can be restored later.`)) return;
+    setActionId(row.id);
+    try {
+      await archiveBorrowing(row.id);
+      toast.success("Borrowing record archived");
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((t) => t - 1);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to archive record");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  // ── Restore a soft-deleted borrowing record ───────────────────────────────
+  const handleRestore = async (row: CirculationLogEntry) => {
+    if (!confirm(`Restore borrowing record for "${row.book_title}"?`)) return;
+    setActionId(row.id);
+    try {
+      await restoreBorrowing(row.id);
+      toast.success("Borrowing record restored");
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setTotal((t) => t - 1);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to restore record");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const colSpan = showArchived ? 8 : 8; // keeps consistent (action column always present)
 
   return (
     <div className="mt-8 space-y-0">
@@ -81,16 +125,43 @@ const CirculationLog = () => {
             className="text-[10px] font-bold uppercase tracking-[0.25em] text-foreground"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Circulation Log
+            {showArchived ? "Archived Records" : "Circulation Log"}
           </h3>
         </div>
-        <span
-          className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {total} records
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {total} records
+          </span>
+          {/* ── Archived toggle ── */}
+          <button
+            onClick={handleToggleArchived}
+            title={showArchived ? "Showing archived — click for active" : "Show archived records"}
+            className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
+              showArchived
+                ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
+                : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
+            }`}
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            <Archive className="h-3 w-3" />
+            {showArchived ? "Archived" : "Active"}
+          </button>
+        </div>
       </div>
+
+      {/* Archived banner */}
+      {showArchived && (
+        <div className="flex items-center gap-2.5 px-4 py-2 bg-warning/5 border border-t-0 border-b-0 border-warning/20">
+          <Archive className="h-3 w-3 text-warning/60 shrink-0" />
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-warning/70"
+            style={{ fontFamily: "var(--font-heading)" }}>
+            Showing archived records — restore to make them visible in the active log
+          </p>
+        </div>
+      )}
 
       {/* ── Filters ─────────────────────────────────────────────────── */}
       <div className="flex gap-0 border border-border border-b-0">
@@ -105,30 +176,34 @@ const CirculationLog = () => {
           />
         </div>
 
-        {/* Status filter */}
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-9 w-36 rounded-none border-0 border-l-0 text-[11px] font-bold uppercase tracking-[0.12em] bg-background focus:ring-0 px-3 shrink-0"
-            style={{ fontFamily: "var(--font-heading)" }}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-none border-border">
-            {[
-              { value: "all",      label: "All"      },
-              { value: "borrowed", label: "Active"   },
-              { value: "overdue",  label: "Overdue"  },
-              { value: "returned", label: "Returned" },
-            ].map(({ value, label }) => (
-              <SelectItem
-                key={value}
-                value={value}
-                className="rounded-none text-[11px] font-bold uppercase tracking-[0.12em]"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Status filter — hidden in archived mode since all archived records are returned */}
+        {!showArchived && (
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger
+              className="h-9 w-36 rounded-none border-0 border-l-0 text-[11px] font-bold uppercase tracking-[0.12em] bg-background focus:ring-0 px-3 shrink-0"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-none border-border">
+              {[
+                { value: "all",      label: "All"      },
+                { value: "borrowed", label: "Active"   },
+                { value: "overdue",  label: "Overdue"  },
+                { value: "returned", label: "Returned" },
+              ].map(({ value, label }) => (
+                <SelectItem
+                  key={value}
+                  value={value}
+                  className="rounded-none text-[11px] font-bold uppercase tracking-[0.12em]"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────── */}
@@ -148,7 +223,7 @@ const CirculationLog = () => {
           <tbody className="divide-y divide-border">
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center">
+                <td colSpan={8} className="px-4 py-10 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-4 w-4 animate-spin text-primary/40" />
                     <span
@@ -164,21 +239,26 @@ const CirculationLog = () => {
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center">
+                <td colSpan={8} className="px-4 py-10 text-center">
                   <span
                     className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/35"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
-                    No records found
+                    {showArchived ? "No archived records found" : "No records found"}
                   </span>
                 </td>
               </tr>
             )}
 
             {!loading && rows.map((row) => {
-              const cfg = statusConfig[row.status];
+              const cfg        = statusConfig[row.status];
+              const isActioning = actionId === row.id;
+
               return (
-                <tr key={row.id} className="hover:bg-muted/15 transition-colors">
+                <tr
+                  key={row.id}
+                  className={`transition-colors hover:bg-muted/15 ${showArchived ? "opacity-70" : ""}`}
+                >
                   {/* User */}
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-foreground leading-tight">{row.user_name}</p>
@@ -217,6 +297,43 @@ const CirculationLog = () => {
                   {/* Status */}
                   <td className="px-4 py-3">
                     <Badge className={cfg.className}>{cfg.label}</Badge>
+                  </td>
+
+                  {/* Action column */}
+                  <td className="px-4 py-3">
+                    {showArchived ? (
+                      // ── Restore button ──
+                      <button
+                        onClick={() => handleRestore(row)}
+                        disabled={isActioning}
+                        className="flex items-center gap-1.5 border border-warning/40 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-40 transition-colors"
+                        style={{ fontFamily: "var(--font-heading)" }}
+                      >
+                        {isActioning
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <ArchiveRestore className="h-3 w-3" />
+                        }
+                        Restore
+                      </button>
+                    ) : (
+                      // ── Archive button — only for returned records ──
+                      row.status === "returned" ? (
+                        <button
+                          onClick={() => handleArchive(row)}
+                          disabled={isActioning}
+                          className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 hover:border-destructive/40 hover:text-destructive disabled:opacity-40 transition-colors"
+                          style={{ fontFamily: "var(--font-heading)" }}
+                        >
+                          {isActioning
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Trash2 className="h-3 w-3" />
+                          }
+                          Archive
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground/20 text-[10px]">—</span>
+                      )
+                    )}
                   </td>
                 </tr>
               );

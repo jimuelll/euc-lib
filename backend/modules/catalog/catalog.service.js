@@ -47,7 +47,7 @@ const upsertSchema = async (fields) => {
 const RESERVED_KEYS = new Set([
   "id", "title", "author", "category", "isbn",
   "edition", "publication_year", "copies", "created_by",
-  "created_at", "updated_at",
+  "created_at", "updated_at", "deleted_at", "deleted_by",
 ]);
 
 const columnExists = async (key) => {
@@ -85,31 +85,18 @@ const dropColumnIfExists = async (key) => {
 
 // ─── book_copies helpers ──────────────────────────────────────────────────────
 
-/**
- * Generate the next barcode for a book.
- * Format: LIB-{bookId padded to 6}-{copy number padded to 3}
- * e.g. LIB-000002-003
- */
 const generateBarcode = (bookId, copyNumber) =>
   `LIB-${String(bookId).padStart(6, "0")}-${String(copyNumber).padStart(3, "0")}`;
 
-/**
- * Ensure book_copies rows match the books.copies count.
- * - If copies increased: insert new rows.
- * - If copies decreased: soft-delete (is_active = 0) excess rows that are not
- *   currently borrowed. Throws if there are more active loans than the new count.
- */
 const syncBookCopies = async (bookId, targetCount, conn = db) => {
-  // Current active copies
   const [existing] = await conn.query(
-    "SELECT id, barcode FROM book_copies WHERE book_id = ? ORDER BY id ASC",
+    "SELECT id, barcode FROM book_copies WHERE book_id = ? AND deleted_at IS NULL ORDER BY id ASC",
     [bookId]
   );
 
   const currentCount = existing.length;
 
   if (targetCount > currentCount) {
-    // Add missing copies
     const toAdd = targetCount - currentCount;
     for (let i = 0; i < toAdd; i++) {
       const copyNumber = currentCount + i + 1;
@@ -120,12 +107,11 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
       );
     }
   } else if (targetCount < currentCount) {
-    // Check how many are currently out on loan
     const [[{ borrowed }]] = await conn.query(
       `SELECT COUNT(*) AS borrowed
        FROM borrowings b
        JOIN book_copies bc ON bc.id = b.copy_id
-       WHERE bc.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
+       WHERE bc.book_id = ? AND bc.deleted_at IS NULL AND b.status IN ('borrowed', 'overdue')`,
       [bookId]
     );
 
@@ -138,10 +124,7 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
       );
     }
 
-    // Soft-deactivate excess copies that are not out on loan (from the end)
-    const toDeactivate = existing
-      .slice(targetCount)
-      .map((c) => c.id);
+    const toDeactivate = existing.slice(targetCount).map((c) => c.id);
 
     if (toDeactivate.length) {
       await conn.query(
@@ -156,9 +139,6 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
   }
 };
 
-/**
- * Get all copies for a book with their current borrow status.
- */
 const getBookCopies = async (bookId) => {
   const [rows] = await db.query(
     `SELECT
@@ -177,7 +157,7 @@ const getBookCopies = async (bookId) => {
      LEFT JOIN borrowings b
        ON b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue')
      LEFT JOIN users u ON u.id = b.user_id
-     WHERE bc.book_id = ?
+     WHERE bc.book_id = ? AND bc.deleted_at IS NULL
      ORDER BY bc.id ASC`,
     [bookId]
   );
@@ -186,8 +166,9 @@ const getBookCopies = async (bookId) => {
 
 // ─── Books CRUD ───────────────────────────────────────────────────────────────
 
-const searchBooks = async (query, publicOnly = false) => {
+const searchBooks = async (query, publicOnly = false, showArchived = false) => {
   const like = `%${query}%`;
+  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
 
   if (publicOnly) {
     const schema = await getSchema();
@@ -206,11 +187,12 @@ const searchBooks = async (query, publicOnly = false) => {
                 COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
               ) AS available
        FROM books bk
-       LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1
+       LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
        LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
-       WHERE bk.title  LIKE ?
+       WHERE bk.deleted_at ${deletedFilter}
+         AND (bk.title  LIKE ?
           OR bk.author LIKE ?
-          OR bk.isbn   LIKE ?
+          OR bk.isbn   LIKE ?)
        GROUP BY bk.id
        ORDER BY bk.title ASC
        LIMIT 50`,
@@ -227,11 +209,12 @@ const searchBooks = async (query, publicOnly = false) => {
               COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
             ) AS available
      FROM books bk
-     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1
+     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
      LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
-     WHERE bk.title  LIKE ?
+     WHERE bk.deleted_at ${deletedFilter}
+       AND (bk.title  LIKE ?
         OR bk.author LIKE ?
-        OR bk.isbn   LIKE ?
+        OR bk.isbn   LIKE ?)
      GROUP BY bk.id
      ORDER BY bk.title ASC
      LIMIT 50`,
@@ -270,7 +253,6 @@ const createBook = async (data, createdBy) => {
     const bookId = result.insertId;
     const copies = parseInt(data.copies ?? 1, 10);
 
-    // Seed book_copies rows for every physical copy
     await syncBookCopies(bookId, copies, conn);
 
     await conn.commit();
@@ -297,10 +279,12 @@ const updateBook = async (id, data) => {
     if (allowedKeys.length) {
       const setClause = allowedKeys.map((k) => `\`${k}\` = ?`).join(", ");
       const values    = [...allowedKeys.map((k) => data[k] ?? null), id];
-      await conn.query(`UPDATE books SET ${setClause} WHERE id = ?`, values);
+      await conn.query(
+        `UPDATE books SET ${setClause} WHERE id = ? AND deleted_at IS NULL`,
+        values
+      );
     }
 
-    // If copies changed, sync book_copies accordingly
     if (data.copies !== undefined) {
       const targetCount = parseInt(data.copies, 10);
       if (!isNaN(targetCount) && targetCount >= 0) {
@@ -317,13 +301,12 @@ const updateBook = async (id, data) => {
   }
 };
 
-const deleteBook = async (id) => {
-  // book_copies has ON DELETE RESTRICT — check for active loans first
+const deleteBook = async (id, deletedBy) => {
   const [[{ borrowed }]] = await db.query(
     `SELECT COUNT(*) AS borrowed
      FROM borrowings b
      JOIN book_copies bc ON bc.id = b.copy_id
-     WHERE bc.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
+     WHERE bc.book_id = ? AND bc.deleted_at IS NULL AND b.status IN ('borrowed', 'overdue')`,
     [id]
   );
 
@@ -334,9 +317,35 @@ const deleteBook = async (id) => {
     );
   }
 
-  // Remove copies first, then the book
-  await db.query("DELETE FROM book_copies WHERE book_id = ?", [id]);
-  await db.query("DELETE FROM books WHERE id = ?", [id]);
+  await db.query(
+    "UPDATE book_copies SET deleted_at = NOW(), deleted_by = ? WHERE book_id = ? AND deleted_at IS NULL",
+    [deletedBy ?? null, id]
+  );
+  await db.query(
+    "UPDATE books SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+    [deletedBy ?? null, id]
+  );
+};
+
+// RESTORE BOOK
+const restoreBook = async (id) => {
+  const [[book]] = await db.query(
+    "SELECT id FROM books WHERE id = ? AND deleted_at IS NOT NULL",
+    [id]
+  );
+  if (!book) throw Object.assign(new Error("Archived book not found"), { status: 404 });
+
+  // Restore the book and all its soft-deleted copies
+  await db.query(
+    "UPDATE books SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
+    [id]
+  );
+  await db.query(
+    "UPDATE book_copies SET deleted_at = NULL, deleted_by = NULL WHERE book_id = ?",
+    [id]
+  );
+
+  return { message: "Book restored successfully" };
 };
 
 const getCopyByBarcode = async (barcode) => {
@@ -358,18 +367,17 @@ const getCopyByBarcode = async (barcode) => {
        br.due_date,
        u.name AS borrower_name
      FROM book_copies bc
-     JOIN  books     b  ON b.id  = bc.book_id
+     JOIN  books     b  ON b.id  = bc.book_id AND b.deleted_at IS NULL
      LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
      LEFT JOIN users      u  ON u.id = br.user_id
-     WHERE bc.barcode = ?`,
+     WHERE bc.barcode = ? AND bc.deleted_at IS NULL`,
     [barcode]
   );
   return rows[0] ?? null;
 };
 
-// Add to module.exports:
 module.exports = {
   getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
-  searchBooks, createBook, updateBook, deleteBook,
+  searchBooks, createBook, updateBook, deleteBook, restoreBook,
   getBookCopies, syncBookCopies, getCopyByBarcode,
 };

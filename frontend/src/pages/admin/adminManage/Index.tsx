@@ -1,12 +1,6 @@
 import { useAdminManage } from "./useAdminManage";
 import AdminManageBuilder from "./AdminManageBuilder";
 
-/**
- * AdminManage
- *
- * Entry point. Owns no local state — delegates everything to
- * `useAdminManage` (logic) and `AdminManageBuilder` (UI).
- */
 const AdminManage = () => {
   const {
     functionType,
@@ -21,13 +15,15 @@ const AdminManage = () => {
     setSearchQuery,
     searchResults,
     handleSearchUsers,
+    showArchived,
+    handleToggleArchived,
     selectedUser,
     selectUserForEdit,
     loading,
     handleCreateUser,
     handleUpdateUser,
-    handleDeactivateUser,
-    handleReactivateUser,
+    handleArchiveUser,
+    handleRestoreUser,
     qrTarget,
     setQrTarget,
   } = useAdminManage();
@@ -47,12 +43,14 @@ const AdminManage = () => {
       onSearchQueryChange={setSearchQuery}
       searchResults={searchResults}
       onSearch={handleSearchUsers}
+      showArchived={showArchived}
+      onToggleArchived={handleToggleArchived}
       selectedUser={selectedUser}
       onSelectUser={selectUserForEdit}
       onCreateUser={handleCreateUser}
       onUpdateUser={handleUpdateUser}
-      onDeactivateUser={handleDeactivateUser}
-      onReactivateUser={handleReactivateUser}
+      onArchiveUser={handleArchiveUser}
+      onRestoreUser={handleRestoreUser}
       qrTarget={qrTarget}
       onSetQrTarget={setQrTarget}
     />

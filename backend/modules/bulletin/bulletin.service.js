@@ -1,12 +1,6 @@
 const db         = require("../../db");
 const cloudinary = require("cloudinary").v2;
 
-// ─── Cloudinary config ────────────────────────────────────────────────────────
-// Add these to your .env:
-//   CLOUDINARY_CLOUD_NAME=your_cloud_name
-//   CLOUDINARY_API_KEY=your_api_key
-//   CLOUDINARY_API_SECRET=your_api_secret
-
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key:    process.env.CLOUDINARY_API_KEY,
@@ -17,11 +11,6 @@ cloudinary.config({
 
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 
-/**
- * Delete an image from Cloudinary if a public_id exists.
- * Non-fatal — logs a warning but never throws, so a missing or already-deleted
- * image on Cloudinary won't block the DB delete from completing.
- */
 const destroyCloudinaryImage = async (publicId) => {
   if (!publicId) return;
   try {
@@ -33,15 +22,12 @@ const destroyCloudinaryImage = async (publicId) => {
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-/**
- * userId is optional — pass null for unauthenticated requests.
- * liked_by_me will always be FALSE when userId is null.
- */
-const getPosts = async (userId, page = 1, limit = 4) => {
+const getPosts = async (userId, page = 1, limit = 4, showArchived = false) => {
   const offset = (page - 1) * limit;
+  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
 
   const [[{ total }]] = await db.query(
-    "SELECT COUNT(*) AS total FROM bulletin_posts"
+    `SELECT COUNT(*) AS total FROM bulletin_posts WHERE deleted_at ${deletedFilter}`
   );
 
   const [rows] = await db.query(
@@ -53,16 +39,19 @@ const getPosts = async (userId, page = 1, limit = 4) => {
        bp.image_url,
        bp.is_pinned,
        bp.created_at,
+       bp.deleted_at,
+       u.id   AS author_id,
        u.name AS author_name,
        u.role AS author_role,
        (SELECT COUNT(*) FROM bulletin_likes    WHERE post_id = bp.id) AS likes,
-       (SELECT COUNT(*) FROM bulletin_comments WHERE post_id = bp.id) AS comment_count,
+       (SELECT COUNT(*) FROM bulletin_comments WHERE post_id = bp.id AND deleted_at IS NULL) AS comment_count,
        ${userId
          ? "EXISTS(SELECT 1 FROM bulletin_likes WHERE post_id = bp.id AND user_id = ?)"
          : "FALSE"}
        AS liked_by_me
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
+     WHERE bp.deleted_at ${deletedFilter}
      ORDER BY bp.is_pinned DESC, bp.created_at DESC
      LIMIT ? OFFSET ?`,
     userId ? [userId, limit, offset] : [limit, offset]
@@ -71,10 +60,6 @@ const getPosts = async (userId, page = 1, limit = 4) => {
   return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
 };
 
-/**
- * userId is optional — pass null for unauthenticated requests.
- * liked_by_me will always be FALSE when userId is null.
- */
 const getPostById = async (postId, userId) => {
   const [[post]] = await db.query(
     `SELECT
@@ -85,6 +70,7 @@ const getPostById = async (postId, userId) => {
        bp.image_url,
        bp.is_pinned,
        bp.created_at,
+       u.id   AS author_id,
        u.name AS author_name,
        u.role AS author_role,
        (SELECT COUNT(*) FROM bulletin_likes WHERE post_id = bp.id) AS likes,
@@ -94,7 +80,7 @@ const getPostById = async (postId, userId) => {
        AS liked_by_me
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE bp.id = ?`,
+     WHERE bp.id = ? AND bp.deleted_at IS NULL`,
     userId ? [userId, postId] : [postId]
   );
 
@@ -109,7 +95,7 @@ const getPostById = async (postId, userId) => {
        u.id   AS author_id
      FROM bulletin_comments bc
      JOIN users u ON u.id = bc.user_id
-     WHERE bc.post_id = ?
+     WHERE bc.post_id = ? AND bc.deleted_at IS NULL
      ORDER BY bc.created_at ASC`,
     [postId]
   );
@@ -117,12 +103,7 @@ const getPostById = async (postId, userId) => {
   return { ...post, comments };
 };
 
-/**
- * Create a new bulletin post.
- * Expects image_url and image_public_id from the Cloudinary upload
- * already completed on the client side.
- */
-const createPost = async (authorId, { title, excerpt, content, image_url, image_public_id }) => {
+const createPost = async (authorId, { title, excerpt, content, image_url, image_public_id, is_pinned }) => {
   if (!title?.trim() || !excerpt?.trim() || !content?.trim()) {
     throw Object.assign(
       new Error("title, excerpt, and content are required"),
@@ -130,10 +111,15 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
     );
   }
 
+  // Enforce single pin — unpin any currently pinned post first
+  if (is_pinned) {
+    await db.query("UPDATE bulletin_posts SET is_pinned = 0 WHERE is_pinned = 1 AND deleted_at IS NULL");
+  }
+
   const [result] = await db.query(
     `INSERT INTO bulletin_posts
-       (title, excerpt, content, image_url, image_public_id, author_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+       (title, excerpt, content, image_url, image_public_id, author_id, is_pinned)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       title.trim(),
       excerpt.trim(),
@@ -141,20 +127,16 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
       image_url?.trim()       ?? null,
       image_public_id?.trim() ?? null,
       authorId,
+      is_pinned ? 1 : 0,
     ]
   );
 
   return { id: result.insertId };
 };
 
-/**
- * Delete a post and its Cloudinary image (if any).
- * Ownership/role check happens here — route just ensures the user is authenticated.
- * DB delete always runs first; Cloudinary cleanup is non-fatal.
- */
 const deletePost = async (postId, requestingUser) => {
   const [[post]] = await db.query(
-    "SELECT author_id, image_public_id FROM bulletin_posts WHERE id = ?",
+    "SELECT author_id, image_public_id FROM bulletin_posts WHERE id = ? AND deleted_at IS NULL",
     [postId]
   );
 
@@ -167,10 +149,70 @@ const deletePost = async (postId, requestingUser) => {
     throw Object.assign(new Error("Forbidden"), { status: 403 });
   }
 
-  await db.query("DELETE FROM bulletin_posts WHERE id = ?", [postId]);
+  await db.query(
+    "UPDATE bulletin_posts SET deleted_at = NOW(), deleted_by = ?, is_pinned = 0 WHERE id = ?",
+    [requestingUser.id, postId]
+  );
+  await db.query(
+    "UPDATE bulletin_comments SET deleted_at = NOW(), deleted_by = ? WHERE post_id = ?",
+    [requestingUser.id, postId]
+  );
 
-  // Clean up Cloudinary after DB delete succeeds — non-fatal if it fails
   await destroyCloudinaryImage(post.image_public_id);
+};
+
+const restorePost = async (postId, requestingUser) => {
+  const [[post]] = await db.query(
+    "SELECT author_id FROM bulletin_posts WHERE id = ? AND deleted_at IS NOT NULL",
+    [postId]
+  );
+
+  if (!post) throw Object.assign(new Error("Archived post not found"), { status: 404 });
+
+  const isOwner = post.author_id === requestingUser.id;
+  const isAdmin = ["admin", "super_admin"].includes(requestingUser.role);
+
+  if (!isOwner && !isAdmin) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
+
+  await db.query(
+    "UPDATE bulletin_posts SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
+    [postId]
+  );
+  await db.query(
+    "UPDATE bulletin_comments SET deleted_at = NULL, deleted_by = NULL WHERE post_id = ?",
+    [postId]
+  );
+
+  return { message: "Post restored successfully" };
+};
+
+// ─── Pin ──────────────────────────────────────────────────────────────────────
+
+const pinPost = async (postId, pinned, requestingUser) => {
+  const [[post]] = await db.query(
+    "SELECT id FROM bulletin_posts WHERE id = ? AND deleted_at IS NULL",
+    [postId]
+  );
+
+  if (!post) throw Object.assign(new Error("Post not found"), { status: 404 });
+
+  if (!["admin", "super_admin"].includes(requestingUser.role)) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
+
+  // Enforce single pin — unpin everything first, then pin this one if requested
+  if (pinned) {
+    await db.query("UPDATE bulletin_posts SET is_pinned = 0 WHERE is_pinned = 1 AND deleted_at IS NULL");
+  }
+
+  await db.query(
+    "UPDATE bulletin_posts SET is_pinned = ? WHERE id = ?",
+    [pinned ? 1 : 0, postId]
+  );
+
+  return { pinned };
 };
 
 // ─── Likes ────────────────────────────────────────────────────────────────────
@@ -232,7 +274,7 @@ const addComment = async (postId, userId, text) => {
 
 const deleteComment = async (commentId, requestingUser) => {
   const [[comment]] = await db.query(
-    "SELECT user_id FROM bulletin_comments WHERE id = ?",
+    "SELECT user_id FROM bulletin_comments WHERE id = ? AND deleted_at IS NULL",
     [commentId]
   );
 
@@ -247,7 +289,10 @@ const deleteComment = async (commentId, requestingUser) => {
     throw Object.assign(new Error("Forbidden"), { status: 403 });
   }
 
-  await db.query("DELETE FROM bulletin_comments WHERE id = ?", [commentId]);
+  await db.query(
+    "UPDATE bulletin_comments SET deleted_at = NOW(), deleted_by = ? WHERE id = ?",
+    [requestingUser.id, commentId]
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,6 +303,8 @@ module.exports = {
   getPostById,
   createPost,
   deletePost,
+  restorePost,
+  pinPost,
   toggleLike,
   addComment,
   deleteComment,

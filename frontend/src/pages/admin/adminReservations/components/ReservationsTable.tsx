@@ -3,12 +3,15 @@ import ReservationRow from "./ReservationRow";
 import type { AdminReservation } from "../reservations.types";
 
 interface ReservationsTableProps {
-  rows:        AdminReservation[];
-  loading:     boolean;
-  actionId:    number | null;
-  onMarkReady: (id: number, title: string) => void;
-  onFulfill:   (id: number, title: string) => void;
-  onCancel:    (id: number, title: string) => void;
+  rows:         AdminReservation[];
+  loading:      boolean;
+  actionId:     number | null;
+  showArchived: boolean;
+  onMarkReady:  (id: number, title: string) => void;
+  onFulfill:    (id: number, title: string) => void;
+  onCancel:     (id: number, title: string) => void;
+  onArchive:    (id: number, title: string) => void;
+  onRestore:    (id: number, title: string) => void;
 }
 
 const ColHeader = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
@@ -23,14 +26,13 @@ const ColHeader = ({ children, className = "" }: { children: React.ReactNode; cl
 );
 
 const ReservationsTable = ({
-  rows, loading, actionId,
-  onMarkReady, onFulfill, onCancel,
+  rows, loading, actionId, showArchived,
+  onMarkReady, onFulfill, onCancel, onArchive, onRestore,
 }: ReservationsTableProps) => (
   <div className="border border-border overflow-x-auto">
     <table className="w-full text-left">
       <thead>
         <tr className="border-b border-border bg-muted/30">
-          {/* Accent bar column */}
           <th className="w-[3px] p-0" />
           <ColHeader>Book</ColHeader>
           <ColHeader className="hidden sm:table-cell">Patron</ColHeader>
@@ -40,7 +42,6 @@ const ReservationsTable = ({
       </thead>
 
       <tbody>
-        {/* Loading */}
         {loading && (
           <tr>
             <td colSpan={5} className="px-4 py-14 text-center">
@@ -57,7 +58,6 @@ const ReservationsTable = ({
           </tr>
         )}
 
-        {/* Empty */}
         {!loading && rows.length === 0 && (
           <tr>
             <td colSpan={5} className="px-4 py-14 text-center">
@@ -67,23 +67,25 @@ const ReservationsTable = ({
                   className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/35"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
-                  No reservations found
+                  {showArchived ? "No archived reservations found" : "No reservations found"}
                 </span>
               </div>
             </td>
           </tr>
         )}
 
-        {/* Rows */}
         {!loading && rows.map((reservation, idx) => (
           <ReservationRow
             key={reservation.id}
             reservation={reservation}
             index={idx}
             isActing={actionId === reservation.id}
+            showArchived={showArchived}
             onMarkReady={onMarkReady}
             onFulfill={onFulfill}
             onCancel={onCancel}
+            onArchive={onArchive}
+            onRestore={onRestore}
           />
         ))}
       </tbody>

@@ -2,17 +2,14 @@ const db = require("../../db");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Expire pending reservations whose expires_at has passed.
- * Called before reads so the frontend always sees fresh status.
- */
 const syncExpired = async () => {
   await db.query(
     `UPDATE reservations
      SET status = 'expired'
      WHERE status = 'pending'
        AND expires_at IS NOT NULL
-       AND expires_at < NOW()`
+       AND expires_at < NOW()
+       AND deleted_at IS NULL`
   );
 };
 
@@ -24,8 +21,9 @@ const getActiveReservations = async (userId) => {
     `SELECT r.id, bk.title, bk.author, bk.location,
             r.status, r.reserved_at, r.expires_at, r.notes
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
      WHERE r.user_id = ? AND r.status IN ('pending', 'ready')
+       AND r.deleted_at IS NULL
      ORDER BY r.reserved_at DESC`,
     [userId]
   );
@@ -38,9 +36,10 @@ const getReservationHistory = async (userId) => {
             r.status, r.reserved_at, r.expires_at,
             r.fulfilled_at, r.cancelled_at
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
      WHERE r.user_id = ?
        AND r.status IN ('cancelled', 'expired', 'fulfilled')
+       AND r.deleted_at IS NULL
      ORDER BY r.reserved_at DESC
      LIMIT 50`,
     [userId]
@@ -48,10 +47,6 @@ const getReservationHistory = async (userId) => {
   return rows;
 };
 
-/**
- * Catalogue search with live availability.
- * available = copies - currently borrowed/overdue
- */
 const searchCatalogue = async (query) => {
   const like = `%${query}%`;
   const [rows] = await db.query(
@@ -67,9 +62,10 @@ const searchCatalogue = async (query) => {
      FROM books bk
      LEFT JOIN borrowings br
        ON br.book_id = bk.id AND br.status IN ('borrowed', 'overdue')
-     WHERE bk.title  LIKE ?
+     WHERE bk.deleted_at IS NULL
+       AND (bk.title  LIKE ?
         OR bk.author LIKE ?
-        OR bk.isbn   LIKE ?
+        OR bk.isbn   LIKE ?)
      GROUP BY bk.id
      ORDER BY bk.title ASC
      LIMIT 50`,
@@ -80,26 +76,21 @@ const searchCatalogue = async (query) => {
 
 // ─── User mutations ───────────────────────────────────────────────────────────
 
-/**
- * Create a reservation for a book.
- * Fails if user already has an active reservation for the same book.
- * expires_at is set to 48 hours from now by default.
- */
 const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [[book]] = await conn.query(
-      "SELECT id, title FROM books WHERE id = ?",
+      "SELECT id, title FROM books WHERE id = ? AND deleted_at IS NULL",
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
 
-    // Block duplicate active reservations
     const [[existing]] = await conn.query(
       `SELECT id FROM reservations
-       WHERE user_id = ? AND book_id = ? AND status IN ('pending', 'ready')`,
+       WHERE user_id = ? AND book_id = ? AND status IN ('pending', 'ready')
+         AND deleted_at IS NULL`,
       [userId, bookId]
     );
     if (existing) {
@@ -129,16 +120,14 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
   }
 };
 
-/**
- * Cancel a reservation. Only the owning user can cancel.
- */
 const cancelReservation = async (reservationId, userId) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      `SELECT id, user_id, status FROM reservations WHERE id = ? FOR UPDATE`,
+      `SELECT id, user_id, status FROM reservations
+       WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
       [reservationId]
     );
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
@@ -165,16 +154,11 @@ const cancelReservation = async (reservationId, userId) => {
 
 // ─── Admin reads ──────────────────────────────────────────────────────────────
 
-/**
- * Paginated list of all reservations across all users.
- * Supports filtering by status and searching by book title, author,
- * patron name, or student/employee ID.
- */
 const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) => {
   await syncExpired();
 
   const offset     = (page - 1) * limit;
-  const conditions = [];
+  const conditions = ["r.deleted_at IS NULL"];
   const params     = [];
 
   if (status && status !== "all") {
@@ -193,13 +177,13 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
     params.push(like, like, like, like);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
 
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
-     JOIN users  u  ON u.id  = r.user_id
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     JOIN users  u  ON u.id  = r.user_id AND u.deleted_at IS NULL
      ${where}`,
     params
   );
@@ -217,8 +201,8 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
        u.name                AS user_name,
        u.student_employee_id
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
-     JOIN users  u  ON u.id  = r.user_id
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     JOIN users  u  ON u.id  = r.user_id AND u.deleted_at IS NULL
      ${where}
      ORDER BY r.reserved_at DESC
      LIMIT ? OFFSET ?`,
@@ -235,16 +219,13 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
 
-/**
- * Mark a pending reservation as ready for patron pickup.
- */
 const markReservationReady = async (reservationId) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [reservationId]
     );
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
@@ -269,16 +250,13 @@ const markReservationReady = async (reservationId) => {
   }
 };
 
-/**
- * Fulfil a ready reservation — patron has collected the book.
- */
 const fulfillReservation = async (reservationId) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [reservationId]
     );
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
@@ -303,16 +281,13 @@ const fulfillReservation = async (reservationId) => {
   }
 };
 
-/**
- * Admin-side cancel — no ownership check.
- */
 const cancelReservationAdmin = async (reservationId) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? FOR UPDATE",
+      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [reservationId]
     );
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
@@ -334,20 +309,41 @@ const cancelReservationAdmin = async (reservationId) => {
   }
 };
 
+const restoreReservation = async (reservationId) => {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[row]] = await conn.query(
+      "SELECT id FROM reservations WHERE id = ? AND deleted_at IS NOT NULL FOR UPDATE",
+      [reservationId]
+    );
+    if (!row) throw Object.assign(new Error("Archived reservation not found"), { status: 404 });
+
+    await conn.query(
+      "UPDATE reservations SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
+      [reservationId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
 module.exports = {
-  // helpers
   syncExpired,
-  // user reads
   getActiveReservations,
   getReservationHistory,
   searchCatalogue,
-  // user mutations
   reserveBook,
   cancelReservation,
-  // admin reads
   getAdminReservations,
-  // admin mutations
   markReservationReady,
   fulfillReservation,
   cancelReservationAdmin,
+  restoreReservation,
 };

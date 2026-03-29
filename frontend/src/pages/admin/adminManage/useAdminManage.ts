@@ -7,55 +7,57 @@ import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 
 interface UseAdminManageReturn {
   // Mode
-  functionType: FunctionType;
+  functionType:    FunctionType;
   setFunctionType: (v: FunctionType) => void;
 
   // Form
-  form: UserFormState;
-  setField: <K extends keyof UserFormState>(key: K, value: string) => void;
-  showPassword: boolean;
-  togglePassword: () => void;
-  resetForm: () => void;
+  form:            UserFormState;
+  setField:        <K extends keyof UserFormState>(key: K, value: string) => void;
+  showPassword:    boolean;
+  togglePassword:  () => void;
+  resetForm:       () => void;
 
   // Roles
   allowedRoles: string[];
 
   // Search
-  searchQuery: string;
-  setSearchQuery: (v: string) => void;
-  searchResults: User[];
-  handleSearchUsers: () => Promise<void>;
+  searchQuery:          string;
+  setSearchQuery:       (v: string) => void;
+  searchResults:        User[];
+  handleSearchUsers:    () => Promise<void>;
+  showArchived:         boolean;
+  handleToggleArchived: () => void;
 
   // Selected user
-  selectedUser: User | null;
+  selectedUser:      User | null;
   selectUserForEdit: (u: User) => void;
 
   // Actions
-  loading: boolean;
-  handleCreateUser: () => Promise<void>;
-  handleUpdateUser: () => Promise<void>;
-  handleDeactivateUser: () => Promise<void>;
-  handleReactivateUser: () => Promise<void>;
+  loading:           boolean;
+  handleCreateUser:  () => Promise<void>;
+  handleUpdateUser:  () => Promise<void>;
+  handleArchiveUser: () => Promise<void>;
+  handleRestoreUser: () => Promise<void>;
 
   // QR
-  qrTarget: QrTarget | null;
+  qrTarget:    QrTarget | null;
   setQrTarget: (v: QrTarget | null) => void;
 }
 
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
 
-  const [functionType, setFunctionType] = useState<FunctionType>("create");
-  const [form, setForm]                 = useState<UserFormState>(EMPTY_FORM);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading]           = useState(false);
-  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery]   = useState("");
+  const [functionType,  setFunctionType]  = useState<FunctionType>("create");
+  const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
+  const [showPassword,  setShowPassword]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
+  const [searchQuery,   setSearchQuery]   = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [qrTarget, setQrTarget]         = useState<QrTarget | null>(null);
+  const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
+  const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
+  const [showArchived,  setShowArchived]  = useState(false);
 
-  // ── Derive allowed roles from logged-in user ───────────────────────────────
   useEffect(() => {
     if (!user) return;
     setAllowedRoles(getAllowedRoles(user.role));
@@ -71,6 +73,14 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
 
   const togglePassword = () => setShowPassword((v) => !v);
+
+  // ── Toggle archived view ───────────────────────────────────────────────────
+  const handleToggleArchived = () => {
+    setShowArchived((prev) => !prev);
+    setSearchResults([]);
+    setSelectedUser(null);
+    setSearchQuery("");
+  };
 
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
@@ -114,7 +124,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
       const res = await axiosInstance.get("/api/admin/users", {
         params: {
           student_employee_id: searchQuery || undefined,
-          name: searchQuery || undefined,
+          name:                searchQuery || undefined,
+          archived:            showArchived ? "true" : undefined,
         },
       });
       setSearchResults(res.data);
@@ -168,52 +179,45 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
   };
 
-  // ── Deactivate ─────────────────────────────────────────────────────────────
-  const handleDeactivateUser = async () => {
+  // ── Archive — DELETE /api/admin/users/:id ──────────────────────────────────
+  // Sets is_active=0 and deleted_at=NOW(). One action, one outcome.
+  const handleArchiveUser = async () => {
     if (!selectedUser) return;
-    if (!confirm(`Deactivate ${selectedUser.name}? They will no longer be able to log in.`)) return;
+    if (!confirm(`Archive ${selectedUser.name}? They won't be able to log in and will be hidden from active searches. You can restore them later.`)) return;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(
         `/api/admin/users/${selectedUser.student_employee_id}`
       );
-      toast.success(res.data.message);
+      toast.success(res.data.message || "User archived");
       setSearchResults((prev) =>
-        prev.map((u) =>
-          u.student_employee_id === selectedUser.student_employee_id
-            ? { ...u, is_active: 0 }
-            : u
-        )
+        prev.filter((u) => u.student_employee_id !== selectedUser.student_employee_id)
       );
       resetForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Deactivation failed");
+      toast.error(err.response?.data?.message || err.message || "Archive failed");
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Reactivate ─────────────────────────────────────────────────────────────
-  const handleReactivateUser = async () => {
+  // ── Restore — PATCH /api/admin/users/:id/restore ───────────────────────────
+  // Clears deleted_at and sets is_active=1. User is fully active again.
+  const handleRestoreUser = async () => {
     if (!selectedUser) return;
-    if (!confirm(`Reactivate ${selectedUser.name}?`)) return;
+    if (!confirm(`Restore ${selectedUser.name}? They will be able to log in again.`)) return;
     setLoading(true);
     try {
-      await axiosInstance.put(
-        `/api/admin/users/${selectedUser.student_employee_id}`,
-        { is_active: 1 }
+      const res = await axiosInstance.patch(
+        `/api/admin/users/${selectedUser.student_employee_id}/restore`
       );
-      toast.success("User reactivated successfully");
+      toast.success(res.data.message || "User restored");
       setSearchResults((prev) =>
-        prev.map((u) =>
-          u.student_employee_id === selectedUser.student_employee_id
-            ? { ...u, is_active: 1 }
-            : u
-        )
+        prev.filter((u) => u.student_employee_id !== selectedUser.student_employee_id)
       );
       resetForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Reactivation failed");
+      toast.error(err.response?.data?.message || err.message || "Restore failed");
     } finally {
       setLoading(false);
     }
@@ -232,13 +236,15 @@ export const useAdminManage = (): UseAdminManageReturn => {
     setSearchQuery,
     searchResults,
     handleSearchUsers,
+    showArchived,
+    handleToggleArchived,
     selectedUser,
     selectUserForEdit,
     loading,
     handleCreateUser,
     handleUpdateUser,
-    handleDeactivateUser,
-    handleReactivateUser,
+    handleArchiveUser,
+    handleRestoreUser,
     qrTarget,
     setQrTarget,
   };

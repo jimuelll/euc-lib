@@ -10,9 +10,10 @@ export interface BulletinPost {
   likes: number;
   liked_by_me: boolean;
   comment_count: number;
+  author_id: number;
   author_name: string;
   author_role: string;
-  is_pinned: boolean; 
+  is_pinned: boolean;
   comments: BulletinComment[];
 }
 
@@ -34,6 +35,7 @@ export interface ApiPost {
   image_url?: string;
   is_pinned: number;
   created_at: string;
+  author_id: number;
   author_name: string;
   author_role: string;
   likes: number;

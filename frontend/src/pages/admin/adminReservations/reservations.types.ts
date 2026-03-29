@@ -31,10 +31,11 @@ export interface ReservationsResult {
 }
 
 export interface ReservationFilters {
-  status?: string;
-  search?: string;
-  page?:   number;
-  limit?:  number;
+  status?:   string;
+  search?:   string;
+  page?:     number;
+  limit?:    number;
+  archived?: true;          // ← new: omit for active, pass true for archived view
 }
 
 // ─── Status display config ────────────────────────────────────────────────────

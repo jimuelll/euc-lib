@@ -17,6 +17,8 @@ interface UseBulletinPostsReturn {
   fetchPosts: (page: number) => Promise<void>;
   setCurrentPage: (page: number) => void;
   updatePost: (id: number, patch: Partial<BulletinPost>) => void;
+  /** Optimistically remove a post from local state (e.g. after archive) */
+  removePost: (id: number) => void;
 }
 
 export function useBulletinPosts({
@@ -58,6 +60,10 @@ export function useBulletinPosts({
     []
   );
 
+  const removePost = useCallback((id: number) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   return {
     posts,
     loading,
@@ -67,5 +73,6 @@ export function useBulletinPosts({
     fetchPosts,
     setCurrentPage,
     updatePost,
+    removePost,
   };
 }
