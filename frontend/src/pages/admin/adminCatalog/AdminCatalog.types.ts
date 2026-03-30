@@ -9,6 +9,7 @@ export type FormField = {
   locked?: boolean;
   public?: boolean;
   order: number;
+  archived?: boolean; // soft-removed fields returned by getSchema({ includeArchived: true })
 };
 
 export type Book = {
@@ -41,3 +42,6 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "select",   label: "Dropdown" },
   { value: "textarea", label: "Textarea" },
 ];
+
+/** Must stay in sync with MAX_CUSTOM_FIELDS in catalog.service.js */
+export const MAX_CUSTOM_FIELDS = 15;

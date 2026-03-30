@@ -9,8 +9,11 @@ import {
   SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
-import { Trash2, Plus, Pencil, X, Check, Eye, EyeOff, Loader2, GripVertical } from "lucide-react";
-import { FormField, FieldType, FIELD_TYPES } from "./AdminCatalog.types";
+import {
+  Trash2, Plus, Pencil, X, Check,
+  Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp,
+} from "lucide-react";
+import { FormField, FieldType, FIELD_TYPES, MAX_CUSTOM_FIELDS } from "./AdminCatalog.types";
 
 type Props = {
   fields: FormField[];
@@ -58,16 +61,25 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
-  const [newFieldLabel,    setNewFieldLabel]    = useState("");
-  const [newFieldType,     setNewFieldType]     = useState<FieldType>("text");
-  const [newFieldOptions,  setNewFieldOptions]  = useState("");
-  const [newFieldRequired, setNewFieldRequired] = useState(false);
-  const [newFieldPublic,   setNewFieldPublic]   = useState(true);
-  const [editingFieldKey,  setEditingFieldKey]  = useState<string | null>(null);
-  const [editingLabel,     setEditingLabel]     = useState("");
-  const [saving,           setSaving]           = useState(false);
+  const [newFieldLabel,     setNewFieldLabel]     = useState("");
+  const [newFieldType,      setNewFieldType]      = useState<FieldType>("text");
+  const [newFieldOptions,   setNewFieldOptions]   = useState("");
+  const [newFieldRequired,  setNewFieldRequired]  = useState(false);
+  const [newFieldPublic,    setNewFieldPublic]    = useState(true);
+  const [editingFieldKey,   setEditingFieldKey]   = useState<string | null>(null);
+  const [editingLabel,      setEditingLabel]      = useState("");
+  const [saving,            setSaving]            = useState(false);
+  const [showArchivedPanel, setShowArchivedPanel] = useState(false);
 
-  const sortedFields = [...fields].sort((a, b) => a.order - b.order);
+  // Only non-locked, non-archived fields count toward the cap
+  const activeCustomFields = fields.filter((f) => !f.locked && !f.archived);
+  const customFieldCount   = activeCustomFields.length;
+  const atCap              = customFieldCount >= MAX_CUSTOM_FIELDS;
+
+  const sortedFields   = [...fields].filter((f) => !f.archived).sort((a, b) => a.order - b.order);
+  const archivedFields = fields.filter((f) => f.archived && !f.locked);
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   const saveSchema = async (updated: FormField[]) => {
     setSaving(true);
@@ -77,13 +89,21 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
       onFieldsChange(updated);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save schema");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddField = async () => {
     if (!newFieldLabel.trim()) { toast.error("Field label is required"); return; }
+    if (atCap) {
+      toast.error(`Maximum of ${MAX_CUSTOM_FIELDS} custom fields reached. Remove one before adding another.`);
+      return;
+    }
     const key = toKey(newFieldLabel);
-    if (fields.find((f) => f.key === key)) { toast.error("Field already exists"); return; }
+    if (!key || key.length < 2) { toast.error("Label produces an invalid key — try a longer name"); return; }
+    if (fields.find((f) => f.key === key && !f.archived)) { toast.error("A field with that name already exists"); return; }
+
     await saveSchema([
       ...fields,
       {
@@ -93,288 +113,426 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
         required: newFieldRequired,
         public:   newFieldPublic,
         order:    fields.length,
+        archived: false,
         options:
           newFieldType === "select"
             ? newFieldOptions.split(",").map((o) => o.trim()).filter(Boolean)
             : undefined,
       },
     ]);
-    setNewFieldLabel(""); setNewFieldType("text");
-    setNewFieldOptions(""); setNewFieldRequired(false); setNewFieldPublic(true);
+    setNewFieldLabel("");
+    setNewFieldType("text");
+    setNewFieldOptions("");
+    setNewFieldRequired(false);
+    setNewFieldPublic(true);
   };
 
-  const handleDeleteField  = (key: string) => saveSchema(fields.filter((f) => f.key !== key));
-  const handleSaveLabel    = (key: string) => {
+  const handleDeleteField = (key: string) => {
+    if (!confirm("Remove this field? Existing data in book records is kept — the field can be restored later.")) return;
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, archived: true } : f)));
+  };
+
+  const handleRestoreField = (key: string) => {
+    if (atCap) {
+      toast.error(`Maximum of ${MAX_CUSTOM_FIELDS} custom fields reached. Remove an active field first.`);
+      return;
+    }
+    const maxOrder = Math.max(0, ...fields.filter((f) => !f.archived).map((f) => f.order));
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, archived: false, order: maxOrder + 1 } : f)));
+  };
+
+  const handleSaveLabel = (key: string) => {
     saveSchema(fields.map((f) => (f.key === key ? { ...f, label: editingLabel } : f)));
     setEditingFieldKey(null);
   };
+
   const handleTogglePublic = (key: string, current: boolean) =>
     saveSchema(fields.map((f) => (f.key === key ? { ...f, public: !current } : f)));
+
   const handleMove = (key: string, dir: "up" | "down") => {
-    const sorted = [...fields].sort((a, b) => a.order - b.order);
+    const sorted = [...fields].filter((f) => !f.archived).sort((a, b) => a.order - b.order);
     const idx    = sorted.findIndex((f) => f.key === key);
     const swap   = dir === "up" ? idx - 1 : idx + 1;
     if (swap < 0 || swap >= sorted.length) return;
     [sorted[idx].order, sorted[swap].order] = [sorted[swap].order, sorted[idx].order];
-    saveSchema([...sorted]);
+    const archived = fields.filter((f) => f.archived);
+    saveSchema([...sorted, ...archived]);
   };
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
-    <div className="mt-6 border border-border grid lg:grid-cols-2">
+    <div className="mt-6 border border-border flex flex-col">
 
-      {/* ── Left: current fields ─────────────────────────────────────── */}
-      <div className="border-b lg:border-b-0 lg:border-r border-border">
-        <PanelLabel>Current Fields</PanelLabel>
+      {/* ── Two-column: current fields + add new field ────────────────── */}
+      <div className="grid lg:grid-cols-2">
 
-        {/* Column headers */}
-        <div className="grid grid-cols-[24px_32px_1fr_auto_auto] gap-x-3 items-center px-5 py-2 border-b border-border bg-muted/20">
-          {["", "#", "Label / Key", "Badges", ""].map((h, i) => (
-            <span
-              key={i}
-              className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/40"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {h}
-            </span>
-          ))}
-        </div>
+        {/* Left: current fields */}
+        <div className="border-b lg:border-b-0 lg:border-r border-border">
+          <PanelLabel>Current Fields</PanelLabel>
 
-        <div className="divide-y divide-border">
-          {sortedFields.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <p
-                className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/35"
+          <div className="grid grid-cols-[24px_32px_1fr_auto_auto] gap-x-3 items-center px-5 py-2 border-b border-border bg-muted/20">
+            {["", "#", "Label / Key", "Badges", ""].map((h, i) => (
+              <span
+                key={i}
+                className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/40"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
-                No fields defined
-              </p>
-            </div>
-          ) : (
-            sortedFields.map((f, idx) => (
-              <div
-                key={f.key}
-                className="flex items-center gap-3 px-5 py-3 bg-background hover:bg-muted/15 transition-colors"
-              >
-                {/* Move arrows */}
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  <button
-                    onClick={() => handleMove(f.key, "up")}
-                    disabled={idx === 0 || saving}
-                    className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
-                  >▲</button>
-                  <button
-                    onClick={() => handleMove(f.key, "down")}
-                    disabled={idx === sortedFields.length - 1 || saving}
-                    className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
-                  >▼</button>
-                </div>
-
-                {/* Index */}
-                <span
-                  className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground/25 w-5 shrink-0 text-right"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-
-                {/* Label — editable */}
-                <div className="min-w-0 flex-1">
-                  {editingFieldKey === f.key ? (
-                    <Input
-                      value={editingLabel}
-                      onChange={(e) => setEditingLabel(e.target.value)}
-                      className="rounded-none border-border h-7 text-sm focus-visible:ring-0 focus-visible:border-primary"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveLabel(f.key);
-                        if (e.key === "Escape") setEditingFieldKey(null);
-                      }}
-                    />
-                  ) : (
-                    <div>
-                      <p className="text-sm font-medium text-foreground truncate leading-tight">{f.label}</p>
-                      <p className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">{f.key}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Type + flags */}
-                <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end max-w-[120px]">
-                  <Badge className="border-border/60 text-muted-foreground/50 bg-muted/30">{f.type}</Badge>
-                  {f.required && (
-                    <Badge className="border-destructive/25 text-destructive/70 bg-destructive/5">Req</Badge>
-                  )}
-                  {f.locked && (
-                    <Badge className="border-border text-muted-foreground/30">Locked</Badge>
-                  )}
-                </div>
-
-                {/* Public toggle */}
-                <button
-                  onClick={() => handleTogglePublic(f.key, !!f.public)}
-                  title={f.public ? "Public — visible in catalogue" : "Hidden from catalogue"}
-                  className={`shrink-0 p-1 rounded transition-colors ${
-                    f.public
-                      ? "text-primary hover:text-primary/60"
-                      : "text-muted-foreground/25 hover:text-muted-foreground"
-                  }`}
-                >
-                  {f.public ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                </button>
-
-                {/* Edit / confirm / delete */}
-                {!f.locked && (
-                  editingFieldKey === f.key ? (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleSaveLabel(f.key)}
-                        className="p-1 text-success hover:text-success/70 transition-colors"
-                        title="Save"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setEditingFieldKey(null)}
-                        className="p-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                        title="Cancel"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => { setEditingFieldKey(f.key); setEditingLabel(f.label); }}
-                        className="p-1 text-muted-foreground/35 hover:text-foreground transition-colors"
-                        title="Rename"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteField(f.key)}
-                        className="p-1 text-muted-foreground/25 hover:text-destructive transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Legend */}
-        <div className="border-t border-border px-5 py-2.5 flex items-center gap-2 bg-muted/10">
-          <Eye className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-          <p className="text-[10px] text-muted-foreground/40 tracking-wide">
-            Eye icon = visible in public catalogue
-          </p>
-        </div>
-      </div>
-
-      {/* ── Right: add new field ──────────────────────────────────────── */}
-      <div>
-        <PanelLabel>Add New Field</PanelLabel>
-
-        <div className="p-5 space-y-5">
-
-          {/* Field Label */}
-          <div>
-            <FieldLabel>Field Label</FieldLabel>
-            <Input
-              value={newFieldLabel}
-              onChange={(e) => setNewFieldLabel(e.target.value)}
-              placeholder="e.g. Publisher"
-              className={inputClass}
-              onKeyDown={(e) => e.key === "Enter" && handleAddField()}
-            />
-          </div>
-
-          {/* Field Type */}
-          <div>
-            <FieldLabel>Field Type</FieldLabel>
-            <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)}>
-              <SelectTrigger className={inputClass}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-none border-border">
-                {FIELD_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value} className="rounded-none text-sm">
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Options — select type only */}
-          {newFieldType === "select" && (
-            <div>
-              <FieldLabel>
-                Options{" "}
-                <span className="normal-case tracking-normal text-muted-foreground/40 font-normal ml-1">
-                  (comma-separated)
-                </span>
-              </FieldLabel>
-              <Input
-                value={newFieldOptions}
-                onChange={(e) => setNewFieldOptions(e.target.value)}
-                placeholder="Option A, Option B, Option C"
-                className={inputClass}
-              />
-            </div>
-          )}
-
-          {/* Toggles */}
-          <div className="flex items-center gap-6 pt-1 border-t border-border/50">
-            {[
-              { label: "Required", checked: newFieldRequired, onChange: setNewFieldRequired },
-              { label: "Public",   checked: newFieldPublic,   onChange: setNewFieldPublic   },
-            ].map(({ label, checked, onChange }) => (
-              <label key={label} className="flex items-center gap-2.5 cursor-pointer group">
-                {/* Sharp custom checkbox */}
-                <div className="relative flex items-center shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => onChange(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
-                    {checked && (
-                      <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 10" fill="none">
-                        <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {label}
-                </span>
-              </label>
+                {h}
+              </span>
             ))}
           </div>
 
-          {/* Submit */}
-          <button
-            onClick={handleAddField}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            {saving ? (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+          <div className="divide-y divide-border">
+            {sortedFields.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p
+                  className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/35"
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  No fields defined
+                </p>
+              </div>
             ) : (
-              <><Plus className="h-3.5 w-3.5" /> Add Field</>
+              sortedFields.map((f, idx) => (
+                <div
+                  key={f.key}
+                  className="flex items-center gap-3 px-5 py-3 bg-background hover:bg-muted/15 transition-colors"
+                >
+                  {/* Move arrows */}
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => handleMove(f.key, "up")}
+                      disabled={idx === 0 || saving}
+                      className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
+                    >▲</button>
+                    <button
+                      onClick={() => handleMove(f.key, "down")}
+                      disabled={idx === sortedFields.length - 1 || saving}
+                      className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
+                    >▼</button>
+                  </div>
+
+                  {/* Index */}
+                  <span
+                    className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground/25 w-5 shrink-0 text-right"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+
+                  {/* Label — editable */}
+                  <div className="min-w-0 flex-1">
+                    {editingFieldKey === f.key ? (
+                      <Input
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        className="rounded-none border-border h-7 text-sm focus-visible:ring-0 focus-visible:border-primary"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter")  handleSaveLabel(f.key);
+                          if (e.key === "Escape") setEditingFieldKey(null);
+                        }}
+                      />
+                    ) : (
+                      <div>
+                        <p className="text-sm font-medium text-foreground truncate leading-tight">{f.label}</p>
+                        <p className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">{f.key}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Type + flags */}
+                  <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end max-w-[120px]">
+                    <Badge className="border-border/60 text-muted-foreground/50 bg-muted/30">{f.type}</Badge>
+                    {f.required && <Badge className="border-destructive/25 text-destructive/70 bg-destructive/5">Req</Badge>}
+                    {f.locked   && <Badge className="border-border text-muted-foreground/30">Locked</Badge>}
+                  </div>
+
+                  {/* Public toggle */}
+                  <button
+                    onClick={() => handleTogglePublic(f.key, !!f.public)}
+                    title={f.public ? "Public — visible in catalogue" : "Hidden from catalogue"}
+                    className={`shrink-0 p-1 rounded transition-colors ${
+                      f.public ? "text-primary hover:text-primary/60" : "text-muted-foreground/25 hover:text-muted-foreground"
+                    }`}
+                  >
+                    {f.public ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  </button>
+
+                  {/* Edit / delete — non-locked only */}
+                  {!f.locked && (
+                    editingFieldKey === f.key ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => handleSaveLabel(f.key)} className="p-1 text-success hover:text-success/70 transition-colors" title="Save">
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => setEditingFieldKey(null)} className="p-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors" title="Cancel">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => { setEditingFieldKey(f.key); setEditingLabel(f.label); }}
+                          className="p-1 text-muted-foreground/35 hover:text-foreground transition-colors"
+                          title="Rename"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteField(f.key)}
+                          className="p-1 text-muted-foreground/25 hover:text-destructive transition-colors"
+                          title="Remove field"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              ))
             )}
-          </button>
+          </div>
+
+          {/* Legend */}
+          <div className="border-t border-border px-5 py-2.5 flex items-center gap-2 bg-muted/10">
+            <Eye className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+            <p className="text-[10px] text-muted-foreground/40 tracking-wide">
+              Eye icon = visible in public catalogue
+            </p>
+          </div>
+        </div>
+
+        {/* Right: add new field */}
+        <div>
+          <PanelLabel>Add New Field</PanelLabel>
+
+          <div className="p-5 space-y-5">
+
+            {/* Custom field usage counter */}
+            <div className="flex items-center justify-between">
+              <span
+                className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                Custom Fields
+              </span>
+              <span
+                className={`text-[10px] font-bold tabular-nums px-2 py-0.5 border ${
+                  atCap
+                    ? "border-destructive/40 text-destructive bg-destructive/5"
+                    : customFieldCount >= MAX_CUSTOM_FIELDS - 3
+                    ? "border-warning/40 text-warning bg-warning/5"
+                    : "border-border text-muted-foreground/50"
+                }`}
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {customFieldCount} / {MAX_CUSTOM_FIELDS}
+              </span>
+            </div>
+
+            {/* Cap warning */}
+            {atCap && (
+              <div className="flex items-start gap-2.5 border border-destructive/25 bg-destructive/5 px-3 py-2.5">
+                <X className="h-3.5 w-3.5 text-destructive/60 mt-0.5 shrink-0" />
+                <p className="text-[10px] text-destructive/80 leading-relaxed">
+                  Maximum of {MAX_CUSTOM_FIELDS} custom fields reached. Remove an existing field or restore an archived one to free up a slot.
+                </p>
+              </div>
+            )}
+
+            {/* Field Label */}
+            <div>
+              <FieldLabel>Field Label</FieldLabel>
+              <Input
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="e.g. Publisher"
+                className={inputClass}
+                disabled={atCap}
+                onKeyDown={(e) => e.key === "Enter" && handleAddField()}
+              />
+              {newFieldLabel.trim() && (
+                <p className="mt-1 text-[10px] font-mono text-muted-foreground/40">
+                  key: <span className="text-muted-foreground/70">{toKey(newFieldLabel)}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Field Type */}
+            <div>
+              <FieldLabel>Field Type</FieldLabel>
+              <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)} disabled={atCap}>
+                <SelectTrigger className={inputClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-border">
+                  {FIELD_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value} className="rounded-none text-sm">
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Options — select type only */}
+            {newFieldType === "select" && (
+              <div>
+                <FieldLabel>
+                  Options{" "}
+                  <span className="normal-case tracking-normal text-muted-foreground/40 font-normal ml-1">
+                    (comma-separated)
+                  </span>
+                </FieldLabel>
+                <Input
+                  value={newFieldOptions}
+                  onChange={(e) => setNewFieldOptions(e.target.value)}
+                  placeholder="Option A, Option B, Option C"
+                  className={inputClass}
+                  disabled={atCap}
+                />
+              </div>
+            )}
+
+            {/* Toggles */}
+            <div className="flex items-center gap-6 pt-1 border-t border-border/50">
+              {[
+                { label: "Required", checked: newFieldRequired, onChange: setNewFieldRequired },
+                { label: "Public",   checked: newFieldPublic,   onChange: setNewFieldPublic   },
+              ].map(({ label, checked, onChange }) => (
+                <label
+                  key={label}
+                  className={`flex items-center gap-2.5 cursor-pointer group ${atCap ? "opacity-40 pointer-events-none" : ""}`}
+                >
+                  <div className="relative flex items-center shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => onChange(e.target.checked)}
+                      className="peer sr-only"
+                      disabled={atCap}
+                    />
+                    <div className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
+                      {checked && (
+                        <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 10" fill="none">
+                          <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* Submit */}
+            <button
+              onClick={handleAddField}
+              disabled={saving || atCap}
+              className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {saving
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : <><Plus className="h-3.5 w-3.5" /> Add Field</>
+              }
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* ── Archived fields panel (full width, below the two-column grid) ── */}
+      {archivedFields.length > 0 && (
+        <div className="border-t border-border">
+
+          {/* Collapsible toggle */}
+          <button
+            onClick={() => setShowArchivedPanel((p) => !p)}
+            className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-muted/20 hover:bg-muted/40 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="h-px w-4 bg-muted-foreground/30 shrink-0" />
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/60"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                Archived Fields
+              </p>
+              <span
+                className="text-[10px] font-bold tabular-nums border border-border px-1.5 py-0.5 text-muted-foreground/40"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {archivedFields.length}
+              </span>
+            </div>
+            {showArchivedPanel
+              ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground/40" />
+              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/40" />
+            }
+          </button>
+
+          {/* Rows */}
+          {showArchivedPanel && (
+            <div className="divide-y divide-border border-t border-border">
+              {archivedFields.map((f) => (
+                <div
+                  key={f.key}
+                  className="flex items-center gap-4 px-5 py-3 bg-background opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  {/* Label + key */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate leading-tight">{f.label}</p>
+                    <p className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">{f.key}</p>
+                  </div>
+
+                  {/* Type badge */}
+                  <Badge className="border-border/60 text-muted-foreground/40 bg-muted/20 shrink-0">
+                    {f.type}
+                  </Badge>
+
+                  {/* Data retained hint */}
+                  <p
+                    className="text-[10px] text-muted-foreground/40 shrink-0 hidden sm:block"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Data retained
+                  </p>
+
+                  {/* Restore */}
+                  <button
+                    onClick={() => handleRestoreField(f.key)}
+                    disabled={saving || atCap}
+                    title={
+                      atCap
+                        ? `Remove an active field first (${MAX_CUSTOM_FIELDS} max)`
+                        : `Restore "${f.label}"`
+                    }
+                    className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    <ArchiveRestore className="h-3 w-3" />
+                    Restore
+                  </button>
+                </div>
+              ))}
+
+              {/* Footer note */}
+              <div className="px-5 py-2.5 bg-muted/10">
+                <p className="text-[10px] text-muted-foreground/40 tracking-wide">
+                  Restoring a field re-adds it to the form. All previously saved data in book records is still intact.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

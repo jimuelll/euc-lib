@@ -1,48 +1,45 @@
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui";
-import type { FunctionType, User, UserFormState, QrTarget } from "./AdminManage.types";
+import { AdminPage, AdminPanel } from "../components/AdminPage";
+import type { FunctionType, QrTarget, User, UserFormState } from "./AdminManage.types";
 import {
-  QrModal,
   CreateForm,
+  EditForm,
+  QrModal,
   SearchBar,
   SearchResultsTable,
-  EditForm,
 } from "./components/AdminManage.components";
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface AdminManageBuilderProps {
-  functionType:         FunctionType;
+  functionType: FunctionType;
   onFunctionTypeChange: (v: FunctionType) => void;
-  form:                 UserFormState;
-  showPassword:         boolean;
-  allowedRoles:         string[];
-  loading:              boolean;
-  onField:              <K extends keyof UserFormState>(key: K, value: string) => void;
-  onTogglePassword:     () => void;
-  onResetForm:          () => void;
-  searchQuery:          string;
-  onSearchQueryChange:  (v: string) => void;
-  searchResults:        User[];
-  onSearch:             () => void;
-  showArchived:         boolean;
-  onToggleArchived:     () => void;
-  selectedUser:         User | null;
-  onSelectUser:         (u: User) => void;
-  onCreateUser:         () => void;
-  onUpdateUser:         () => void;
-  onArchiveUser:        () => void;
-  onRestoreUser:        () => void;
-  qrTarget:             QrTarget | null;
-  onSetQrTarget:        (v: QrTarget | null) => void;
+  form: UserFormState;
+  showPassword: boolean;
+  allowedRoles: string[];
+  loading: boolean;
+  onField: <K extends keyof UserFormState>(key: K, value: string) => void;
+  onTogglePassword: () => void;
+  onResetForm: () => void;
+  searchQuery: string;
+  onSearchQueryChange: (v: string) => void;
+  searchResults: User[];
+  onSearch: () => void;
+  showArchived: boolean;
+  onToggleArchived: () => void;
+  selectedUser: User | null;
+  onSelectUser: (u: User) => void;
+  onCreateUser: () => void;
+  onUpdateUser: () => void;
+  onArchiveUser: () => void;
+  onRestoreUser: () => void;
+  qrTarget: QrTarget | null;
+  onSetQrTarget: (v: QrTarget | null) => void;
 }
-
-// ─── Builder ─────────────────────────────────────────────────────────────────
 
 const AdminManageBuilder = ({
   functionType,
@@ -69,57 +66,32 @@ const AdminManageBuilder = ({
   qrTarget,
   onSetQrTarget,
 }: AdminManageBuilderProps) => (
-  <div className="max-w-3xl">
+  <AdminPage
+    eyebrow="Administration"
+    title="User Management"
+    description="Create, update, archive, and review library users in a single workspace built for quick scanning and fewer layout jumps."
+  >
+    {qrTarget ? <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} /> : null}
 
-    {qrTarget && (
-      <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} />
-    )}
-
-    {/* ── Section heading ── */}
-    <div className="flex items-center gap-3 mb-1">
-      <div className="h-px w-6 bg-warning shrink-0" />
-      <p
-        className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
-        Administration
-      </p>
-    </div>
-    <h2
-      className="text-xl font-bold tracking-tight text-foreground mb-6"
-      style={{ fontFamily: "var(--font-heading)" }}
+    <AdminPanel
+      title="Mode"
+      description="Switch between creating a new user and searching or editing an existing one."
+      className="max-w-xl"
     >
-      User Management
-    </h2>
-
-    {/* ── Mode selector ── */}
-    <div className="border border-border bg-background">
-      <div className="border-b border-border px-5 py-3 bg-secondary/30 flex items-center gap-3">
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Mode
-        </p>
-      </div>
-      <div className="px-5 py-4">
-        <Select
-          value={functionType}
-          onValueChange={(v) => onFunctionTypeChange(v as FunctionType)}
-        >
-          <SelectTrigger className="rounded-none max-w-xs">
+      <div className="max-w-xs">
+        <Select value={functionType} onValueChange={(v) => onFunctionTypeChange(v as FunctionType)}>
+          <SelectTrigger>
             <SelectValue placeholder="Select mode" />
           </SelectTrigger>
-          <SelectContent className="rounded-none">
-            <SelectItem value="create" className="rounded-none">Create User</SelectItem>
-            <SelectItem value="edit"   className="rounded-none">Edit / Search</SelectItem>
+          <SelectContent>
+            <SelectItem value="create">Create User</SelectItem>
+            <SelectItem value="edit">Edit / Search</SelectItem>
           </SelectContent>
         </Select>
       </div>
-    </div>
+    </AdminPanel>
 
-    {/* ── Create mode ── */}
-    {functionType === "create" && (
+    {functionType === "create" ? (
       <CreateForm
         form={form}
         showPassword={showPassword}
@@ -130,10 +102,7 @@ const AdminManageBuilder = ({
         onSubmit={onCreateUser}
         onReset={onResetForm}
       />
-    )}
-
-    {/* ── Edit / Search mode ── */}
-    {functionType === "edit" && (
+    ) : (
       <>
         <SearchBar
           value={searchQuery}
@@ -144,15 +113,15 @@ const AdminManageBuilder = ({
           onToggleArchived={onToggleArchived}
         />
 
-        {searchResults.length > 0 && (
+        {searchResults.length > 0 ? (
           <SearchResultsTable
             results={searchResults}
             showArchived={showArchived}
             onSelect={onSelectUser}
           />
-        )}
+        ) : null}
 
-        {selectedUser && (
+        {selectedUser ? (
           <EditForm
             selectedUser={selectedUser}
             form={form}
@@ -163,17 +132,19 @@ const AdminManageBuilder = ({
             onField={onField}
             onTogglePassword={onTogglePassword}
             onSubmit={onUpdateUser}
-            onViewQr={() => onSetQrTarget({
-              studentId: selectedUser.student_employee_id,
-              name:      selectedUser.name,
-            })}
+            onViewQr={() =>
+              onSetQrTarget({
+                studentId: selectedUser.student_employee_id,
+                name: selectedUser.name,
+              })
+            }
             onArchive={onArchiveUser}
             onRestore={onRestoreUser}
           />
-        )}
+        ) : null}
       </>
     )}
-  </div>
+  </AdminPage>
 );
 
 export default AdminManageBuilder;

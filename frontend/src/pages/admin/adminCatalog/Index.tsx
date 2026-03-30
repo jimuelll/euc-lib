@@ -6,6 +6,7 @@ import type { FormField } from "./AdminCatalog.types";
 import AdminCatalogData from "./AdminCatalogData";
 import AdminCatalogBuilder from "./AdminCatalogBuilder";
 import { Button } from "@/components/ui/button";
+import { AdminPage, AdminPanel } from "../components/AdminPage";
 
 const AdminCatalog = () => {
   const { user } = useAuth();
@@ -31,18 +32,17 @@ const AdminCatalog = () => {
   const canAccessBuilder = user?.role === "admin" || user?.role === "super_admin";
 
   if (loadingSchema) {
-    return <p className="text-sm text-muted-foreground mt-6">Loading...</p>;
+    return <p className="mt-6 text-sm text-muted-foreground">Loading...</p>;
   }
 
   return (
-    <div className="max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-heading text-lg font-bold text-foreground">Catalog Management</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Add, edit, or remove books from the catalog.</p>
-        </div>
-        {canAccessBuilder && (
-          <div className="flex gap-2">
+    <AdminPage
+      eyebrow="Library Management"
+      title="Catalog Management"
+      description="Add, edit, archive, and organize catalog records in a workspace that keeps catalog operations and schema controls clearly separated."
+      actions={
+        canAccessBuilder ? (
+          <>
             <Button
               size="sm"
               variant={mode === "catalog" ? "default" : "outline"}
@@ -57,15 +57,26 @@ const AdminCatalog = () => {
             >
               Form Builder
             </Button>
-          </div>
+          </>
+        ) : undefined
+      }
+    >
+      <AdminPanel
+        title={mode === "catalog" ? "Catalog records" : "Catalog form builder"}
+        description={
+          mode === "catalog"
+            ? "Manage books and copies from the main catalog table."
+            : "Adjust the catalog schema fields used when creating or editing records."
+        }
+        className="border-none bg-transparent shadow-none"
+        contentClassName="p-0"
+      >
+        {mode === "catalog" && <AdminCatalogData fields={fields} />}
+        {mode === "builder" && canAccessBuilder && (
+          <AdminCatalogBuilder fields={fields} onFieldsChange={setFields} />
         )}
-      </div>
-
-      {mode === "catalog" && <AdminCatalogData fields={fields} />}
-      {mode === "builder" && canAccessBuilder && (
-        <AdminCatalogBuilder fields={fields} onFieldsChange={setFields} />
-      )}
-    </div>
+      </AdminPanel>
+    </AdminPage>
   );
 };
 

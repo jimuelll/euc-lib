@@ -43,6 +43,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // --- Public Routes ---
 // --- Public Routes ---
 app.use("/api/auth",     authRoutes);

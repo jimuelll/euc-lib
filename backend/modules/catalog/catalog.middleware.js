@@ -5,6 +5,8 @@ const VALID_TYPES     = ["text", "textarea", "number", "date", "select"];
 // Matches LIB-000001-001 format exactly
 const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
 
+const { MAX_CUSTOM_FIELDS } = require("./catalog.service");
+
 const requireAdminRole = (req, res, next) => {
   if (!req.user || !ALLOWED_ROLES.includes(req.user.role)) {
     return res.status(403).json({ message: "Access denied" });
@@ -19,12 +21,27 @@ const validateSchemaPayload = (req, res, next) => {
     return res.status(400).json({ message: "'fields' must be an array" });
   }
 
+  // FIX #3: Cap the number of custom (non-locked) fields
+  const customFields = fields.filter((f) => !f.locked);
+  if (customFields.length > MAX_CUSTOM_FIELDS) {
+    return res.status(400).json({
+      message: `Too many custom fields. Maximum allowed is ${MAX_CUSTOM_FIELDS} (you have ${customFields.length}).`,
+    });
+  }
+
+  // Guard against duplicate keys in the same payload
+  const seenKeys = new Set();
   for (const f of fields) {
     if (!f.key || !VALID_KEY_REGEX.test(f.key)) {
       return res.status(400).json({
         message: `Invalid field key "${f.key}". Must be lowercase letters, digits, or underscores (2–64 chars, start with a letter).`,
       });
     }
+    if (seenKeys.has(f.key)) {
+      return res.status(400).json({ message: `Duplicate field key "${f.key}"` });
+    }
+    seenKeys.add(f.key);
+
     if (!f.label?.trim()) {
       return res.status(400).json({ message: `Field "${f.key}" is missing a label` });
     }

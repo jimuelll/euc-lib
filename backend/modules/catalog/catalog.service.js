@@ -2,23 +2,57 @@ const db = require("../../db");
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
-const getSchema = async () => {
+const MAX_CUSTOM_FIELDS = 15;
+
+const getSchema = async ({ includeArchived = false } = {}) => {
   const [rows] = await db.query(
-    "SELECT * FROM catalog_schema ORDER BY `order` ASC"
+    `SELECT * FROM catalog_schema
+     ${includeArchived ? "" : "WHERE archived = 0"}
+     ORDER BY \`order\` ASC`
   );
   return rows;
 };
 
+/**
+ * FIX #2: Replace DELETE+INSERT with INSERT ... ON DUPLICATE KEY UPDATE.
+ * This is atomic per-row and never leaves the schema table empty on failure.
+ */
 const upsertSchema = async (fields) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query("DELETE FROM catalog_schema");
+
+    // Determine which non-locked keys are being removed so we can archive them
+    const [existing] = await conn.query(
+      "SELECT `key` FROM catalog_schema WHERE locked = 0 AND archived = 0"
+    );
+    const incomingKeys = new Set(fields.map((f) => f.key));
+    const toArchive    = existing
+      .map((r) => r.key)
+      .filter((k) => !incomingKeys.has(k));
+
+    // Archive removed custom fields instead of deleting them
+    if (toArchive.length) {
+      await conn.query(
+        "UPDATE catalog_schema SET archived = 1 WHERE `key` IN (?) AND locked = 0",
+        [toArchive]
+      );
+    }
+
+    // Upsert each incoming field
     if (fields.length) {
       await conn.query(
         `INSERT INTO catalog_schema
-           (\`key\`, label, type, options, required, locked, \`public\`, \`order\`)
-         VALUES ?`,
+           (\`key\`, label, type, options, required, locked, \`public\`, \`order\`, archived)
+         VALUES ?
+         ON DUPLICATE KEY UPDATE
+           label    = VALUES(label),
+           type     = VALUES(type),
+           options  = VALUES(options),
+           required = VALUES(required),
+           \`public\` = VALUES(\`public\`),
+           \`order\` = VALUES(\`order\`),
+           archived = 0`,
         [
           fields.map((f) => [
             f.key,
@@ -29,10 +63,12 @@ const upsertSchema = async (fields) => {
             f.locked   ? 1 : 0,
             f.public   ? 1 : 0,
             f.order,
+            0,
           ]),
         ]
       );
     }
+
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -77,10 +113,17 @@ const addColumnIfMissing = async (key, type) => {
   await db.query(`ALTER TABLE books ADD COLUMN \`${key}\` ${sqlType} DEFAULT NULL`);
 };
 
+/**
+ * FIX #1: Never physically drop a column.
+ * Data stays in the DB; the column is simply hidden from the schema.
+ * A DBA can physically drop it later after verifying the data is no longer needed.
+ */
 const dropColumnIfExists = async (key) => {
+  // Intentionally a no-op — column archival is handled by upsertSchema.
+  // The physical column remains in `books` with its data intact.
   if (RESERVED_KEYS.has(key)) return;
-  if (!(await columnExists(key))) return;
-  await db.query(`ALTER TABLE books DROP COLUMN \`${key}\``);
+  // Log for visibility
+  console.info(`[catalog] Field "${key}" removed from schema (column retained in books table)`);
 };
 
 // ─── book_copies helpers ──────────────────────────────────────────────────────
@@ -327,7 +370,6 @@ const deleteBook = async (id, deletedBy) => {
   );
 };
 
-// RESTORE BOOK
 const restoreBook = async (id) => {
   const [[book]] = await db.query(
     "SELECT id FROM books WHERE id = ? AND deleted_at IS NOT NULL",
@@ -335,14 +377,18 @@ const restoreBook = async (id) => {
   );
   if (!book) throw Object.assign(new Error("Archived book not found"), { status: 404 });
 
-  // Restore the book and all its soft-deleted copies
   await db.query(
     "UPDATE books SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
     [id]
   );
+  // Only restore copies that were deleted at the same time as the book,
+  // not ones that were manually deactivated beforehand
   await db.query(
-    "UPDATE book_copies SET deleted_at = NULL, deleted_by = NULL WHERE book_id = ?",
-    [id]
+    `UPDATE book_copies SET deleted_at = NULL, deleted_by = NULL
+     WHERE book_id = ? AND deleted_at >= (
+       SELECT deleted_at FROM (SELECT deleted_at FROM books WHERE id = ?) AS t
+     )`,
+    [id, id]
   );
 
   return { message: "Book restored successfully" };
@@ -377,6 +423,7 @@ const getCopyByBarcode = async (barcode) => {
 };
 
 module.exports = {
+  MAX_CUSTOM_FIELDS,
   getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
   searchBooks, createBook, updateBook, deleteBook, restoreBook,
   getBookCopies, syncBookCopies, getCopyByBarcode,
