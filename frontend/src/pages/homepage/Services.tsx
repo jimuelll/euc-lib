@@ -18,7 +18,7 @@ const services = [
     title: "Academic Subscriptions",
     description:
       "Full access to JSTOR, IEEE Xplore, ScienceDirect, and other academic databases for research and scholarly articles. Available 24/7 with your credentials.",
-    requiresLogin: false,
+    requiresLogin: true,
     link: "/services/subscriptions",
     note: "Placeholder — Subscriptions will be configurable by admin.",
   },

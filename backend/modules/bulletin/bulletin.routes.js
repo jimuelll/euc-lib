@@ -1,14 +1,14 @@
 const express    = require("express");
 const router     = express.Router();
 const controller = require("./bulletin.controller");
-const { authMiddleware } = require("../auth/auth.middleware");
+const { authMiddleware, optionalAuthMiddleware } = require("../auth/auth.middleware");
 
 const CAN_POST  = ["staff", "admin", "super_admin"];
 const ADMIN_ONLY = ["admin", "super_admin"];
 
 // ─── Public — no login required ───────────────────────────────────────────────
-router.get("/",        controller.getPosts);
-router.get("/:postId", controller.getPostById);
+router.get("/",        optionalAuthMiddleware(), controller.getPosts);
+router.get("/:postId", optionalAuthMiddleware(), controller.getPostById);
 
 // ─── Protected — must be logged in ───────────────────────────────────────────
 router.post  ("/",                            authMiddleware(CAN_POST),   controller.createPost);

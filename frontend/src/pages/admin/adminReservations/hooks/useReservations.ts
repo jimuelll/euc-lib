@@ -10,6 +10,7 @@ import {
 } from "../reservations.api";
 import { PAGE_SIZE } from "../reservations.types";
 import type { ReservationsResult } from "../reservations.types";
+import { useAdminConfirmDialog } from "../../components/useAdminConfirmDialog";
 
 export const useReservations = () => {
   const [data,         setData]         = useState<ReservationsResult | null>(null);
@@ -19,6 +20,7 @@ export const useReservations = () => {
   const [page,         setPage]         = useState(1);
   const [actionId,     setActionId]     = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +106,13 @@ export const useReservations = () => {
   };
 
   const handleArchive = async (id: number, title: string) => {
-    if (!confirm(`Archive the reservation for "${title}"? It can be restored later.`)) return;
+    const shouldArchive = await confirm({
+      title: `Archive "${title}" reservation?`,
+      description: "The reservation will move out of the active queue until it is restored.",
+      actionLabel: "Archive Reservation",
+      tone: "danger",
+    });
+    if (!shouldArchive) return;
     setActionId(id);
     try {
       await archiveReservation(id);
@@ -123,7 +131,12 @@ export const useReservations = () => {
   };
 
   const handleRestore = async (id: number, title: string) => {
-    if (!confirm(`Restore the reservation for "${title}"?`)) return;
+    const shouldRestore = await confirm({
+      title: `Restore "${title}" reservation?`,
+      description: "The reservation will return to the active reservation records.",
+      actionLabel: "Restore Reservation",
+    });
+    if (!shouldRestore) return;
     setActionId(id);
     try {
       await restoreReservation(id);
@@ -149,6 +162,7 @@ export const useReservations = () => {
     page,
     actionId,
     showArchived,
+    confirmDialog,
     // filter handlers
     handleSearchChange,
     handleStatusChange,

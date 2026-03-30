@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/sonner";
 import { getCirculationLog, archiveBorrowing, restoreBorrowing } from "../circulation.api";
 import type { CirculationLogEntry } from "../circulation.api";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAdminConfirmDialog } from "../../components/useAdminConfirmDialog";
 
 const statusConfig: Record<
   CirculationLogEntry["status"],
@@ -48,6 +49,7 @@ const CirculationLog = () => {
   const [loading,      setLoading]      = useState(false);
   const [showArchived, setShowArchived] = useState(false);  // ← NEW
   const [actionId,     setActionId]     = useState<number | null>(null); // tracks which row is mid-action
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   const debouncedSearch = useDebounce(search, 400);
 
@@ -82,7 +84,13 @@ const CirculationLog = () => {
 
   // ── Archive a returned borrowing record ───────────────────────────────────
   const handleArchive = async (row: CirculationLogEntry) => {
-    if (!confirm(`Archive this borrowing record for "${row.book_title}"? It can be restored later.`)) return;
+    const shouldArchive = await confirm({
+      title: `Archive "${row.book_title}" record?`,
+      description: "The borrowing record will be removed from the active circulation log until restored.",
+      actionLabel: "Archive Record",
+      tone: "danger",
+    });
+    if (!shouldArchive) return;
     setActionId(row.id);
     try {
       await archiveBorrowing(row.id);
@@ -98,7 +106,12 @@ const CirculationLog = () => {
 
   // ── Restore a soft-deleted borrowing record ───────────────────────────────
   const handleRestore = async (row: CirculationLogEntry) => {
-    if (!confirm(`Restore borrowing record for "${row.book_title}"?`)) return;
+    const shouldRestore = await confirm({
+      title: `Restore "${row.book_title}" record?`,
+      description: "The borrowing record will return to the active circulation log.",
+      actionLabel: "Restore Record",
+    });
+    if (!shouldRestore) return;
     setActionId(row.id);
     try {
       await restoreBorrowing(row.id);
@@ -116,6 +129,7 @@ const CirculationLog = () => {
 
   return (
     <div className="mt-8 space-y-0">
+      {confirmDialog}
 
       {/* ── Section header ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 border border-border border-b-0 px-5 py-3 bg-muted/30">
@@ -374,3 +388,4 @@ const CirculationLog = () => {
 };
 
 export default CirculationLog;
+

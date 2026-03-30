@@ -1,6 +1,6 @@
-import { CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock3, XCircle, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
-import type { AttendanceResult, AttendanceType, ScanMode } from "../types";
+import type { AttendanceResult, AttendanceNotice, AttendanceType } from "../types";
 import { AUTO_RESET_DELAY } from "../utils";
 
 // ─── Success ──────────────────────────────────────────────────────────────────
@@ -124,6 +124,81 @@ export const SuccessView = ({ result, onReset }: SuccessViewProps) => {
     </motion.div>
   );
 };
+
+interface NoticeViewProps {
+  notice: AttendanceNotice;
+  onReset: () => void;
+}
+
+export const NoticeView = ({ notice, onReset }: NoticeViewProps) => (
+  <motion.div
+    key="notice"
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -12 }}
+    transition={{ duration: 0.35 }}
+    className="w-full max-w-sm"
+  >
+    <div className="border border-border overflow-hidden">
+      <div className="bg-warning/10 border-b border-warning/20 px-8 py-6 flex items-center gap-4">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 220, delay: 0.1 }}
+        >
+          <Clock3 className="h-8 w-8 text-warning" />
+        </motion.div>
+        <div>
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning/70"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Attendance Status
+          </p>
+          <h2
+            className="text-base font-bold text-foreground tracking-tight"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            {notice.type === "check_in" ? "User already timed in" : "User already timed out"}
+          </h2>
+        </div>
+      </div>
+
+      <div className="bg-background divide-y divide-border">
+        <div className="flex items-center justify-between px-8 py-4">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Name
+          </span>
+          <span className="text-sm text-foreground">{notice.userName}</span>
+        </div>
+        <div className="flex items-center justify-between px-8 py-4">
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            ID
+          </span>
+          <span className="text-sm font-mono text-foreground">{notice.studentId}</span>
+        </div>
+        <div className="px-8 py-4">
+          <p className="text-sm text-muted-foreground">{notice.message}</p>
+        </div>
+      </div>
+
+      <button
+        onClick={onReset}
+        className="w-full border-t border-border bg-background py-3.5 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+        Scan Again
+      </button>
+    </div>
+  </motion.div>
+);
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 

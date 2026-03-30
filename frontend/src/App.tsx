@@ -4,8 +4,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { RoleProvider } from "@/hooks/use-role";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PasswordChangeGate from "@/components/auth/PasswordChangeGate";
+import SiteVisitTracker from "@/components/analytics/SiteVisitTracker";
 import ScrollToTop from "@/components/ScrollToTop";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -49,14 +50,15 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
-      <RoleProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <ScrollToTop />
-            <AuthProvider>
-              <Routes>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <ScrollToTop />
+          <AuthProvider>
+            <PasswordChangeGate />
+            <SiteVisitTracker />
+            <Routes>
 
                 {/* ── Public ── */}
                 <Route path="/"                        element={<Index />} />
@@ -116,11 +118,10 @@ const App = () => (
 
                 <Route path="*" element={<NotFound />} />
 
-              </Routes>
-            </AuthProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </RoleProvider>
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

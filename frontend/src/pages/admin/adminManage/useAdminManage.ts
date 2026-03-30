@@ -4,6 +4,7 @@ import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import type { FunctionType, User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
+import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 
 interface UseAdminManageReturn {
   // Mode
@@ -38,6 +39,7 @@ interface UseAdminManageReturn {
   handleUpdateUser:  () => Promise<void>;
   handleArchiveUser: () => Promise<void>;
   handleRestoreUser: () => Promise<void>;
+  confirmDialog: JSX.Element;
 
   // QR
   qrTarget:    QrTarget | null;
@@ -57,6 +59,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   useEffect(() => {
     if (!user) return;
@@ -183,7 +186,13 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // Sets is_active=0 and deleted_at=NOW(). One action, one outcome.
   const handleArchiveUser = async () => {
     if (!selectedUser) return;
-    if (!confirm(`Archive ${selectedUser.name}? They won't be able to log in and will be hidden from active searches. You can restore them later.`)) return;
+    const shouldArchive = await confirm({
+      title: `Archive ${selectedUser.name}?`,
+      description: "They will lose access to the system and disappear from active searches until restored.",
+      actionLabel: "Archive User",
+      tone: "danger",
+    });
+    if (!shouldArchive) return;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(
@@ -205,7 +214,12 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // Clears deleted_at and sets is_active=1. User is fully active again.
   const handleRestoreUser = async () => {
     if (!selectedUser) return;
-    if (!confirm(`Restore ${selectedUser.name}? They will be able to log in again.`)) return;
+    const shouldRestore = await confirm({
+      title: `Restore ${selectedUser.name}?`,
+      description: "They will be able to log in and appear in active searches again.",
+      actionLabel: "Restore User",
+    });
+    if (!shouldRestore) return;
     setLoading(true);
     try {
       const res = await axiosInstance.patch(
@@ -245,6 +259,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
+    confirmDialog,
     qrTarget,
     setQrTarget,
   };

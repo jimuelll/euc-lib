@@ -6,7 +6,7 @@ const { authMiddleware } = require("../auth/auth.middleware");
 const adminOnly = authMiddleware(["admin", "super_admin"]);
 
 // ── Public ────────────────────────────────────────────────────────────────────
-router.get("/subscriptions", controller.getPublicSubscriptions);
+router.get("/subscriptions", authMiddleware(), controller.getPublicSubscriptions);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 router.get(   "/admin/subscriptions",         adminOnly, controller.getAllSubscriptions);

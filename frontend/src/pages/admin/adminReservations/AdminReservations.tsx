@@ -17,6 +17,7 @@ const AdminReservations = () => {
     statusFilter,
     actionId,
     showArchived,
+    confirmDialog,
     handleSearchChange,
     handleStatusChange,
     handleToggleArchived,
@@ -45,6 +46,7 @@ const AdminReservations = () => {
         </Button>
       }
     >
+      {confirmDialog}
       {showArchived ? (
         <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           Showing archived records. Restore an item to return it to the active reservation list.

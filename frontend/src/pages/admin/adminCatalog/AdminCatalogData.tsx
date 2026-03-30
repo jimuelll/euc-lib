@@ -5,6 +5,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
+import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import { FormField, Book } from "./AdminCatalog.types";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
@@ -147,6 +148,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   const sortedFields = [...fields].sort((a, b) => a.order - b.order);
   const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
@@ -208,7 +210,13 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   const handleDeleteBook = async () => {
     if (!selectedBook) return;
-    if (!confirm(`Archive "${selectedBook.title}"? It can be restored later.`)) return;
+    const shouldDelete = await confirm({
+      title: `Archive "${selectedBook.title}"?`,
+      description: "The book will be hidden from active catalog management until it is restored.",
+      actionLabel: "Archive Book",
+      tone: "danger",
+    });
+    if (!shouldDelete) return;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
@@ -221,7 +229,12 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   // ── NEW: Restore a soft-deleted book ──────────────────────────────
   const handleRestoreBook = async (book: Book) => {
-    if (!confirm(`Restore "${book.title}"?`)) return;
+    const shouldRestore = await confirm({
+      title: `Restore "${book.title}"?`,
+      description: "This book will return to the active catalog list and can be edited again.",
+      actionLabel: "Restore Book",
+    });
+    if (!shouldRestore) return;
     setLoading(true);
     try {
       const res = await axiosInstance.post(`api/admin/books/${book.id}/restore`);
@@ -242,6 +255,7 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   return (
     <>
+      {confirmDialog}
       {copiesBook && (
         <BookCopiesModal
           bookId={copiesBook.id}
@@ -310,6 +324,7 @@ const AdminCatalogData = ({ fields }: Props) => {
       {/* ── Edit / Search / Delete ─────────────────────────────────── */}
       {catalogMode === "edit" && (
         <>
+      {confirmDialog}
           {/* Search bar + archived toggle */}
           <div className="mt-5 flex gap-0 border border-border">
             <div className="relative flex-1">
@@ -489,3 +504,4 @@ const AdminCatalogData = ({ fields }: Props) => {
 };
 
 export default AdminCatalogData;
+

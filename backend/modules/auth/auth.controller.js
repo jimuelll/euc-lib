@@ -1,4 +1,8 @@
 const { changePassword } = require("./auth.service");
+const {
+  getRememberMeFromCookies,
+  setRefreshAuthCookies,
+} = require("./auth.cookies");
 
 async function handleChangePassword(req, res) {
   try {
@@ -9,11 +13,14 @@ async function handleChangePassword(req, res) {
       return res.status(400).json({ message: "Both old and new password are required" });
     }
 
-    const result = await changePassword(userId, oldPassword, newPassword);
+    const rememberMe = getRememberMeFromCookies(req);
+    const result = await changePassword(userId, oldPassword, newPassword, rememberMe);
+
+    setRefreshAuthCookies(res, result.refreshToken, rememberMe);
 
     res.json({
+      accessToken: result.token,
       token: result.token,
-      refreshToken: result.refreshToken,
       message: result.message,
     });
   } catch (err) {

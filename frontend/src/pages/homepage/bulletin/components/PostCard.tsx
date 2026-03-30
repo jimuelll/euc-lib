@@ -146,11 +146,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
               }`}
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <span
-                className={`inline-block w-[5px] h-[5px] shrink-0 transition-colors ${
-                  post.liked_by_me ? "bg-warning" : "bg-border"
-                }`}
-              />
+              <Heart className={`h-3 w-3 transition-all duration-150 ${post.liked_by_me ? "fill-current text-primary" : ""}`} />
               {post.likes}
             </span>
 

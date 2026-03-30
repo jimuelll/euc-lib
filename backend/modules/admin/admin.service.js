@@ -9,6 +9,12 @@ const roleHierarchy = {
   staff: ["staff", "scanner", "student"],
 };
 
+const searchRoleHierarchy = {
+  super_admin: ["super_admin", "admin", "staff", "scanner", "student"],
+  admin: ["admin", "staff", "scanner", "student"],
+  staff: ["student"],
+};
+
 // CREATE USER
 async function createUser({ student_employee_id, name, role, password, address, contact }, creatorRole) {
   if (!roleHierarchy[creatorRole]?.includes(role)) {
@@ -159,11 +165,18 @@ async function updateUser(student_employee_id, updates, requesterRole) {
 }
 
 // SEARCH USERS
-async function searchUsers(query) {
+async function searchUsers(query, requesterRole) {
+  const allowedRoles = searchRoleHierarchy[requesterRole];
+  if (!allowedRoles?.length) {
+    throw new Error("You are not allowed to search users");
+  }
+
   const showArchived = query.archived === "true";
   let sql = `SELECT student_employee_id, name, role, is_active, address, contact, deleted_at
              FROM users WHERE deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`;
-  const values = [];
+  const values = [...allowedRoles];
+
+  sql += ` AND role IN (${allowedRoles.map(() => "?").join(", ")})`;
 
   if (query.student_employee_id && query.name) {
     sql += " AND (student_employee_id = ? OR name LIKE ?)";
@@ -180,6 +193,9 @@ async function searchUsers(query) {
   }
 
   if (query.role) {
+    if (!allowedRoles.includes(query.role)) {
+      return [];
+    }
     sql += " AND role = ?";
     values.push(query.role);
   }

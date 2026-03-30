@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
+import { useAuth } from "@/context/AuthContext";
 import { toPost } from "../utils";
 import type { BulletinPost } from "../types";
 
@@ -25,6 +26,7 @@ export function useBulletinPosts({
   limit = 4,
   autoFetch = true,
 }: UseBulletinPostsOptions = {}): UseBulletinPostsReturn {
+  const { loading: authLoading } = useAuth();
   const [posts, setPosts]             = useState<BulletinPost[]>([]);
   const [loading, setLoading]         = useState(autoFetch);
   const [error, setError]             = useState<string | null>(null);
@@ -48,8 +50,9 @@ export function useBulletinPosts({
   }, [limit]);
 
   useEffect(() => {
-    if (autoFetch) fetchPosts(currentPage);
-  }, [currentPage, fetchPosts, autoFetch]);
+    if (!autoFetch || authLoading) return;
+    fetchPosts(currentPage);
+  }, [currentPage, fetchPosts, autoFetch, authLoading]);
 
   const updatePost = useCallback(
     (id: number, patch: Partial<BulletinPost>) => {

@@ -6,9 +6,9 @@ import Footer from "@/components/Footer";
 
 import IdleView from "./components/IdleView";
 import ScanningView from "./components/ScanningView";
-import { SuccessView, ErrorView } from "./components/ResultView";
-import type { ScanMode, AttendanceType, AttendanceResult } from "./types";
-import { postAttendanceScan, AUTO_RESET_DELAY } from "./utils";
+import { SuccessView, NoticeView, ErrorView } from "./components/ResultView";
+import type { ScanMode, AttendanceType, AttendanceResult, AttendanceNotice } from "./types";
+import { postAttendanceScan, AttendanceScanError, AUTO_RESET_DELAY } from "./utils";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,7 @@ const ScanQR = () => {
   const [scanMode, setScanMode] = useState<ScanMode>("idle");
   const [attendanceType, setAttendanceType] = useState<AttendanceType>("check_in");
   const [result, setResult] = useState<AttendanceResult | null>(null);
+  const [notice, setNotice] = useState<AttendanceNotice | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
   // Ref-based processing guard prevents rapid double-scans from slipping through
@@ -46,6 +47,7 @@ const ScanQR = () => {
     isProcessingRef.current = false;
     setScanMode("idle");
     setResult(null);
+    setNotice(null);
     setErrorMsg("");
   };
 
@@ -56,6 +58,7 @@ const ScanQR = () => {
 
       setScanMode("processing");
       setErrorMsg("");
+      setNotice(null);
 
       try {
         const data = await postAttendanceScan(scannedId.trim(), attendanceType);
@@ -67,8 +70,23 @@ const ScanQR = () => {
         });
         setScanMode("success");
       } catch (err: unknown) {
-        setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred");
-        setScanMode("error");
+        if (
+          err instanceof AttendanceScanError &&
+          (err.code === "ALREADY_TIMED_IN" || err.code === "ALREADY_TIMED_OUT") &&
+          err.user &&
+          err.type
+        ) {
+          setNotice({
+            type: err.type,
+            userName: err.user.name,
+            studentId: err.user.student_employee_id,
+            message: err.message,
+          });
+          setScanMode("notice");
+        } else {
+          setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred");
+          setScanMode("error");
+        }
       } finally {
         isProcessingRef.current = false;
       }
@@ -138,6 +156,10 @@ const ScanQR = () => {
 
             {scanMode === "success" && result && (
               <SuccessView key="success" result={result} onReset={reset} />
+            )}
+
+            {scanMode === "notice" && notice && (
+              <NoticeView key="notice" notice={notice} onReset={reset} />
             )}
 
             {scanMode === "error" && (

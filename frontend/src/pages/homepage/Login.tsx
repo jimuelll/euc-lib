@@ -1,28 +1,38 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, HelpCircle } from "lucide-react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe]     = useState(false);
-  const [id, setId]                     = useState("");
-  const [password, setPassword]         = useState("");
-  const [error, setError]               = useState("");
-  const [loading, setLoading]           = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!id || !password) { setError("Please fill in all fields."); return; }
+    if (!id || !password) {
+      setError("Please fill in all fields.");
+      return;
+    }
     setLoading(true);
     try {
-      await login(id, password);
+      await login(id, password, rememberMe);
     } catch (err: any) {
       setError(err.message || "Login failed.");
     } finally {
@@ -36,11 +46,7 @@ const Login = () => {
 
       <main className="bg-background">
         <div className="container px-4 sm:px-6 py-16 md:py-24 flex items-start justify-center">
-
-          {/* ── Login panel ── */}
           <div className="w-full max-w-sm">
-
-            {/* Panel header band — same primary-band grammar */}
             <div className="bg-primary relative overflow-hidden">
               <div className="h-[3px] w-full bg-warning" />
               <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
@@ -74,10 +80,7 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Form body */}
             <div className="border border-border border-t-0 divide-y divide-border bg-card">
-
-              {/* ID Number field */}
               <div className="px-6 pt-5 pb-4">
                 <label
                   className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
@@ -97,7 +100,6 @@ const Login = () => {
                 />
               </div>
 
-              {/* Password field */}
               <div className="px-6 pt-4 pb-5">
                 <div className="flex items-center justify-between mb-2">
                   <label
@@ -108,9 +110,8 @@ const Login = () => {
                     Password <span className="text-destructive">*</span>
                   </label>
 
-                  {/* Forgot password — hover card */}
-                  <HoverCard>
-                    <HoverCardTrigger asChild>
+                  <Dialog>
+                    <DialogTrigger asChild>
                       <button
                         type="button"
                         className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-primary transition-colors"
@@ -119,19 +120,44 @@ const Login = () => {
                         Forgot?
                         <HelpCircle className="h-3 w-3" />
                       </button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="w-64 border-border shadow-lg" style={{ borderRadius: 0 }}>
-                      <p
-                        className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground mb-1.5"
-                        style={{ fontFamily: "var(--font-heading)" }}
-                      >
-                        Password Reset
-                      </p>
-                      <p className="text-[12px] text-muted-foreground leading-relaxed">
-                        Visit the library front desk with a valid school ID to reset your password.
-                      </p>
-                    </HoverCardContent>
-                  </HoverCard>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-sm rounded-none border-border bg-card p-0 shadow-2xl">
+                      <div className="bg-primary relative overflow-hidden px-6 py-5">
+                        <div className="absolute inset-x-0 top-0 h-[3px] bg-warning" />
+                        <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
+                        <div
+                          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                          style={{
+                            backgroundImage:
+                              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
+                          }}
+                        />
+                        <DialogHeader className="relative z-10 space-y-3 text-left">
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            Account Help
+                          </span>
+                          <DialogTitle
+                            className="text-xl font-bold tracking-tight text-primary-foreground"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                          >
+                            Password Reset
+                          </DialogTitle>
+                          <DialogDescription className="text-sm leading-6 text-primary-foreground/70">
+                            Visit the library front desk with a valid school ID to reset your password.
+                          </DialogDescription>
+                        </DialogHeader>
+                      </div>
+
+                      <div className="px-6 py-5 border-t border-border bg-background">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          Staff will verify your identity and issue a new temporary password for your account.
+                        </p>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 <div className="relative">
@@ -155,10 +181,8 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Remember me */}
               <div className="px-6 py-3 flex items-center justify-between bg-muted/30">
                 <label className="flex items-center gap-2.5 cursor-pointer group">
-                  {/* Sharp custom checkbox */}
                   <div className="relative flex items-center">
                     <input
                       type="checkbox"
@@ -167,9 +191,7 @@ const Login = () => {
                       className="peer sr-only"
                       id="remember-me"
                     />
-                    <div
-                      className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center"
-                    >
+                    <div className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
                       {rememberMe && (
                         <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 10" fill="none">
                           <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
@@ -186,7 +208,6 @@ const Login = () => {
                 </label>
               </div>
 
-              {/* Error state */}
               {error && (
                 <div className="flex gap-0">
                   <div className="w-[3px] bg-destructive shrink-0" />
@@ -199,7 +220,6 @@ const Login = () => {
                 </div>
               )}
 
-              {/* Submit — full-width footer button */}
               <button
                 type="submit"
                 onClick={handleLogin}
@@ -210,7 +230,7 @@ const Login = () => {
                 {loading ? (
                   <>
                     <span className="inline-block h-3.5 w-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
-                    Signing In…
+                    Signing In...
                   </>
                 ) : (
                   "Sign In"
@@ -218,7 +238,6 @@ const Login = () => {
               </button>
             </div>
 
-            {/* Back link */}
             <div className="mt-5 flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />
               <Link
@@ -226,11 +245,10 @@ const Login = () => {
                 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
-                ← Back to Home
+                Back to Home
               </Link>
               <div className="flex-1 h-px bg-border" />
             </div>
-
           </div>
         </div>
       </main>

@@ -1,15 +1,7 @@
 const db = require("../../db");
+const { syncOverdueBorrowings } = require("./overdue.helper");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const syncOverdue = async () => {
-  await db.query(
-    `UPDATE borrowings
-     SET status = 'overdue'
-     WHERE status = 'borrowed'
-       AND due_date < CURDATE()`
-  );
-};
 
 const borrowedCopies = async (bookId, conn = db) => {
   const [rows] = await conn.query(
@@ -23,7 +15,7 @@ const borrowedCopies = async (bookId, conn = db) => {
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 const getActiveBorrows = async (userId) => {
-  await syncOverdue();
+  await syncOverdueBorrowings();
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
             b.borrowed_at, b.due_date, b.status, b.notes,
@@ -58,7 +50,7 @@ const getBorrowHistory = async (userId) => {
  * Catalogue search — includes live availability calculated from book_copies.
  */
 const searchCatalogueWithAvailability = async (query) => {
-  await syncOverdue();
+  await syncOverdueBorrowings();
   const like = `%${query}%`;
   const [rows] = await db.query(
     `SELECT
@@ -336,7 +328,7 @@ const adminRestoreBorrowing = async (borrowingId) => {
  * Admin: list borrowings with optional archived filter + search.
  */
 const adminGetBorrowings = async ({ search = "", status, showArchived = false, page = 1, limit = 20 }) => {
-  await syncOverdue();
+  await syncOverdueBorrowings();
 
   const offset     = (page - 1) * limit;
   const conditions = [`b.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`];

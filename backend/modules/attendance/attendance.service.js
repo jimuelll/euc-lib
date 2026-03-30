@@ -59,10 +59,23 @@ const recordScan = async ({ scannedId, type, scannedBy, ipAddress }) => {
 
     // Prevent duplicate consecutive check-in / check-out
     if (lastLog?.type === type) {
-      const label = type === "check_in" ? "already checked in" : "not checked in";
+      const isCheckIn = type === "check_in";
       throw Object.assign(
-        new Error(`This user is ${label}. Please scan the correct action.`),
-        { status: 409 }
+        new Error(
+          isCheckIn
+            ? `${user.name} is already timed in for today.`
+            : `${user.name} is already timed out for today.`
+        ),
+        {
+          status: 409,
+          code: isCheckIn ? "ALREADY_TIMED_IN" : "ALREADY_TIMED_OUT",
+          user: {
+            id: user.id,
+            name: user.name,
+            student_employee_id: user.student_employee_id,
+          },
+          type,
+        }
       );
     }
 

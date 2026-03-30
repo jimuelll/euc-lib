@@ -15,9 +15,6 @@ const ProtectedRoute = ({ children, roles = [] }: Props) => {
   // Not logged in
   if (!user) return <Navigate to="/login" replace />;
 
-  // Logged in but must change password — lock them here no matter what
-  if (user.must_change_password) return <Navigate to="/change-password" replace />;
-
   // Role check
   if (roles.length && !roles.includes(user.role)) return <Navigate to="/" replace />;
 
@@ -25,3 +22,4 @@ const ProtectedRoute = ({ children, roles = [] }: Props) => {
 };
 
 export default ProtectedRoute;
+

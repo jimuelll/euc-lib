@@ -6,14 +6,16 @@ const {
   validateSchemaPayload,
   validateBookId,
   validateBarcode,
+  validateCreateBookPayload,
+  validateUpdateBookPayload,
 } = require("./catalog.middleware");
 
 router.get   ("/catalog-schema",                                          controller.getSchema);
 router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",                                                   controller.getBooks);
-router.post  ("/books",          requireAdminRole,                        controller.createBook);
-router.put   ("/books/:id",      requireAdminRole, validateBookId,        controller.updateBook);
+router.post  ("/books",          requireAdminRole, validateCreateBookPayload,           controller.createBook);
+router.put   ("/books/:id",      requireAdminRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireAdminRole, validateBookId,        controller.deleteBook);
 
 router.get   ("/books/:id/copies",           requireAdminRole, validateBookId,  controller.getBookCopies);

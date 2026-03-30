@@ -4,10 +4,19 @@ import { UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useRole } from "@/hooks/use-role";
+import { useAuth } from "@/context/AuthContext";
 
 const EditProfile = () => {
-  const { userName, userInitials } = useRole();
+  const { user } = useAuth();
+
+  const userName = user?.name ?? "Library User";
+  const userInitials = userName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-background">

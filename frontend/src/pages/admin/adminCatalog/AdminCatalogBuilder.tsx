@@ -9,6 +9,7 @@ import {
   SelectItem,
 } from "@/components/ui";
 import { toast } from "@/components/ui/sonner";
+import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import {
   Trash2, Plus, Pencil, X, Check,
   Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp,
@@ -70,6 +71,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const [editingLabel,      setEditingLabel]      = useState("");
   const [saving,            setSaving]            = useState(false);
   const [showArchivedPanel, setShowArchivedPanel] = useState(false);
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   // Only non-locked, non-archived fields count toward the cap
   const activeCustomFields = fields.filter((f) => !f.locked && !f.archived);
@@ -127,8 +129,14 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     setNewFieldPublic(true);
   };
 
-  const handleDeleteField = (key: string) => {
-    if (!confirm("Remove this field? Existing data in book records is kept — the field can be restored later.")) return;
+  const handleDeleteField = async (key: string) => {
+    const shouldDelete = await confirm({
+      title: "Archive this field?",
+      description: "Existing data in book records will be kept, and you can restore the field later.",
+      actionLabel: "Archive Field",
+      tone: "danger",
+    });
+    if (!shouldDelete) return;
     saveSchema(fields.map((f) => (f.key === key ? { ...f, archived: true } : f)));
   };
 
@@ -163,6 +171,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 
   return (
     <div className="mt-6 border border-border flex flex-col">
+      {confirmDialog}
 
       {/* ── Two-column: current fields + add new field ────────────────── */}
       <div className="grid lg:grid-cols-2">
@@ -538,3 +547,4 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 };
 
 export default AdminCatalogBuilder;
+

@@ -21,7 +21,12 @@ const scan = async (req, res) => {
     res.status(201).json(result);
   } catch (err) {
     console.error("[attendance] scan:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to record attendance" });
+    res.status(err.status ?? 500).json({
+      message: err.message ?? "Failed to record attendance",
+      code: err.code,
+      user: err.user,
+      type: err.type,
+    });
   }
 };
 

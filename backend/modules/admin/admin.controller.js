@@ -48,7 +48,7 @@ async function handleUpdateUser(req, res) {
 // SEARCH
 async function handleSearchUsers(req, res) {
   try {
-    const result = await searchUsers(req.query);
+    const result = await searchUsers(req.query, req.user.role);
     res.json(result);
   } catch (err) {
     res.status(400).json({ message: err.message });
