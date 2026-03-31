@@ -99,8 +99,8 @@ const cancelReservationAdmin = async (req, res) => {
     if (target) {
       await notificationsService.createNotification({
         type: "reservation_cancelled",
-        title: "Reservation cancelled",
-        body: `Your reservation for ${target.title} was cancelled by the library staff.`,
+        title: "Reservation rejected",
+        body: `Your reservation for ${target.title} was rejected by the library staff.`,
         href: "/services/borrowing",
         audienceType: "user",
         audienceUserId: target.user_id,

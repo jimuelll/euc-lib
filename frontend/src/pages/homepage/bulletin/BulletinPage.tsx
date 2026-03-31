@@ -147,16 +147,6 @@ export function BulletinPage() {
 
       <main className="bg-background">
         <div className="container px-4 sm:px-6 py-10">
-          <div className="flex gap-0 border border-primary/20 bg-primary/[0.03] mb-10">
-            <div className="w-[3px] bg-warning shrink-0" />
-            <p
-              className="px-4 py-3 text-[11px] text-primary/70 leading-relaxed"
-              style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
-            >
-              Please comment responsibly. All interactions are subject to school rules and policies.
-            </p>
-          </div>
-
           <div className="flex flex-col lg:flex-row lg:items-start gap-8">
             <div className="flex-1 min-w-0">
               <div className="mb-6 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">

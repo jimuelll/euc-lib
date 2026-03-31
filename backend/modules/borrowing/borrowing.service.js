@@ -4,6 +4,7 @@ const {
   mapBorrowingsWithFineDetails,
   syncOverdueBorrowings,
 } = require("./overdue.helper");
+const notificationsService = require("../notifications/notifications.service");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,22 @@ const getActiveBorrowingByCopyBarcode = async (barcode) => {
   return row ?? null;
 };
 
+const getBorrowingNotificationTarget = async (borrowingId, conn = db) => {
+  const [[row]] = await conn.query(
+    `SELECT
+       b.id,
+       b.user_id,
+       bk.title
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     WHERE b.id = ?
+     LIMIT 1`,
+    [borrowingId]
+  );
+
+  return row ?? null;
+};
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 /**
@@ -218,6 +235,26 @@ const borrowBook = async (
     const borrowingId = result.insertId;
 
     await conn.commit();
+
+    const target = await getBorrowingNotificationTarget(borrowingId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "borrowing_created",
+        title: "Book borrowed successfully",
+        body: `You borrowed "${target.title}". Please return it on or before ${new Date(dueDate).toLocaleString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })}.`,
+        href: "/my-library",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: issuedBy ?? null,
+      });
+    }
+
     return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate };
   } catch (err) {
     await conn.rollback();
@@ -255,6 +292,19 @@ const returnBook = async (borrowingId, userId) => {
     );
 
     await conn.commit();
+
+    const target = await getBorrowingNotificationTarget(borrowingId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "borrowing_returned",
+        title: "Book return recorded",
+        body: `Your return for "${target.title}" has been recorded successfully.`,
+        href: "/my-library",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: userId ?? null,
+      });
+    }
   } catch (err) {
     await conn.rollback();
     throw err;

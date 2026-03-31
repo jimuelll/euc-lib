@@ -506,12 +506,15 @@ export function PostModal({
                 </div>
               )}
 
-              <p
-                className="text-[10px] text-muted-foreground/50"
-                style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
-              >
-                Comments are subject to school community guidelines.
-              </p>
+              <div className="flex gap-0 border border-warning/30 bg-warning/10">
+                <div className="w-[3px] bg-warning shrink-0" />
+                <p
+                  className="px-3 py-2 text-[11px] leading-relaxed text-foreground/80"
+                  style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
+                >
+                  Please comment responsibly. All interactions are subject to school rules and policies.
+                </p>
+              </div>
 
               <div className="flex gap-0 border border-border">
                 <div className="w-10 shrink-0 flex items-center justify-center border-r border-border bg-muted/30">

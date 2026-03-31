@@ -1,8 +1,38 @@
 const db = require("../../db");
+const notificationsService = require("../notifications/notifications.service");
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const getReservationNotificationTarget = async (reservationId, conn = db) => {
+  const [[row]] = await conn.query(
+    `SELECT
+       r.id,
+       r.user_id,
+       bk.title
+     FROM reservations r
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     WHERE r.id = ?
+     LIMIT 1`,
+    [reservationId]
+  );
+
+  return row ?? null;
+};
 
 const syncExpired = async () => {
+  const [expiredRows] = await db.query(
+    `SELECT
+       r.id,
+       r.user_id,
+       bk.title
+     FROM reservations r
+     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     WHERE r.status = 'pending'
+       AND r.expires_at IS NOT NULL
+       AND r.expires_at < NOW()
+       AND r.deleted_at IS NULL`
+  );
+
+  if (!expiredRows.length) return;
+
   await db.query(
     `UPDATE reservations
      SET status = 'expired'
@@ -11,9 +41,18 @@ const syncExpired = async () => {
        AND expires_at < NOW()
        AND deleted_at IS NULL`
   );
-};
 
-// ─── User reads ───────────────────────────────────────────────────────────────
+  for (const row of expiredRows) {
+    await notificationsService.createNotification({
+      type: "reservation_expired",
+      title: "Reservation expired",
+      body: `Your reservation for ${row.title} expired before pickup.`,
+      href: "/services/borrowing",
+      audienceType: "user",
+      audienceUserId: row.user_id,
+    });
+  }
+};
 
 const getActiveReservations = async (userId) => {
   await syncExpired();
@@ -74,8 +113,6 @@ const searchCatalogue = async (query) => {
   return rows;
 };
 
-// ─── User mutations ───────────────────────────────────────────────────────────
-
 const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
   const conn = await db.getConnection();
   try {
@@ -111,6 +148,19 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
     );
 
     await conn.commit();
+
+    const target = await getReservationNotificationTarget(result.insertId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "reservation_created",
+        title: "Reservation placed",
+        body: `Your reservation for ${target.title} has been placed and is pending library processing.`,
+        href: "/services/borrowing",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+      });
+    }
+
     return { reservationId: result.insertId, expiresAt: expiresAtStr };
   } catch (err) {
     await conn.rollback();
@@ -152,8 +202,6 @@ const cancelReservation = async (reservationId, userId) => {
   }
 };
 
-// ─── Admin reads ──────────────────────────────────────────────────────────────
-
 const getAdminReservations = async ({
   search,
   status,
@@ -164,9 +212,9 @@ const getAdminReservations = async ({
 }) => {
   await syncExpired();
 
-  const offset     = (page - 1) * limit;
+  const offset = (page - 1) * limit;
   const conditions = ["r.deleted_at IS NULL"];
-  const params     = [];
+  const params = [];
 
   if (status && status !== "all") {
     conditions.push("r.status = ?");
@@ -253,8 +301,6 @@ const getAdminReservations = async ({
     },
   };
 };
-
-// ─── Admin mutations ──────────────────────────────────────────────────────────
 
 const markReservationReady = async (reservationId) => {
   const conn = await db.getConnection();

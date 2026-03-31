@@ -1,5 +1,22 @@
 const db = require("../../db");
 const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
+const notificationsService = require("../notifications/notifications.service");
+
+const getBorrowingNotificationTarget = async (borrowingId, conn = db) => {
+  const [[row]] = await conn.query(
+    `SELECT
+       b.id,
+       b.user_id,
+       bk.title
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     WHERE b.id = ?
+     LIMIT 1`,
+    [borrowingId]
+  );
+
+  return row ?? null;
+};
 
 const lookupUser = async (studentEmployeeId) => {
   const [[user]] = await db.query(
@@ -85,6 +102,26 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
     );
 
     await conn.commit();
+
+    const target = await getBorrowingNotificationTarget(result.insertId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "borrowing_created",
+        title: "Book borrowed successfully",
+        body: `You borrowed "${target.title}". Please return it on or before ${new Date(dueDate).toLocaleString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })}.`,
+        href: "/my-library",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: issuedBy ?? null,
+      });
+    }
+
     return { message: "Book borrowed successfully", borrowingId: result.insertId };
   } catch (err) {
     await conn.rollback();
@@ -96,7 +133,7 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
 
 const processReturn = async (borrowingId) => {
   const [[row]] = await db.query(
-    "SELECT id, status FROM borrowings WHERE id = ?",
+    "SELECT id, status, user_id FROM borrowings WHERE id = ?",
     [borrowingId]
   );
   if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
@@ -108,6 +145,19 @@ const processReturn = async (borrowingId) => {
     `UPDATE borrowings SET status = 'returned', returned_at = NOW() WHERE id = ?`,
     [borrowingId]
   );
+
+  const target = await getBorrowingNotificationTarget(borrowingId);
+  if (target) {
+    await notificationsService.createNotification({
+      type: "borrowing_returned",
+      title: "Book return recorded",
+      body: `Your return for "${target.title}" has been recorded successfully.`,
+      href: "/my-library",
+      audienceType: "user",
+      audienceUserId: target.user_id,
+      createdBy: null,
+    });
+  }
 };
 
 const processRenew = async ({ borrowingId, dueDate }) => {
@@ -124,6 +174,25 @@ const processRenew = async ({ borrowingId, dueDate }) => {
     `UPDATE borrowings SET due_date = ?, status = 'borrowed' WHERE id = ?`,
     [dueDate, borrowingId]
   );
+
+  const target = await getBorrowingNotificationTarget(borrowingId);
+  if (target) {
+    await notificationsService.createNotification({
+      type: "borrowing_renewed",
+      title: "Book renewal recorded",
+      body: `Your borrowing for "${target.title}" has been renewed. New due date: ${new Date(dueDate).toLocaleString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`,
+      href: "/my-library",
+      audienceType: "user",
+      audienceUserId: target.user_id,
+      createdBy: null,
+    });
+  }
 
   return { message: "Book renewed successfully", dueDate };
 };

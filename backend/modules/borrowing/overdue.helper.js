@@ -3,6 +3,7 @@ const notificationsService = require("../notifications/notifications.service");
 const { getSettings, getHolidayDateSet } = require("../librarySettings/librarySettings.service");
 
 const HOUR_MS = 60 * 60 * 1000;
+const OVERDUE_REMINDER_INTERVAL_MS = 24 * HOUR_MS;
 
 const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
@@ -102,7 +103,11 @@ const syncOverdueBorrowings = async (conn = db) => {
       );
     }
 
-    if (!row.last_overdue_notification_at) {
+    const shouldNotifyAgain =
+      !row.last_overdue_notification_at ||
+      (Date.now() - new Date(row.last_overdue_notification_at).getTime()) >= OVERDUE_REMINDER_INTERVAL_MS;
+
+    if (shouldNotifyAgain) {
       await notificationsService.createNotification({
         type: "overdue_fine",
         title: "Borrowed book is overdue",
