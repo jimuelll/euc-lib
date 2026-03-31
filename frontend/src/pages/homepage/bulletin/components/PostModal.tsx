@@ -260,7 +260,7 @@ export function PostModal({
     <>
       <Dialog open={!!post} onOpenChange={onClose}>
         <DialogContent
-          className="[&>button]:hidden w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
+          className="[&>button]:hidden w-[calc(100vw-1rem)] max-w-2xl max-h-[92dvh] overflow-x-hidden overflow-y-auto p-0 gap-0 border-border shadow-2xl sm:w-[calc(100vw-2rem)]"
           style={{ borderRadius: 0 }}
         >
           <div className="bg-primary relative overflow-hidden shrink-0">
@@ -273,13 +273,13 @@ export function PostModal({
                   "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
               }}
             />
-            <div className="relative z-10 flex items-start justify-between gap-4 px-5 py-4">
+            <div className="relative z-10 flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5">
               <div className="flex-1 min-w-0">
                 <ModalSectionLabel>Bulletin Board</ModalSectionLabel>
 
                 <DialogHeader className="mt-2">
                   <DialogTitle
-                    className="text-base sm:text-lg font-bold leading-snug text-primary-foreground pr-4"
+                    className="break-words pr-0 text-base font-bold leading-snug text-primary-foreground sm:pr-4 sm:text-lg"
                     style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em" }}
                   >
                     {post.title}
@@ -312,7 +312,7 @@ export function PostModal({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex flex-wrap items-center justify-end gap-1 shrink-0 sm:flex-nowrap">
                 {canPin && (
                   <button
                     onClick={handlePin}
@@ -408,7 +408,7 @@ export function PostModal({
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
-                className={`flex flex-1 items-center justify-center gap-2.5 py-3 border-r border-border text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 py-3 border-r border-border px-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
                   liked
                     ? "bg-primary/[0.04] text-primary"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -421,7 +421,7 @@ export function PostModal({
               </button>
 
               <div
-                className="flex flex-1 items-center justify-center gap-2.5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                className="flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 <MessageCircle className="h-3.5 w-3.5" />

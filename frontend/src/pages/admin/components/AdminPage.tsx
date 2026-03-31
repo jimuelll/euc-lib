@@ -88,7 +88,7 @@ export function AdminPanel({
   const hasHeader = title || description || actions;
 
   return (
-    <Card className={cn("border-border/80 shadow-none", className)}>
+    <Card className={cn("min-w-0 border-border/80 shadow-none", className)}>
       {hasHeader ? (
         <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-muted/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">

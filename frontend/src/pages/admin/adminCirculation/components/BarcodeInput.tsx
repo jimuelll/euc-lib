@@ -32,14 +32,14 @@ const BarcodeInput = ({
     <div className="space-y-3">
 
       {/* ── Input row ──────────────────────────────────────────────── */}
-      <div className="flex gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors">
+      <div className="flex flex-wrap gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors sm:flex-nowrap">
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSubmit())}
           placeholder={placeholder}
           disabled={disabled || scanning}
-          className={`flex-1 h-9 px-3.5 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none disabled:opacity-50 transition-colors ${
+          className={`h-9 min-w-0 basis-full px-3.5 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none disabled:opacity-50 transition-colors sm:basis-auto sm:flex-1 ${
             success ? "bg-success/5" : ""
           }`}
         />
@@ -50,7 +50,7 @@ const BarcodeInput = ({
           disabled={disabled || loading}
           onClick={() => setScanning((s) => !s)}
           title={scanning ? "Stop scanning" : "Scan QR code"}
-          className={`flex items-center justify-center h-9 w-9 border-l border-border shrink-0 transition-colors ${
+          className={`flex h-9 flex-1 items-center justify-center border-t border-border transition-colors sm:w-9 sm:flex-none sm:border-l sm:border-t-0 ${
             scanning
               ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
               : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/40"
@@ -64,7 +64,7 @@ const BarcodeInput = ({
           type="button"
           disabled={disabled || loading || !value.trim() || scanning}
           onClick={onSubmit}
-          className="flex items-center justify-center h-9 w-9 border-l border-border bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 disabled:opacity-40 transition-colors"
+          className="flex h-9 flex-1 items-center justify-center border-l border-t border-border bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 sm:w-9 sm:flex-none sm:border-t-0"
         >
           {loading
             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -75,10 +75,10 @@ const BarcodeInput = ({
 
       {/* ── Success indicator ──────────────────────────────────────── */}
       {success && (
-        <div className="flex items-center gap-2 text-success">
+        <div className="flex items-start gap-2 text-success">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
           <span
-            className="text-[10px] font-bold uppercase tracking-[0.15em]"
+            className="break-words text-[10px] font-bold uppercase tracking-[0.15em]"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             QR code scanned successfully
@@ -89,7 +89,7 @@ const BarcodeInput = ({
       {/* ── Scanner viewport ───────────────────────────────────────── */}
       {scanning && (
         <div className="flex flex-col items-center gap-2">
-          <div className="relative w-64 h-64 bg-black overflow-hidden border border-border">
+          <div className="relative aspect-square w-full max-w-[16rem] bg-black overflow-hidden border border-border">
             <video
               ref={videoRef}
               className="w-full h-full object-cover"

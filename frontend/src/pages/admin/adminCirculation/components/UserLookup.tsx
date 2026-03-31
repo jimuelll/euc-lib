@@ -52,7 +52,7 @@ const UserLookup = ({
         {/* Gold left accent — user confirmed */}
         <div className="w-[3px] shrink-0 bg-warning/60" />
 
-        <div className="flex-1 flex items-center justify-between gap-3 px-4 py-3 bg-card">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p
               className="text-[13px] font-bold text-foreground truncate leading-tight"
@@ -65,7 +65,7 @@ const UserLookup = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
             {type === "return" && activeBorrows.length > 0 && (
               <div className="text-right">
                 <p

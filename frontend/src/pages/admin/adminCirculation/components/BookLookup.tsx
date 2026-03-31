@@ -43,9 +43,9 @@ const BookLookup = ({
         {/* Status accent bar */}
         <div className={`w-[3px] shrink-0 ${foundCopy.is_active ? "bg-success/60" : "bg-destructive/50"}`} />
 
-        <div className="flex-1 px-4 py-3 space-y-2 bg-card">
+        <div className="min-w-0 flex-1 space-y-2 bg-card px-4 py-3">
           {/* Title + barcode */}
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div className="min-w-0">
               <p
                 className="text-[13px] font-bold text-foreground truncate leading-tight"
@@ -58,8 +58,8 @@ const BookLookup = ({
                 {foundCopy.author}
               </p>
             </div>
-            <div className="text-right shrink-0">
-              <p className="font-mono text-[11px] text-muted-foreground/60">{foundCopy.barcode}</p>
+            <div className="min-w-0 text-left sm:shrink-0 sm:text-right">
+              <p className="break-all font-mono text-[11px] text-muted-foreground/60">{foundCopy.barcode}</p>
               <p className={`mt-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${
                 foundCopy.is_active ? "text-success" : "text-destructive"
               }`} style={{ fontFamily: "var(--font-heading)" }}>

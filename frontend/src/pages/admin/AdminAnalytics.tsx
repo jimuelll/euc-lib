@@ -216,10 +216,10 @@ const AdminAnalytics = () => {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <AdminPanel title="Site Traffic Trend" description="Unique visitors and total tracked hits over the last seven days.">
-          <ChartContainer className="h-[280px] w-full" config={{ unique_visitors: { label: "Unique Visitors", color: "#7f1d1d" }, visit_hits: { label: "Visit Hits", color: "#b45309" } }}>
+          <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ unique_visitors: { label: "Unique Visitors", color: "#7f1d1d" }, visit_hits: { label: "Visit Hits", color: "#b45309" } }}>
             <LineChart data={data.charts.visitTrend}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <ChartLegend content={<ChartLegendContent />} />
@@ -230,10 +230,10 @@ const AdminAnalytics = () => {
         </AdminPanel>
 
         <AdminPanel title="Circulation Trend" description="Borrow and return volume over the last seven days.">
-          <ChartContainer className="h-[280px] w-full" config={{ borrowed_count: { label: "Borrowed", color: "#1d4ed8" }, returned_count: { label: "Returned", color: "#0f766e" } }}>
+          <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ borrowed_count: { label: "Borrowed", color: "#1d4ed8" }, returned_count: { label: "Returned", color: "#0f766e" } }}>
             <BarChart data={data.charts.circulationTrend}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <ChartLegend content={<ChartLegendContent />} />
@@ -245,12 +245,12 @@ const AdminAnalytics = () => {
 
         <AdminPanel title="Borrowing Status Mix" description="Live borrowing distribution across active, overdue, and returned states.">
           <ChartContainer
-            className="h-[280px] w-full"
+            className="h-[240px] w-full sm:h-[280px]"
             config={Object.fromEntries(data.charts.borrowingStatus.map((item, index) => [item.name, { label: item.name, color: chartPalette[index % chartPalette.length] }]))}
           >
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-              <Pie data={data.charts.borrowingStatus} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95}>
+              <Pie data={data.charts.borrowingStatus} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
                 {data.charts.borrowingStatus.map((item, index) => (
                   <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />
                 ))}
@@ -261,11 +261,11 @@ const AdminAnalytics = () => {
         </AdminPanel>
 
         <AdminPanel title="User Role Distribution" description="Current account mix across roles in the users table.">
-          <ChartContainer className="h-[280px] w-full" config={{ value: { label: "Users", color: "#7f1d1d" } }}>
-            <BarChart data={data.charts.userRoles} layout="vertical" margin={{ left: 16, right: 16 }}>
+          <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ value: { label: "Users", color: "#7f1d1d" } }}>
+            <BarChart data={data.charts.userRoles} layout="vertical" margin={{ left: 8, right: 8 }}>
               <CartesianGrid horizontal={false} />
               <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
-              <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={90} />
+              <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={72} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="value" fill="var(--color-value)" radius={[0, 2, 2, 0]} />
             </BarChart>
@@ -275,10 +275,10 @@ const AdminAnalytics = () => {
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <AdminPanel title="Most Borrowed Books" description="Top borrowed titles based on the complete borrowing history.">
-          <ChartContainer className="h-[300px] w-full" config={{ total: { label: "Borrow Count", color: "#b45309" } }}>
-            <BarChart data={data.charts.popularBooks} margin={{ left: 16, right: 16 }}>
+          <ChartContainer className="h-[260px] w-full sm:h-[300px]" config={{ total: { label: "Borrow Count", color: "#b45309" } }}>
+            <BarChart data={data.charts.popularBooks} margin={{ left: 8, right: 8 }}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="total" fill="var(--color-total)" radius={[2, 2, 0, 0]} />
