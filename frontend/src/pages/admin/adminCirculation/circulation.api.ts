@@ -13,9 +13,12 @@ export interface CirculationLogEntry {
   book_title: string;
   book_author: string;
   isbn: string | null;
+  copy_barcode: string | null;
   borrowed_at: string;
   due_date: string;
   returned_at: string | null;
+  fine_amount: number;
+  hours_overdue: number;
   status: "borrowed" | "overdue" | "returned";
   issued_by_name: string | null;
   deleted_at: string | null;   // ← NEW: present when archived
@@ -26,6 +29,8 @@ export interface CirculationLogFilters {
   search?: string;
   page?: number;
   limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
   archived?: boolean;          // ← NEW
 }
 
@@ -34,6 +39,13 @@ export interface CirculationLogResult {
   total: number;
   page: number;
   totalPages: number;
+  summary?: {
+    total_records: number;
+    borrowed_count: number;
+    overdue_count: number;
+    returned_count: number;
+    unique_borrowers: number;
+  };
 }
 
 export const lookupUser = async (studentEmployeeId: string): Promise<LookupUserResult> => {

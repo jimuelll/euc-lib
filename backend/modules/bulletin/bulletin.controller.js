@@ -5,12 +5,13 @@ const service = require("./bulletin.service");
 const getPosts = async (req, res) => {
   try {
     const page         = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit        = Math.min(20, parseInt(req.query.limit) || 4);
+    const limit        = Math.min(200, parseInt(req.query.limit) || 4);
     const userId       = req.user?.id ?? null;
+    const search       = typeof req.query.search === "string" ? req.query.search.trim() : "";
     const showArchived = req.user && ["admin", "super_admin"].includes(req.user.role)
       ? req.query.archived === "true"
       : false;
-    const result = await service.getPosts(userId, page, limit, showArchived);
+    const result = await service.getPosts(userId, page, limit, showArchived, search);
     res.json(result);
   } catch (err) {
     console.error("[bulletin] getPosts:", err);

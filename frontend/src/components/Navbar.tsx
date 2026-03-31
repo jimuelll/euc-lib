@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
+import type { NotificationItem } from "@/services/notifications.service";
 
 const navLinks = [
   { label: "Home",      to: "/",          matchPrefix: false },
@@ -40,6 +42,7 @@ const Navbar = () => {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, loading } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   const role       = user?.role ?? "guest";
   const isLoggedIn = !!user && !loading;
@@ -125,8 +128,25 @@ const Navbar = () => {
             ) : isLoggedIn ? (
               <>
                 {/* Bell — visible on both mobile and desktop */}
-                <button className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                <div className="hidden md:block">
+                  <NotificationsDropdown
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    onNavigate={navigate}
+                    onMarkAsRead={markAsRead}
+                    onMarkAllAsRead={markAllAsRead}
+                  />
+                </div>
+                <button
+                  className="relative p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors md:hidden"
+                  onClick={() => navigate("/my-library")}
+                >
                   <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-primary">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </button>
                 {/* User dropdown — desktop only, never takes mobile space */}
                 <div className="hidden md:block ml-1">
@@ -308,6 +328,132 @@ const DesktopNav = ({
 );
 
 // ── User dropdown ─────────────────────────────────────────────────────────────
+
+const NotificationsDropdown = ({
+  notifications,
+  unreadCount,
+  onNavigate,
+  onMarkAsRead,
+  onMarkAllAsRead,
+}: {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  onNavigate: (path: string) => void;
+  onMarkAsRead: (notificationId: number) => Promise<void>;
+  onMarkAllAsRead: () => Promise<void>;
+}) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button className="relative p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+        <Bell className="h-4 w-4" />
+        {unreadCount > 0 && (
+          <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-primary">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-[360px] rounded-none border-border/60 p-0 shadow-lg">
+      <div className="border-b border-border/30 bg-primary px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p
+              className="text-[12px] font-bold uppercase tracking-[0.1em] text-primary-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Notifications
+            </p>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-primary-foreground/55">
+              {unreadCount} unread
+            </p>
+          </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => { void onMarkAllAsRead(); }}
+              className="text-[10px] font-bold uppercase tracking-[0.14em] text-warning"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="max-h-[420px] overflow-y-auto">
+        {notifications.length > 0 ? (
+          notifications.slice(0, 8).map((notification) => (
+            <button
+              key={notification.id}
+              onClick={() => {
+                if (!notification.is_read) {
+                  void onMarkAsRead(notification.id);
+                }
+                onNavigate(notification.href || "/my-library");
+              }}
+              className={`w-full border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-muted/10 ${
+                notification.is_read ? "bg-background" : "bg-warning/5"
+              }`}
+            >
+              <p
+                className="text-[11px] font-bold uppercase tracking-[0.12em] text-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {notification.title}
+              </p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                {notification.body}
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+                  {formatNotificationTime(notification.created_at)}
+                </span>
+                {!notification.is_read && (
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-[0.12em] text-warning"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    New
+                  </span>
+                )}
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            No notifications yet.
+          </div>
+        )}
+      </div>
+
+      <DropdownMenuSeparator className="m-0" />
+      <DropdownMenuItem
+        onClick={() => onNavigate("/my-library")}
+        className="rounded-none px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-primary"
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        View all notifications
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
+const formatNotificationTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently";
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString();
+};
 
 const UserDropdown = ({
   name, role, initials, showAdminPanel, onNavigate, onLogout,

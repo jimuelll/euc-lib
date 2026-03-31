@@ -4,9 +4,11 @@ const controller = require("./attendance.controller");
 const { authMiddleware } = require("../auth/auth.middleware");
 
 const scannerOrAbove = authMiddleware(["scanner", "staff", "admin", "super_admin"]);
+const anyAuthenticatedUser = authMiddleware();
+const adminOnly = authMiddleware(["admin", "super_admin"]);
 
 router.post("/scan",  scannerOrAbove, controller.scan);
-router.get("/today",  scannerOrAbove, controller.getToday);
-router.get("/my",     scannerOrAbove, controller.getMy);
+router.get("/today",  adminOnly, controller.getToday);
+router.get("/my",     anyAuthenticatedUser, controller.getMy);
 
 module.exports = router;

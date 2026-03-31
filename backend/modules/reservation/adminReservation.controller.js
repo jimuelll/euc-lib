@@ -1,5 +1,23 @@
 const service = require("../reservation/reservation.service");
 const db      = require("../../db");
+const notificationsService = require("../notifications/notifications.service");
+
+const getReservationNotificationTarget = async (reservationId) => {
+  const [[row]] = await db.query(
+    `SELECT
+       r.id,
+       r.user_id,
+       r.status,
+       bk.title
+     FROM reservations r
+     JOIN books bk ON bk.id = r.book_id
+     WHERE r.id = ?
+     LIMIT 1`,
+    [reservationId]
+  );
+
+  return row ?? null;
+};
 
 const getAdminReservations = async (req, res) => {
   try {
@@ -23,6 +41,18 @@ const markReservationReady = async (req, res) => {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
     await service.markReservationReady(reservationId);
+    const target = await getReservationNotificationTarget(reservationId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "reservation_ready",
+        title: "Reservation ready for pickup",
+        body: `${target.title} is now ready for pickup at the library front desk.`,
+        href: "/services/borrowing",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: req.user.id,
+      });
+    }
     res.json({ message: "Reservation marked as ready" });
   } catch (err) {
     console.error("[admin/reservations] markReservationReady:", err);
@@ -37,6 +67,18 @@ const fulfillReservation = async (req, res) => {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
     await service.fulfillReservation(reservationId);
+    const target = await getReservationNotificationTarget(reservationId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "reservation_fulfilled",
+        title: "Reservation completed",
+        body: `Your reservation for ${target.title} has been fulfilled successfully.`,
+        href: "/my-library",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: req.user.id,
+      });
+    }
     res.json({ message: "Reservation fulfilled" });
   } catch (err) {
     console.error("[admin/reservations] fulfillReservation:", err);
@@ -51,6 +93,18 @@ const cancelReservationAdmin = async (req, res) => {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
     await service.cancelReservationAdmin(reservationId);
+    const target = await getReservationNotificationTarget(reservationId);
+    if (target) {
+      await notificationsService.createNotification({
+        type: "reservation_cancelled",
+        title: "Reservation cancelled",
+        body: `Your reservation for ${target.title} was cancelled by the library staff.`,
+        href: "/services/borrowing",
+        audienceType: "user",
+        audienceUserId: target.user_id,
+        createdBy: req.user.id,
+      });
+    }
     res.json({ message: "Reservation cancelled" });
   } catch (err) {
     console.error("[admin/reservations] cancelReservationAdmin:", err);

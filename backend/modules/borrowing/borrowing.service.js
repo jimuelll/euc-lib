@@ -1,5 +1,9 @@
 const db = require("../../db");
-const { syncOverdueBorrowings } = require("./overdue.helper");
+const {
+  calculateDueDateWithHolidays,
+  mapBorrowingsWithFineDetails,
+  syncOverdueBorrowings,
+} = require("./overdue.helper");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +31,7 @@ const getActiveBorrows = async (userId) => {
      ORDER BY b.due_date ASC`,
     [userId]
   );
-  return rows;
+  return mapBorrowingsWithFineDetails(rows);
 };
 
 const getBorrowHistory = async (userId) => {
@@ -39,7 +43,7 @@ const getBorrowHistory = async (userId) => {
      JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status = 'returned'
-     ORDER BY b.returned_at DESC
+    ORDER BY b.returned_at DESC
      LIMIT 50`,
     [userId]
   );
@@ -143,6 +147,7 @@ const borrowBook = async (
   { isCopyBarcode = false, ipAddress = null } = {}
 ) => {
   const conn = await db.getConnection();
+  const safeDaysAllowed = Math.max(1, Number.parseInt(daysAllowed, 10) || 7);
   try {
     await conn.beginTransaction();
 
@@ -202,20 +207,18 @@ const borrowBook = async (
       throw Object.assign(new Error("User already has this book borrowed"), { status: 409 });
     }
 
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + daysAllowed);
-    const dueDateStr = dueDate.toISOString().slice(0, 10);
+    const dueDate = await calculateDueDateWithHolidays(new Date(), safeDaysAllowed, conn);
 
     const [result] = await conn.query(
       `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, status, issued_by)
        VALUES (?, ?, ?, ?, 'borrowed', ?)`,
-      [userId, copy.book_id, copy.id, dueDateStr, issuedBy ?? null]
+      [userId, copy.book_id, copy.id, dueDate, issuedBy ?? null]
     );
 
     const borrowingId = result.insertId;
 
     await conn.commit();
-    return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate: dueDateStr };
+    return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate };
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -279,7 +282,7 @@ const lookupUserWithBorrows = async (studentEmployeeId) => {
     [user.id]
   );
 
-  return { user, activeBorrows };
+  return { user, activeBorrows: await mapBorrowingsWithFineDetails(activeBorrows) };
 };
 
 // ─── Admin soft-delete / restore ──────────────────────────────────────────────
@@ -327,7 +330,15 @@ const adminRestoreBorrowing = async (borrowingId) => {
 /**
  * Admin: list borrowings with optional archived filter + search.
  */
-const adminGetBorrowings = async ({ search = "", status, showArchived = false, page = 1, limit = 20 }) => {
+const adminGetBorrowings = async ({
+  search = "",
+  status,
+  showArchived = false,
+  page = 1,
+  limit = 20,
+  dateFrom,
+  dateTo,
+}) => {
   await syncOverdueBorrowings();
 
   const offset     = (page - 1) * limit;
@@ -343,6 +354,16 @@ const adminGetBorrowings = async ({ search = "", status, showArchived = false, p
     conditions.push("(bk.title LIKE ? OR u.name LIKE ? OR u.student_employee_id LIKE ?)");
     const like = `%${search.trim()}%`;
     params.push(like, like, like);
+  }
+
+  if (dateFrom) {
+    conditions.push("DATE(b.borrowed_at) >= ?");
+    params.push(dateFrom);
+  }
+
+  if (dateTo) {
+    conditions.push("DATE(b.borrowed_at) <= ?");
+    params.push(dateTo);
   }
 
   const where = `WHERE ${conditions.join(" AND ")}`;
@@ -367,20 +388,49 @@ const adminGetBorrowings = async ({ search = "", status, showArchived = false, p
        b.notes,
        bk.title  AS book_title,
        bk.author AS book_author,
+       bk.isbn,
        u.name                AS user_name,
        u.student_employee_id,
-       bc.barcode            AS copy_barcode
+       bc.barcode            AS copy_barcode,
+       issuer.name           AS issued_by_name
      FROM borrowings b
      JOIN books bk      ON bk.id = b.book_id
      JOIN users  u      ON u.id  = b.user_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id
+     LEFT JOIN users issuer ON issuer.id = b.issued_by
      ${where}
      ORDER BY b.borrowed_at DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
 
-  return { rows, total, page, totalPages: Math.ceil(total / limit) };
+  const [[summaryRow]] = await db.query(
+    `SELECT
+       COUNT(*) AS total_records,
+       SUM(CASE WHEN b.status = 'borrowed' THEN 1 ELSE 0 END) AS borrowed_count,
+       SUM(CASE WHEN b.status = 'overdue' THEN 1 ELSE 0 END) AS overdue_count,
+       SUM(CASE WHEN b.status = 'returned' THEN 1 ELSE 0 END) AS returned_count,
+       COUNT(DISTINCT b.user_id) AS unique_borrowers
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id
+     JOIN users u ON u.id = b.user_id
+     ${where}`,
+    params
+  );
+
+  return {
+    rows: await mapBorrowingsWithFineDetails(rows),
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+    summary: {
+      total_records: Number(summaryRow?.total_records ?? 0),
+      borrowed_count: Number(summaryRow?.borrowed_count ?? 0),
+      overdue_count: Number(summaryRow?.overdue_count ?? 0),
+      returned_count: Number(summaryRow?.returned_count ?? 0),
+      unique_borrowers: Number(summaryRow?.unique_borrowers ?? 0),
+    },
+  };
 };
 
 module.exports = {

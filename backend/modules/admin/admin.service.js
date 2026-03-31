@@ -20,6 +20,9 @@ async function createUser({ student_employee_id, name, role, password, address, 
   if (!roleHierarchy[creatorRole]?.includes(role)) {
     throw new Error("You are not allowed to create a user with this role");
   }
+  if (role === creatorRole) {
+    throw new Error("You cannot create a user with your own role");
+  }
 
   const [existing] = await db.query(
     "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
@@ -126,6 +129,9 @@ async function updateUser(student_employee_id, updates, requesterRole) {
     if (!roleHierarchy[requesterRole]?.includes(updates.role)) {
       throw new Error("You are not allowed to assign this role");
     }
+    if (updates.role === requesterRole) {
+      throw new Error("You cannot assign your own role");
+    }
     fields.push("role = ?");
     values.push(updates.role);
   }
@@ -204,4 +210,123 @@ async function searchUsers(query, requesterRole) {
   return results;
 }
 
-module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers };
+async function queryToolsSearch(term, requesterRole) {
+  const query = term?.trim();
+  if (!query) {
+    throw new Error("Search term is required");
+  }
+
+  const like = `%${query}%`;
+  const allowedRoles = searchRoleHierarchy[requesterRole];
+  if (!allowedRoles?.length) {
+    throw new Error("You are not allowed to search query tools");
+  }
+
+  const [users, books, borrowings, reservations, notifications] = await Promise.all([
+    db.query(
+      `SELECT id, student_employee_id, name, role, is_active
+       FROM users
+       WHERE deleted_at IS NULL
+         AND role IN (${allowedRoles.map(() => "?").join(", ")})
+         AND (
+           student_employee_id LIKE ?
+           OR name LIKE ?
+           OR barcode LIKE ?
+         )
+       ORDER BY name ASC
+       LIMIT 10`,
+      [...allowedRoles, like, like, like]
+    ),
+    db.query(
+      `SELECT id, title, author, isbn, category, copies, location
+       FROM books
+       WHERE deleted_at IS NULL
+         AND (
+           title LIKE ?
+           OR author LIKE ?
+           OR isbn LIKE ?
+         )
+       ORDER BY title ASC
+       LIMIT 10`,
+      [like, like, like]
+    ),
+    db.query(
+      `SELECT
+         b.id,
+         b.status,
+         b.borrowed_at,
+         b.due_date,
+         b.returned_at,
+         u.name AS user_name,
+         u.student_employee_id,
+         bk.title AS book_title,
+         bc.barcode AS copy_barcode
+       FROM borrowings b
+       JOIN users u ON u.id = b.user_id
+       JOIN books bk ON bk.id = b.book_id
+       LEFT JOIN book_copies bc ON bc.id = b.copy_id
+       WHERE b.deleted_at IS NULL
+         AND (
+           u.student_employee_id LIKE ?
+           OR u.name LIKE ?
+           OR bk.title LIKE ?
+           OR bk.isbn LIKE ?
+           OR bc.barcode LIKE ?
+           OR CAST(b.id AS CHAR) LIKE ?
+         )
+       ORDER BY b.borrowed_at DESC
+       LIMIT 10`,
+      [like, like, like, like, like, like]
+    ),
+    db.query(
+      `SELECT
+         r.id,
+         r.status,
+         r.reserved_at,
+         r.expires_at,
+         u.name AS user_name,
+         u.student_employee_id,
+         bk.title AS book_title
+       FROM reservations r
+       JOIN users u ON u.id = r.user_id
+       JOIN books bk ON bk.id = r.book_id
+       WHERE r.deleted_at IS NULL
+         AND (
+           u.student_employee_id LIKE ?
+           OR u.name LIKE ?
+           OR bk.title LIKE ?
+           OR CAST(r.id AS CHAR) LIKE ?
+         )
+       ORDER BY r.reserved_at DESC
+       LIMIT 10`,
+      [like, like, like, like]
+    ),
+    db.query(
+      `SELECT
+         n.id,
+         n.type,
+         n.title,
+         n.created_at,
+         n.audience_type,
+         n.audience_role
+       FROM notifications n
+       WHERE n.title LIKE ?
+          OR n.body LIKE ?
+          OR n.type LIKE ?
+          OR CAST(n.id AS CHAR) LIKE ?
+       ORDER BY n.created_at DESC
+       LIMIT 10`,
+      [like, like, like, like]
+    ),
+  ]);
+
+  return {
+    users: users[0],
+    books: books[0],
+    borrowings: borrowings[0],
+    reservations: reservations[0],
+    notifications: notifications[0],
+  };
+}
+
+module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };

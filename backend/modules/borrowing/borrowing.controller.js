@@ -180,8 +180,18 @@ const adminGetBorrowings = async (req, res) => {
     const search       = req.query.search ?? "";
     const status       = req.query.status ?? "all";
     const showArchived = req.query.archived === "true";
+    const dateFrom     = req.query.dateFrom ?? "";
+    const dateTo       = req.query.dateTo ?? "";
 
-    const result = await service.adminGetBorrowings({ search, status, showArchived, page, limit });
+    const result = await service.adminGetBorrowings({
+      search,
+      status,
+      showArchived,
+      page,
+      limit,
+      dateFrom,
+      dateTo,
+    });
     res.json(result);
   } catch (err) {
     console.error("[borrowing] adminGetBorrowings:", err);

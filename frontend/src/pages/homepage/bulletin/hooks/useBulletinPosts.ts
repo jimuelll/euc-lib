@@ -15,10 +15,11 @@ interface UseBulletinPostsReturn {
   error: string | null;
   currentPage: number;
   totalPages: number;
-  fetchPosts: (page: number) => Promise<void>;
+  search: string;
+  setSearch: (value: string) => void;
+  fetchPosts: (page: number, nextSearch?: string) => Promise<void>;
   setCurrentPage: (page: number) => void;
   updatePost: (id: number, patch: Partial<BulletinPost>) => void;
-  /** Optimistically remove a post from local state (e.g. after archive) */
   removePost: (id: number) => void;
 }
 
@@ -27,19 +28,25 @@ export function useBulletinPosts({
   autoFetch = true,
 }: UseBulletinPostsOptions = {}): UseBulletinPostsReturn {
   const { loading: authLoading } = useAuth();
-  const [posts, setPosts]             = useState<BulletinPost[]>([]);
-  const [loading, setLoading]         = useState(autoFetch);
-  const [error, setError]             = useState<string | null>(null);
+  const [posts, setPosts] = useState<BulletinPost[]>([]);
+  const [loading, setLoading] = useState(autoFetch);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages]   = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState("");
 
-  const fetchPosts = useCallback(async (page: number) => {
+  const fetchPosts = useCallback(async (page: number, nextSearch?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await axiosInstance.get(
-        `/api/bulletin?page=${page}&limit=${limit}`
-      );
+      const query = typeof nextSearch === "string" ? nextSearch : search;
+      const { data } = await axiosInstance.get("/api/bulletin", {
+        params: {
+          page,
+          limit,
+          ...(query.trim() ? { search: query.trim() } : {}),
+        },
+      });
       setPosts(data.data.map(toPost));
       setTotalPages(data.totalPages ?? 1);
     } catch {
@@ -47,21 +54,16 @@ export function useBulletinPosts({
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, search]);
 
   useEffect(() => {
     if (!autoFetch || authLoading) return;
     fetchPosts(currentPage);
   }, [currentPage, fetchPosts, autoFetch, authLoading]);
 
-  const updatePost = useCallback(
-    (id: number, patch: Partial<BulletinPost>) => {
-      setPosts((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...patch } : p))
-      );
-    },
-    []
-  );
+  const updatePost = useCallback((id: number, patch: Partial<BulletinPost>) => {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
 
   const removePost = useCallback((id: number) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
@@ -73,6 +75,8 @@ export function useBulletinPosts({
     error,
     currentPage,
     totalPages,
+    search,
+    setSearch,
     fetchPosts,
     setCurrentPage,
     updatePost,

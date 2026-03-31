@@ -1,4 +1,4 @@
-const { createUser, deleteUser, restoreUser, updateUser, searchUsers } = require("./admin.service");
+const { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch } = require("./admin.service");
 const qr = require("qrcode");
 const db = require("../../db");
 
@@ -55,6 +55,15 @@ async function handleSearchUsers(req, res) {
   }
 }
 
+async function handleQueryToolsSearch(req, res) {
+  try {
+    const result = await queryToolsSearch(req.query.q, req.user.role);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
 // GET /admin/users/:student_employee_id/barcode-png
 async function handleGetBarcodePng(req, res) {
   try {
@@ -88,5 +97,6 @@ module.exports = {
   handleRestoreUser,
   handleUpdateUser,
   handleSearchUsers,
+  handleQueryToolsSearch,
   handleGetBarcodePng,
 };

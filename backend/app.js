@@ -17,6 +17,9 @@ const attendanceRoutes  = require("./modules/attendance/attendance.routes");
 const subscriptionsRoutes = require("./modules/subscriptions/subscriptions.routes");
 const analyticsRoutes = require("./modules/analytics/analytics.routes");
 const analyticsAdminRoutes = require("./modules/analytics/analytics.admin.routes");
+const myLibraryRoutes = require("./modules/myLibrary/myLibrary.routes");
+const notificationsRoutes = require("./modules/notifications/notifications.routes");
+const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -68,6 +71,9 @@ app.use("/api/admin",        adminReservationRoutes);
 app.use("/api/admin/about",  aboutRoutes);
 app.use("/api/attendance",   attendanceRoutes);
 app.use("/api",              subscriptionsRoutes);
+app.use("/api",              myLibraryRoutes);
+app.use("/api",              notificationsRoutes);
+app.use("/api/admin",        librarySettingsRoutes);
 
 
 module.exports = app;

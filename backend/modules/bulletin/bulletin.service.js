@@ -9,7 +9,7 @@ cloudinary.config({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
+const CAN_POST_ROLES = ["admin", "super_admin"];
 
 const destroyCloudinaryImage = async (publicId) => {
   if (!publicId) return;
@@ -22,13 +22,31 @@ const destroyCloudinaryImage = async (publicId) => {
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-const getPosts = async (userId, page = 1, limit = 4, showArchived = false) => {
+const getPosts = async (userId, page = 1, limit = 4, showArchived = false, search = "") => {
   const offset = (page - 1) * limit;
   const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
+  const normalizedSearch = search.trim();
+  const hasSearch = normalizedSearch.length > 0;
+  const searchFilter = hasSearch
+    ? "AND (bp.title LIKE ? OR bp.excerpt LIKE ? OR bp.content LIKE ? OR u.name LIKE ?)"
+    : "";
+  const searchParams = hasSearch
+    ? Array(4).fill(`%${normalizedSearch}%`)
+    : [];
 
   const [[{ total }]] = await db.query(
-    `SELECT COUNT(*) AS total FROM bulletin_posts WHERE deleted_at ${deletedFilter}`
+    `SELECT COUNT(*) AS total
+     FROM bulletin_posts bp
+     JOIN users u ON u.id = bp.author_id
+     WHERE bp.deleted_at ${deletedFilter} ${searchFilter}`,
+    searchParams
   );
+
+  const queryParams = [];
+  if (userId) {
+    queryParams.push(userId);
+  }
+  queryParams.push(...searchParams, limit, offset);
 
   const [rows] = await db.query(
     `SELECT
@@ -52,9 +70,10 @@ const getPosts = async (userId, page = 1, limit = 4, showArchived = false) => {
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
      WHERE bp.deleted_at ${deletedFilter}
+     ${searchFilter}
      ORDER BY bp.is_pinned DESC, bp.created_at DESC
      LIMIT ? OFFSET ?`,
-    userId ? [userId, limit, offset] : [limit, offset]
+    queryParams
   );
 
   return { data: rows, total, page, totalPages: Math.ceil(total / limit) };

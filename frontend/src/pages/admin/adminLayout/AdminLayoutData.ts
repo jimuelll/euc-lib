@@ -1,7 +1,7 @@
 import {
   Home, ShieldCheck, BookCopy, ArrowLeftRight, CreditCard, DatabaseBackup,
-  FileBarChart, HelpCircle, Wifi, ClipboardCheck, PenSquare,
-  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock,
+  FileBarChart, Wifi, ClipboardCheck, PenSquare,
+  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
 
@@ -22,7 +22,7 @@ export const sidebarSections: SidebarSection[] = [
     label: "Administration",
     items: [
       { title: "User Management", url: "/admin/manage",       icon: ShieldCheck    },
-      { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff    },
+      { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff, roles: ["admin", "super_admin"] },
       { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert    },
       { title: "Clearance",       url: "/admin/clearance",    icon: ClipboardCheck },
     ],
@@ -30,25 +30,27 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "Content Management",
     items: [
-      { title: "Bulletin Posts",      url: "/admin/bulletin",      icon: FileText      },
+      { title: "Bulletin Posts",      url: "/admin/bulletin",      icon: FileText, roles: ["admin", "super_admin"] },
       { title: "Edit About Section", url: "/admin/edit-about", icon: PenSquare, roles: [...ROLES_WITH_ABOUT_SECTION] },
-      { title: "Subscriptions",       url: "/admin/subscriptions", icon: GraduationCap },
+      { title: "Subscriptions",       url: "/admin/subscriptions", icon: GraduationCap, roles: ["admin", "super_admin"] },
+      { title: "Notifications",       url: "/admin/notifications", icon: BellRing, roles: ["admin", "super_admin"] },
     ],
   },
   {
     label: "Reports",
     items: [
-      { title: "Circulation Report", url: "/admin/report",     icon: FileBarChart },
-      { title: "Attendance Logs",  url: "/admin/attendance-logs", icon: Clock        },
+      { title: "Analytics",        url: "/admin/analytics",     icon: FileBarChart, roles: ["admin", "super_admin"] },
+      { title: "Audit Logs",       url: "/admin/audit-logs",    icon: ScrollText, roles: ["super_admin"]  },
+      { title: "Circulation Report", url: "/admin/report",      icon: FileBarChart, roles: ["admin", "super_admin"] },
+      { title: "Attendance Logs",  url: "/admin/attendance-logs", icon: Clock, roles: ["admin", "super_admin"] },
     ],
   },
   {
     label: "System",
     items: [
-      { title: "Payment",         url: "/admin/payment",  icon: CreditCard     },
-      { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup },
-      { title: "Internet Access", url: "/admin/internet", icon: Wifi           },
-      { title: "Query Tools",     url: "/admin/query",    icon: HelpCircle     },
+      { title: "Payment",         url: "/admin/payment",  icon: CreditCard, roles: ["admin", "super_admin"] },
+      { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["admin", "super_admin"] },
+      { title: "Internet Access", url: "/admin/internet", icon: Wifi, roles: ["admin", "super_admin"] },
     ],
   },
 ];

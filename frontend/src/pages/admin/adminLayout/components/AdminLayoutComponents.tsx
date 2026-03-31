@@ -18,6 +18,12 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { user, logout } = useAuth();
+  const visibleSections = sidebarSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.roles || item.roles.includes(user?.role ?? "")),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Sidebar
@@ -118,7 +124,7 @@ export function AdminSidebar() {
 
       {/* ── Nav ── */}
       <SidebarContent className="px-0 py-2">
-        {sidebarSections.map((section, sectionIndex) => (
+        {visibleSections.map((section, sectionIndex) => (
           <SidebarGroup key={section.label} className="p-0">
 
             {sectionIndex > 0 && (
@@ -152,9 +158,7 @@ export function AdminSidebar() {
                 <CollapsibleContent>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {section.items
-                      .filter(item => !item.roles || item.roles.includes(user?.role ?? ""))
-                      .map((item) => (
+                      {section.items.map((item) => (
                       <SidebarMenuItem key={item.title} className="px-2">
                           <SidebarMenuButton asChild>
                             <NavLink
@@ -190,9 +194,7 @@ export function AdminSidebar() {
               /* Collapsed — icons only */
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {section.items
-                    .filter(item => !item.roles || item.roles.includes(user?.role ?? ""))
-                    .map((item) => (
+                  {section.items.map((item) => (
                     <SidebarMenuItem key={item.title} className="px-1.5">
                       <SidebarMenuButton asChild>
                         <NavLink

@@ -26,4 +26,4 @@ export const formatRole = (role: string) =>
   role.replace("_", " ").toUpperCase();
 
 export const getAllowedRoles = (userRole: string): UserRole[] =>
-  ROLE_HIERARCHY[userRole] ?? [];
+  (ROLE_HIERARCHY[userRole] ?? []).filter((role) => role !== userRole);

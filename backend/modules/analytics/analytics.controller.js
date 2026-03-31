@@ -1,4 +1,6 @@
 const {
+  getAuditLog,
+  getAuditLogMeta,
   getDashboardOverview,
   logSiteVisit,
   newVisitorId,
@@ -44,7 +46,17 @@ async function handleTrackVisit(req, res) {
 
 async function handleGetDashboardOverview(req, res) {
   try {
-    const result = await getDashboardOverview({
+    const result = await getDashboardOverview();
+    res.json(result);
+  } catch (err) {
+    console.error("[analytics] getDashboardOverview:", err);
+    res.status(500).json({ message: "Failed to load dashboard data" });
+  }
+}
+
+async function handleGetAuditLog(req, res) {
+  try {
+    const result = await getAuditLog({
       limit: req.query.limit,
       page: req.query.page,
       category: req.query.category,
@@ -54,12 +66,24 @@ async function handleGetDashboardOverview(req, res) {
     });
     res.json(result);
   } catch (err) {
-    console.error("[analytics] getDashboardOverview:", err);
-    res.status(500).json({ message: "Failed to load dashboard data" });
+    console.error("[analytics] getAuditLog:", err);
+    res.status(500).json({ message: "Failed to load audit log" });
+  }
+}
+
+async function handleGetAuditLogMeta(req, res) {
+  try {
+    const result = await getAuditLogMeta();
+    res.json(result);
+  } catch (err) {
+    console.error("[analytics] getAuditLogMeta:", err);
+    res.status(500).json({ message: "Failed to load audit metadata" });
   }
 }
 
 module.exports = {
+  handleGetAuditLog,
+  handleGetAuditLogMeta,
   handleGetDashboardOverview,
   handleTrackVisit,
 };

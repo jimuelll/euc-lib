@@ -198,21 +198,6 @@ function buildAuditFeedQuery() {
       UNION ALL
 
       SELECT
-        r.deleted_at AS occurred_at,
-        CAST('reservation' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('archived' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(actor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(actor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT('Reservation archived for ', requester.name, ' on "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM reservations r
-      JOIN users requester ON requester.id = r.user_id
-      JOIN books bk ON bk.id = r.book_id
-      LEFT JOIN users actor ON actor.id = r.deleted_by
-      WHERE r.deleted_at IS NOT NULL
-
-      UNION ALL
-
-      SELECT
         bp.created_at AS occurred_at,
         CAST('bulletin' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
         CAST('post_created' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
@@ -221,44 +206,6 @@ function buildAuditFeedQuery() {
         CONVERT(CONCAT('Bulletin post created: ', bp.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
       FROM bulletin_posts bp
       LEFT JOIN users author ON author.id = bp.author_id
-
-      UNION ALL
-
-      SELECT
-        bp.deleted_at AS occurred_at,
-        CAST('bulletin' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('post_archived' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(actor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(actor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT('Bulletin post archived: ', bp.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM bulletin_posts bp
-      LEFT JOIN users actor ON actor.id = bp.deleted_by
-      WHERE bp.deleted_at IS NOT NULL
-
-      UNION ALL
-
-      SELECT
-        bc.created_at AS occurred_at,
-        CAST('bulletin' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('comment_created' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(commenter.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(commenter.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT(commenter.name, ' commented on bulletin post #', bc.post_id) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM bulletin_comments bc
-      LEFT JOIN users commenter ON commenter.id = bc.user_id
-
-      UNION ALL
-
-      SELECT
-        bc.deleted_at AS occurred_at,
-        CAST('bulletin' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('comment_archived' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(actor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(actor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT('Bulletin comment archived on post #', bc.post_id) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM bulletin_comments bc
-      LEFT JOIN users actor ON actor.id = bc.deleted_by
-      WHERE bc.deleted_at IS NOT NULL
 
       UNION ALL
 
@@ -275,44 +222,48 @@ function buildAuditFeedQuery() {
       UNION ALL
 
       SELECT
-        s.updated_at AS occurred_at,
-        CAST('subscriptions' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('updated' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(editor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(editor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT('Subscription updated: ', s.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM academic_subscriptions s
-      LEFT JOIN users editor ON editor.id = s.updated_by
-      WHERE s.updated_at > s.created_at
-
-      UNION ALL
-
-      SELECT
-        s.deleted_at AS occurred_at,
-        CAST('subscriptions' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('archived' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(actor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(actor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT('Subscription archived: ', s.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM academic_subscriptions s
-      LEFT JOIN users actor ON actor.id = s.deleted_by
-      WHERE s.deleted_at IS NOT NULL
-
-      UNION ALL
-
-      SELECT
-        a.updated_at AS occurred_at,
-        CAST('about' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('updated' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
-        CONVERT(editor.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
-        CONVERT(editor.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CAST('Updated About page settings' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM about_settings a
-      LEFT JOIN users editor ON editor.id = a.updated_by
+        n.created_at AS occurred_at,
+        CAST('notifications' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
+        CONVERT(n.type USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
+        CONVERT(creator.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
+        CONVERT(creator.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
+        CONVERT(CONCAT('Notification created: ', n.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+      FROM notifications n
+      LEFT JOIN users creator ON creator.id = n.created_by
     ) audit_feed`;
 }
 
-async function getDashboardOverview({
+function buildAuditFilters({ category = "all", action = "", dateFrom = "", dateTo = "" } = {}) {
+  const filters = ["occurred_at IS NOT NULL"];
+  const params = [];
+
+  if (category && category !== "all") {
+    filters.push("category = ?");
+    params.push(category);
+  }
+
+  if (action && action.trim()) {
+    filters.push("action = ?");
+    params.push(action.trim());
+  }
+
+  if (dateFrom) {
+    filters.push("DATE(occurred_at) >= ?");
+    params.push(dateFrom);
+  }
+
+  if (dateTo) {
+    filters.push("DATE(occurred_at) <= ?");
+    params.push(dateTo);
+  }
+
+  return {
+    whereClause: `WHERE ${filters.join(" AND ")}`,
+    params,
+  };
+}
+
+async function getAuditLog({
   limit = 20,
   page = 1,
   category = "all",
@@ -320,67 +271,30 @@ async function getDashboardOverview({
   dateFrom = "",
   dateTo = "",
 } = {}) {
-  await ensureSiteDailyVisitsTable();
-
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safeLimit;
-
-  const [[stats]] = await db.query(
-    `SELECT
-       (SELECT COUNT(*) FROM books WHERE deleted_at IS NULL) AS total_books,
-       (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND is_active = 1) AS active_users,
-       (SELECT COUNT(*) FROM site_daily_visits WHERE visit_date = CURDATE()) AS unique_visitors_today,
-       (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits WHERE visit_date = CURDATE()) AS visit_hits_today,
-       (SELECT COUNT(DISTINCT visitor_id) FROM site_daily_visits) AS total_unique_visitors,
-       (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits) AS total_visit_hits`
-  );
-
-  const filters = ["occurred_at IS NOT NULL"];
-  const filterParams = [];
-
-  if (category && category !== "all") {
-    filters.push("category = ?");
-    filterParams.push(category);
-  }
-
-  if (action && action.trim()) {
-    filters.push("action = ?");
-    filterParams.push(action.trim());
-  }
-
-  if (dateFrom) {
-    filters.push("DATE(occurred_at) >= ?");
-    filterParams.push(dateFrom);
-  }
-
-  if (dateTo) {
-    filters.push("DATE(occurred_at) <= ?");
-    filterParams.push(dateTo);
-  }
-
   const auditFeedQuery = buildAuditFeedQuery();
-  const whereClause = `WHERE ${filters.join(" AND ")}`;
+  const { whereClause, params } = buildAuditFilters({ category, action, dateFrom, dateTo });
 
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM (${auditFeedQuery}) audit_feed
      ${whereClause}`,
-    filterParams
+    params
   );
 
-  const [auditLog] = await db.query(
+  const [rows] = await db.query(
     `SELECT *
      FROM (${auditFeedQuery}) audit_feed
      ${whereClause}
      ORDER BY occurred_at DESC
      LIMIT ? OFFSET ?`,
-    [...filterParams, safeLimit, offset]
+    [...params, safeLimit, offset]
   );
 
   return {
-    stats,
-    auditLog,
+    rows,
     pagination: {
       page: safePage,
       limit: safeLimit,
@@ -396,8 +310,182 @@ async function getDashboardOverview({
   };
 }
 
+async function getAuditLogMeta() {
+  const auditFeedQuery = buildAuditFeedQuery();
+  const [actions] = await db.query(
+    `SELECT DISTINCT action
+     FROM (${auditFeedQuery}) audit_feed
+     WHERE occurred_at IS NOT NULL
+     ORDER BY action ASC`
+  );
+
+  return {
+    categories: ["all", "auth", "users", "attendance", "borrowing", "reservation", "bulletin", "subscriptions", "notifications"],
+    actions: actions.map((row) => row.action),
+  };
+}
+
+async function getDashboardOverview() {
+  await ensureSiteDailyVisitsTable();
+
+  const [
+    [[stats]],
+    [visitTrend],
+    [circulationTrend],
+    [borrowingStatus],
+    [reservationStatus],
+    [userRoles],
+    [popularBooks],
+  ] = await Promise.all([
+    db.query(
+      `SELECT
+         (SELECT COUNT(*) FROM books WHERE deleted_at IS NULL) AS total_books,
+         (SELECT COUNT(*) FROM book_copies WHERE deleted_at IS NULL AND is_active = 1) AS total_book_copies,
+         (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND is_active = 1) AS active_users,
+         (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS total_users,
+         (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'borrowed') AS active_borrowings,
+         (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue') AS overdue_borrowings,
+         (SELECT COALESCE(COUNT(*), 0) FROM reservations WHERE deleted_at IS NULL AND status IN ('pending', 'ready')) AS active_reservations,
+         (SELECT COALESCE(COUNT(*), 0) FROM reservations WHERE deleted_at IS NULL AND status = 'ready') AS ready_reservations,
+         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(created_at) = CURDATE()) AS attendance_today,
+         (SELECT COUNT(*) FROM site_daily_visits WHERE visit_date = CURDATE()) AS unique_visitors_today,
+         (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits WHERE visit_date = CURDATE()) AS visit_hits_today,
+         (SELECT COUNT(DISTINCT visitor_id) FROM site_daily_visits) AS total_unique_visitors,
+         (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits) AS total_visit_hits,
+         (SELECT COUNT(*) FROM notifications WHERE is_active = 1) AS active_notifications,
+         (SELECT COUNT(*) FROM academic_subscriptions WHERE deleted_at IS NULL AND is_active = 1) AS active_subscriptions,
+         (SELECT COUNT(*) FROM library_holidays WHERE is_active = 1 AND holiday_date >= CURDATE()) AS upcoming_holidays,
+         (SELECT COALESCE(SUM(TIMESTAMPDIFF(HOUR, due_date, NOW())), 0)
+            FROM borrowings
+           WHERE deleted_at IS NULL
+             AND status = 'overdue'
+             AND due_date < NOW()) AS overdue_hours_total,
+         (SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1 LIMIT 1) AS overdue_fine_per_hour`
+    ),
+    db.query(
+      `SELECT
+         DATE_FORMAT(visit_date, '%Y-%m-%d') AS label,
+         COUNT(*) AS unique_visitors,
+         COALESCE(SUM(hit_count), 0) AS visit_hits
+       FROM site_daily_visits
+       WHERE visit_date >= CURDATE() - INTERVAL 6 DAY
+       GROUP BY visit_date
+       ORDER BY visit_date ASC`
+    ),
+    db.query(
+      `SELECT
+         label,
+         SUM(borrowed_count) AS borrowed_count,
+         SUM(returned_count) AS returned_count
+       FROM (
+         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count
+         FROM borrowings
+         WHERE deleted_at IS NULL
+           AND created_at >= CURDATE() - INTERVAL 6 DAY
+         GROUP BY DATE(created_at)
+         UNION ALL
+         SELECT DATE_FORMAT(returned_at, '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count
+         FROM borrowings
+         WHERE deleted_at IS NULL
+           AND returned_at IS NOT NULL
+           AND returned_at >= CURDATE() - INTERVAL 6 DAY
+         GROUP BY DATE(returned_at)
+       ) circulation
+       GROUP BY label
+       ORDER BY label ASC`
+    ),
+    db.query(
+      `SELECT status AS name, COUNT(*) AS value
+       FROM borrowings
+       WHERE deleted_at IS NULL
+       GROUP BY status
+       ORDER BY FIELD(status, 'borrowed', 'overdue', 'returned')`
+    ),
+    db.query(
+      `SELECT status AS name, COUNT(*) AS value
+       FROM reservations
+       WHERE deleted_at IS NULL
+       GROUP BY status
+       ORDER BY FIELD(status, 'pending', 'ready', 'fulfilled', 'cancelled', 'expired')`
+    ),
+    db.query(
+      `SELECT role AS name, COUNT(*) AS value
+       FROM users
+       WHERE deleted_at IS NULL
+       GROUP BY role
+       ORDER BY value DESC, role ASC`
+    ),
+    db.query(
+      `SELECT bk.title AS name, COUNT(*) AS total
+       FROM borrowings b
+       JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+       WHERE b.deleted_at IS NULL
+       GROUP BY b.book_id, bk.title
+       ORDER BY total DESC, bk.title ASC
+       LIMIT 5`
+    ),
+  ]);
+
+  const overdueFinePerHour = Number(stats.overdue_fine_per_hour || 0);
+  const overdueHoursTotal = Math.max(Number(stats.overdue_hours_total || 0), 0);
+  const outstandingFines = Number((overdueHoursTotal * overdueFinePerHour).toFixed(2));
+
+  return {
+    stats: {
+      total_books: Number(stats.total_books || 0),
+      total_book_copies: Number(stats.total_book_copies || 0),
+      active_users: Number(stats.active_users || 0),
+      total_users: Number(stats.total_users || 0),
+      active_borrowings: Number(stats.active_borrowings || 0),
+      overdue_borrowings: Number(stats.overdue_borrowings || 0),
+      active_reservations: Number(stats.active_reservations || 0),
+      ready_reservations: Number(stats.ready_reservations || 0),
+      attendance_today: Number(stats.attendance_today || 0),
+      unique_visitors_today: Number(stats.unique_visitors_today || 0),
+      visit_hits_today: Number(stats.visit_hits_today || 0),
+      total_unique_visitors: Number(stats.total_unique_visitors || 0),
+      total_visit_hits: Number(stats.total_visit_hits || 0),
+      active_notifications: Number(stats.active_notifications || 0),
+      active_subscriptions: Number(stats.active_subscriptions || 0),
+      upcoming_holidays: Number(stats.upcoming_holidays || 0),
+      overdue_fine_per_hour: overdueFinePerHour,
+      outstanding_fines: outstandingFines,
+    },
+    charts: {
+      visitTrend: visitTrend.map((row) => ({
+        label: row.label,
+        unique_visitors: Number(row.unique_visitors || 0),
+        visit_hits: Number(row.visit_hits || 0),
+      })),
+      circulationTrend: circulationTrend.map((row) => ({
+        label: row.label,
+        borrowed_count: Number(row.borrowed_count || 0),
+        returned_count: Number(row.returned_count || 0),
+      })),
+      borrowingStatus: borrowingStatus.map((row) => ({
+        name: row.name,
+        value: Number(row.value || 0),
+      })),
+      reservationStatus: reservationStatus.map((row) => ({
+        name: row.name,
+        value: Number(row.value || 0),
+      })),
+      userRoles: userRoles.map((row) => ({
+        name: row.name,
+        value: Number(row.value || 0),
+      })),
+      popularBooks: popularBooks.map((row) => ({
+        name: row.name,
+        total: Number(row.total || 0),
+      })),
+    },
+  };
+}
+
 module.exports = {
   ensureSiteDailyVisitsTable,
+  getAuditLog,
+  getAuditLogMeta,
   getDashboardOverview,
   logSiteVisit,
   newVisitorId,

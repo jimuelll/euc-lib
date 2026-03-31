@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -20,15 +21,14 @@ interface PostModalProps {
   onLikeToggle: (postId: number, liked: boolean, total: number) => void;
   onCommentAdded: (postId: number) => void;
   onPinToggle?: (postId: number, pinned: boolean) => void;
-  /** Called after a post is archived so the list can remove it */
+  onRequireLogin?: () => void;
   onArchived?: (postId: number) => void;
 }
 
-const ADMIN_ROLES      = ["admin", "super_admin"];
+const ADMIN_ROLES = ["admin", "super_admin"];
 const CAN_DELETE_ROLES = ["admin", "super_admin"];
-const CAN_PIN_ROLES    = ["admin", "super_admin"];
+const CAN_PIN_ROLES = ["admin", "super_admin"];
 
-// ── Section label — same as page header grammar ───────────────────────────────
 const ModalSectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3">
     <div className="h-px w-4 bg-warning shrink-0" />
@@ -47,31 +47,32 @@ export function PostModal({
   onLikeToggle,
   onCommentAdded,
   onPinToggle,
+  onRequireLogin,
   onArchived,
 }: PostModalProps) {
   const { user } = useAuth();
 
-  const [liked, setLiked]         = useState(false);
+  const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [likeBusy, setLikeBusy]   = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
 
-  const [pinned, setPinned]   = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
 
-  const [archiveBusy, setArchiveBusy]       = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState(false);
 
-  const [comments, setComments]               = useState<BulletinComment[]>([]);
+  const [comments, setComments] = useState<BulletinComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
 
-  const [commentText, setCommentText]   = useState("");
-  const [commenting, setCommenting]     = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commenting, setCommenting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [zoom, setZoom]                 = useState(1);
-  const [origin, setOrigin]             = useState({ x: 50, y: 50 });
-  const imgRef                          = useRef<HTMLImageElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [origin, setOrigin] = useState({ x: 50, y: 50 });
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (!post) return;
@@ -86,7 +87,10 @@ export function PostModal({
   }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!lightboxOpen) { setZoom(1); setOrigin({ x: 50, y: 50 }); }
+    if (!lightboxOpen) {
+      setZoom(1);
+      setOrigin({ x: 50, y: 50 });
+    }
   }, [lightboxOpen]);
 
   const loadComments = async (postId: number) => {
@@ -95,25 +99,44 @@ export function PostModal({
       const { data } = await axiosInstance.get(`/api/bulletin/${postId}`);
       setComments(
         (data.comments ?? []).map((c: ApiComment): BulletinComment => ({
-          id: c.id, author: c.author, author_id: c.author_id,
-          text: c.text, date: formatDate(c.created_at),
+          id: c.id,
+          author: c.author,
+          author_id: c.author_id,
+          text: c.text,
+          date: formatDate(c.created_at),
         }))
       );
-    } catch { /* non-blocking */ }
-    finally { setCommentsLoading(false); }
+    } catch {
+      // Non-blocking in the modal.
+    } finally {
+      setCommentsLoading(false);
+    }
   };
 
   const handleLike = async () => {
     if (!post || likeBusy) return;
+    if (!user) {
+      onRequireLogin?.();
+      return;
+    }
+
     setLikeBusy(true);
-    const next = !liked; const count = likeCount + (next ? 1 : -1);
-    setLiked(next); setLikeCount(count);
+    const next = !liked;
+    const count = likeCount + (next ? 1 : -1);
+    setLiked(next);
+    setLikeCount(count);
+
     try {
       const { data } = await axiosInstance.post(`/api/bulletin/${post.id}/like`);
-      setLiked(data.liked); setLikeCount(data.total);
+      setLiked(data.liked);
+      setLikeCount(data.total);
       onLikeToggle(post.id, data.liked, data.total);
-    } catch { setLiked(!next); setLikeCount(likeCount); }
-    finally { setLikeBusy(false); }
+    } catch {
+      setLiked(!next);
+      setLikeCount(likeCount);
+    } finally {
+      setLikeBusy(false);
+    }
   };
 
   const handlePin = async () => {
@@ -124,35 +147,61 @@ export function PostModal({
     try {
       await axiosInstance.patch(`/api/bulletin/${post.id}/pin`, { pinned: next });
       onPinToggle?.(post.id, next);
-    } catch { setPinned(!next); }
-    finally { setPinBusy(false); }
+    } catch {
+      setPinned(!next);
+    } finally {
+      setPinBusy(false);
+    }
   };
 
   const handleArchive = async () => {
     if (!post || archiveBusy) return;
-    if (!archiveConfirm) { setArchiveConfirm(true); return; }
+    if (!archiveConfirm) {
+      setArchiveConfirm(true);
+      return;
+    }
+
     setArchiveBusy(true);
     try {
       await axiosInstance.delete(`/api/bulletin/${post.id}`);
       onArchived?.(post.id);
       onClose();
-    } catch { /* silent — could show a toast */ }
-    finally { setArchiveBusy(false); setArchiveConfirm(false); }
+    } catch {
+      // Silent for now to preserve existing behavior.
+    } finally {
+      setArchiveBusy(false);
+      setArchiveConfirm(false);
+    }
   };
 
   const handleComment = async () => {
-    if (!post || !commentText.trim() || commenting) return;
-    setCommentError(null); setCommenting(true);
+    if (!post || commenting) return;
+    if (!user) {
+      onRequireLogin?.();
+      return;
+    }
+    if (!commentText.trim()) return;
+
+    setCommentError(null);
+    setCommenting(true);
     try {
-      const { data: c } = await axiosInstance.post(`/api/bulletin/${post.id}/comments`, { text: commentText.trim() });
+      const { data: c } = await axiosInstance.post(`/api/bulletin/${post.id}/comments`, {
+        text: commentText.trim(),
+      });
       setComments((prev) => [...prev, {
-        id: c.id, author: c.author, author_id: c.author_id,
-        text: c.text, date: formatDate(c.created_at),
+        id: c.id,
+        author: c.author,
+        author_id: c.author_id,
+        text: c.text,
+        date: formatDate(c.created_at),
       }]);
-      setCommentText(""); onCommentAdded(post.id);
+      setCommentText("");
+      onCommentAdded(post.id);
     } catch (err: any) {
       setCommentError(err.response?.data?.message ?? "Failed to post comment.");
-    } finally { setCommenting(false); }
+    } finally {
+      setCommenting(false);
+    }
   };
 
   const handleDeleteComment = async (commentId: number) => {
@@ -160,56 +209,60 @@ export function PostModal({
     try {
       await axiosInstance.delete(`/api/bulletin/${post.id}/comments/${commentId}`);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
-    } catch { /* silent */ }
+    } catch {
+      // Silent.
+    }
   };
 
   const handleDownload = async () => {
     if (!post?.image_url) return;
     try {
       const rawUrl = post.image_url.replace(/\/upload\/[^/]+\//, "/upload/");
-      const res    = await fetch(rawUrl);
-      const blob   = await res.blob();
-      const url    = URL.createObjectURL(blob);
-      const ext    = blob.type.split("/")[1] || "jpg";
-      const a      = Object.assign(document.createElement("a"), {
+      const res = await fetch(rawUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const ext = blob.type.split("/")[1] || "jpg";
+      const a = Object.assign(document.createElement("a"), {
         href: url,
         download: `${post.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.${ext}`,
       });
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
-    } catch { window.open(post.image_url, "_blank"); }
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(post.image_url, "_blank");
+    }
   };
 
   const handleLightboxImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const xPct = ((e.clientX - rect.left) / rect.width)  * 100;
-    const yPct = ((e.clientY - rect.top)  / rect.height) * 100;
-    if (zoom > 1) { setZoom(1); setOrigin({ x: 50, y: 50 }); }
-    else           { setZoom(2.5); setOrigin({ x: xPct, y: yPct }); }
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+    if (zoom > 1) {
+      setZoom(1);
+      setOrigin({ x: 50, y: 50 });
+    } else {
+      setZoom(2.5);
+      setOrigin({ x: xPct, y: yPct });
+    }
   };
 
   const canDeleteComment = (c: BulletinComment) =>
     user?.id === c.author_id || CAN_DELETE_ROLES.includes(user?.role ?? "");
-  const canPin     = CAN_PIN_ROLES.includes(user?.role ?? "");
-  const canArchive = ADMIN_ROLES.includes(user?.role ?? "")
-    || user?.id === post?.author_id; // owner can also archive their own post
+  const canPin = CAN_PIN_ROLES.includes(user?.role ?? "");
+  const canArchive = ADMIN_ROLES.includes(user?.role ?? "") || user?.id === post?.author_id;
 
   if (!post) return null;
 
   return (
     <>
-      {/*
-        The `[&>button]:hidden` class suppresses shadcn's auto-injected close
-        button so we only show our own custom X in the header band.
-      */}
       <Dialog open={!!post} onOpenChange={onClose}>
         <DialogContent
           className="[&>button]:hidden w-[calc(100vw-2rem)] max-w-2xl max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
           style={{ borderRadius: 0 }}
         >
-
-          {/* ── Header band ── */}
           <div className="bg-primary relative overflow-hidden shrink-0">
             <div className="h-[3px] w-full bg-warning" />
             <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
@@ -233,7 +286,6 @@ export function PostModal({
                   </DialogTitle>
                 </DialogHeader>
 
-                {/* Author row */}
                 <div className="mt-3 flex items-center gap-2.5 flex-wrap">
                   <div
                     className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary-foreground/15 border border-primary-foreground/25 text-primary-foreground text-[9px] font-bold"
@@ -260,9 +312,7 @@ export function PostModal({
                 </div>
               </div>
 
-              {/* Header action buttons */}
               <div className="flex items-center gap-1 shrink-0">
-                {/* Pin toggle */}
                 {canPin && (
                   <button
                     onClick={handlePin}
@@ -270,16 +320,16 @@ export function PostModal({
                     title={pinned ? "Unpin post" : "Pin post"}
                     className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-warning hover:bg-primary-foreground/10 transition-colors disabled:opacity-40"
                   >
-                    {pinBusy
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : pinned
-                        ? <PinOff className="h-3.5 w-3.5" />
-                        : <Pin className="h-3.5 w-3.5" />
-                    }
+                    {pinBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : pinned ? (
+                      <PinOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5" />
+                    )}
                   </button>
                 )}
 
-                {/* Archive */}
                 {canArchive && (
                   <button
                     onClick={handleArchive}
@@ -291,10 +341,7 @@ export function PostModal({
                         : "text-primary-foreground/40 hover:text-destructive hover:bg-primary-foreground/10"
                     }`}
                   >
-                    {archiveBusy
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Archive className="h-3.5 w-3.5" />
-                    }
+                    {archiveBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
                     {archiveConfirm && (
                       <span
                         className="text-[9px] font-bold uppercase tracking-[0.15em]"
@@ -306,7 +353,6 @@ export function PostModal({
                   </button>
                 )}
 
-                {/* Close */}
                 <button
                   onClick={onClose}
                   className="flex h-8 w-8 items-center justify-center text-primary-foreground/40 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
@@ -317,7 +363,6 @@ export function PostModal({
             </div>
           </div>
 
-          {/* ── Cover image ── */}
           {post.image_url && (
             <div
               className="group relative w-full bg-muted cursor-zoom-in overflow-hidden border-b border-border shrink-0"
@@ -339,7 +384,10 @@ export function PostModal({
                   <ZoomIn className="h-3 w-3" /> Expand
                 </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload();
+                  }}
                   className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white hover:bg-black/80 transition-colors"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
@@ -349,17 +397,13 @@ export function PostModal({
             </div>
           )}
 
-          {/* ── Body ── */}
           <div className="divide-y divide-border">
-
-            {/* Post content */}
             <div className="px-5 sm:px-6 py-5">
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {post.content}
               </p>
             </div>
 
-            {/* Engagement row */}
             <div className="flex items-stretch border-b border-border">
               <button
                 onClick={handleLike}
@@ -386,7 +430,6 @@ export function PostModal({
               </div>
             </div>
 
-            {/* Comments section */}
             <div className="px-5 sm:px-6 pt-5 pb-3">
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px w-4 bg-border shrink-0" />
@@ -402,9 +445,11 @@ export function PostModal({
               {commentsLoading && (
                 <div className="flex items-center gap-2 py-3 text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.15em]"
-                    style={{ fontFamily: "var(--font-heading)" }}>
-                    Loading…
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Loading...
                   </span>
                 </div>
               )}
@@ -453,7 +498,6 @@ export function PostModal({
               </div>
             </div>
 
-            {/* Comment input */}
             <div className="px-5 sm:px-6 py-4 space-y-3">
               {commentError && (
                 <div className="flex gap-0">
@@ -481,30 +525,56 @@ export function PostModal({
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleComment(); } }}
-                  placeholder="Write a comment…"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleComment();
+                    }
+                  }}
+                  onFocus={() => {
+                    if (!user) {
+                      onRequireLogin?.();
+                    }
+                  }}
+                  readOnly={!user}
+                  placeholder={user ? "Write a comment..." : "Login to join the conversation"}
                   maxLength={1000}
                   className="flex-1 min-w-0 h-11 px-3.5 text-sm text-foreground bg-background outline-none placeholder:text-muted-foreground/40 focus:ring-0 border-0"
                 />
                 <button
-                  disabled={!commentText.trim() || commenting}
+                  disabled={commenting || (!!user && !commentText.trim())}
                   onClick={handleComment}
                   className="w-11 h-11 flex items-center justify-center shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-border"
                 >
                   {commenting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 </button>
               </div>
+
+              {!user && (
+                <div className="flex items-center justify-between gap-3 border border-border bg-secondary/20 px-3 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Reacting and commenting on bulletin posts requires an account.
+                  </p>
+                  <Link
+                    to="/login"
+                    className="shrink-0 text-[10px] font-bold uppercase tracking-[0.15em] text-primary"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Login
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
-
         </DialogContent>
       </Dialog>
 
-      {/* ── Lightbox ── */}
       {lightboxOpen && post.image_url && (
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95"
-          onClick={() => { if (zoom === 1) setLightboxOpen(false); }}
+          onClick={() => {
+            if (zoom === 1) setLightboxOpen(false);
+          }}
         >
           <img
             ref={imgRef}
@@ -524,7 +594,7 @@ export function PostModal({
             className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 px-4 py-2 text-[10px] text-white/60 pointer-events-none transition-opacity duration-300"
             style={{ opacity: zoom > 1 ? 0 : 1, fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
           >
-            CLICK IMAGE TO ZOOM · CLICK BACKDROP TO CLOSE
+            CLICK IMAGE TO ZOOM - CLICK BACKDROP TO CLOSE
           </div>
           <button
             onClick={() => setLightboxOpen(false)}

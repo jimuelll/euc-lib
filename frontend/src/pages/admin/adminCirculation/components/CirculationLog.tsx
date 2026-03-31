@@ -39,6 +39,12 @@ const ColHeader = ({ children }: { children: React.ReactNode }) => (
   </th>
 );
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+};
+
 const CirculationLog = () => {
   const [rows,         setRows]         = useState<CirculationLogEntry[]>([]);
   const [total,        setTotal]        = useState(0);
@@ -287,18 +293,18 @@ const CirculationLog = () => {
 
                   {/* Borrowed */}
                   <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(row.borrowed_at).toLocaleDateString()}
+                    {formatDateTime(row.borrowed_at)}
                   </td>
 
                   {/* Due */}
                   <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(row.due_date).toLocaleDateString()}
+                    {formatDateTime(row.due_date)}
                   </td>
 
                   {/* Returned */}
                   <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                     {row.returned_at
-                      ? new Date(row.returned_at).toLocaleDateString()
+                      ? formatDateTime(row.returned_at)
                       : <span className="text-muted-foreground/30">—</span>
                     }
                   </td>
