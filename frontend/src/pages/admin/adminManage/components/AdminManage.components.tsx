@@ -401,7 +401,7 @@ export const SearchBar = ({
     {/* Input */}
     <div className="flex gap-0">
       <Input
-        placeholder="Search by ID or name…"
+        placeholder="Search by ID or name, or leave blank to show all…"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && onSearch()}

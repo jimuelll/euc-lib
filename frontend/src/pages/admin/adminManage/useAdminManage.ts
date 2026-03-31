@@ -121,21 +121,21 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Search ─────────────────────────────────────────────────────────────────
   const handleSearchUsers = async () => {
-    if (!searchQuery.trim()) {
-      toast.error("Enter a name or ID to search");
-      return;
-    }
+    const trimmedQuery = searchQuery.trim();
+
     setLoading(true);
     try {
       const res = await axiosInstance.get("/api/admin/users", {
         params: {
-          student_employee_id: searchQuery || undefined,
-          name:                searchQuery || undefined,
+          student_employee_id: trimmedQuery || undefined,
+          name:                trimmedQuery || undefined,
           archived:            showArchived ? "true" : undefined,
         },
       });
       setSearchResults(res.data);
-      if (!res.data.length) toast.info("No users found");
+      if (!res.data.length) {
+        toast.info(trimmedQuery ? "No users found" : `No ${showArchived ? "archived" : "active"} users found`);
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Search failed");
     } finally {
