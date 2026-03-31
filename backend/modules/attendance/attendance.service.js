@@ -143,6 +143,109 @@ const getTodayLogs = async ({ limit = 100, lastId = null } = {}) => {
   return rows;
 };
 
+const getLogs = async ({
+  page = 1,
+  limit = 25,
+  search = "",
+  type = "all",
+  purpose = "all",
+  dateFrom = "",
+  dateTo = "",
+} = {}) => {
+  const offset = (page - 1) * limit;
+  const conditions = [];
+  const params = [];
+
+  if (type && type !== "all") {
+    conditions.push("al.type = ?");
+    params.push(type);
+  }
+
+  if (purpose && purpose !== "all") {
+    conditions.push("al.purpose = ?");
+    params.push(purpose);
+  }
+
+  if (dateFrom) {
+    conditions.push("al.created_at >= ?");
+    params.push(`${dateFrom} 00:00:00`);
+  }
+
+  if (dateTo) {
+    conditions.push("al.created_at < DATE_ADD(?, INTERVAL 1 DAY)");
+    params.push(dateTo);
+  }
+
+  if (search.trim()) {
+    const like = `%${search.trim()}%`;
+    conditions.push(`(
+      u.name LIKE ? OR
+      u.student_employee_id LIKE ? OR
+      al.scanned_id LIKE ? OR
+      scanner.name LIKE ?
+    )`);
+    params.push(like, like, like, like);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const baseFromClause = `
+    FROM attendance_logs al
+    JOIN users u ON u.id = al.user_id
+    LEFT JOIN users scanner ON scanner.id = al.scanned_by
+    ${whereClause}
+  `;
+
+  const [[totalRow]] = await db.query(
+    `SELECT COUNT(*) AS total ${baseFromClause}`,
+    params,
+  );
+
+  const [[summaryRow]] = await db.query(
+    `SELECT
+       COUNT(*) AS total_records,
+       SUM(CASE WHEN al.type = 'check_in' THEN 1 ELSE 0 END) AS check_in_count,
+       SUM(CASE WHEN al.type = 'check_out' THEN 1 ELSE 0 END) AS check_out_count,
+       COUNT(DISTINCT al.user_id) AS unique_users,
+       SUM(CASE WHEN al.purpose = 'borrowing' THEN 1 ELSE 0 END) AS borrowing_scan_count
+     ${baseFromClause}`,
+    params,
+  );
+
+  const [rows] = await db.query(
+    `SELECT
+       al.id,
+       al.type,
+       al.purpose,
+       al.scanned_id,
+       al.created_at AS timestamp,
+       u.name,
+       u.student_employee_id,
+       u.role,
+       scanner.name AS scanned_by_name
+     ${baseFromClause}
+     ORDER BY al.created_at DESC, al.id DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
+  );
+
+  return {
+    rows,
+    pagination: {
+      page,
+      limit,
+      total: Number(totalRow?.total ?? 0),
+      totalPages: Math.max(1, Math.ceil(Number(totalRow?.total ?? 0) / limit)),
+    },
+    summary: {
+      total_records: Number(summaryRow?.total_records ?? 0),
+      check_in_count: Number(summaryRow?.check_in_count ?? 0),
+      check_out_count: Number(summaryRow?.check_out_count ?? 0),
+      unique_users: Number(summaryRow?.unique_users ?? 0),
+      borrowing_scan_count: Number(summaryRow?.borrowing_scan_count ?? 0),
+    },
+  };
+};
+
 /**
  * Logged-in user's own attendance history.
  */
@@ -158,4 +261,4 @@ const getMyLogs = async (userId) => {
   return rows;
 };
 
-module.exports = { recordScan, getTodayLogs, getMyLogs };
+module.exports = { recordScan, getTodayLogs, getLogs, getMyLogs };

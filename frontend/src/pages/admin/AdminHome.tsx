@@ -31,7 +31,7 @@ const emptyStats: HomeStats = {
 const adminQuickLinks = [
   { title: "Analytics", description: "Open the full charts and trends dashboard.", href: "/admin/analytics" },
   { title: "Circulation", description: "Process borrowing and returns at the desk.", href: "/admin/circulation" },
-  { title: "Circulation Report", description: "Review filtered transaction reports by timeframe.", href: "/admin/report" },
+  { title: "Reports", description: "Review circulation and reservation records by date range.", href: "/admin/report" },
   { title: "Fine Settings", description: "Adjust the hourly overdue fine and review exposure.", href: "/admin/payment" },
 ];
 

@@ -25,8 +25,10 @@ const getAdminReservations = async (req, res) => {
     const limit  = Math.min(50, parseInt(req.query.limit, 10) || 15);
     const search = req.query.search ?? "";
     const status = req.query.status ?? "all";
+    const dateFrom = req.query.dateFrom ?? "";
+    const dateTo = req.query.dateTo ?? "";
 
-    const result = await service.getAdminReservations({ search, status, page, limit });
+    const result = await service.getAdminReservations({ search, status, dateFrom, dateTo, page, limit });
     res.json(result);
   } catch (err) {
     console.error("[admin/reservations] getAdminReservations:", err);

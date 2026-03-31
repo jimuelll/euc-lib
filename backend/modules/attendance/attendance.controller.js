@@ -45,6 +45,28 @@ const getToday = async (req, res) => {
   }
 };
 
+const getLogs = async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const filters = {
+      page,
+      limit,
+      search: String(req.query.search ?? ""),
+      type: String(req.query.type ?? "all"),
+      purpose: String(req.query.purpose ?? "all"),
+      dateFrom: String(req.query.dateFrom ?? ""),
+      dateTo: String(req.query.dateTo ?? ""),
+    };
+
+    const result = await service.getLogs(filters);
+    res.json(result);
+  } catch (err) {
+    console.error("[attendance] getLogs:", err);
+    res.status(500).json({ message: "Failed to fetch attendance logs" });
+  }
+};
+
 const getMy = async (req, res) => {
   try {
     const rows = await service.getMyLogs(req.user.id);
@@ -55,4 +77,4 @@ const getMy = async (req, res) => {
   }
 };
 
-module.exports = { scan, getToday, getMy };
+module.exports = { scan, getToday, getLogs, getMy };

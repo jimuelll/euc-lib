@@ -41,7 +41,7 @@ export const sidebarSections: SidebarSection[] = [
     items: [
       { title: "Analytics",        url: "/admin/analytics",     icon: FileBarChart, roles: ["admin", "super_admin"] },
       { title: "Audit Logs",       url: "/admin/audit-logs",    icon: ScrollText, roles: ["super_admin"]  },
-      { title: "Circulation Report", url: "/admin/report",      icon: FileBarChart, roles: ["admin", "super_admin"] },
+      { title: "Reports", url: "/admin/report",      icon: FileBarChart, roles: ["admin", "super_admin"] },
       { title: "Attendance Logs",  url: "/admin/attendance-logs", icon: Clock, roles: ["admin", "super_admin"] },
     ],
   },

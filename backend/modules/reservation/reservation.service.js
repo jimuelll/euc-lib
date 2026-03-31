@@ -154,7 +154,14 @@ const cancelReservation = async (reservationId, userId) => {
 
 // ─── Admin reads ──────────────────────────────────────────────────────────────
 
-const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) => {
+const getAdminReservations = async ({
+  search,
+  status,
+  dateFrom,
+  dateTo,
+  page = 1,
+  limit = 15,
+}) => {
   await syncExpired();
 
   const offset     = (page - 1) * limit;
@@ -177,14 +184,39 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
     params.push(like, like, like, like);
   }
 
-  const where = `WHERE ${conditions.join(" AND ")}`;
+  if (dateFrom) {
+    conditions.push("r.reserved_at >= ?");
+    params.push(`${dateFrom} 00:00:00`);
+  }
 
-  const [[{ total }]] = await db.query(
-    `SELECT COUNT(*) AS total
+  if (dateTo) {
+    conditions.push("r.reserved_at < DATE_ADD(?, INTERVAL 1 DAY)");
+    params.push(dateTo);
+  }
+
+  const where = `WHERE ${conditions.join(" AND ")}`;
+  const baseFromClause = `
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
      JOIN users  u  ON u.id  = r.user_id AND u.deleted_at IS NULL
-     ${where}`,
+     ${where}
+  `;
+
+  const [[{ total }]] = await db.query(
+    `SELECT COUNT(*) AS total
+     ${baseFromClause}`,
+    params
+  );
+
+  const [[summary]] = await db.query(
+    `SELECT
+       COUNT(*) AS total_records,
+       SUM(CASE WHEN r.status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
+       SUM(CASE WHEN r.status = 'ready' THEN 1 ELSE 0 END) AS ready_count,
+       SUM(CASE WHEN r.status = 'fulfilled' THEN 1 ELSE 0 END) AS fulfilled_count,
+       SUM(CASE WHEN r.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
+       SUM(CASE WHEN r.status = 'expired' THEN 1 ELSE 0 END) AS expired_count
+     ${baseFromClause}`,
     params
   );
 
@@ -200,10 +232,7 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
        bk.location AS book_location,
        u.name                AS user_name,
        u.student_employee_id
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     JOIN users  u  ON u.id  = r.user_id AND u.deleted_at IS NULL
-     ${where}
+     ${baseFromClause}
      ORDER BY r.reserved_at DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
@@ -214,6 +243,14 @@ const getAdminReservations = async ({ search, status, page = 1, limit = 15 }) =>
     total,
     page,
     totalPages: Math.ceil(total / limit),
+    summary: {
+      total_records: Number(summary?.total_records ?? 0),
+      pending_count: Number(summary?.pending_count ?? 0),
+      ready_count: Number(summary?.ready_count ?? 0),
+      fulfilled_count: Number(summary?.fulfilled_count ?? 0),
+      cancelled_count: Number(summary?.cancelled_count ?? 0),
+      expired_count: Number(summary?.expired_count ?? 0),
+    },
   };
 };
 

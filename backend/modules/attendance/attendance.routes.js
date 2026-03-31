@@ -9,6 +9,7 @@ const adminOnly = authMiddleware(["admin", "super_admin"]);
 
 router.post("/scan",  scannerOrAbove, controller.scan);
 router.get("/today",  adminOnly, controller.getToday);
+router.get("/logs",   adminOnly, controller.getLogs);
 router.get("/my",     anyAuthenticatedUser, controller.getMy);
 
 module.exports = router;
