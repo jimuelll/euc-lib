@@ -37,7 +37,7 @@ const About = () => {
 
       <AboutHeader libraryName={library_name} />
 
-      <main className="bg-background">
+      <main className="bg-background pt-8 sm:pt-10">
         {loading ? (
           <LoadingIndicator />
         ) : (

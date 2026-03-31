@@ -82,15 +82,6 @@ const Services = () => {
       <main className="bg-background">
         <div className="border-b border-border py-8 sm:py-10">
           <div className="container px-4 sm:px-6">
-            <div className="mb-8 flex gap-0 border border-warning/25 bg-warning/8">
-              <div className="w-[3px] bg-warning shrink-0" />
-              <p
-                className="px-4 py-3 text-[11px] leading-relaxed text-foreground/78"
-                style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
-              >
-                Access the library&apos;s core services from here, with more breathing room between the page header and the service cards.
-              </p>
-            </div>
             <div
               className="border-l border-t border-border"
               style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))" }}
