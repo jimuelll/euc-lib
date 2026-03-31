@@ -3,7 +3,7 @@ import { Globe } from "lucide-react";
 const LIBRARY_LABEL = "Enverga-Candelaria Library";
 const PAGE_TITLE = "Academic Subscriptions";
 const PAGE_SUBTITLE =
-  "Full access to the following databases is available 24/7 with your student credentials. Click any resource to visit the platform.";
+  "Full access to the following databases is available 24/7 with your student or employee credentials. Click any resource to visit the platform.";
 
 export const PageHeader = () => (
   <div className="bg-primary relative overflow-hidden">

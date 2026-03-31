@@ -2,17 +2,19 @@ const bcrypt = require("bcryptjs");
 const db = require("../../db");
 const qr = require("qrcode");
 
+const STUDENT_LIKE_ROLES = ["student", "employee"];
+
 // Role hierarchy map
 const roleHierarchy = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "student"],
-  admin: ["admin", "staff", "scanner", "student"],
-  staff: ["staff", "scanner", "student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "student"],
+  admin: ["admin", "staff", "scanner", "employee", "student"],
+  staff: ["staff", "scanner", "employee", "student"],
 };
 
 const searchRoleHierarchy = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "student"],
-  admin: ["admin", "staff", "scanner", "student"],
-  staff: ["student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "student"],
+  admin: ["admin", "staff", "scanner", "employee", "student"],
+  staff: ["employee", "student"],
 };
 
 // CREATE USER
@@ -20,7 +22,7 @@ async function createUser({ student_employee_id, name, role, password, address, 
   if (!roleHierarchy[creatorRole]?.includes(role)) {
     throw new Error("You are not allowed to create a user with this role");
   }
-  if (role === creatorRole) {
+  if (role === creatorRole && creatorRole !== "super_admin") {
     throw new Error("You cannot create a user with your own role");
   }
 
@@ -329,4 +331,63 @@ async function queryToolsSearch(term, requesterRole) {
   };
 }
 
-module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };
+async function bulkDeactivateStudentLikeUsers(requesterRole, requesterId) {
+  if (!["admin", "super_admin"].includes(requesterRole)) {
+    throw new Error("You are not allowed to bulk deactivate users");
+  }
+
+  const [users] = await db.query(
+    `SELECT
+       u.id,
+       u.student_employee_id,
+       u.role,
+       COUNT(CASE WHEN b.status IN ('borrowed', 'overdue') THEN 1 END) AS active_borrow_count
+     FROM users u
+     LEFT JOIN borrowings b ON b.user_id = u.id AND b.deleted_at IS NULL
+     WHERE u.deleted_at IS NULL
+       AND u.is_active = 1
+       AND u.role IN (${STUDENT_LIKE_ROLES.map(() => "?").join(", ")})
+     GROUP BY u.id, u.student_employee_id, u.role`,
+    STUDENT_LIKE_ROLES
+  );
+
+  const eligibleUsers = users.filter((user) => Number(user.active_borrow_count) === 0);
+  const skippedUsers = users.filter((user) => Number(user.active_borrow_count) > 0);
+
+  if (eligibleUsers.length) {
+    await db.query(
+      `UPDATE users
+       SET is_active = 0,
+           deleted_at = NOW(),
+           deleted_by = ?
+       WHERE deleted_at IS NULL
+         AND is_active = 1
+         AND role IN (${STUDENT_LIKE_ROLES.map(() => "?").join(", ")})
+         AND id IN (${eligibleUsers.map(() => "?").join(", ")})`,
+      [requesterId, ...STUDENT_LIKE_ROLES, ...eligibleUsers.map((user) => user.id)]
+    );
+  }
+
+  return {
+    message: skippedUsers.length
+      ? `Deactivated ${eligibleUsers.length} account${eligibleUsers.length === 1 ? "" : "s"}. Skipped ${skippedUsers.length} account${skippedUsers.length === 1 ? "" : "s"} with unreturned books.`
+      : `Deactivated ${eligibleUsers.length} student and employee account${eligibleUsers.length === 1 ? "" : "s"}.`,
+    deactivated_count: eligibleUsers.length,
+    skipped_count: skippedUsers.length,
+    skipped_users: skippedUsers.map((user) => ({
+      student_employee_id: user.student_employee_id,
+      role: user.role,
+      active_borrow_count: Number(user.active_borrow_count),
+    })),
+  };
+}
+
+module.exports = {
+  createUser,
+  deleteUser,
+  restoreUser,
+  updateUser,
+  searchUsers,
+  queryToolsSearch,
+  bulkDeactivateStudentLikeUsers,
+};

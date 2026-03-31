@@ -10,6 +10,7 @@ const AdminManage = () => {
     showPassword,
     togglePassword,
     resetForm,
+    currentUserRole,
     allowedRoles,
     searchQuery,
     setSearchQuery,
@@ -24,6 +25,7 @@ const AdminManage = () => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
+    handleBulkDeactivateStudentLikeUsers,
     confirmDialog,
     qrTarget,
     setQrTarget,
@@ -37,6 +39,7 @@ const AdminManage = () => {
         onFunctionTypeChange={(v) => { setFunctionType(v); resetForm(); }}
         form={form}
         showPassword={showPassword}
+        currentUserRole={currentUserRole}
         allowedRoles={allowedRoles}
         loading={loading}
         onField={setField}
@@ -54,6 +57,7 @@ const AdminManage = () => {
         onUpdateUser={handleUpdateUser}
         onArchiveUser={handleArchiveUser}
         onRestoreUser={handleRestoreUser}
+        onBulkDeactivateStudentLikeUsers={handleBulkDeactivateStudentLikeUsers}
         qrTarget={qrTarget}
         onSetQrTarget={setQrTarget}
       />

@@ -2,7 +2,7 @@
 
 export type FunctionType = "create" | "edit";
 
-export type UserRole = "super_admin" | "admin" | "staff" | "scanner" | "student";
+export type UserRole = "super_admin" | "admin" | "staff" | "scanner" | "employee" | "student";
 
 export interface User {
   student_employee_id: string;

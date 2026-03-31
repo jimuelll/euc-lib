@@ -1,5 +1,5 @@
 import { useRole, UserRole } from "@/hooks/use-role";
-import { Shield, User, QrCode, GraduationCap } from "lucide-react";
+import { Shield, User, QrCode, GraduationCap, Briefcase } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 const roles: { value: UserRole; label: string; icon: typeof User; description: string }[] = [
   { value: "guest", label: "Guest", icon: User, description: "Public visitor" },
   { value: "student", label: "Student", icon: GraduationCap, description: "Logged-in student" },
+  { value: "employee", label: "Employee", icon: Briefcase, description: "Logged-in employee" },
   { value: "scanner", label: "Scanner", icon: QrCode, description: "Library entrance kiosk" },
   { value: "admin", label: "Admin", icon: Shield, description: "Administrator" },
 ];

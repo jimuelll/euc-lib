@@ -333,16 +333,18 @@ export const CreateForm = ({
 // ─── Search Bar ───────────────────────────────────────────────────────────────
 
 interface SearchBarProps {
+  currentUserRole:  string;
   value:            string;
   loading:          boolean;
   showArchived:     boolean;
   onChange:         (v: string) => void;
   onSearch:         () => void;
   onToggleArchived: () => void;
+  onBulkDeactivateStudentLikeUsers: () => void;
 }
 
 export const SearchBar = ({
-  value, loading, showArchived, onChange, onSearch, onToggleArchived,
+  currentUserRole, value, loading, showArchived, onChange, onSearch, onToggleArchived, onBulkDeactivateStudentLikeUsers,
 }: SearchBarProps) => (
   <div className="mt-6 space-y-0">
     {/* Section header with toggle */}
@@ -356,18 +358,31 @@ export const SearchBar = ({
           {showArchived ? "Archived Users" : "Active Users"}
         </span>
       </div>
-      <button
-        onClick={onToggleArchived}
-        className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
-          showArchived
-            ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
-            : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
-        }`}
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
-        <Archive className="h-3 w-3" />
-        {showArchived ? "Archived" : "Active"}
-      </button>
+      <div className="flex items-center gap-2">
+        {["admin", "super_admin"].includes(currentUserRole) ? (
+          <ActionButton
+            type="button"
+            variant="danger"
+            onClick={onBulkDeactivateStudentLikeUsers}
+            disabled={loading}
+            className="px-3 py-1 text-[10px]"
+          >
+            {loading ? "Working..." : "Deactivate All Students + Employee"}
+          </ActionButton>
+        ) : null}
+        <button
+          onClick={onToggleArchived}
+          className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
+            showArchived
+              ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
+              : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
+          }`}
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          <Archive className="h-3 w-3" />
+          {showArchived ? "Archived" : "Active"}
+        </button>
+      </div>
     </div>
 
     {/* Archived banner */}

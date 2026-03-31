@@ -20,6 +20,7 @@ interface AdminManageBuilderProps {
   onFunctionTypeChange: (v: FunctionType) => void;
   form: UserFormState;
   showPassword: boolean;
+  currentUserRole: string;
   allowedRoles: string[];
   loading: boolean;
   onField: <K extends keyof UserFormState>(key: K, value: string) => void;
@@ -37,6 +38,7 @@ interface AdminManageBuilderProps {
   onUpdateUser: () => void;
   onArchiveUser: () => void;
   onRestoreUser: () => void;
+  onBulkDeactivateStudentLikeUsers: () => void;
   qrTarget: QrTarget | null;
   onSetQrTarget: (v: QrTarget | null) => void;
 }
@@ -46,6 +48,7 @@ const AdminManageBuilder = ({
   onFunctionTypeChange,
   form,
   showPassword,
+  currentUserRole,
   allowedRoles,
   loading,
   onField,
@@ -63,6 +66,7 @@ const AdminManageBuilder = ({
   onUpdateUser,
   onArchiveUser,
   onRestoreUser,
+  onBulkDeactivateStudentLikeUsers,
   qrTarget,
   onSetQrTarget,
 }: AdminManageBuilderProps) => (
@@ -105,12 +109,14 @@ const AdminManageBuilder = ({
     ) : (
       <>
         <SearchBar
+          currentUserRole={currentUserRole}
           value={searchQuery}
           loading={loading}
           showArchived={showArchived}
           onChange={onSearchQueryChange}
           onSearch={onSearch}
           onToggleArchived={onToggleArchived}
+          onBulkDeactivateStudentLikeUsers={onBulkDeactivateStudentLikeUsers}
         />
 
         {searchResults.length > 0 ? (

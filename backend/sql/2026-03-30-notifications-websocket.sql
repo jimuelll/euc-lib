@@ -6,7 +6,7 @@ CREATE TABLE `notifications` (
   `href` varchar(255) DEFAULT NULL,
   `audience_type` enum('all','user','role') NOT NULL DEFAULT 'all',
   `audience_user_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `audience_role` enum('scanner','student','staff','admin','super_admin') DEFAULT NULL,
+  `audience_role` enum('scanner','student','employee','staff','admin','super_admin') DEFAULT NULL,
   `expires_at` datetime DEFAULT NULL,
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,

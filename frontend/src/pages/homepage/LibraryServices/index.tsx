@@ -103,7 +103,7 @@ const LibraryServices = () => {
                   {readyCount} book{readyCount > 1 ? "s are" : " is"} ready for pickup
                 </p>
                 <p className="text-muted-foreground mt-0.5">
-                  Head to the library front desk with your student ID.
+                    Head to the library front desk with your student or employee ID.
                 </p>
               </div>
             </div>

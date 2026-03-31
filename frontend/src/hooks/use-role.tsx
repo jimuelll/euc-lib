@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-export type UserRole = "guest" | "student" | "scanner" | "admin";
+export type UserRole = "guest" | "student" | "employee" | "scanner" | "admin";
 
 interface RoleContextType {
   role: UserRole;
@@ -13,6 +13,7 @@ interface RoleContextType {
 const roleProfiles: Record<UserRole, { name: string; initials: string }> = {
   guest: { name: "Guest", initials: "G" },
   student: { name: "Maria Santos", initials: "MS" },
+  employee: { name: "Elena Reyes", initials: "ER" },
   scanner: { name: "Library Scanner", initials: "LS" },
   admin: { name: "Admin User", initials: "AD" },
 };
@@ -22,7 +23,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 export const RoleProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<UserRole>(() => {
     const stored = localStorage.getItem("demo-role") as UserRole;
-    return stored && ["guest", "student", "scanner", "admin"].includes(stored) ? stored : "guest";
+    return stored && ["guest", "student", "employee", "scanner", "admin"].includes(stored) ? stored : "guest";
   });
 
   const handleSetRole = (newRole: UserRole) => {

@@ -87,7 +87,7 @@ const ReserveTab = ({
             >
               48 hours
             </span>
-            . Bring your student ID to the front desk to claim your book.
+                    . Bring your student or employee ID to the front desk to claim your book.
             Unclaimed reservations expire automatically.
           </p>
         </div>

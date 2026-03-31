@@ -19,6 +19,7 @@ interface UseAdminManageReturn {
   resetForm:       () => void;
 
   // Roles
+  currentUserRole: string;
   allowedRoles: string[];
 
   // Search
@@ -39,6 +40,7 @@ interface UseAdminManageReturn {
   handleUpdateUser:  () => Promise<void>;
   handleArchiveUser: () => Promise<void>;
   handleRestoreUser: () => Promise<void>;
+  handleBulkDeactivateStudentLikeUsers: () => Promise<void>;
   confirmDialog: JSX.Element;
 
   // QR
@@ -60,6 +62,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
+  const currentUserRole = user?.role ?? "";
 
   useEffect(() => {
     if (!user) return;
@@ -237,6 +240,44 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
   };
 
+  const handleBulkDeactivateStudentLikeUsers = async () => {
+    const shouldDeactivate = await confirm({
+      title: "Deactivate all student and employee accounts?",
+      description: "This archives every active student and employee account with no unreturned books so their library cards stop working for the new semester.",
+      actionLabel: "Deactivate Eligible Accounts",
+      tone: "danger",
+    });
+    if (!shouldDeactivate) return;
+
+    setLoading(true);
+    try {
+      const res = await axiosInstance.post("/api/admin/users/bulk-deactivate-student-like");
+      toast.success(res.data.message || "Accounts updated");
+
+      if (res.data.skipped_count) {
+        const skippedSummary = (res.data.skipped_users ?? [])
+          .slice(0, 3)
+          .map((item: { student_employee_id: string; active_borrow_count: number }) =>
+            `${item.student_employee_id} (${item.active_borrow_count})`
+          )
+          .join(", ");
+
+        toast.info(
+          skippedSummary
+            ? `Skipped accounts with unreturned books: ${skippedSummary}${res.data.skipped_count > 3 ? "..." : ""}`
+            : "Some accounts were skipped because they still have unreturned books."
+        );
+      }
+
+      setSearchResults([]);
+      setSelectedUser(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Bulk deactivation failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     functionType,
     setFunctionType,
@@ -245,6 +286,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     showPassword,
     togglePassword,
     resetForm,
+    currentUserRole,
     allowedRoles,
     searchQuery,
     setSearchQuery,
@@ -259,6 +301,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
+    handleBulkDeactivateStudentLikeUsers,
     confirmDialog,
     qrTarget,
     setQrTarget,
