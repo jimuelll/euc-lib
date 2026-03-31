@@ -3,6 +3,7 @@ import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
 
 interface Book {
@@ -41,6 +42,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 );
 
 const Catalogue = () => {
+  const { isLoggedIn, loading: authLoading } = useAuth();
   const [query, setQuery] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("q") || "";
@@ -62,6 +64,15 @@ const Catalogue = () => {
 
   const searchBooks = useCallback(async (q: string) => {
     if (!q.trim()) { setBooks([]); setHasSearched(false); return; }
+    if (authLoading) return;
+
+    if (!isLoggedIn) {
+      setBooks([]);
+      setHasSearched(true);
+      setError("Catalogue search requires login access.");
+      return;
+    }
+
     setLoading(true); setError(null); setHasSearched(true);
     try {
       const res = await axiosInstance.get("api/admin/catalogue/search", { params: { query: q.trim() } });
@@ -72,7 +83,7 @@ const Catalogue = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, isLoggedIn]);
 
   useEffect(() => { searchBooks(debouncedQuery); }, [debouncedQuery, searchBooks]);
 
