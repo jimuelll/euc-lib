@@ -17,7 +17,7 @@ import { formatRole } from "../AdminManage.data";
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3 mb-5">
-    <div className="h-px w-6 bg-warning shrink-0" />
+    <div className="h-px w-8 bg-warning shrink-0" />
     <p
       className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
       style={{ fontFamily: "var(--font-heading)" }}
@@ -52,13 +52,13 @@ const ActionButton = ({
   className?: string;
 }) => {
   const base =
-    "inline-flex items-center gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] border transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] border transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50";
   const variants: Record<string, string> = {
-    primary: "bg-primary border-primary text-primary-foreground hover:bg-primary/85",
-    ghost:   "bg-transparent border-border text-muted-foreground hover:bg-secondary hover:text-foreground",
-    danger:  "bg-transparent border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-    success: "bg-transparent border-success/40 text-success hover:bg-success hover:text-success-foreground",
-    warning: "bg-transparent border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground",
+    primary: "border-primary bg-primary text-primary-foreground shadow-[0_10px_24px_hsl(var(--primary)/0.18)] hover:bg-primary/90",
+    ghost:   "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground",
+    danger:  "border-destructive/40 bg-transparent text-destructive hover:bg-destructive hover:text-destructive-foreground",
+    success: "border-success/40 bg-transparent text-success hover:bg-success hover:text-success-foreground",
+    warning: "border-warning/40 bg-transparent text-warning hover:bg-warning hover:text-warning-foreground",
   };
   return (
     <button
@@ -273,10 +273,10 @@ export const CreateForm = ({
   onField, onTogglePassword, onSubmit, onReset,
 }: CreateFormProps) => (
   <form
-    className="mt-6 border border-border bg-background"
+    className="admin-panel-surface admin-etched-border mt-6 border border-border bg-background"
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    <div className="border-b border-border px-6 py-4 bg-secondary/30">
+    <div className="border-b border-border px-6 py-4 bg-[linear-gradient(180deg,hsl(var(--primary)/0.07),transparent)]">
       <SectionLabel>New User Details</SectionLabel>
     </div>
 
@@ -319,7 +319,7 @@ export const CreateForm = ({
       <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
 
-    <div className="border-t border-border px-6 py-4 flex gap-2">
+    <div className="flex gap-2 border-t border-border px-6 py-4">
       <ActionButton type="submit" disabled={loading}>
         {loading ? "Creating…" : "Create User"}
       </ActionButton>
@@ -346,7 +346,7 @@ export const SearchBar = ({
 }: SearchBarProps) => (
   <div className="mt-6 space-y-0">
     {/* Section header with toggle */}
-    <div className="flex items-center justify-between border border-border border-b-0 px-4 py-2.5 bg-muted/30">
+    <div className="flex items-center justify-between border border-border border-b-0 bg-[linear-gradient(180deg,hsl(var(--primary)/0.06),transparent)] px-4 py-2.5">
       <div className="flex items-center gap-2.5">
         <div className="h-px w-4 bg-warning shrink-0" />
         <span

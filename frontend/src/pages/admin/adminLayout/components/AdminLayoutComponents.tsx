@@ -1,8 +1,16 @@
 import { Library, ChevronDown, LogOut, Bell, ExternalLink } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter,
-  SidebarHeader, SidebarTrigger, useSidebar,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -11,8 +19,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { sidebarSections, getInitials, resolveCurrentItem, resolveCurrentSection } from "../AdminLayoutData";
-
-// ── AdminSidebar ──────────────────────────────────────────────────────────────
 
 export function AdminSidebar() {
   const { state } = useSidebar();
@@ -26,30 +32,28 @@ export function AdminSidebar() {
     .filter((section) => section.items.length > 0);
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="border-r-0"
-      style={{ background: "hsl(var(--sidebar-background))" }}
-    >
-      {/* ── Brand header ── */}
+    <Sidebar collapsible="icon" className="border-r-0" style={{ background: "hsl(var(--sidebar-background))" }}>
       <SidebarHeader className="p-0">
-        <div className="h-[3px] w-full" style={{ background: "hsl(var(--sidebar-primary))" }} />
+        <div
+          className="h-[4px] w-full"
+          style={{ background: "linear-gradient(90deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / 0.45))" }}
+        />
 
         <div className={cn("flex items-center gap-3 px-4 py-4", collapsed && "justify-center px-3")}>
           <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center border"
+            className="flex h-9 w-9 shrink-0 items-center justify-center border"
             style={{
-              background: "hsl(var(--primary) / 0.18)",
-              borderColor: "hsl(var(--primary) / 0.35)",
+              background: "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.2), hsl(var(--sidebar-primary) / 0.08))",
+              borderColor: "hsl(var(--sidebar-primary) / 0.35)",
             }}
           >
-            <Library className="h-4 w-4" style={{ color: "hsl(var(--primary-foreground))" }} />
+            <Library className="h-4 w-4" style={{ color: "hsl(var(--sidebar-primary))" }} />
           </div>
 
           {!collapsed && (
-            <div className="flex flex-col min-w-0">
+            <div className="min-w-0 flex flex-col">
               <span
-                className="text-[11px] font-bold uppercase tracking-[0.18em] leading-none truncate"
+                className="truncate text-[11px] font-bold uppercase leading-none tracking-[0.18em]"
                 style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
               >
                 EUC Library
@@ -64,15 +68,11 @@ export function AdminSidebar() {
           )}
         </div>
 
-        <div className="h-px mx-0" style={{ background: "hsl(var(--sidebar-border))" }} />
+        <div className="mx-0 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
 
-        {/* ── Profile card ── */}
         {!collapsed ? (
-          <div className="px-4 py-4 flex items-center gap-3">
-            <Avatar
-              className="h-9 w-9 shrink-0 border"
-              style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}
-            >
+          <div className="flex items-center gap-3 bg-[linear-gradient(180deg,hsl(var(--sidebar-primary)/0.05),transparent)] px-4 py-4">
+            <Avatar className="h-9 w-9 shrink-0 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
               <AvatarFallback
                 className="text-[11px] font-bold"
                 style={{
@@ -86,7 +86,7 @@ export function AdminSidebar() {
             </Avatar>
             <div className="min-w-0 flex-1">
               <p
-                className="text-[12px] font-bold truncate leading-tight"
+                className="truncate text-[12px] font-bold leading-tight"
                 style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
               >
                 {user?.name ?? "Administrator"}
@@ -101,10 +101,7 @@ export function AdminSidebar() {
           </div>
         ) : (
           <div className="flex justify-center py-3">
-            <Avatar
-              className="h-7 w-7 border"
-              style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}
-            >
+            <Avatar className="h-7 w-7 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
               <AvatarFallback
                 className="text-[10px] font-bold"
                 style={{
@@ -122,16 +119,11 @@ export function AdminSidebar() {
         <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
       </SidebarHeader>
 
-      {/* ── Nav ── */}
       <SidebarContent className="px-0 py-2">
         {visibleSections.map((section, sectionIndex) => (
           <SidebarGroup key={section.label} className="p-0">
-
             {sectionIndex > 0 && (
-              <div
-                className="mx-3 my-1"
-                style={{ height: "1px", background: "hsl(var(--sidebar-border))" }}
-              />
+              <div className="mx-3 my-1" style={{ height: "1px", background: "hsl(var(--sidebar-border))" }} />
             )}
 
             {!collapsed ? (
@@ -141,10 +133,7 @@ export function AdminSidebar() {
                   style={{ color: "hsl(var(--sidebar-foreground) / 0.35)" }}
                 >
                   <div className="flex items-center gap-2">
-                    <div
-                      className="h-px w-2 shrink-0"
-                      style={{ background: "hsl(var(--sidebar-primary) / 0.5)" }}
-                    />
+                    <div className="h-px w-2 shrink-0" style={{ background: "hsl(var(--sidebar-primary) / 0.5)" }} />
                     <span
                       className="text-[9px] font-bold uppercase tracking-[0.25em]"
                       style={{ fontFamily: "var(--font-heading)" }}
@@ -159,21 +148,19 @@ export function AdminSidebar() {
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {section.items.map((item) => (
-                      <SidebarMenuItem key={item.title} className="px-2">
+                        <SidebarMenuItem key={item.title} className="px-2">
                           <SidebarMenuButton asChild>
                             <NavLink
                               to={item.url}
                               end={item.url === "/admin"}
-                              className={cn(
-                                "flex items-center gap-2.5 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors",
-                              )}
+                              className="flex items-center gap-2.5 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors"
                               style={({ isActive }: { isActive: boolean }) => ({
                                 fontFamily: "var(--font-heading)",
                                 color: isActive
                                   ? "hsl(var(--sidebar-primary))"
                                   : "hsl(var(--sidebar-foreground) / 0.65)",
                                 background: isActive
-                                  ? "hsl(var(--sidebar-primary) / 0.12)"
+                                  ? "linear-gradient(90deg, hsl(var(--sidebar-primary) / 0.16), transparent)"
                                   : "transparent",
                                 borderLeft: isActive
                                   ? "2px solid hsl(var(--sidebar-primary))"
@@ -191,7 +178,6 @@ export function AdminSidebar() {
                 </CollapsibleContent>
               </Collapsible>
             ) : (
-              /* Collapsed — icons only */
               <SidebarGroupContent>
                 <SidebarMenu>
                   {section.items.map((item) => (
@@ -207,7 +193,7 @@ export function AdminSidebar() {
                               ? "hsl(var(--sidebar-primary))"
                               : "hsl(var(--sidebar-foreground) / 0.5)",
                             background: isActive
-                              ? "hsl(var(--sidebar-primary) / 0.12)"
+                              ? "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.18), transparent)"
                               : "transparent",
                           })}
                         >
@@ -223,7 +209,6 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      {/* ── Footer — logout ── */}
       <SidebarFooter className="p-0">
         <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
         <div className={cn("p-3", collapsed && "flex justify-center")}>
@@ -234,8 +219,12 @@ export function AdminSidebar() {
               collapsed ? "justify-center" : "w-full",
             )}
             style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "hsl(var(--destructive))"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-foreground) / 0.4)"; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "hsl(var(--destructive))";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-foreground) / 0.4)";
+            }}
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />
             {!collapsed && <span>Logout</span>}
@@ -246,68 +235,66 @@ export function AdminSidebar() {
   );
 }
 
-// ── AdminTopbar ───────────────────────────────────────────────────────────────
-
 export function AdminTopbar({ pathname }: { pathname: string }) {
   const current = resolveCurrentItem(pathname);
   const currentSection = current ? resolveCurrentSection(current.url) : undefined;
 
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/90 backdrop-blur-md px-4">
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/92 backdrop-blur-md">
+      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--warning)),transparent_70%)]" />
+      <div className="flex h-14 items-center justify-between px-4 sm:px-5">
+        <div className="flex items-center gap-3">
+          <SidebarTrigger className="border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" />
 
-      {/* Left — trigger + breadcrumb */}
-      <div className="flex items-center gap-3">
-        <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
+          <div className="h-5 w-px bg-border" />
 
-        <div className="h-4 w-px bg-border" />
+          {current && (
+            <div className="flex items-center gap-2">
+              <div className="h-px w-5 shrink-0 bg-warning" />
+              <span
+                className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground sm:block"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {currentSection?.label}
+              </span>
+              <span className="hidden text-xs text-muted-foreground/30 sm:block">/</span>
+              <span
+                className="text-[11px] font-bold uppercase tracking-[0.18em] text-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {current.title}
+              </span>
+            </div>
+          )}
+        </div>
 
-        {current && (
-          <div className="flex items-center gap-2">
-            <div className="h-px w-3 bg-warning shrink-0" />
+        <div className="flex items-center gap-1">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-9 items-center gap-1.5 border border-border/70 bg-card px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:border-warning/40 hover:text-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            <ExternalLink className="h-3 w-3" />
+            <span className="hidden sm:inline">View Site</span>
+          </a>
+
+          <div className="mx-0.5 h-4 w-px bg-border" />
+
+          <button
+            className="relative flex h-9 w-9 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border/70 hover:bg-card hover:text-foreground"
+            aria-label="Notifications"
+          >
+            <Bell className="h-3.5 w-3.5" />
             <span
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground hidden sm:block"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {currentSection?.label}
-            </span>
-            <span className="text-muted-foreground/30 hidden sm:block text-xs">/</span>
-            <span
-              className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {current.title}
-            </span>
-          </div>
-        )}
-      </div>
+              className="absolute right-2 top-2 h-1.5 w-1.5 ring-2 ring-background"
+              style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
+            />
+          </button>
 
-      {/* Right — actions */}
-      <div className="flex items-center gap-1">
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 h-8 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground border border-transparent hover:border-border transition-colors"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          <ExternalLink className="h-3 w-3" />
-          <span className="hidden sm:inline">View Site</span>
-        </a>
-
-        <div className="h-4 w-px bg-border mx-0.5" />
-
-        <button
-          className="relative flex items-center justify-center h-8 w-8 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="h-3.5 w-3.5" />
-          <span
-            className="absolute top-1.5 right-1.5 h-1.5 w-1.5 ring-2 ring-background"
-            style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
-          />
-        </button>
-
-        <ThemeToggle />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

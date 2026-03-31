@@ -45,30 +45,36 @@ export function AdminPage({
         : "max-w-none";
 
   return (
-    <div className={cn("flex w-full flex-col gap-6", widthClass, className)}>
-      <section className="border-b border-border/70 pb-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
-            <p
-              className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {eyebrow}
-            </p>
-            <div className="space-y-1.5">
+    <div className={cn("flex w-full flex-col gap-7", widthClass, className)}>
+      <section className="admin-panel-surface admin-etched-border relative overflow-hidden border border-border/80 bg-card/95">
+        <div className="absolute inset-x-0 top-0 h-[3px] bg-warning" />
+        <div className="absolute right-0 top-0 hidden h-full w-40 bg-[linear-gradient(180deg,hsl(var(--primary)/0.08),transparent)] lg:block" />
+
+        <div className="relative flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-7">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px w-8 bg-warning" />
+              <p
+                className="text-[10px] font-semibold uppercase tracking-[0.32em] text-muted-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {eyebrow}
+              </p>
+            </div>
+            <div className="space-y-2">
               <h1
-                className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+                className="max-w-4xl text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {title}
               </h1>
               {description ? (
-                <p className="max-w-5xl text-sm leading-6 text-muted-foreground">{description}</p>
+                <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-[15px]">{description}</p>
               ) : null}
             </div>
           </div>
 
-          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="flex flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
         </div>
       </section>
 
@@ -88,13 +94,14 @@ export function AdminPanel({
   const hasHeader = title || description || actions;
 
   return (
-    <Card className={cn("min-w-0 border-border/80 shadow-none", className)}>
+    <Card className={cn("admin-panel-surface admin-etched-border min-w-0 rounded-sm border-border/80 bg-card/95 shadow-none", className)}>
+      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--warning)),transparent_72%)]" />
       {hasHeader ? (
-        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-muted/20 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-[linear-gradient(180deg,hsl(var(--primary)/0.06),transparent)] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             {title ? (
               <CardTitle
-                className="text-base font-semibold tracking-tight text-foreground"
+                className="text-base font-semibold tracking-[-0.01em] text-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {title}
@@ -120,21 +127,31 @@ export function AdminStatGrid({ children }: { children: ReactNode }) {
 
 export function AdminStatCard({ label, value, icon, helperText }: AdminStatCardProps) {
   return (
-    <Card className="border-border/80 shadow-none">
+    <Card className="admin-panel-surface admin-etched-border rounded-sm border-border/80 bg-card/95 shadow-none">
+      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--warning)),transparent_78%)]" />
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className="space-y-2.5">
             <p
-              className="text-2xl font-semibold tracking-tight text-foreground"
+              className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {label}
+            </p>
+            <p
+              className="text-2xl font-semibold tracking-[-0.02em] text-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {value}
             </p>
           </div>
-          {icon ? <div className="mt-0.5 text-muted-foreground">{icon}</div> : null}
+          {icon ? (
+            <div className="mt-0.5 flex h-10 w-10 items-center justify-center border border-warning/25 bg-warning/10 text-warning">
+              {icon}
+            </div>
+          ) : null}
         </div>
-        {helperText ? <p className="mt-3 text-xs leading-5 text-muted-foreground">{helperText}</p> : null}
+        {helperText ? <p className="mt-4 border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">{helperText}</p> : null}
       </CardContent>
     </Card>
   );

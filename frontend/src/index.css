@@ -121,6 +121,10 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    background-image:
+      linear-gradient(180deg, hsl(var(--primary) / 0.06), transparent 18rem),
+      linear-gradient(90deg, hsl(var(--warning) / 0.04), transparent 24rem);
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -145,5 +149,31 @@
     opacity: 0;
     width: 1.25rem;
     cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .admin-shell-backdrop {
+    background-image:
+      linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 14rem),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0,
+        transparent 47px,
+        hsl(var(--border) / 0.32) 47px,
+        hsl(var(--border) / 0.32) 48px
+      );
+  }
+
+  .admin-panel-surface {
+    background-image:
+      linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / 0.96)),
+      linear-gradient(90deg, hsl(var(--warning) / 0.05), transparent 14rem);
+  }
+
+  .admin-etched-border {
+    box-shadow:
+      inset 0 1px 0 hsl(var(--background) / 0.7),
+      0 12px 32px hsl(var(--primary) / 0.08);
   }
 }
