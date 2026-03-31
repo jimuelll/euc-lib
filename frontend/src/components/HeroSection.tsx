@@ -1,14 +1,17 @@
 import { useState, useRef } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Search, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
 import { useTheme } from "@/hooks/use-theme"
+import { useAuth } from "@/context/AuthContext"
 
 const HeroSection = () => {
   const [searchActive, setSearchActive] = useState(false)
   const [query, setQuery] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate()
   const { theme } = useTheme()
+  const { isLoggedIn, loading } = useAuth()
 
   const isDark = theme === "dark"
 
@@ -19,7 +22,7 @@ const HeroSection = () => {
 
   const navigateToSearch = () => {
     if (query.trim()) {
-      window.location.href = `/catalogue?q=${encodeURIComponent(query.trim())}`
+      navigate(`/catalogue?q=${encodeURIComponent(query.trim())}`)
     }
   }
 
@@ -175,14 +178,16 @@ const HeroSection = () => {
             </button>
           </Link>
 
-          <Link to="/login">
-            <button
-              className="flex items-center gap-2 border border-white/30 px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-white/70 hover:border-white/55 hover:text-white backdrop-blur-sm transition-colors"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Login for Reservation
-            </button>
-          </Link>
+          {!loading && (
+            <Link to={isLoggedIn ? "/my-library" : "/login"}>
+              <button
+                className="flex items-center gap-2 border border-white/30 px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-white/70 hover:border-white/55 hover:text-white backdrop-blur-sm transition-colors"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                {isLoggedIn ? "Go to My Library" : "Login for Reservation"}
+              </button>
+            </Link>
+          )}
         </motion.div>
 
         {/* Stats row */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -43,10 +44,8 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 const Catalogue = () => {
   const { isLoggedIn, loading: authLoading } = useAuth();
-  const [query, setQuery] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("q") || "";
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") || "");
 
   const [books, setBooks]             = useState<Book[]>([]);
   const [schema, setSchema]           = useState<SchemaField[]>([]);
@@ -55,6 +54,27 @@ const Catalogue = () => {
   const [hasSearched, setHasSearched] = useState(false);
 
   const debouncedQuery = useDebounce(query, 400);
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    setQuery((currentQuery) => (currentQuery === nextQuery ? currentQuery : nextQuery));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const trimmedQuery = debouncedQuery.trim();
+    const currentQuery = searchParams.get("q") || "";
+
+    if (trimmedQuery === currentQuery) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (trimmedQuery) {
+      nextParams.set("q", trimmedQuery);
+    } else {
+      nextParams.delete("q");
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  }, [debouncedQuery, searchParams, setSearchParams]);
 
   useEffect(() => {
     axiosInstance.get("api/admin/catalog-schema")
