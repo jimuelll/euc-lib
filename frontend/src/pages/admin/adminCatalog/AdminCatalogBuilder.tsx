@@ -71,6 +71,8 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const [newFieldPublic,    setNewFieldPublic]    = useState(true);
   const [editingFieldKey,   setEditingFieldKey]   = useState<string | null>(null);
   const [editingLabel,      setEditingLabel]      = useState("");
+  const [editingOptionsKey, setEditingOptionsKey] = useState<string | null>(null);
+  const [editingOptions,    setEditingOptions]    = useState("");
   const [saving,            setSaving]            = useState(false);
   const [showArchivedPanel, setShowArchivedPanel] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
@@ -156,6 +158,32 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     setEditingFieldKey(null);
   };
 
+  const handleStartOptionsEdit = (field: FormField) => {
+    setEditingOptionsKey(field.key);
+    setEditingOptions((field.options ?? []).join(", "));
+  };
+
+  const handleSaveOptions = (key: string) => {
+    const nextOptions = editingOptions
+      .split(",")
+      .map((option) => option.trim())
+      .filter(Boolean);
+
+    if (!nextOptions.length) {
+      toast.error("Dropdown fields need at least one option");
+      return;
+    }
+
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, options: nextOptions } : f)));
+    setEditingOptionsKey(null);
+    setEditingOptions("");
+  };
+
+  const handleCancelOptionsEdit = () => {
+    setEditingOptionsKey(null);
+    setEditingOptions("");
+  };
+
   const handleToggleLocked = (key: string, current: boolean) => {
     if (SYSTEM_LOCKED_KEYS.has(key) && current) {
       toast.error("This field is required by the system and must stay locked.");
@@ -214,10 +242,8 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
               </div>
             ) : (
               sortedFields.map((f, idx) => (
-                <div
-                  key={f.key}
-                  className="flex items-center gap-3 px-5 py-3 bg-background hover:bg-muted/15 transition-colors"
-                >
+                <div key={f.key}>
+                  <div className="flex items-center gap-3 px-5 py-3 bg-background hover:bg-muted/15 transition-colors">
                   {/* Move arrows */}
                   <div className="flex flex-col gap-0.5 shrink-0">
                     <button
@@ -316,6 +342,16 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
+                        {f.type === "select" && (
+                          <button
+                            onClick={() => handleStartOptionsEdit(f)}
+                            className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/45 hover:text-foreground transition-colors"
+                            style={{ fontFamily: "var(--font-heading)" }}
+                            title="Edit dropdown options"
+                          >
+                            Options
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteField(f.key)}
                           className="p-1 text-muted-foreground/25 hover:text-destructive transition-colors"
@@ -325,6 +361,48 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                         </button>
                       </div>
                     )
+                  )}
+                  </div>
+
+                  {f.type === "select" && editingOptionsKey === f.key && (
+                    <div className="border-t border-border/60 bg-muted/10 px-5 py-3">
+                      <FieldLabel>
+                        Dropdown Options{" "}
+                        <span className="normal-case tracking-normal text-muted-foreground/40 font-normal ml-1">
+                          (comma-separated)
+                        </span>
+                      </FieldLabel>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={editingOptions}
+                          onChange={(e) => setEditingOptions(e.target.value)}
+                          className={inputClass}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveOptions(f.key);
+                            if (e.key === "Escape") handleCancelOptionsEdit();
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveOptions(f.key)}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 border border-success/40 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-success hover:bg-success hover:text-success-foreground disabled:opacity-50 transition-colors"
+                          style={{ fontFamily: "var(--font-heading)" }}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelOptionsEdit}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground hover:border-foreground disabled:opacity-50 transition-colors"
+                          style={{ fontFamily: "var(--font-heading)" }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ))

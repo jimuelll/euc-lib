@@ -384,15 +384,15 @@ CREATE TABLE `catalog_schema` (
 --
 
 INSERT INTO `catalog_schema` (`id`, `key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`) VALUES
-(87, 'title', 'Book Title', 'text', NULL, 1, 1, 0, 1, 0),
-(88, 'author', 'Author', 'text', NULL, 0, 1, 1, 1, 0),
-(89, 'isbn', 'ISBN', 'text', NULL, 0, 1, 2, 1, 0),
-(90, 'category', 'Category', 'select', '[\"Computer Science\",\"Engineering\",\"Mathematics\",\"Science\",\"Literature\",\"History\",\"Business\",\"Other\"]', 0, 1, 3, 1, 0),
-(91, 'edition', 'Edition', 'text', NULL, 0, 1, 4, 1, 0),
-(92, 'publication_year', 'Publication Year', 'number', NULL, 0, 1, 5, 1, 0),
-(93, 'copies', 'Copies', 'number', NULL, 0, 1, 6, 1, 0),
-(94, 'location', 'Location', 'text', NULL, 0, 0, 7, 1, 1),
-(103, 'try', 'try', 'text', NULL, 0, 0, 8, 1, 1);
+  (87, 'title', 'Book Title', 'text', NULL, 1, 1, 0, 1, 0),
+  (88, 'author', 'Author', 'text', NULL, 1, 1, 1, 1, 0),
+  (89, 'isbn', 'ISBN', 'text', NULL, 0, 0, 2, 1, 0),
+  (90, 'category', 'Category', 'select', '[\"Computer Science\",\"Engineering\",\"Mathematics\",\"Science\",\"Literature\",\"History\",\"Business\",\"Other\"]', 0, 0, 3, 1, 0),
+  (91, 'edition', 'Edition', 'text', NULL, 0, 0, 6, 1, 1),
+  (92, 'publication_year', 'Publication Year', 'number', NULL, 0, 0, 7, 1, 1),
+  (93, 'copies', 'Copies', 'number', NULL, 0, 0, 4, 1, 0),
+  (94, 'location', 'Location', 'text', NULL, 0, 0, 5, 0, 0),
+  (103, 'try', 'try', 'text', NULL, 0, 0, 8, 1, 1);
 
 -- --------------------------------------------------------
 
