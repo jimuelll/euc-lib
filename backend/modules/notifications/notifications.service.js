@@ -3,6 +3,37 @@ const hub = require("../../realtime/notificationHub");
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+let ensuredNotificationSourceColumns = false;
+
+const ensureNotificationSourceColumns = async (conn = db) => {
+  if (ensuredNotificationSourceColumns) return;
+
+  const [columns] = await conn.query(
+    `SELECT COLUMN_NAME
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'notifications'
+       AND COLUMN_NAME IN ('source_type', 'source_id')`
+  );
+
+  const existingColumns = new Set(columns.map((column) => column.COLUMN_NAME));
+
+  if (!existingColumns.has("source_type")) {
+    await conn.query(
+      `ALTER TABLE notifications
+       ADD COLUMN source_type VARCHAR(50) DEFAULT NULL AFTER created_by`
+    );
+  }
+
+  if (!existingColumns.has("source_id")) {
+    await conn.query(
+      `ALTER TABLE notifications
+       ADD COLUMN source_id BIGINT DEFAULT NULL AFTER source_type`
+    );
+  }
+
+  ensuredNotificationSourceColumns = true;
+};
 
 const normaliseNotification = (row) => ({
   id: row.id,
@@ -17,6 +48,8 @@ const normaliseNotification = (row) => ({
   expires_at: row.expires_at,
   is_active: !!row.is_active,
   created_by: row.created_by,
+  source_type: row.source_type ?? null,
+  source_id: row.source_id ?? null,
   read_at: row.read_at ?? null,
   is_read: !!row.read_at,
 });
@@ -32,6 +65,7 @@ const buildAudienceWhere = () => `
 `;
 
 const listForUser = async ({ userId, role, limit = DEFAULT_LIMIT, unreadOnly = false }) => {
+  await ensureNotificationSourceColumns();
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
   const params = [userId, role];
 
@@ -59,6 +93,7 @@ const listForUser = async ({ userId, role, limit = DEFAULT_LIMIT, unreadOnly = f
 };
 
 const getUnreadCountForUser = async ({ userId, role }) => {
+  await ensureNotificationSourceColumns();
   const [[row]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM notifications n
@@ -74,6 +109,7 @@ const getUnreadCountForUser = async ({ userId, role }) => {
 };
 
 const getByIdForUser = async ({ notificationId, userId, role }) => {
+  await ensureNotificationSourceColumns();
   const [[row]] = await db.query(
     `SELECT
        n.*,
@@ -151,6 +187,35 @@ const resolveRecipients = async ({ audienceType, audienceUserId, audienceRole })
   return rows.map((row) => row.id);
 };
 
+const findExistingNotification = async ({
+  type,
+  audienceType,
+  audienceUserId,
+  audienceRole,
+  sourceType = null,
+  sourceId = null,
+}, conn = db) => {
+  if (!sourceType || sourceId === null || sourceId === undefined) {
+    return null;
+  }
+
+  const [[row]] = await conn.query(
+    `SELECT id
+     FROM notifications
+     WHERE type = ?
+       AND audience_type = ?
+       AND audience_user_id <=> ?
+       AND audience_role <=> ?
+       AND source_type = ?
+       AND source_id = ?
+     ORDER BY id DESC
+     LIMIT 1`,
+    [type, audienceType, audienceUserId, audienceRole, sourceType, sourceId]
+  );
+
+  return row ?? null;
+};
+
 const createNotification = async ({
   type,
   title,
@@ -161,16 +226,58 @@ const createNotification = async ({
   audienceRole = null,
   expiresAt = null,
   createdBy = null,
+  sourceType = null,
+  sourceId = null,
+  replaceExisting = false,
 }) => {
-  const [result] = await db.query(
-    `INSERT INTO notifications
-      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy]
-  );
+  await ensureNotificationSourceColumns();
 
-  const notificationId = result.insertId;
   const recipients = await resolveRecipients({ audienceType, audienceUserId, audienceRole });
+  const existingNotification = replaceExisting
+    ? await findExistingNotification({
+        type,
+        audienceType,
+        audienceUserId,
+        audienceRole,
+        sourceType,
+        sourceId,
+      })
+    : null;
+
+  let notificationId = existingNotification?.id ?? null;
+
+  if (notificationId) {
+    await db.query(
+      `UPDATE notifications
+       SET title = ?,
+           body = ?,
+           href = ?,
+           expires_at = ?,
+           created_by = ?,
+           source_type = ?,
+           source_id = ?,
+           is_active = 1,
+           created_at = NOW()
+       WHERE id = ?`,
+      [title, body, href, expiresAt, createdBy, sourceType, sourceId, notificationId]
+    );
+
+    await db.query(
+      `DELETE FROM notification_reads
+       WHERE notification_id = ?`,
+      [notificationId]
+    );
+  } else {
+    const [result] = await db.query(
+      `INSERT INTO notifications
+        (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId]
+    );
+
+    notificationId = result.insertId;
+  }
+
   const baseNotification = {
     id: notificationId,
     type,
@@ -184,6 +291,8 @@ const createNotification = async ({
     expires_at: expiresAt,
     is_active: true,
     created_by: createdBy,
+    source_type: sourceType,
+    source_id: sourceId,
     read_at: null,
     is_read: false,
   };
@@ -217,6 +326,7 @@ const getUserRole = async (userId) => {
 };
 
 const listAdminNotifications = async ({ limit = DEFAULT_LIMIT } = {}) => {
+  await ensureNotificationSourceColumns();
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
 
   const [rows] = await db.query(
@@ -237,6 +347,7 @@ const listAdminNotifications = async ({ limit = DEFAULT_LIMIT } = {}) => {
 };
 
 const getAdminStats = async () => {
+  await ensureNotificationSourceColumns();
   const [[row]] = await db.query(
     `SELECT
        COUNT(*) AS total_notifications,
@@ -255,6 +366,7 @@ const getAdminStats = async () => {
 };
 
 module.exports = {
+  ensureNotificationSourceColumns,
   listForUser,
   getUnreadCountForUser,
   getByIdForUser,

@@ -182,6 +182,9 @@ const syncOverdueBorrowings = async (conn = db) => {
         href: "/my-library",
         audienceType: "user",
         audienceUserId: row.user_id,
+        sourceType: "borrowing",
+        sourceId: row.id,
+        replaceExisting: true,
       });
 
       await conn.query(
