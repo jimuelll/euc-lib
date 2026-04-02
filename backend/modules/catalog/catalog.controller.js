@@ -3,7 +3,9 @@ const service = require("./catalog.service");
 
 const getSchema = async (req, res) => {
   try {
-    const fields = await service.getSchema();
+    const canIncludeArchived = req.user && ["admin", "super_admin"].includes(req.user.role);
+    const includeArchived = canIncludeArchived && req.query.includeArchived === "true";
+    const fields = await service.getSchema({ includeArchived });
     res.json(fields);
   } catch (err) {
     console.error("[catalog] getSchema:", err);
@@ -19,9 +21,9 @@ const updateSchema = async (req, res) => {
       await service.addColumnIfMissing(f.key, f.type);
     }
 
-    const oldFields     = await service.getSchema();
+    const oldFields     = await service.getSchema({ includeArchived: true });
     const newKeys       = new Set(fields.map((f) => f.key));
-    const removedFields = oldFields.filter((f) => !f.locked && !newKeys.has(f.key));
+    const removedFields = oldFields.filter((f) => !f.archived && !f.locked && !newKeys.has(f.key));
 
     for (const f of removedFields) {
       await service.dropColumnIfExists(f.key);

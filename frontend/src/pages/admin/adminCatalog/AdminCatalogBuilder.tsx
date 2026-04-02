@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import {
   Trash2, Plus, Pencil, X, Check,
-  Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp,
+  Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp, Lock, LockOpen,
 } from "lucide-react";
 import { FormField, FieldType, FIELD_TYPES, MAX_CUSTOM_FIELDS } from "./AdminCatalog.types";
 
@@ -26,6 +26,8 @@ const toKey = (label: string) =>
 
 const inputClass =
   "rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors h-9";
+
+const SYSTEM_LOCKED_KEYS = new Set(["title", "author"]);
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -79,7 +81,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const atCap              = customFieldCount >= MAX_CUSTOM_FIELDS;
 
   const sortedFields   = [...fields].filter((f) => !f.archived).sort((a, b) => a.order - b.order);
-  const archivedFields = fields.filter((f) => f.archived && !f.locked);
+  const archivedFields = fields.filter((f) => f.archived);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,14 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const handleSaveLabel = (key: string) => {
     saveSchema(fields.map((f) => (f.key === key ? { ...f, label: editingLabel } : f)));
     setEditingFieldKey(null);
+  };
+
+  const handleToggleLocked = (key: string, current: boolean) => {
+    if (SYSTEM_LOCKED_KEYS.has(key) && current) {
+      toast.error("This field is required by the system and must stay locked.");
+      return;
+    }
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, locked: !current } : f)));
   };
 
   const handleTogglePublic = (key: string, current: boolean) =>
@@ -258,6 +268,23 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                     {f.locked   && <Badge className="border-border text-muted-foreground/30">Locked</Badge>}
                   </div>
 
+                  <button
+                    onClick={() => handleToggleLocked(f.key, !!f.locked)}
+                    disabled={saving || (SYSTEM_LOCKED_KEYS.has(f.key) && !!f.locked)}
+                    title={
+                      f.locked
+                        ? SYSTEM_LOCKED_KEYS.has(f.key)
+                          ? "Required by the system"
+                          : "Locked from schema changes"
+                        : "Unlocked for schema changes"
+                    }
+                    className={`shrink-0 p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      f.locked ? "text-muted-foreground/45 hover:text-foreground" : "text-warning hover:text-warning/70"
+                    }`}
+                  >
+                    {f.locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
+                  </button>
+
                   {/* Public toggle */}
                   <button
                     onClick={() => handleTogglePublic(f.key, !!f.public)}
@@ -308,7 +335,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
           <div className="border-t border-border px-5 py-2.5 flex items-center gap-2 bg-muted/10">
             <Eye className="h-3 w-3 text-muted-foreground/30 shrink-0" />
             <p className="text-[10px] text-muted-foreground/40 tracking-wide">
-              Eye icon = visible in public catalogue
+              Eye icon = visible on the public homepage catalogue only
             </p>
           </div>
         </div>
@@ -409,7 +436,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             <div className="flex items-center gap-6 pt-1 border-t border-border/50">
               {[
                 { label: "Required", checked: newFieldRequired, onChange: setNewFieldRequired },
-                { label: "Public",   checked: newFieldPublic,   onChange: setNewFieldPublic   },
+                { label: "Homepage Catalogue", checked: newFieldPublic, onChange: setNewFieldPublic },
               ].map(({ label, checked, onChange }) => (
                 <label
                   key={label}

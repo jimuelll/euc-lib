@@ -22,7 +22,7 @@ const upsertSchema = async (fields) => {
   try {
     await conn.beginTransaction();
 
-    // Determine which non-locked keys are being removed so we can archive them
+    // Determine which active non-locked keys are being removed so we can archive them
     const [existing] = await conn.query(
       "SELECT `key` FROM catalog_schema WHERE locked = 0 AND archived = 0"
     );
@@ -50,9 +50,10 @@ const upsertSchema = async (fields) => {
            type     = VALUES(type),
            options  = VALUES(options),
            required = VALUES(required),
+           locked   = VALUES(locked),
            \`public\` = VALUES(\`public\`),
            \`order\` = VALUES(\`order\`),
-           archived = 0`,
+           archived = VALUES(archived)`,
         [
           fields.map((f) => [
             f.key,
@@ -63,7 +64,7 @@ const upsertSchema = async (fields) => {
             f.locked   ? 1 : 0,
             f.public   ? 1 : 0,
             f.order,
-            0,
+            f.archived ? 1 : 0,
           ]),
         ]
       );
