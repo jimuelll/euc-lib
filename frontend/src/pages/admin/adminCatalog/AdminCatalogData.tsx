@@ -150,12 +150,13 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
-  const sortedFields = [...fields].sort((a, b) => a.order - b.order);
+  const activeFields = fields.filter((f) => !f.archived);
+  const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
   const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
   const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
 
   const validateRequired = () => {
-    for (const f of fields.filter((f) => f.required)) {
+    for (const f of activeFields.filter((f) => f.required)) {
       if (!formValues[f.key]) { toast.error(`${f.label} is required`); return false; }
     }
     return true;
@@ -254,7 +255,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const selectBookForEdit = (b: Book) => {
     setSelectedBook(b);
     const vals: Record<string, any> = {};
-    fields.forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
+    activeFields.forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
     setFormValues(vals);
   };
 
