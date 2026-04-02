@@ -227,6 +227,48 @@ const adminRestoreBorrowing = async (req, res) => {
   }
 };
 
+const getAdminPaymentOverview = async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const result = await service.getAdminPaymentOverview({ limit });
+    res.json(result);
+  } catch (err) {
+    console.error("[borrowing] getAdminPaymentOverview:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch payment overview" });
+  }
+};
+
+const getUserPaymentOverview = async (req, res) => {
+  try {
+    const studentEmployeeId = String(req.query.student_employee_id ?? "").trim();
+
+    if (!studentEmployeeId) {
+      return res.status(400).json({ message: "student_employee_id is required" });
+    }
+
+    const result = await service.getUserPaymentOverview(studentEmployeeId);
+    res.json(result);
+  } catch (err) {
+    console.error("[borrowing] getUserPaymentOverview:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch user payment overview" });
+  }
+};
+
+const settleUserPayments = async (req, res) => {
+  try {
+    const result = await service.settleUserPayments({
+      studentEmployeeId: req.body?.student_employee_id,
+      amount: req.body?.amount,
+      settledBy: req.user?.id ?? null,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("[borrowing] settleUserPayments:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to settle payment" });
+  }
+};
+
 module.exports = {
   getActiveBorrows,
   getBorrowHistory,
@@ -240,4 +282,7 @@ module.exports = {
   adminGetBorrowings,
   adminDeleteBorrowing,
   adminRestoreBorrowing,
+  getAdminPaymentOverview,
+  getUserPaymentOverview,
+  settleUserPayments,
 };

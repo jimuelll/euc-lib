@@ -165,9 +165,9 @@ const AdminAnalytics = () => {
       icon: <ShieldAlert className="h-4 w-4" />,
     },
     {
-      label: "Outstanding Fines",
+      label: "Total unsettled payments",
       value: currencyFormatter.format(data.stats.outstanding_fines),
-      helperText: `${currencyFormatter.format(data.stats.overdue_fine_per_hour)} per overdue hour.`,
+      helperText: `${currencyFormatter.format(data.stats.overdue_fine_per_hour)} added per overdue hour.`,
       icon: <Coins className="h-4 w-4" />,
     },
     {

@@ -32,7 +32,7 @@ const adminQuickLinks = [
   { title: "Analytics", description: "Open the full charts and trends dashboard.", href: "/admin/analytics" },
   { title: "Circulation", description: "Process borrowing and returns at the desk.", href: "/admin/circulation" },
   { title: "Reports", description: "Review circulation and reservation records by date range.", href: "/admin/report" },
-  { title: "Fine Settings", description: "Adjust the hourly overdue fine and review exposure.", href: "/admin/payment" },
+  { title: "Payments", description: "Review fine exposure and settle unsettled balances.", href: "/admin/payment" },
 ];
 
 const staffQuickLinks = [
@@ -106,7 +106,7 @@ const AdminHome = () => {
           <AdminStatCard label="Books" value={loading ? "..." : String(stats.total_books)} helperText="Non-archived catalog titles." icon={<ArrowRight className="h-4 w-4" />} />
           <AdminStatCard label="Active Users" value={loading ? "..." : String(stats.active_users)} helperText="Current active accounts in the system." icon={<Users className="h-4 w-4" />} />
           <AdminStatCard label="Overdue Borrowings" value={loading ? "..." : String(stats.overdue_borrowings)} helperText={`${stats.active_borrowings} active borrowings in total.`} icon={<ShieldAlert className="h-4 w-4" />} />
-          <AdminStatCard label="Outstanding Fines" value={loading ? "..." : currencyFormatter.format(stats.outstanding_fines)} helperText={`${stats.upcoming_holidays} upcoming holiday date(s) configured.`} icon={<Coins className="h-4 w-4" />} />
+          <AdminStatCard label="Total unsettled payments" value={loading ? "..." : currencyFormatter.format(stats.outstanding_fines)} helperText={`${stats.upcoming_holidays} upcoming holiday date(s) configured.`} icon={<Coins className="h-4 w-4" />} />
         </AdminStatGrid>
       ) : null}
 

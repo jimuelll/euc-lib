@@ -37,12 +37,9 @@ const updateSchema = async (req, res) => {
 
 const getBooks = async (req, res) => {
   try {
-    const { query } = req.query;
-    if (!query?.trim()) {
-      return res.status(400).json({ message: "Search query is required" });
-    }
+    const query = String(req.query.query ?? "").trim();
     const books = await service.searchBooks(
-      query.trim(),
+      query,
       !!req.publicCatalogue,
       !req.publicCatalogue && req.query.archived === "true"
     );

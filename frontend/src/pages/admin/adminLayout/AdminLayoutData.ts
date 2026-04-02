@@ -48,7 +48,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "System",
     items: [
-      { title: "Payment",         url: "/admin/payment",  icon: CreditCard, roles: ["admin", "super_admin"] },
+      { title: "Payments",        url: "/admin/payment",  icon: CreditCard, roles: ["admin", "super_admin"] },
       { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["admin", "super_admin"] },
       { title: "Internet Access", url: "/admin/internet", icon: Wifi, roles: ["admin", "super_admin"] },
     ],

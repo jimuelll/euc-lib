@@ -1,5 +1,6 @@
 const { randomUUID } = require("crypto");
 const db = require("../../db");
+const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
 
 let ensured = false;
@@ -327,6 +328,7 @@ async function getAuditLogMeta() {
 
 async function getDashboardOverview() {
   await ensureSiteDailyVisitsTable();
+  await syncOverdueBorrowings();
 
   const [
     [[stats]],
@@ -336,6 +338,7 @@ async function getDashboardOverview() {
     [reservationStatus],
     [userRoles],
     [popularBooks],
+    unsettledOverview,
   ] = await Promise.all([
     db.query(
       `SELECT
@@ -424,11 +427,10 @@ async function getDashboardOverview() {
        ORDER BY total DESC, bk.title ASC
        LIMIT 5`
     ),
+    listUnsettledBorrowings({ limit: null }),
   ]);
-
   const overdueFinePerHour = Number(stats.overdue_fine_per_hour || 0);
-  const overdueHoursTotal = Math.max(Number(stats.overdue_hours_total || 0), 0);
-  const outstandingFines = Number((overdueHoursTotal * overdueFinePerHour).toFixed(2));
+  const outstandingFines = Number(unsettledOverview.summary.total_unsettled_amount || 0);
 
   return {
     stats: {

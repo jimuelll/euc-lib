@@ -3,8 +3,10 @@ const {
   calculateDueDateWithHolidays,
   mapBorrowingsWithFineDetails,
   syncOverdueBorrowings,
+  listUnsettledBorrowings,
 } = require("./overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
+const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +25,8 @@ const getActiveBorrows = async (userId) => {
   await syncOverdueBorrowings();
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
-            b.borrowed_at, b.due_date, b.status, b.notes,
+            b.borrowed_at, b.due_date, b.returned_at, b.status, b.notes,
+            COALESCE(b.settled_amount, 0) AS settled_amount,
             bc.barcode AS copy_barcode, bc.condition AS copy_condition
      FROM borrowings b
      JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
@@ -39,6 +42,7 @@ const getBorrowHistory = async (userId) => {
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
             b.borrowed_at, b.returned_at, b.due_date, b.status,
+            COALESCE(b.settled_amount, 0) AS settled_amount,
             bc.barcode AS copy_barcode
      FROM borrowings b
      JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
@@ -324,7 +328,8 @@ const lookupUserWithBorrows = async (studentEmployeeId) => {
   if (!user) return null;
 
   const [activeBorrows] = await db.query(
-    `SELECT b.id, b.book_id, bk.title, bk.author, b.due_date, b.status
+    `SELECT b.id, b.book_id, bk.title, bk.author, b.due_date, b.status,
+            COALESCE(b.settled_amount, 0) AS settled_amount
      FROM borrowings b
      JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
@@ -436,6 +441,9 @@ const adminGetBorrowings = async ({
        b.returned_at,
        b.deleted_at,
        b.notes,
+       COALESCE(b.settled_amount, 0) AS settled_amount,
+        b.settled_at,
+        b.settled_by,
        bk.title  AS book_title,
        bk.author AS book_author,
        bk.isbn,
@@ -483,6 +491,178 @@ const adminGetBorrowings = async ({
   };
 };
 
+const getAdminPaymentOverview = async ({ limit = 50 } = {}) => {
+  await syncOverdueBorrowings();
+
+  const paymentOverview = await listUnsettledBorrowings({ limit });
+
+  return {
+    rows: paymentOverview.rows,
+    summary: paymentOverview.summary,
+  };
+};
+
+const getUserPaymentOverview = async (studentEmployeeId) => {
+  const [[user]] = await db.query(
+    `SELECT id, name, role, student_employee_id, is_active
+     FROM users
+     WHERE student_employee_id = ?
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    [studentEmployeeId.trim()]
+  );
+
+  if (!user) {
+    throw Object.assign(new Error("User not found"), { status: 404 });
+  }
+
+  const paymentOverview = await listUnsettledBorrowings({ userId: user.id });
+
+  return {
+    user,
+    rows: paymentOverview.rows,
+    summary: paymentOverview.summary,
+  };
+};
+
+const settleUserPayments = async ({ studentEmployeeId, amount, settledBy }) => {
+  const trimmedId = String(studentEmployeeId ?? "").trim();
+  const numericAmount = roundCurrency(amount);
+
+  if (!trimmedId) {
+    throw Object.assign(new Error("Student or employee ID is required"), { status: 400 });
+  }
+
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw Object.assign(new Error("Payment amount must be greater than zero"), { status: 400 });
+  }
+
+  await syncOverdueBorrowings();
+
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [[user]] = await conn.query(
+      `SELECT id, name, student_employee_id
+       FROM users
+       WHERE student_employee_id = ?
+         AND deleted_at IS NULL
+       LIMIT 1
+       FOR UPDATE`,
+      [trimmedId]
+    );
+
+    if (!user) {
+      throw Object.assign(new Error("User not found"), { status: 404 });
+    }
+
+    const [rows] = await conn.query(
+      `SELECT
+         b.id,
+         b.user_id,
+         b.status,
+         b.borrowed_at,
+         b.due_date,
+         b.returned_at,
+         COALESCE(b.settled_amount, 0) AS settled_amount,
+         bk.title AS book_title,
+         bk.author AS book_author,
+         bk.isbn,
+         bc.barcode AS copy_barcode
+       FROM borrowings b
+       JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+       LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
+       WHERE b.user_id = ?
+         AND b.deleted_at IS NULL
+       ORDER BY COALESCE(b.returned_at, b.due_date) ASC, b.id ASC
+       FOR UPDATE`,
+      [user.id]
+    );
+
+    const mappedRows = await mapBorrowingsWithFineDetails(rows, conn);
+    const unsettledRows = mappedRows.filter((row) => Number(row.unsettled_amount || 0) > 0);
+
+    if (!unsettledRows.length) {
+      throw Object.assign(new Error("This user has no unsettled payments"), { status: 409 });
+    }
+
+    const totalUnsettled = roundCurrency(
+      unsettledRows.reduce((sum, row) => sum + Number(row.unsettled_amount || 0), 0)
+    );
+
+    if (numericAmount > totalUnsettled) {
+      throw Object.assign(
+        new Error(`Payment amount exceeds the user's unsettled balance of PHP ${totalUnsettled.toFixed(2)}`),
+        { status: 400 }
+      );
+    }
+
+    let remainingAmount = numericAmount;
+    const settledRows = [];
+
+    for (const row of unsettledRows) {
+      if (remainingAmount <= 0) break;
+
+      const unsettledAmount = roundCurrency(row.unsettled_amount);
+      const appliedAmount = roundCurrency(Math.min(remainingAmount, unsettledAmount));
+      const nextSettledAmount = roundCurrency(Number(row.settled_amount || 0) + appliedAmount);
+
+      await conn.query(
+        `UPDATE borrowings
+         SET settled_amount = ?,
+             settled_at = NOW(),
+             settled_by = ?
+         WHERE id = ?`,
+        [nextSettledAmount, settledBy ?? null, row.id]
+      );
+
+      settledRows.push({
+        borrowing_id: row.id,
+        book_title: row.book_title,
+        applied_amount: appliedAmount,
+      });
+
+      remainingAmount = roundCurrency(remainingAmount - appliedAmount);
+    }
+
+    await conn.commit();
+
+    const refreshedOverview = await listUnsettledBorrowings({ userId: user.id });
+    const remainingBalance = refreshedOverview.summary.total_unsettled_amount;
+
+    try {
+      await notificationsService.createNotification({
+        type: "payment_settled",
+        title: "Payment received",
+        body: `A payment of PHP ${numericAmount.toFixed(2)} was recorded for your unsettled library fines. Remaining unsettled balance: PHP ${remainingBalance.toFixed(2)}.`,
+        href: "/my-library",
+        audienceType: "user",
+        audienceUserId: user.id,
+        createdBy: settledBy ?? null,
+      });
+    } catch (notificationError) {
+      console.error("[borrowing] Failed to create payment notification:", notificationError);
+    }
+
+    return {
+      message: remainingBalance > 0
+        ? "Payment recorded successfully"
+        : "Payment recorded and all unsettled balances are cleared",
+      user,
+      settled_amount: numericAmount,
+      remaining_balance: remainingBalance,
+      settled_rows: settledRows,
+    };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
 module.exports = {
   getActiveBorrows,
   getBorrowHistory,
@@ -496,4 +676,7 @@ module.exports = {
   adminDeleteBorrowing,
   adminRestoreBorrowing,
   adminGetBorrowings,
+  getAdminPaymentOverview,
+  getUserPaymentOverview,
+  settleUserPayments,
 };

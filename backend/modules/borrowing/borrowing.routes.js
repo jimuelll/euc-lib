@@ -30,5 +30,8 @@ router.post("/scan/return",                   scannerOrAbove, controller.scanRet
 router.get   ("/admin/borrows",                          adminOnly, controller.adminGetBorrowings);
 router.delete("/admin/borrows/:borrowingId",             adminOnly, controller.adminDeleteBorrowing);
 router.patch ("/admin/borrows/:borrowingId/restore",     adminOnly, controller.adminRestoreBorrowing);
+router.get   ("/admin/payments",                         adminOnly, controller.getAdminPaymentOverview);
+router.get   ("/admin/payments/user",                    adminOnly, controller.getUserPaymentOverview);
+router.post  ("/admin/payments/settle",                  adminOnly, controller.settleUserPayments);
 
 module.exports = router;

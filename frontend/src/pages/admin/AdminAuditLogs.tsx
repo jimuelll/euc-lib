@@ -178,7 +178,7 @@ const AdminAuditLogs = () => {
             <SelectTrigger>
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
               {categoryOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -191,7 +191,7 @@ const AdminAuditLogs = () => {
             <SelectTrigger>
               <SelectValue placeholder="All actions" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
               <SelectItem value="all">All actions</SelectItem>
               {actionOptions.map((action) => (
                 <SelectItem key={action} value={action}>

@@ -173,7 +173,6 @@ const AdminCatalogData = ({ fields }: Props) => {
   };
 
   const handleSearchBooks = async (archivedOverride?: boolean) => {
-    if (!searchQuery.trim()) { toast.error("Enter a title, author, or ISBN"); return; }
     setLoading(true);
     const archived = archivedOverride ?? showArchived;
     try {
@@ -181,7 +180,13 @@ const AdminCatalogData = ({ fields }: Props) => {
         params: { query: searchQuery, ...(archived && { archived: "true" }) },
       });
       setSearchResults(res.data);
-      if (!res.data.length) toast.info(archived ? "No archived books found" : "No books found");
+      if (!res.data.length) {
+        toast.info(
+          searchQuery.trim()
+            ? (archived ? "No archived books found" : "No books found")
+            : (archived ? "No archived books are available" : "No active books are available")
+        );
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Search failed");
     } finally { setLoading(false); }
