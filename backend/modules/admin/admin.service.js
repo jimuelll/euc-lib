@@ -2,19 +2,19 @@ const bcrypt = require("bcryptjs");
 const db = require("../../db");
 const qr = require("qrcode");
 
-const STUDENT_LIKE_ROLES = ["student", "employee"];
+const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
 
 // Role hierarchy map
 const roleHierarchy = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "student"],
-  admin: ["admin", "staff", "scanner", "employee", "student"],
-  staff: ["staff", "scanner", "employee", "student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
+  admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
+  staff: ["staff", "scanner", "employee", "alumni", "student"],
 };
 
 const searchRoleHierarchy = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "student"],
-  admin: ["admin", "staff", "scanner", "employee", "student"],
-  staff: ["employee", "student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
+  admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
+  staff: ["employee", "alumni", "student"],
 };
 
 // CREATE USER
@@ -371,7 +371,7 @@ async function bulkDeactivateStudentLikeUsers(requesterRole, requesterId) {
   return {
     message: skippedUsers.length
       ? `Deactivated ${eligibleUsers.length} account${eligibleUsers.length === 1 ? "" : "s"}. Skipped ${skippedUsers.length} account${skippedUsers.length === 1 ? "" : "s"} with unreturned books.`
-      : `Deactivated ${eligibleUsers.length} student and employee account${eligibleUsers.length === 1 ? "" : "s"}.`,
+      : `Deactivated ${eligibleUsers.length} student-like account${eligibleUsers.length === 1 ? "" : "s"}.`,
     deactivated_count: eligibleUsers.length,
     skipped_count: skippedUsers.length,
     skipped_users: skippedUsers.map((user) => ({

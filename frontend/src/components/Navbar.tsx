@@ -20,7 +20,7 @@ const navLinks = [
   { label: "Bulletin",  to: "/bulletin",  matchPrefix: true  },
 ];
 
-const ROLES_WITH_MY_LIBRARY  = new Set(["student", "employee", "scanner", "staff", "admin", "super_admin"]);
+const ROLES_WITH_MY_LIBRARY  = new Set(["student", "employee", "alumni", "scanner", "staff", "admin", "super_admin"]);
 const ROLES_WITH_SCANNER     = new Set(["scanner"]);
 const ROLES_WITH_ADMIN_PANEL = new Set(["admin", "super_admin", "staff"]);
 

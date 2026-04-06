@@ -242,8 +242,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   const handleBulkDeactivateStudentLikeUsers = async () => {
     const shouldDeactivate = await confirm({
-      title: "Deactivate all student and employee accounts?",
-      description: "This archives every active student and employee account with no unreturned books so their library cards stop working for the new semester.",
+      title: "Deactivate all student-like accounts?",
+      description: "This archives every active student, employee, and alumni account with no unreturned books so their library cards stop working for the new semester.",
       actionLabel: "Deactivate Eligible Accounts",
       tone: "danger",
     });
