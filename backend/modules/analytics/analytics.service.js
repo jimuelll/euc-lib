@@ -313,16 +313,25 @@ async function getAuditLog({
 
 async function getAuditLogMeta() {
   const auditFeedQuery = buildAuditFeedQuery();
-  const [actions] = await db.query(
-    `SELECT DISTINCT action
+  const [actionRows] = await db.query(
+    `SELECT DISTINCT category, action
      FROM (${auditFeedQuery}) audit_feed
      WHERE occurred_at IS NOT NULL
-     ORDER BY action ASC`
+     ORDER BY category ASC, action ASC`
   );
+
+  const actionsByCategory = {};
+  for (const row of actionRows) {
+    if (!actionsByCategory[row.category]) {
+      actionsByCategory[row.category] = [];
+    }
+    actionsByCategory[row.category].push(row.action);
+  }
 
   return {
     categories: ["all", "auth", "users", "attendance", "borrowing", "reservation", "bulletin", "subscriptions", "notifications"],
-    actions: actions.map((row) => row.action),
+    actions: [...new Set(actionRows.map((row) => row.action))],
+    actionsByCategory,
   };
 }
 

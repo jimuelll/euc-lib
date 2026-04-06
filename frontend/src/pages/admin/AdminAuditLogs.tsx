@@ -35,6 +35,7 @@ interface AuditResponse {
 interface AuditMetaResponse {
   categories: string[];
   actions: string[];
+  actionsByCategory: Record<string, string[]>;
 }
 
 const emptyFilters = {
@@ -86,6 +87,7 @@ const AdminAuditLogs = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [actionOptions, setActionOptions] = useState<string[]>([]);
+  const [actionsByCategory, setActionsByCategory] = useState<Record<string, string[]>>({});
 
   const loadAuditLogs = async (
     mode: "initial" | "refresh" = "initial",
@@ -127,8 +129,10 @@ const AdminAuditLogs = () => {
       try {
         const res = await axiosInstance.get<AuditMetaResponse>("/api/admin/dashboard/audit/meta");
         setActionOptions(res.data.actions);
+        setActionsByCategory(res.data.actionsByCategory ?? {});
       } catch {
         setActionOptions([]);
+        setActionsByCategory({});
       }
     };
 
@@ -146,6 +150,11 @@ const AdminAuditLogs = () => {
       action: "",
     }));
   };
+
+  const visibleActionOptions =
+    filters.category && filters.category !== "all"
+      ? (actionsByCategory[filters.category] ?? [])
+      : actionOptions;
 
   const applyFilters = () => {
     setPage(1);
@@ -215,7 +224,7 @@ const AdminAuditLogs = () => {
                 </SelectTrigger>
                 <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
                   <SelectItem value="all">All actions</SelectItem>
-                  {actionOptions.map((action) => (
+                  {visibleActionOptions.map((action) => (
                     <SelectItem key={action} value={action}>
                       {action.replace(/_/g, " ")}
                     </SelectItem>
