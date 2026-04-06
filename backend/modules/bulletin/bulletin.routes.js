@@ -3,7 +3,7 @@ const router     = express.Router();
 const controller = require("./bulletin.controller");
 const { authMiddleware, optionalAuthMiddleware } = require("../auth/auth.middleware");
 
-const CAN_POST  = ["admin", "super_admin"];
+const CAN_POST  = ["staff", "admin", "super_admin"];
 const ADMIN_ONLY = ["admin", "super_admin"];
 
 // ─── Public — no login required ───────────────────────────────────────────────

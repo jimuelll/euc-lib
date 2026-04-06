@@ -21,7 +21,7 @@ import { BulletinSidebar } from "./components/BulletinSidebar";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
 
-const CAN_POST_ROLES = ["admin", "super_admin"];
+const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
 
 const SectionLabel = ({ children, light = false }: { children: React.ReactNode; light?: boolean }) => (

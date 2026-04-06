@@ -13,9 +13,10 @@ const { authMiddleware } = require("../auth/auth.middleware");
 const router = express.Router();
 
 const adminOnly = authMiddleware(["admin", "super_admin"]);
+const userCreateRoles = authMiddleware(["staff", "admin", "super_admin"]);
 const userSearchRoles = authMiddleware(["staff", "admin", "super_admin"]);
 
-router.post("/users", adminOnly, handleCreateUser);
+router.post("/users", userCreateRoles, handleCreateUser);
 router.delete("/users/:student_employee_id", adminOnly, handleDeleteUser);
 router.put("/users/:student_employee_id", adminOnly, handleUpdateUser);
 router.post("/users/bulk-deactivate-student-like", adminOnly, handleBulkDeactivateStudentLikeUsers);
