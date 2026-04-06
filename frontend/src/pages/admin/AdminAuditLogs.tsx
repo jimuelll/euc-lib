@@ -3,6 +3,7 @@ import { Activity, RefreshCcw } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPanel } from "./components/AdminPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -173,46 +174,72 @@ const AdminAuditLogs = () => {
       }
     >
       <AdminPanel title="Filters" description="Narrow the audit feed by category, action, or date range.">
-        <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
-          <Select value={filters.category} onValueChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
-              {categoryOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <form className="space-y-4" onSubmit={(event) => {
+          event.preventDefault();
+          applyFilters();
+        }}>
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="audit-category" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Category
+              </Label>
+              <Select value={filters.category} onValueChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
+                <SelectTrigger id="audit-category" className="rounded-none">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
+                  {categoryOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <Select value={filters.action || "all"} onValueChange={(value) => setFilters((current) => ({ ...current, action: value === "all" ? "" : value }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All actions" />
-            </SelectTrigger>
-            <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
-              <SelectItem value="all">All actions</SelectItem>
-              {actionOptions.map((action) => (
-                <SelectItem key={action} value={action}>
-                  {action.replace(/_/g, " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <div className="space-y-2">
+              <Label htmlFor="audit-action" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Action
+              </Label>
+              <Select value={filters.action || "all"} onValueChange={(value) => setFilters((current) => ({ ...current, action: value === "all" ? "" : value }))}>
+                <SelectTrigger id="audit-action" className="rounded-none">
+                  <SelectValue placeholder="All actions" />
+                </SelectTrigger>
+                <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
+                  <SelectItem value="all">All actions</SelectItem>
+                  {actionOptions.map((action) => (
+                    <SelectItem key={action} value={action}>
+                      {action.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <Input type="date" value={filters.dateFrom} onChange={handleFilterChange("dateFrom")} />
-          <Input type="date" value={filters.dateTo} onChange={handleFilterChange("dateTo")} />
+            <div className="space-y-2">
+              <Label htmlFor="audit-start-date" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Start date
+              </Label>
+              <Input id="audit-start-date" type="date" className="rounded-none" value={filters.dateFrom} onChange={handleFilterChange("dateFrom")} />
+            </div>
 
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="rounded-none" onClick={applyFilters}>
-              Apply
-            </Button>
-            <Button type="button" variant="ghost" className="rounded-none" onClick={resetFilters}>
-              Reset
-            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="audit-end-date" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                End date
+              </Label>
+              <Input id="audit-end-date" type="date" className="rounded-none" value={filters.dateTo} onChange={handleFilterChange("dateTo")} />
+            </div>
+
+            <div className="flex items-end gap-2">
+              <Button type="submit" className="rounded-none" variant="outline">
+                Apply
+              </Button>
+              <Button type="button" variant="ghost" className="rounded-none" onClick={resetFilters}>
+                Reset
+              </Button>
+            </div>
           </div>
-        </div>
+        </form>
       </AdminPanel>
 
       <AdminPanel

@@ -14,7 +14,7 @@ const AdminLayoutBuilder = () => {
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--background)/0.18),transparent_18rem)]" />
           <AdminTopbar pathname={pathname} />
 
-          <main className="relative flex-1 overflow-x-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+          <main className="relative flex-1 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
             <div className="mx-auto w-full max-w-[1560px]">
               <Outlet />
             </div>

@@ -208,7 +208,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mt-6 border border-border flex flex-col">
+    <div className="mt-6 flex w-full flex-col overflow-hidden border border-border">
       {confirmDialog}
 
       {/* ── Two-column: current fields + add new field ────────────────── */}
@@ -243,15 +243,17 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             ) : (
               sortedFields.map((f, idx) => (
                 <div key={f.key}>
-                  <div className="flex items-center gap-3 px-5 py-3 bg-background hover:bg-muted/15 transition-colors">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-5 py-3 bg-background hover:bg-muted/15 transition-colors">
                   {/* Move arrows */}
-                  <div className="flex flex-col gap-0.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 sm:flex-col sm:gap-0.5">
                     <button
+                      type="button"
                       onClick={() => handleMove(f.key, "up")}
                       disabled={idx === 0 || saving}
                       className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
                     >▲</button>
                     <button
+                      type="button"
                       onClick={() => handleMove(f.key, "down")}
                       disabled={idx === sortedFields.length - 1 || saving}
                       className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
@@ -267,7 +269,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                   </span>
 
                   {/* Label — editable */}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-[1_1_12rem]">
                     {editingFieldKey === f.key ? (
                       <Input
                         value={editingLabel}
@@ -288,13 +290,14 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                   </div>
 
                   {/* Type + flags */}
-                  <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end max-w-[120px]">
+                  <div className="flex flex-wrap items-center gap-1 shrink-0 sm:ml-auto sm:justify-end">
                     <Badge className="border-border/60 text-muted-foreground/50 bg-muted/30">{f.type}</Badge>
                     {f.required && <Badge className="border-destructive/25 text-destructive/70 bg-destructive/5">Req</Badge>}
                     {f.locked   && <Badge className="border-border text-muted-foreground/30">Locked</Badge>}
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handleToggleLocked(f.key, !!f.locked)}
                     disabled={saving || (SYSTEM_LOCKED_KEYS.has(f.key) && !!f.locked)}
                     title={
@@ -313,6 +316,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 
                   {/* Public toggle */}
                   <button
+                    type="button"
                     onClick={() => handleTogglePublic(f.key, !!f.public)}
                     title={f.public ? "Public — visible in catalogue" : "Hidden from catalogue"}
                     className={`shrink-0 p-1 rounded transition-colors ${
@@ -325,17 +329,18 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                   {/* Edit / delete — non-locked only */}
                   {!f.locked && (
                     editingFieldKey === f.key ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => handleSaveLabel(f.key)} className="p-1 text-success hover:text-success/70 transition-colors" title="Save">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        <button type="button" onClick={() => handleSaveLabel(f.key)} className="p-1 text-success hover:text-success/70 transition-colors" title="Save">
                           <Check className="h-3.5 w-3.5" />
                         </button>
-                        <button onClick={() => setEditingFieldKey(null)} className="p-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors" title="Cancel">
+                        <button type="button" onClick={() => setEditingFieldKey(null)} className="p-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors" title="Cancel">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                         <button
+                          type="button"
                           onClick={() => { setEditingFieldKey(f.key); setEditingLabel(f.label); }}
                           className="p-1 text-muted-foreground/35 hover:text-foreground transition-colors"
                           title="Rename"
@@ -344,6 +349,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                         </button>
                         {f.type === "select" && (
                           <button
+                            type="button"
                             onClick={() => handleStartOptionsEdit(f)}
                             className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/45 hover:text-foreground transition-colors"
                             style={{ fontFamily: "var(--font-heading)" }}
@@ -353,6 +359,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                           </button>
                         )}
                         <button
+                          type="button"
                           onClick={() => handleDeleteField(f.key)}
                           className="p-1 text-muted-foreground/25 hover:text-destructive transition-colors"
                           title="Remove field"
@@ -372,7 +379,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                           (comma-separated)
                         </span>
                       </FieldLabel>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <Input
                           value={editingOptions}
                           onChange={(e) => setEditingOptions(e.target.value)}
@@ -384,18 +391,20 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                           }}
                         />
                         <button
+                          type="button"
                           onClick={() => handleSaveOptions(f.key)}
                           disabled={saving}
-                          className="flex items-center gap-1.5 border border-success/40 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-success hover:bg-success hover:text-success-foreground disabled:opacity-50 transition-colors"
+                          className="flex items-center justify-center gap-1.5 border border-success/40 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-success transition-colors hover:bg-success hover:text-success-foreground disabled:opacity-50"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           <Check className="h-3.5 w-3.5" />
                           Save
                         </button>
                         <button
+                          type="button"
                           onClick={handleCancelOptionsEdit}
                           disabled={saving}
-                          className="flex items-center gap-1.5 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground hover:border-foreground disabled:opacity-50 transition-colors"
+                          className="flex items-center justify-center gap-1.5 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -422,10 +431,16 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
         <div>
           <PanelLabel>Add New Field</PanelLabel>
 
-          <div className="p-5 space-y-5">
+          <form
+            className="space-y-5 p-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleAddField();
+            }}
+          >
 
             {/* Custom field usage counter */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span
                 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50"
                 style={{ fontFamily: "var(--font-heading)" }}
@@ -511,14 +526,14 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             )}
 
             {/* Toggles */}
-            <div className="flex items-center gap-6 pt-1 border-t border-border/50">
+            <div className="flex flex-col gap-3 border-t border-border/50 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-3">
               {[
                 { label: "Required", checked: newFieldRequired, onChange: setNewFieldRequired },
                 { label: "Homepage Catalogue", checked: newFieldPublic, onChange: setNewFieldPublic },
               ].map(({ label, checked, onChange }) => (
                 <label
                   key={label}
-                  className={`flex items-center gap-2.5 cursor-pointer group ${atCap ? "opacity-40 pointer-events-none" : ""}`}
+                  className={`flex items-center gap-2.5 cursor-pointer group ${atCap ? "pointer-events-none opacity-40" : ""}`}
                 >
                   <div className="relative flex items-center shrink-0">
                     <input
@@ -528,7 +543,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                       className="peer sr-only"
                       disabled={atCap}
                     />
-                    <div className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
+                    <div className="flex h-4 w-4 items-center justify-center border border-border bg-background transition-colors peer-checked:border-primary peer-checked:bg-primary">
                       {checked && (
                         <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 10" fill="none">
                           <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
@@ -548,7 +563,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 
             {/* Submit */}
             <button
-              onClick={handleAddField}
+              type="submit"
               disabled={saving || atCap}
               className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               style={{ fontFamily: "var(--font-heading)" }}
@@ -558,7 +573,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                 : <><Plus className="h-3.5 w-3.5" /> Add Field</>
               }
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -568,8 +583,9 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 
           {/* Collapsible toggle */}
           <button
+            type="button"
             onClick={() => setShowArchivedPanel((p) => !p)}
-            className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-muted/20 hover:bg-muted/40 transition-colors"
+            className="flex w-full items-center justify-between gap-3 px-5 py-3 bg-muted/20 transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-2.5">
               <div className="h-px w-4 bg-muted-foreground/30 shrink-0" />
@@ -598,7 +614,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
               {archivedFields.map((f) => (
                 <div
                   key={f.key}
-                  className="flex items-center gap-4 px-5 py-3 bg-background opacity-60 hover:opacity-100 transition-opacity"
+                  className="flex flex-col gap-3 px-5 py-3 bg-background opacity-60 transition-opacity hover:opacity-100 sm:flex-row sm:items-center"
                 >
                   {/* Label + key */}
                   <div className="flex-1 min-w-0">
@@ -621,6 +637,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
 
                   {/* Restore */}
                   <button
+                    type="button"
                     onClick={() => handleRestoreField(f.key)}
                     disabled={saving || atCap}
                     title={

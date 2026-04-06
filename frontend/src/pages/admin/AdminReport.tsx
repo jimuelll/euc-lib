@@ -146,9 +146,11 @@ const AdminReport = () => {
             <form className="space-y-4" onSubmit={handleCirculationSubmit}>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="circulation-status">Status</Label>
+                  <Label htmlFor="circulation-status" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Status
+                  </Label>
                   <Select value={circulationStatus} onValueChange={setCirculationStatus}>
-                    <SelectTrigger id="circulation-status">
+                    <SelectTrigger id="circulation-status" className="rounded-none">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -161,13 +163,17 @@ const AdminReport = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="circulation-from">Start date</Label>
-                  <Input id="circulation-from" type="date" value={circulationDateFrom} onChange={(event) => setCirculationDateFrom(event.target.value)} />
+                  <Label htmlFor="circulation-from" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Start date
+                  </Label>
+                  <Input id="circulation-from" type="date" className="rounded-none" value={circulationDateFrom} onChange={(event) => setCirculationDateFrom(event.target.value)} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="circulation-to">End date</Label>
-                  <Input id="circulation-to" type="date" value={circulationDateTo} onChange={(event) => setCirculationDateTo(event.target.value)} />
+                  <Label htmlFor="circulation-to" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    End date
+                  </Label>
+                  <Input id="circulation-to" type="date" className="rounded-none" value={circulationDateTo} onChange={(event) => setCirculationDateTo(event.target.value)} />
                 </div>
               </div>
 
@@ -234,14 +240,18 @@ const AdminReport = () => {
             <form className="space-y-4" onSubmit={handleReservationSubmit}>
               <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
                 <div className="space-y-2">
-                  <Label htmlFor="reservation-search">Search</Label>
-                  <Input id="reservation-search" placeholder="Student, ID, or book title" value={reservationSearch} onChange={(event) => setReservationSearch(event.target.value)} />
+                  <Label htmlFor="reservation-search" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Search
+                  </Label>
+                  <Input id="reservation-search" className="rounded-none" placeholder="Student, ID, or book title" value={reservationSearch} onChange={(event) => setReservationSearch(event.target.value)} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reservation-status">Status</Label>
+                  <Label htmlFor="reservation-status" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Status
+                  </Label>
                   <Select value={reservationStatus} onValueChange={setReservationStatus}>
-                    <SelectTrigger id="reservation-status">
+                    <SelectTrigger id="reservation-status" className="rounded-none">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -256,13 +266,17 @@ const AdminReport = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reservation-from">Start date</Label>
-                  <Input id="reservation-from" type="date" value={reservationDateFrom} onChange={(event) => setReservationDateFrom(event.target.value)} />
+                  <Label htmlFor="reservation-from" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Start date
+                  </Label>
+                  <Input id="reservation-from" type="date" className="rounded-none" value={reservationDateFrom} onChange={(event) => setReservationDateFrom(event.target.value)} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reservation-to">End date</Label>
-                  <Input id="reservation-to" type="date" value={reservationDateTo} onChange={(event) => setReservationDateTo(event.target.value)} />
+                  <Label htmlFor="reservation-to" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    End date
+                  </Label>
+                  <Input id="reservation-to" type="date" className="rounded-none" value={reservationDateTo} onChange={(event) => setReservationDateTo(event.target.value)} />
                 </div>
               </div>
 
