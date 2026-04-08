@@ -1,40 +1,40 @@
 # Enverga-Candelaria Library Management System
 
-A full-stack library platform for Manuel S. Enverga University Foundation - Candelaria Inc. The project combines a React/Vite frontend with an Express/MySQL backend for catalogue search, borrowing, reservations, attendance scanning, notifications, and admin operations.
+A full-stack library platform for Manuel S. Enverga University Foundation - Candelaria Inc. The project combines a React/Vite frontend with an Express/MySQL backend for catalogue search, borrowing, reservations, attendance scanning, notifications, analytics, and admin operations.
 
-## Project Scope
-
-This repository is organized as a split frontend and backend application:
+## Project Structure
 
 - `frontend/` - React 18 + TypeScript + Vite client
-- `backend/` - Express API, JWT auth, MySQL access, and WebSocket notifications
-- `sql/` - shared SQL migration for fines and holidays
-- `backend/sql/` - backend-specific analytics and notification migrations
+- `backend/` - Express API, JWT auth, MySQL access, overdue sync, and WebSocket notifications
+- `db/` - full database dump variants
+- `backend/sql/` - incremental SQL updates for newer backend features
 
-## Implemented Features
+## Current Features
 
 ### Public and student-facing
 
-- Landing page, About page, services page, bulletin board, and searchable public catalogue
-- Login using `student_employee_id` and password with refresh-token cookies
+- Landing page, About page, Services page, bulletin board, and searchable public catalogue
+- Login with `student_employee_id` and password using refresh-token cookies
 - Forced password-change flow for newly created or reset accounts
 - My Library dashboard with active borrows, overdue fines, reservations, attendance history, notifications, and academic subscriptions
 - Reservation workflow with active and history views plus ready-for-pickup status
 - QR/barcode attendance scanner for check-in and check-out
-- Real-time notifications and unread counts over WebSockets
+- Public bulletin browsing plus authenticated likes/comments and staff/admin posting
+- Real-time notifications with unread counts over WebSockets
 
 ### Staff and admin
 
-- Role-based access for `student`, `scanner`, `staff`, `admin`, and `super_admin`
+- Protected admin/staff flows for `scanner`, `staff`, `admin`, and `super_admin`
 - User management with account creation, update, archive, restore, and barcode/QR generation
 - Catalog management with a dynamic schema builder and per-copy barcode tracking
 - Circulation desk tools for barcode-based borrowing and return processing
 - Reservation queue management for staff/admin
-- Analytics dashboard, audit log, circulation report, and admin overview
-- Library fine settings and holiday calendar that affect due-date calculations
+- Analytics dashboard, admin overview, attendance logs, audit logs, and filtered reports
+- Payment overview, overdue fine configuration, and settlement tools
+- Library settings for overdue fines and holiday calendar rules
 - Bulletin management, About page management, academic subscription management, and admin notifications
 
-### Present in the UI but not fully wired to backend services yet
+### Present in the UI but not fully backed by server modules
 
 - Backup
 - Internet Access
@@ -52,31 +52,33 @@ This repository is organized as a split frontend and backend application:
 - React Router
 - Recharts
 - Axios
-- ZXing for camera/barcode scanning
+- ZXing for barcode/QR scanning
 - Framer Motion
 
 ### Backend
 
 - Node.js
-- Express
+- Express 5
 - MySQL via `mysql2`
 - JWT access tokens + refresh-token cookies
 - WebSockets via `ws`
-- Cloudinary for image lifecycle handling
+- Cloudinary for image handling
 - QR/barcode generation with `qrcode` and `jsbarcode`
 
 ## Local Setup
 
-There is no root workspace script right now, so run the frontend and backend separately.
+There is no root workspace runner in this repository, so start the backend and frontend separately.
 
-### 1. Install backend dependencies
+### 1. Backend
+
+Install dependencies:
 
 ```powershell
 cd backend
 npm install
 ```
 
-Create `backend/.env` with the variables currently used by the codebase:
+Create `backend/.env` with the variables used by the current codebase:
 
 ```env
 PORT=4000
@@ -86,6 +88,7 @@ DB_HOST=localhost
 DB_USER=your_mysql_user
 DB_PASS=your_mysql_password
 DB_NAME=library
+DB_CONNECTION_LIMIT=2
 
 JWT_SECRET=your_access_token_secret
 JWT_EXPIRES_IN=15m
@@ -109,7 +112,15 @@ Optional during development:
 npx nodemon server.js
 ```
 
-### 2. Install frontend dependencies
+Notes:
+
+- Default backend port is `4000`
+- The server also attaches a WebSocket endpoint at `/ws`
+- Overdue borrowing sync runs automatically on startup and every 5 minutes
+
+### 2. Frontend
+
+Install dependencies:
 
 ```powershell
 cd frontend
@@ -124,26 +135,37 @@ VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 VITE_CLOUDINARY_UPLOAD_PRESET=your_unsigned_upload_preset
 ```
 
-Start the frontend:
+Useful scripts:
 
 ```powershell
 npm run dev
+npm run build
+npm run lint
 ```
 
-Default local ports in the current repo:
+Notes:
 
-- Frontend: `http://localhost:8080`
-- Backend: `http://localhost:4000`
+- Default frontend dev port is `8080`
+- Vite proxies `/api` requests to `http://localhost:4000`
 
 ## Database Notes
 
-The backend expects a MySQL database and includes migrations related to the latest library features:
+The project expects a MySQL database.
 
-- `sql/borrowing-fines-holidays-migration.sql`
+Database resources included in this repository:
+
+- `db/library-aiven.sql`
+- `db/library-clevercloud.sql`
+- `db/library-portable.sql`
+
+Incremental backend SQL updates for newer features:
+
 - `backend/sql/2026-03-30-dashboard-analytics.sql`
 - `backend/sql/2026-03-30-notifications-websocket.sql`
+- `backend/sql/2026-04-01-add-employees-role.sql`
+- `backend/sql/2026-04-02-align-catalog-schema.sql`
 
-If your database was created before the current fine, holiday, analytics, or notification work, apply those SQL files before running the app.
+If your database predates the latest analytics, notifications, role, or catalog changes, apply the relevant SQL files before running the app.
 
 ## Deployment Notes
 
@@ -153,15 +175,18 @@ If your database was created before the current fine, holiday, analytics, or not
   - `http://localhost:5173`
   - `https://euc-lib.vercel.app`
   - `https://euc-lib-git-master-jimuellls-projects.vercel.app`
-- The WebSocket endpoint is served from the backend at `/ws`
 
-## Current Repository Status
+## Repository Status
 
-This README matches the code that is currently present in the repository as of the latest local changes, including:
+This README reflects the code currently present in the repository, including:
 
-- analytics dashboard and audit log support
-- notification tables and WebSocket push support
-- My Library dashboard APIs
-- holiday and overdue-fine management
+- analytics dashboard support
+- audit log support
+- My Library APIs and UI
+- payments and reporting flows
+- WebSocket notifications
+- holiday-aware due date handling
+- overdue-fine management
+- employee-role and catalog-alignment SQL updates
 
-Some admin screens are intentionally documented as UI-only because no matching backend module exists for them in this repo yet.
+Some admin pages are still intentionally documented as UI-only because no matching backend module exists for them in this repository yet.
