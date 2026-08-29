@@ -143,7 +143,7 @@ const Catalogue = () => {
         {/* Bottom border */}
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+        <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-px w-6 bg-warning shrink-0" />
             <span
@@ -174,7 +174,7 @@ const Catalogue = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by title, author, or ISBN…"
-              className="h-12 w-full border-0 pl-12 pr-11 text-sm outline-none transition-colors duration-150 placeholder:text-primary-foreground/30"
+              className="h-12 w-full border-0 border-b border-primary-foreground/20 pl-12 pr-11 text-sm outline-none transition-colors duration-200 placeholder:text-primary-foreground/45 focus:border-warning"
               style={{
                 backgroundColor: "hsl(var(--primary) / 0.5)",
                 color: "hsl(var(--primary-foreground))",
@@ -190,7 +190,7 @@ const Catalogue = () => {
 
       {/* ── Results — parchment ground ── */}
       <main className="bg-background">
-        <div className="container px-4 sm:px-6 py-10 md:py-14">
+        <div className="container px-4 py-8 sm:px-6 md:py-10">
 
           {error && (
             <div className="mb-6 border-l-2 border-destructive bg-destructive/5 px-5 py-3.5">
@@ -227,41 +227,40 @@ const Catalogue = () => {
                 return (
                   <div
                     key={book.id}
-                    className="border-b border-r border-border bg-background flex items-start gap-6 transition-colors duration-100 hover:bg-secondary/50"
-                    style={{ padding: "1.75rem 2rem" }}
+                    className="group flex items-start gap-3 border-b border-r border-border bg-background px-4 py-5 transition-colors duration-200 hover:bg-secondary/50 sm:gap-5 sm:px-6"
                   >
                     <span
-                      className="text-[10px] font-bold tracking-[0.15em] text-border shrink-0 mt-0.5 w-6 text-right"
+                      className="mt-0.5 w-5 shrink-0 text-right text-[10px] font-bold tracking-[0.15em] text-muted-foreground/55 sm:w-6"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {String(index + 1).padStart(2, "0")}
                     </span>
 
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold tracking-tight text-foreground truncate" style={{ fontFamily: "var(--font-heading)" }}>
+                      <h3 className="break-words text-sm font-bold tracking-tight text-foreground transition-colors duration-200 group-hover:text-primary" style={{ fontFamily: "var(--font-heading)" }}>
                         {book.title}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                         {book.author && <span className="text-xs text-muted-foreground">{book.author}</span>}
                         {book.category && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.category}</span></>}
                         {book.edition && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.edition} ed.</span></>}
                         {book.publication_year && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.publication_year}</span></>}
                       </div>
                       {book.isbn && (
-                        <p className="text-[10px] tracking-[0.08em] text-muted-foreground/50 mt-1.5" style={{ fontFamily: "var(--font-heading)" }}>
+                        <p className="mt-1.5 break-all text-[10px] tracking-[0.08em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
                           ISBN {book.isbn}
                         </p>
                       )}
                       {extraFields.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                        <div className="mt-3 grid gap-x-5 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
                           {extraFields.map((field) => {
                             const val = book[field.key];
                             if (val === undefined || val === null || val === "") return null;
                             return (
-                              <span key={field.key} className="text-[11px] text-muted-foreground">
-                                <span className="font-bold uppercase tracking-[0.1em] text-muted-foreground/50" style={{ fontFamily: "var(--font-heading)" }}>
+                              <span key={field.key} className="min-w-0 break-words text-[11px] leading-relaxed text-muted-foreground">
+                                <span className="mr-1 font-bold uppercase tracking-[0.1em] text-muted-foreground/75" style={{ fontFamily: "var(--font-heading)" }}>
                                   {getLabelForKey(field.key)}
-                                </span>{" "}{String(val)}
+                                </span>{String(val)}
                               </span>
                             );
                           })}
@@ -270,7 +269,7 @@ const Catalogue = () => {
                     </div>
 
                     {copies && (
-                      <div className="shrink-0 flex flex-col items-end gap-1 pt-0.5">
+                      <div className="ml-2 flex shrink-0 flex-col items-end gap-1 pt-0.5 text-right sm:ml-4">
                         <span
                           className="text-[10px] font-bold uppercase tracking-[0.15em]"
                           style={{ fontFamily: "var(--font-heading)", color: copies.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
@@ -278,7 +277,7 @@ const Catalogue = () => {
                           {copies.available ? "Available" : "Checked Out"}
                         </span>
                         {copies.available && book.copies && (
-                          <span className="text-[10px] tracking-wide text-muted-foreground/50" style={{ fontFamily: "var(--font-heading)" }}>
+                          <span className="text-[10px] tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
                             {book.copies} cop{book.copies === 1 ? "y" : "ies"}
                           </span>
                         )}

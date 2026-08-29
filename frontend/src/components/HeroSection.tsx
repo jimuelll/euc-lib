@@ -35,7 +35,7 @@ const HeroSection = () => {
   }
 
   return (
-    <section className="relative flex flex-col items-center justify-center overflow-hidden px-4 py-28 md:py-40">
+    <section className="relative flex min-h-[580px] flex-col items-center justify-center overflow-hidden px-4 py-24 sm:py-28 md:min-h-[640px] md:py-32">
 
       {/* Background photo — let it breathe */}
       <div className="absolute inset-0">
@@ -108,7 +108,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="mt-5 max-w-xl text-base leading-relaxed text-white/65"
+          className="mt-5 max-w-xl text-[15px] leading-7 text-white/75"
         >
           Digitalized inventory tracking, book reservations, and seamless access
           to library services — built for academic excellence.
@@ -123,7 +123,7 @@ const HeroSection = () => {
         >
           <div
             onClick={!searchActive ? handleSearchClick : undefined}
-            className={`relative flex h-12 max-w-lg cursor-text items-center border px-4 transition-all duration-200 backdrop-blur-sm ${
+            className={`relative flex h-12 max-w-lg cursor-text items-center border px-4 transition-colors duration-200 ${
               searchActive
                 ? "border-warning/50 bg-black/20"
                 : isDark
@@ -170,7 +170,7 @@ const HeroSection = () => {
         >
           <Link to="/catalogue">
             <button
-              className="flex items-center gap-2 bg-warning px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-foreground hover:bg-warning/85 transition-colors"
+              className="flex items-center gap-2 bg-warning px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-foreground transition-colors duration-200 hover:bg-warning/85 focus-visible:ring-offset-primary"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Browse Catalogue
@@ -181,7 +181,7 @@ const HeroSection = () => {
           {!loading && (
             <Link to={isLoggedIn ? "/my-library" : "/login"}>
               <button
-                className="flex items-center gap-2 border border-white/30 px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-white/70 hover:border-white/55 hover:text-white backdrop-blur-sm transition-colors"
+                className="flex items-center gap-2 border border-white/35 px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-white/80 transition-colors duration-200 hover:border-white/65 hover:text-white focus-visible:ring-offset-primary"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {isLoggedIn ? "Go to My Library" : "Login for Reservation"}
@@ -195,7 +195,7 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="mt-16 flex flex-wrap items-center gap-0 border-t border-white/10 pt-8"
+          className="mt-12 flex flex-wrap items-center gap-0 border-t border-white/15 pt-6"
         >
           {[
             { value: "12,000+", label: "Volumes" },

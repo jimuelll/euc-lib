@@ -58,7 +58,7 @@ const HistoryTab = ({ history, loading }: HistoryTabProps) => {
 
   // ── List ───────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {history.map((res) => {
         const { label, date } = getDateLabel(res);
         const cfg = reservationHistoryStatusConfig[res.status];

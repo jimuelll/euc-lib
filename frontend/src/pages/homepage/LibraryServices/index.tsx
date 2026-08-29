@@ -83,12 +83,13 @@ const LibraryServices = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="py-16">
-        <div className="container max-w-4xl space-y-6">
+      <main className="border-t border-border py-10 sm:py-12">
+        <div className="container max-w-5xl space-y-5 px-4 sm:px-6">
 
           <Link
             to="/services"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors duration-200 hover:text-primary"
+            style={{ fontFamily: "var(--font-heading)" }}
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Services
@@ -96,7 +97,7 @@ const LibraryServices = () => {
 
           {/* Ready for pickup banner */}
           {readyCount > 0 && (
-            <div className="rounded-lg border border-success/20 bg-success/5 p-4 flex items-start gap-3">
+            <div className="flex items-start gap-3 border border-success/20 bg-success/5 p-4">
               <BookMarked className="h-5 w-5 text-success shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-foreground">
@@ -110,17 +111,20 @@ const LibraryServices = () => {
           )}
 
           {error && (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+            <div className="border border-destructive/20 border-l-[3px] border-l-destructive bg-destructive/5 p-4 text-sm text-destructive">
               {error}
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-              <BookMarked className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-4 border-b border-border pb-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center border border-primary/20 bg-primary text-primary-foreground">
+              <BookMarked className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="font-heading text-2xl font-bold text-foreground">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+                Library Services
+              </p>
+              <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 Book Reservations
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -129,34 +133,35 @@ const LibraryServices = () => {
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative border border-border bg-card">
+            <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
+            <Search className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
             <Input
               placeholder="Search by title, author, or ISBN..."
-              className="pl-9"
+              className="h-12 border-0 bg-transparent pl-12 pr-4 shadow-none focus-visible:ring-inset"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
           <Tabs defaultValue="reserve">
-            <TabsList>
-              <TabsTrigger value="reserve">
+            <TabsList className="h-auto w-full justify-start gap-0 rounded-none border border-border bg-card p-0 text-muted-foreground sm:w-auto">
+              <TabsTrigger value="reserve" className="h-11 rounded-none border-r border-border px-4 text-[11px] font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
                 <BookMarked className="h-3.5 w-3.5 mr-1.5" />
                 Reserve
                 {pendingCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                  <span className="ml-1.5 bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-current">
                     {pendingCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="history">
+              <TabsTrigger value="history" className="h-11 rounded-none px-4 text-[11px] font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                 History
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="reserve" className="mt-4">
+            <TabsContent value="reserve" className="mt-5">
               <ReserveTab
                 catalog={catalog}
                 activeReservations={activeReservations}
@@ -168,7 +173,7 @@ const LibraryServices = () => {
               />
             </TabsContent>
 
-            <TabsContent value="history" className="mt-4">
+            <TabsContent value="history" className="mt-5">
               <HistoryTab history={history} loading={dataLoading} />
             </TabsContent>
           </Tabs>

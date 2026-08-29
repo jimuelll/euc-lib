@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, Image as ImageIcon } from "lucide-react";
+import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, FileText } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
@@ -197,7 +197,7 @@ const AdminBulletin = () => {
 
       <AdminPanel
         title="Post register"
-        description="All bulletin posts are grouped by their publish month and year, with status toggles and image previews available in each entry."
+        description="All bulletin posts are grouped by their publish month and year, with status toggles and image previews where available."
       >
         <div className="grid gap-4 xl:grid-cols-[240px_1fr]">
           <div className="space-y-5">
@@ -274,26 +274,27 @@ const AdminBulletin = () => {
 
                     return (
                       <article key={post.id} className="overflow-hidden rounded-md border border-border bg-background">
-                        <div className="grid gap-0 md:grid-cols-[220px_1fr]">
-                          <div className="relative min-h-[180px] border-b border-border bg-muted/30 md:border-b-0 md:border-r">
-                            {post.image_url ? (
+                        <div className={`grid gap-0 ${post.image_url ? "md:grid-cols-[220px_1fr]" : "grid-cols-1"}`}>
+                          {post.image_url ? (
+                            <div className="relative min-h-[180px] border-b border-border bg-muted/30 md:border-b-0 md:border-r">
                               <img
                                 src={post.image_url}
                                 alt={post.title}
                                 className="h-full w-full object-cover"
                                 loading="lazy"
                               />
-                            ) : (
-                              <div className="flex h-full min-h-[180px] items-center justify-center text-muted-foreground/50">
-                                <ImageIcon className="h-8 w-8" />
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          ) : null}
 
                           <div className="space-y-4 p-4">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
+                                  {!post.image_url ? (
+                                    <span className="inline-flex items-center gap-1 border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                                      <FileText className="h-3 w-3" /> Text-only
+                                    </span>
+                                  ) : null}
                                   <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
                                     isArchived
                                       ? "border-border bg-muted/20 text-muted-foreground"

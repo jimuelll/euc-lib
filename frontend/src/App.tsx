@@ -37,7 +37,6 @@ const AdminReservations = lazy(() => import("./pages/admin/adminReservations/Adm
 const AdminPayment = lazy(() => import("./pages/admin/AdminPayment"));
 const AdminBackup = lazy(() => import("./pages/admin/AdminBackup"));
 const AdminReport = lazy(() => import("./pages/admin/AdminReport"));
-const AdminInternet = lazy(() => import("./pages/admin/AdminInternet"));
 const AdminClearance = lazy(() => import("./pages/admin/AdminClearance"));
 const AdminEditAbout = lazy(() => import("./pages/admin/adminAbout/Index"));
 const AdminAttendanceLogs = lazy(() => import("./pages/admin/adminAttendanceLogs/Index"));
@@ -142,7 +141,6 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
-                    <Route path="internet" element={<AdminInternet />} />
                     <Route path="clearance" element={<AdminClearance />} />
                     <Route path="reservations" element={<AdminReservations />} />
                     <Route path="holidays" element={<AdminHolidays />} />

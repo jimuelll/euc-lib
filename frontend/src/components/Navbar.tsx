@@ -197,7 +197,7 @@ const Navbar = () => {
           />
 
           <nav
-            className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 bg-primary border-b border-primary-foreground/10 shadow-xl md:hidden overflow-y-auto"
+            className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 overflow-y-auto border-b border-primary-foreground/10 bg-primary md:hidden"
             style={{ maxHeight: "calc(100dvh - 3px - 3.5rem)" }}
           >
             {/* User identity band */}
@@ -304,7 +304,7 @@ const DesktopNav = ({
         <Link
           key={link.to}
           to={link.to}
-          className={`relative px-4 h-14 flex items-center text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-b-2 ${
+          className={`relative flex h-14 items-center border-b-2 px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors duration-200 focus-visible:ring-inset ${
             active
               ? "text-primary-foreground border-warning"
               : "text-primary-foreground/55 hover:text-primary-foreground/90 border-transparent hover:border-primary-foreground/20"

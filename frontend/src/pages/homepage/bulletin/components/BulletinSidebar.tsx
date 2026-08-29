@@ -22,7 +22,7 @@ const SidebarHeading = ({ children }: { children: React.ReactNode }) => (
 
 export function BulletinSidebar() {
   return (
-    <aside className="w-full lg:w-64 lg:shrink-0 lg:sticky lg:top-[4.5rem] self-start">
+    <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
 
       {/* ── Upcoming Events ── */}
       <div className="border border-border">
@@ -43,7 +43,7 @@ export function BulletinSidebar() {
           {upcomingEvents.map((event, i) => (
             <div
               key={event.title}
-              className="flex gap-0 group hover:bg-secondary/50 transition-colors duration-100"
+              className="group flex gap-0 transition-colors duration-200 hover:bg-secondary/50"
             >
               {/* Index column — like a numbered register */}
               <div
@@ -63,10 +63,10 @@ export function BulletinSidebar() {
                 >
                   {event.title}
                 </p>
-                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
                   {event.date}
                 </p>
-                <p className="text-[10px] text-muted-foreground/70 leading-tight">
+                <p className="text-[10px] leading-tight text-muted-foreground/80">
                   {event.time}
                 </p>
               </div>

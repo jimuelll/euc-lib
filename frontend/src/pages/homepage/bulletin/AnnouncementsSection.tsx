@@ -21,7 +21,7 @@ export function AnnouncementsSection() {
   };
 
   return (
-    <section className="py-16 sm:py-24">
+    <section className="py-14 sm:py-[4.5rem]">
       <div className="container px-4 sm:px-6">
 
         {/* ── Section header ── */}
@@ -30,7 +30,7 @@ export function AnnouncementsSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-end justify-between gap-4 mb-10 sm:mb-12"
+          className="mb-8 flex items-end justify-between gap-4 sm:mb-10"
         >
           <div>
             {/* Eyebrow — gold rule + label, like a cornerstone inscription */}
@@ -58,7 +58,7 @@ export function AnnouncementsSection() {
           {/* View all — restrained, directional */}
           <Link
             to="/bulletin"
-            className="hidden sm:flex shrink-0 items-center gap-2 border border-border px-4 py-2 text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            className="hidden shrink-0 items-center gap-2 border border-border px-4 py-2 text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground transition-colors duration-200 hover:border-primary hover:text-primary sm:flex"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             View All
@@ -97,7 +97,8 @@ export function AnnouncementsSection() {
           </div>
         )}
 
-        {/* ── Posts grid ── */}
+        {/* ── Editorial post composition: the lead keeps visual priority while the
+            following posts retain their natural content height. */}
         {!loading && posts.length > 0 && (
           <motion.div
             initial="hidden"
@@ -107,24 +108,28 @@ export function AnnouncementsSection() {
               hidden:  {},
               visible: { transition: { staggerChildren: 0.07 } },
             }}
-            className="grid grid-cols-1 sm:grid-cols-2 border-l border-t border-border"
+            className="grid border-l border-t border-border lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.85fr)]"
           >
-            {posts.map((post) => (
-              <motion.div
-                key={post.id}
-                variants={{
-                  hidden:   { opacity: 0, y: 16 },
-                  visible:  { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
-                }}
-                className="border-r border-b border-border"
-              >
-                <PostCard
-                  post={post}
-                  variant="grid"
-                  onClick={() => setSelected(post)}
-                />
-              </motion.div>
-            ))}
+            <motion.div
+              variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } } }}
+              className="border-r border-b border-border"
+            >
+              <PostCard post={posts[0]} variant="featured" onClick={() => setSelected(posts[0])} />
+            </motion.div>
+
+            {posts.length > 1 && (
+              <div className="grid content-start sm:grid-cols-2 lg:grid-cols-1">
+                {posts.slice(1).map((post) => (
+                  <motion.div
+                    key={post.id}
+                    variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } } }}
+                    className="border-r border-b border-border"
+                  >
+                    <PostCard post={post} variant="grid" onClick={() => setSelected(post)} />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
 

@@ -15,7 +15,7 @@ const contactDetails = [
 
 const LibraryHoursSection = () => {
   return (
-    <section className="py-16 sm:py-24 border-t border-border">
+    <section className="border-t border-border py-14 sm:py-[4.5rem]">
       <div className="container px-4 sm:px-6">
 
         {/* ── Section label ── */}
@@ -24,7 +24,7 @@ const LibraryHoursSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 mb-10 sm:mb-14"
+          className="mb-8 flex items-center gap-3 sm:mb-10"
         >
           <div className="h-px w-6 bg-warning" />
           <p
@@ -46,7 +46,7 @@ const LibraryHoursSection = () => {
             className="border-r border-b border-border flex flex-col"
           >
             {/* Maroon column header */}
-            <div className="flex items-center gap-3 bg-primary px-8 py-5">
+            <div className="flex items-center gap-3 bg-primary px-6 py-4 sm:px-8">
               <Clock className="h-4 w-4 text-primary-foreground/60 shrink-0" />
               <h3
                 className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary-foreground"
@@ -57,7 +57,7 @@ const LibraryHoursSection = () => {
             </div>
 
             {/* Hours rows */}
-            <div className="flex-1 px-8 py-6 border-t border-primary/20">
+            <div className="flex-1 border-t border-primary/20 px-6 py-4 sm:px-8">
               {hours.map((row, i) => (
                 <motion.div
                   key={row.day}
@@ -65,7 +65,7 @@ const LibraryHoursSection = () => {
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: i * 0.08 }}
-                  className={`flex items-center justify-between py-4 gap-4 ${
+                  className={`flex items-center justify-between gap-4 py-3.5 ${
                     i < hours.length - 1 ? "border-b border-border" : ""
                   }`}
                 >
@@ -101,7 +101,7 @@ const LibraryHoursSection = () => {
             className="border-r border-b border-border flex flex-col"
           >
             {/* Matching header — neutral so the two panels feel related but distinct */}
-            <div className="flex items-center gap-3 bg-muted/60 px-8 py-5 border-b border-border">
+            <div className="flex items-center gap-3 border-b border-border bg-muted/60 px-6 py-4 sm:px-8">
               <MapPin className="h-4 w-4 text-primary shrink-0" />
               <h3
                 className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground"
@@ -112,7 +112,7 @@ const LibraryHoursSection = () => {
             </div>
 
             {/* Contact rows */}
-            <div className="flex-1 px-8 py-6">
+            <div className="flex-1 px-6 py-4 sm:px-8">
               {contactDetails.map((item, i) => {
                 const Icon = item.icon;
                 return (
@@ -122,7 +122,7 @@ const LibraryHoursSection = () => {
                     whileInView={{ opacity: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.3, delay: i * 0.08 }}
-                    className={`flex items-start gap-4 py-4 ${
+                    className={`flex items-start gap-4 py-3.5 ${
                       i < contactDetails.length - 1 ? "border-b border-border" : ""
                     }`}
                   >
@@ -133,7 +133,7 @@ const LibraryHoursSection = () => {
 
                     <div className="min-w-0">
                       <p
-                        className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mb-1"
+                        className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/75"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         {item.label}

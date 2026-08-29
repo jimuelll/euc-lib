@@ -16,7 +16,7 @@ const AboutHeader = ({ libraryName }: AboutHeaderProps) => (
     <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
     <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-    <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+    <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
       <div className="flex items-center gap-3 mb-5">
         <div className="h-px w-6 bg-warning shrink-0" />
         <span

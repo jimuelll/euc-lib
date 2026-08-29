@@ -72,7 +72,7 @@ const ReserveTab = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
 
       {/* Info banner — info/5 tint with left accent bar */}
       <div className="flex gap-0 border border-info/20 bg-info/[0.04] overflow-hidden">
@@ -94,7 +94,7 @@ const ReserveTab = ({
       </div>
 
       {/* ── Catalogue results ─────────────────────────────────────────────── */}
-      <div className="space-y-2">
+      <div className="space-y-2.5">
 
         {/* Loading */}
         {catalogLoading && (
@@ -118,7 +118,7 @@ const ReserveTab = ({
               <div className="h-px w-6 bg-border" />
             </div>
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Search the catalogue above to find a book
@@ -130,7 +130,7 @@ const ReserveTab = ({
         {!catalogLoading && hasSearched && catalog.length === 0 && (
           <div className="flex flex-col items-center justify-center py-14 gap-2 border border-dashed border-border bg-card">
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               No books found matching your search
@@ -183,7 +183,7 @@ const ReserveTab = ({
                     <button
                       disabled={reservingId === book.id}
                       onClick={() => handleReserve(book)}
-                      className="shrink-0 h-8 px-4 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                      className="flex h-9 shrink-0 items-center gap-1.5 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {reservingId === book.id ? (
@@ -229,7 +229,7 @@ const ReserveTab = ({
           activeReservations.map((res) => (
             <div
               key={res.id}
-              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4 first:pt-0 last:pb-0 sm:flex-nowrap"
             >
               {/* Title + author */}
               <div className="flex-1 min-w-0">
@@ -239,18 +239,18 @@ const ReserveTab = ({
                 >
                   {res.title}
                 </p>
-                <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70 truncate"
+                <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80 truncate"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {res.author}
                 </p>
                 {res.location && (
-                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">{res.location}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground/70">{res.location}</p>
                 )}
               </div>
 
               {/* Expiry — hidden on mobile */}
-              <div className="hidden sm:block text-right shrink-0">
+              <div className="order-3 w-full border-t border-border/60 pt-2 sm:order-none sm:w-auto sm:shrink-0 sm:border-0 sm:pt-0 sm:text-right">
                 <p
                   className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
@@ -290,8 +290,9 @@ const ReserveTab = ({
                 <button
                   onClick={() => handleCancel(res.id, res.title)}
                   disabled={cancellingId === res.id}
-                  className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors disabled:opacity-30"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground/65 transition-colors duration-200 hover:bg-destructive/5 hover:text-destructive disabled:opacity-30"
                   title="Cancel reservation"
+                  aria-label={`Cancel reservation for ${res.title}`}
                 >
                   {cancellingId === res.id
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

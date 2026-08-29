@@ -57,7 +57,7 @@ const Services = () => {
         <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+        <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-px w-6 bg-warning shrink-0" />
             <span
@@ -80,7 +80,7 @@ const Services = () => {
       </div>
 
       <main className="bg-background">
-        <div className="border-b border-border py-8 sm:py-10">
+        <div className="border-b border-border py-7 sm:py-8">
           <div className="container px-4 sm:px-6">
             <div
               className="border-l border-t border-border"
@@ -94,10 +94,9 @@ const Services = () => {
                 return (
                   <div
                     key={s.title}
-                    className="border-r border-b border-border bg-background flex flex-col"
-                    style={{ padding: "3.5rem 3.75rem" }}
+                    className="flex flex-col border-r border-b border-border bg-background p-7 sm:p-9 lg:p-10"
                   >
-                    <div className="flex items-start justify-between mb-8">
+                    <div className="mb-7 flex items-start justify-between">
                       <div className="flex h-11 w-11 items-center justify-center bg-primary border border-primary/20 shrink-0">
                         <Icon className="h-4 w-4 text-primary-foreground" />
                       </div>
@@ -109,7 +108,7 @@ const Services = () => {
                       </span>
                     </div>
 
-                    <div className="flex-1 border-t border-border pt-7">
+                    <div className="flex-1 border-t border-border pt-6">
                       <SectionLabel>{s.requiresLogin ? "Requires Login" : "Open Access"}</SectionLabel>
                       <h2 className="text-xl font-bold tracking-tight text-foreground mb-4" style={{ fontFamily: "var(--font-heading)" }}>
                         {s.title}
@@ -118,7 +117,7 @@ const Services = () => {
                       {s.note && <p className="mt-3 text-xs text-muted-foreground/60 italic">{s.note}</p>}
                     </div>
 
-                    <div className="border-t border-border mt-10 pt-6">
+                    <div className="mt-8 border-t border-border pt-5">
                       <Link to={href}>
                         <button
                           className="group flex w-full items-center justify-between px-5 py-3.5 border text-xs font-bold uppercase tracking-[0.15em] transition-colors duration-150"

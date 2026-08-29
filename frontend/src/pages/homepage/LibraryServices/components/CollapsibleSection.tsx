@@ -19,12 +19,12 @@ const CollapsibleSection = ({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-border bg-card overflow-hidden">
+    <div className="overflow-hidden border border-border bg-card">
 
       {/* Header — trigger */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left bg-card hover:bg-muted/30 transition-colors group"
+        className="group flex w-full items-center justify-between bg-card px-5 py-3.5 text-left transition-colors duration-200 hover:bg-muted/30 focus-visible:ring-inset"
       >
         <div className="flex items-center gap-3">
           {/* Gold left rule when open */}
@@ -65,7 +65,7 @@ const CollapsibleSection = ({
 
       {/* Content */}
       {open && (
-        <div className="px-5 py-4 space-y-0 divide-y divide-border/60">
+        <div className="space-y-0 divide-y divide-border/60 px-5 py-4">
           {children}
         </div>
       )}

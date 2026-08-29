@@ -115,7 +115,7 @@ export function BulletinPage() {
         <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 px-4 sm:px-6 py-14 md:py-16">
+        <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
           <SectionLabel light>Enverga-Candelaria Library</SectionLabel>
 
           <div className="mt-5 flex items-start justify-between gap-6 flex-wrap">
@@ -146,10 +146,10 @@ export function BulletinPage() {
       </div>
 
       <main className="bg-background">
-        <div className="container px-4 sm:px-6 py-10">
-          <div className="flex flex-col lg:flex-row lg:items-start gap-8">
+        <div className="container px-4 py-8 sm:px-6 sm:py-9">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
             <div className="flex-1 min-w-0">
-              <div className="mb-6 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-5 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-xl">
                   <p
                     className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
@@ -157,7 +157,7 @@ export function BulletinPage() {
                   >
                     Search Posts
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                     Search by title, excerpt, post content, or author name.
                   </p>
                 </div>
@@ -168,7 +168,7 @@ export function BulletinPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search bulletin posts"
-                    className="h-11 border-border pl-10 text-sm"
+                    className="h-11 border-border pl-10 text-sm focus-visible:ring-warning"
                   />
                 </div>
               </div>

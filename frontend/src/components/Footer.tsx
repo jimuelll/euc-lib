@@ -16,13 +16,13 @@ const Footer = () => {
         }}
       />
 
-      <div className="container relative z-10 px-4 sm:px-6 py-14">
+      <div className="container relative z-10 px-4 py-11 sm:px-6">
 
         {/* ── Main grid ── */}
         <div className="grid gap-0 border-l border-t border-primary-foreground/10 md:grid-cols-4">
 
           {/* Brand column */}
-          <div className="border-r border-b border-primary-foreground/10 p-8 md:col-span-1">
+          <div className="border-r border-b border-primary-foreground/10 p-6 md:col-span-1 md:p-7">
             {/* Wordmark */}
             <div className="mb-4">
               <div className="flex items-center gap-2.5 mb-1">
@@ -80,7 +80,7 @@ const Footer = () => {
         </div>
 
         {/* ── Bottom bar ── */}
-        <div className="border-l border-r border-b border-primary-foreground/10 px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex flex-col items-center justify-between gap-2 border-x border-b border-primary-foreground/10 px-6 py-4 sm:flex-row sm:px-7">
           <p
             className="text-[10px] tracking-[0.15em] uppercase text-primary-foreground/30"
             style={{ fontFamily: "var(--font-heading)" }}
@@ -109,7 +109,7 @@ const FooterColumn = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <div className="border-r border-b border-primary-foreground/10 p-8 flex flex-col gap-0">
+  <div className="flex flex-col gap-0 border-r border-b border-primary-foreground/10 p-6 md:p-7">
     {/* Column header — like a brass nameplate */}
     <h4
       className="text-[10px] font-bold uppercase tracking-[0.25em] text-warning/80 mb-5"
@@ -132,14 +132,14 @@ const FooterLink = ({
 }) => (
   <Link
     to={to}
-    className="text-xs text-primary-foreground/50 hover:text-primary-foreground transition-colors tracking-wide"
+    className="text-xs tracking-wide text-primary-foreground/65 transition-colors duration-200 hover:text-primary-foreground"
   >
     {children}
   </Link>
 );
 
 const FooterSpan = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-xs text-primary-foreground/40 tracking-wide">
+  <span className="text-xs tracking-wide text-primary-foreground/55">
     {children}
   </span>
 );

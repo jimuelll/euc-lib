@@ -1,6 +1,6 @@
 import {
   Home, ShieldCheck, BookCopy, ArrowLeftRight, CreditCard, DatabaseBackup,
-  FileBarChart, Wifi, ClipboardCheck, PenSquare,
+  FileBarChart, ClipboardCheck, PenSquare,
   CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
@@ -50,7 +50,6 @@ export const sidebarSections: SidebarSection[] = [
     items: [
       { title: "Payments",        url: "/admin/payment",  icon: CreditCard, roles: ["admin", "super_admin"] },
       { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["admin", "super_admin"] },
-      { title: "Internet Access", url: "/admin/internet", icon: Wifi, roles: ["admin", "super_admin"] },
     ],
   },
 ];

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 const AboutPreviewSection = () => {
   return (
-    <section className="relative bg-background py-20 sm:py-28 border-t border-border overflow-hidden">
+    <section className="relative overflow-hidden border-t border-border bg-background py-16 sm:py-20">
 
       {/* Faint maroon wash — tints without dominating */}
       <div
@@ -57,7 +57,7 @@ const AboutPreviewSection = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.12 }}
-            className="mt-5 text-sm text-muted-foreground leading-relaxed max-w-lg"
+            className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground"
           >
             Our college library fosters scholarly growth through comprehensive resources,
             modern facilities, and digital services. With a growing collection and access
@@ -80,11 +80,11 @@ const AboutPreviewSection = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, delay: 0.28 }}
-            className="mt-8"
+            className="mt-7"
           >
             <Link
               to="/about"
-              className="inline-flex items-center gap-2 border border-border px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              className="inline-flex items-center gap-2 border border-border px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground transition-colors duration-200 hover:border-primary hover:text-primary"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Learn More

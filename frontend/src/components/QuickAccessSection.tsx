@@ -52,7 +52,7 @@ const cardVariants = {
 const QuickAccessSection = () => {
   return (
     /* bg-background gives it its own floor, border-t draws the line between hero and cards */
-    <section className="bg-background border-t border-border py-10">
+    <section className="border-t border-border bg-background py-9 sm:py-10">
       <div className="container">
 
         {/* Section label — orients the reader, marks the transition */}
@@ -61,7 +61,7 @@ const QuickAccessSection = () => {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="flex items-center gap-3 mb-8"
+          className="mb-7 flex items-center gap-3"
         >
           <div className="h-px w-6 bg-warning" />
           <p
@@ -85,11 +85,11 @@ const QuickAccessSection = () => {
               <motion.div key={link.title} variants={cardVariants}>
                 <Link
                   to={link.to}
-                  className="group relative flex h-full flex-col border-r border-b border-border bg-card p-6 transition-colors duration-200 hover:bg-primary hover:border-primary"
+                  className="group relative flex h-full min-h-[220px] flex-col border-r border-b border-border bg-card p-5 transition-colors duration-200 hover:bg-primary hover:border-primary focus-visible:z-10 focus-visible:ring-inset"
                 >
                   {/* Index number */}
                   <span
-                    className="mb-6 block text-[10px] font-bold tracking-[0.25em] text-muted-foreground/50 group-hover:text-primary-foreground/40 transition-colors"
+                    className="mb-5 block text-[10px] font-bold tracking-[0.25em] text-muted-foreground/70 transition-colors group-hover:text-primary-foreground/55"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {link.index}
@@ -109,7 +109,7 @@ const QuickAccessSection = () => {
                   </h3>
 
                   {/* Description */}
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground group-hover:text-primary-foreground/60 transition-colors duration-200 flex-1">
+                  <p className="mt-2 flex-1 text-xs leading-5 text-muted-foreground transition-colors duration-200 group-hover:text-primary-foreground/75">
                     {link.description}
                   </p>
 
