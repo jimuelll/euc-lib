@@ -255,18 +255,9 @@ const getUserPaymentOverview = async (req, res) => {
 };
 
 const settleUserPayments = async (req, res) => {
-  try {
-    const result = await service.settleUserPayments({
-      studentEmployeeId: req.body?.student_employee_id,
-      amount: req.body?.amount,
-      settledBy: req.user?.id ?? null,
-    });
-
-    res.json(result);
-  } catch (err) {
-    console.error("[borrowing] settleUserPayments:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to settle payment" });
-  }
+  res.status(410).json({
+    message: "Payments are recorded through Clearance as a full cash settlement. Open the Clearance workspace to continue.",
+  });
 };
 
 module.exports = {

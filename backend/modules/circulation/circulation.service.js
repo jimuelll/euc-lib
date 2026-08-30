@@ -1,6 +1,7 @@
 const db = require("../../db");
 const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
+const { getClearanceProfile, assertEligible } = require("../clearance/clearance.service");
 
 const getBorrowingNotificationTarget = async (borrowingId, conn = db) => {
   const [[row]] = await conn.query(
@@ -43,7 +44,8 @@ const lookupUser = async (studentEmployeeId) => {
     [user.id]
   );
 
-  return { user, activeBorrows };
+  const clearance = await getClearanceProfile(studentEmployeeId);
+  return { user, activeBorrows, clearance };
 };
 
 const lookupBook = async (isbn) => {
@@ -67,15 +69,19 @@ const lookupBook = async (isbn) => {
 };
 
 const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
+  await syncOverdueBorrowings();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
+    await assertEligible(userId, conn);
+
     const [[book]] = await conn.query(
-      "SELECT id, copies FROM books WHERE id = ? FOR UPDATE",
+      "SELECT id, copies, material_type FROM books WHERE id = ? FOR UPDATE",
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
+    if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
 
     const [[{ borrowed_count }]] = await conn.query(
       `SELECT COUNT(*) AS borrowed_count FROM borrowings

@@ -5,6 +5,7 @@ const ALLOWED_ROLES = ["admin", "super_admin"];
 const VALID_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
 const VALID_TYPES = ["text", "textarea", "number", "date", "select"];
 const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
+const MATERIAL_KEYS = new Set(["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"]);
 
 const requireAdminRole = (req, res, next) => {
   if (!req.user || !ALLOWED_ROLES.includes(req.user.role)) {
@@ -73,9 +74,11 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
 
   for (const key of payloadKeys) {
     const field = schemaByKey.get(key);
-    if (!field) {
+    if (!field && !MATERIAL_KEYS.has(key)) {
       throw createValidationError(`Unknown field "${key}"`);
     }
+    if (key === "material_type") { if (!["book", "thesis"].includes(req.body[key])) throw createValidationError("material_type must be book or thesis"); continue; }
+    if (MATERIAL_KEYS.has(key)) { if (typeof req.body[key] !== "string") throw createValidationError(`Field "${key}" must be text`); continue; }
     validateFieldValue(field, req.body[key]);
   }
 

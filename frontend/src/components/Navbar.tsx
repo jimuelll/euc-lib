@@ -353,7 +353,7 @@ const NotificationsDropdown = ({
         )}
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[360px] rounded-none border-border/60 p-0 shadow-lg">
+    <DropdownMenuContent align="end" className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-none border-border/60 p-0 shadow-lg">
       <div className="border-b border-border/30 bg-primary px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>

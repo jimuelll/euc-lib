@@ -1,5 +1,7 @@
 const db = require("../../db");
 const notificationsService = require("../notifications/notifications.service");
+const { assertEligible } = require("../clearance/clearance.service");
+const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
 
 const getReservationNotificationTarget = async (reservationId, conn = db) => {
   const [[row]] = await conn.query(
@@ -114,15 +116,19 @@ const searchCatalogue = async (query) => {
 };
 
 const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
+  await syncOverdueBorrowings();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
+    await assertEligible(userId, conn);
+
     const [[book]] = await conn.query(
-      "SELECT id, title FROM books WHERE id = ? AND deleted_at IS NULL",
+      "SELECT id, title, material_type FROM books WHERE id = ? AND deleted_at IS NULL",
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
+    if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be reserved"), { status: 409 });
 
     const [[existing]] = await conn.query(
       `SELECT id FROM reservations

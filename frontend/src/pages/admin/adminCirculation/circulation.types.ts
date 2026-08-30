@@ -22,6 +22,13 @@ export interface UserInfo {
   role: string;
 }
 
+export interface ClearanceStatus {
+  status: "blocked" | "eligible";
+  reasons: string[];
+  outstandingAmount: number;
+  overdueItems: { id: number; title: string }[];
+}
+
 export interface ActiveBorrow {
   id: number;
   book_id: number;

@@ -7,7 +7,7 @@ import {
   processReturn,
 } from "../circulation.api";
 import { DEFAULT_LOAN_DAYS } from "../circulation.types";
-import type { TransactionType, UserInfo, BookInfo, ActiveBorrow } from "../circulation.types";
+import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus } from "../circulation.types";
 
 export const useCirculation = () => {
   const [type, setType]                   = useState<TransactionType>("borrow");
@@ -23,6 +23,7 @@ export const useCirculation = () => {
   const [foundCopy, setFoundCopy]         = useState<BookInfo | null>(null);
   const [activeBorrows, setActiveBorrows] = useState<ActiveBorrow[]>([]);
   const [matchedBorrow, setMatchedBorrow] = useState<ActiveBorrow | null>(null);
+  const [clearance, setClearance] = useState<ClearanceStatus | null>(null);
 
   // Reset copy state when type changes
   useEffect(() => {
@@ -37,38 +38,43 @@ export const useCirculation = () => {
       setFoundUser(null);
       setActiveBorrows([]);
       setMatchedBorrow(null);
-      setFoundCopy(null);
-      setCopyBarcode("");
+      setClearance(null);
     }
   }, [studentId]);
 
-  const handleLookupUser = async () => {
-    if (!studentId.trim()) return;
+  const handleLookupUser = async (studentIdOverride?: string) => {
+    const lookupId = (studentIdOverride ?? studentId).trim();
+    if (!lookupId) return;
     setLookingUpUser(true);
     try {
-      const { user, activeBorrows } = await apiLookupUser(studentId.trim());
+      const { user, activeBorrows, clearance } = await apiLookupUser(lookupId);
+      setStudentId(lookupId);
       setFoundUser(user);
       setActiveBorrows(activeBorrows);
-      setMatchedBorrow(null);
-      setFoundCopy(null);
-      setCopyBarcode("");
+      setClearance(clearance);
+      setMatchedBorrow(type === "return" && foundCopy
+        ? activeBorrows.find((borrow) => borrow.book_id === foundCopy.book_id) ?? null
+        : null);
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "User not found");
       setFoundUser(null);
       setActiveBorrows([]);
+      setClearance(null);
     } finally {
       setLookingUpUser(false);
     }
   };
 
-const handleLookupCopy = async () => {
-  if (!copyBarcode.trim() || !foundUser) return;
+const handleLookupCopy = async (copyBarcodeOverride?: string) => {
+  const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
+  if (!lookupBarcode) return;
   setLookingUpCopy(true);
   try {
-    const copy = await apiLookupCopy(copyBarcode.trim());
+    const copy = await apiLookupCopy(lookupBarcode);
+    setCopyBarcode(lookupBarcode);
     setFoundCopy(copy);
 
-    if (type === "return") {
+    if (type === "return" && foundUser) {
       const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
       setMatchedBorrow(match);
       if (!match) toast.error("No active borrow found for this copy and user");
@@ -77,6 +83,7 @@ const handleLookupCopy = async () => {
     toast.error(err.response?.data?.message ?? "Copy not found");
     setFoundCopy(null);
     setMatchedBorrow(null);
+    setClearance(null);
   } finally {
     setLookingUpCopy(false);
   }
@@ -127,12 +134,13 @@ const handleLookupCopy = async () => {
     !!foundCopy &&
     foundCopy.is_active &&
     !(type === "return" && !matchedBorrow);
+  const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 
   return {
     type, studentId, copyBarcode, daysAllowed,
     lookingUpUser, lookingUpCopy, submitting,
-    foundUser, foundCopy, activeBorrows, matchedBorrow,
-    canSubmit,
+    foundUser, foundCopy, activeBorrows, matchedBorrow, clearance,
+    canSubmit: canSubmit && clearanceAllowsBorrow,
     setStudentId, setCopyBarcode, setDaysAllowed,
     handleTypeChange: setType,
     handleLookupUser,

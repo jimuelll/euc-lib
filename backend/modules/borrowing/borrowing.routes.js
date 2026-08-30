@@ -27,7 +27,7 @@ router.post("/scan/borrow",                   scannerOrAbove, controller.scanBor
 router.post("/scan/return",                   scannerOrAbove, controller.scanReturn);
 
 // ─── Admin borrowing management ───────────────────────────────────────────────
-router.get   ("/admin/borrows",                          adminOnly, controller.adminGetBorrowings);
+router.get   ("/admin/borrows",                          staffOrAbove, controller.adminGetBorrowings);
 router.delete("/admin/borrows/:borrowingId",             adminOnly, controller.adminDeleteBorrowing);
 router.patch ("/admin/borrows/:borrowingId/restore",     adminOnly, controller.adminRestoreBorrowing);
 router.get   ("/admin/payments",                         adminOnly, controller.getAdminPaymentOverview);

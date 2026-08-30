@@ -6,6 +6,7 @@ const {
   listUnsettledBorrowings,
 } = require("./overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
+const { assertEligible, getClearanceProfile } = require("../clearance/clearance.service");
 const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -167,6 +168,7 @@ const borrowBook = async (
   daysAllowed = 7,
   { isCopyBarcode = false, ipAddress = null } = {}
 ) => {
+  await syncOverdueBorrowings();
   const conn = await db.getConnection();
   const safeDaysAllowed = Math.max(1, Number.parseInt(daysAllowed, 10) || 7);
   try {
@@ -177,7 +179,7 @@ const borrowBook = async (
     if (isCopyBarcode) {
       const [[c]] = await conn.query(
         `SELECT bc.id, bc.book_id, bc.barcode, bc.is_active,
-                bk.copies
+                bk.copies, bk.material_type
          FROM book_copies bc
          JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
          WHERE bc.barcode = ? AND bc.deleted_at IS NULL
@@ -185,14 +187,16 @@ const borrowBook = async (
         [bookIdOrCopyBarcode]
       );
       if (!c) throw Object.assign(new Error("Copy barcode not found"), { status: 404 });
+      if (c.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
       if (!c.is_active) throw Object.assign(new Error("This copy is not available"), { status: 409 });
       copy = c;
     } else {
       const [[book]] = await conn.query(
-        "SELECT id, copies FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+        "SELECT id, copies, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
         [bookIdOrCopyBarcode]
       );
       if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
+      if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
 
       const [copies] = await conn.query(
         `SELECT bc.id, bc.barcode FROM book_copies bc
@@ -337,7 +341,12 @@ const lookupUserWithBorrows = async (studentEmployeeId) => {
     [user.id]
   );
 
-  return { user, activeBorrows: await mapBorrowingsWithFineDetails(activeBorrows) };
+  const clearance = await getClearanceProfile(studentEmployeeId);
+  return {
+    user,
+    activeBorrows: await mapBorrowingsWithFineDetails(activeBorrows),
+    clearance,
+  };
 };
 
 // ─── Admin soft-delete / restore ──────────────────────────────────────────────
@@ -543,6 +552,8 @@ const settleUserPayments = async ({ studentEmployeeId, amount, settledBy }) => {
 
   try {
     await conn.beginTransaction();
+
+    await assertEligible(userId, conn);
 
     const [[user]] = await conn.query(
       `SELECT id, name, student_employee_id

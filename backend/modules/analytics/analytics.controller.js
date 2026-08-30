@@ -46,7 +46,7 @@ async function handleTrackVisit(req, res) {
 
 async function handleGetDashboardOverview(req, res) {
   try {
-    const result = await getDashboardOverview();
+    const result = await getDashboardOverview({ range: req.query.range });
     res.json(result);
   } catch (err) {
     console.error("[analytics] getDashboardOverview:", err);

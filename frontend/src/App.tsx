@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +38,7 @@ const AdminPayment = lazy(() => import("./pages/admin/AdminPayment"));
 const AdminBackup = lazy(() => import("./pages/admin/AdminBackup"));
 const AdminReport = lazy(() => import("./pages/admin/AdminReport"));
 const AdminClearance = lazy(() => import("./pages/admin/AdminClearance"));
+const AdminClearanceReceipt = lazy(() => import("./pages/admin/AdminClearanceReceipt"));
 const AdminEditAbout = lazy(() => import("./pages/admin/adminAbout/Index"));
 const AdminAttendanceLogs = lazy(() => import("./pages/admin/adminAttendanceLogs/Index"));
 const AdminSubscriptions = lazy(() => import("./pages/admin/adminSubscriptions/index"));
@@ -116,14 +117,7 @@ const App = () => (
                     <Route path="manage" element={<AdminManage />} />
                     <Route path="catalog" element={<AdminCatalog />} />
                     <Route path="circulation" element={<AdminCirculation />} />
-                    <Route
-                      path="payment"
-                      element={
-                        <ProtectedRoute roles={["admin", "super_admin"]}>
-                          <AdminPayment />
-                        </ProtectedRoute>
-                      }
-                    />
+                    <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
                     <Route path="backup" element={<AdminBackup />} />
                     <Route
                       path="report"
@@ -142,6 +136,7 @@ const App = () => (
                       }
                     />
                     <Route path="clearance" element={<AdminClearance />} />
+                    <Route path="clearance/receipt/:receiptNumber" element={<AdminClearanceReceipt />} />
                     <Route path="reservations" element={<AdminReservations />} />
                     <Route path="holidays" element={<AdminHolidays />} />
                     <Route path="restrictions" element={<AdminManage />} />

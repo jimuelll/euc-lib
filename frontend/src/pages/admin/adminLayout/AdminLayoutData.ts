@@ -1,5 +1,5 @@
 import {
-  Home, ShieldCheck, BookCopy, ArrowLeftRight, CreditCard, DatabaseBackup,
+  LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
   FileBarChart, ClipboardCheck, PenSquare,
   CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText,
 } from "lucide-react";
@@ -12,7 +12,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "Library Management",
     items: [
-      { title: "Home",         url: "/admin",              icon: Home           },
+      { title: "Dashboard",    url: "/admin",              icon: LayoutDashboard },
       { title: "Catalog",      url: "/admin/catalog",      icon: BookCopy       },
       { title: "Circulation",  url: "/admin/circulation",  icon: ArrowLeftRight },
       { title: "Reservations", url: "/admin/reservations", icon: CalendarDays   },
@@ -48,7 +48,6 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "System",
     items: [
-      { title: "Payments",        url: "/admin/payment",  icon: CreditCard, roles: ["admin", "super_admin"] },
       { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["admin", "super_admin"] },
     ],
   },

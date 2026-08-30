@@ -242,14 +242,14 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/92 backdrop-blur-md">
       <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--warning)),transparent_70%)]" />
-      <div className="flex h-14 items-center justify-between px-4 sm:px-5">
-        <div className="flex items-center gap-3">
+      <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <SidebarTrigger className="border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" />
 
           <div className="h-5 w-px bg-border" />
 
           {current && (
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <div className="h-px w-5 shrink-0 bg-warning" />
               <span
                 className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground sm:block"
@@ -259,7 +259,7 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
               </span>
               <span className="hidden text-xs text-muted-foreground/30 sm:block">/</span>
               <span
-                className="text-[11px] font-bold uppercase tracking-[0.18em] text-foreground"
+                className="max-w-[10rem] truncate text-[10px] font-bold uppercase tracking-[0.14em] text-foreground sm:max-w-none sm:text-[11px] sm:tracking-[0.18em]"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {current.title}
@@ -268,7 +268,7 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <a
             href="/"
             target="_blank"

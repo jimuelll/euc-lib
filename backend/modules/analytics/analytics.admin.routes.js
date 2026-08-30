@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.get(
   "/dashboard",
-  authMiddleware(["admin", "super_admin"]),
+  authMiddleware(["staff", "admin", "super_admin"]),
   handleGetDashboardOverview
 );
 

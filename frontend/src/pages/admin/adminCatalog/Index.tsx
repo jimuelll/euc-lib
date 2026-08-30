@@ -41,7 +41,6 @@ const AdminCatalog = () => {
     <AdminPage
       eyebrow="Library Management"
       title="Catalog Management"
-      description="Add, edit, archive, and organize catalog records in a workspace that keeps catalog operations and schema controls clearly separated."
       actions={
         canAccessBuilder ? (
           <>
@@ -65,11 +64,6 @@ const AdminCatalog = () => {
     >
       <AdminPanel
         title={mode === "catalog" ? "Catalog records" : "Catalog form builder"}
-        description={
-          mode === "catalog"
-            ? "Manage books and copies from the main catalog table."
-            : "Adjust the catalog schema fields used when creating or editing records."
-        }
         className="border-none bg-transparent shadow-none"
         contentClassName="p-0"
       >

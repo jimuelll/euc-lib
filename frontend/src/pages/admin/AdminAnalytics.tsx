@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -13,14 +13,18 @@ import {
 } from "recharts";
 import {
   ArchiveRestore,
+  AlertTriangle,
+  BarChart3,
   BookMarked,
   BookCopy,
   Coins,
-  ClipboardCheck,
   DoorOpen,
   LibraryBig,
+  PackageCheck,
   RefreshCcw,
+  CheckCircle2,
   ShieldAlert,
+  List,
   Users,
 } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -32,7 +36,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
+import { AdminPage, AdminPanel } from "./components/AdminPage";
 
 interface DashboardStats {
   total_books: number;
@@ -168,12 +172,26 @@ const currencyFormatter = new Intl.NumberFormat("en-PH", {
 });
 
 const chartPalette = ["#7f1d1d", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
+type AnalyticsRange = "7d" | "30d" | "month" | "year";
+
+const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
+  { value: "7d", label: "7 days" },
+  { value: "30d", label: "30 days" },
+  { value: "month", label: "This month" },
+  { value: "year", label: "This year" },
+];
 
 const AdminAnalytics = () => {
   const [data, setData] = useState<DashboardResponse>(emptyData);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [range, setRange] = useState<AnalyticsRange>("7d");
+  const [groupViews, setGroupViews] = useState({
+    circulation: "charts" as "charts" | "text",
+    collection: "charts" as "charts" | "text",
+    activity: "charts" as "charts" | "text",
+  });
 
   const loadDashboard = async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") setLoading(true);
@@ -181,7 +199,7 @@ const AdminAnalytics = () => {
     setError("");
 
     try {
-      const res = await axiosInstance.get<DashboardResponse>("/api/admin/dashboard");
+      const res = await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range } });
       setData(res.data);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to load dashboard data");
@@ -193,143 +211,66 @@ const AdminAnalytics = () => {
 
   useEffect(() => {
     void loadDashboard();
-  }, []);
-
-  const topStats = [
-    {
-      label: "Borrowings Today",
-      value: String(data.stats.borrowings_today),
-      helperText: `${data.stats.active_borrowings} items are currently on loan.`,
-      icon: <ArchiveRestore className="h-4 w-4" />,
-    },
-    {
-      label: "Returns Today",
-      value: String(data.stats.returns_today),
-      helperText: `${data.stats.overdue_borrowings} borrowings are overdue right now.`,
-      icon: <BookCopy className="h-4 w-4" />,
-    },
-    {
-      label: "Reservations Today",
-      value: String(data.stats.reservations_today),
-      helperText: `${data.stats.ready_reservations} reservations are ready for pickup.`,
-      icon: <BookMarked className="h-4 w-4" />,
-    },
-    {
-      label: "Attendance Today",
-      value: String(data.stats.attendance_today),
-      helperText: `${data.stats.entry_exit_attendance_today} entry scans and ${data.stats.borrowing_attendance_today} borrowing scans were logged.`,
-      icon: <DoorOpen className="h-4 w-4" />,
-    },
-    {
-      label: "Overdue Borrowings",
-      value: String(data.stats.overdue_borrowings),
-      helperText: `${currencyFormatter.format(data.stats.outstanding_fines)} remains unsettled.`,
-      icon: <ShieldAlert className="h-4 w-4" />,
-    },
-    {
-      label: "Available Copies",
-      value: String(data.stats.available_book_copies),
-      helperText: `${data.stats.borrowed_book_copies} copies are on loan right now.`,
-      icon: <LibraryBig className="h-4 w-4" />,
-    },
-  ];
-
-  const healthStats = [
-    {
-      label: "Total Titles",
-      value: String(data.stats.total_books),
-      helperText: `${data.stats.total_book_copies} active copies are tracked in inventory.`,
-      icon: <BookCopy className="h-4 w-4" />,
-    },
-    {
-      label: "Active Users",
-      value: String(data.stats.active_users),
-      helperText: `${data.stats.total_users} total accounts remain in the database.`,
-      icon: <Users className="h-4 w-4" />,
-    },
-    {
-      label: "Outstanding Fines",
-      value: currencyFormatter.format(data.stats.outstanding_fines),
-      helperText: `${currencyFormatter.format(data.stats.settled_fines_total)} collected so far, with ${currencyFormatter.format(data.stats.overdue_fine_per_hour)} added per overdue hour.`,
-      icon: <Coins className="h-4 w-4" />,
-    },
-    {
-      label: "Damaged Copies",
-      value: String(data.stats.damaged_book_copies),
-      helperText: `${data.stats.lost_book_copies} copies are marked lost.`,
-      icon: <ClipboardCheck className="h-4 w-4" />,
-    },
-    {
-      label: "Site Visitors Today",
-      value: String(data.stats.unique_visitors_today),
-      helperText: `${data.stats.visit_hits_today} total page hits were recorded.`,
-      icon: <ClipboardCheck className="h-4 w-4" />,
-    },
-  ];
+  }, [range]);
 
   return (
     <AdminPage
       eyebrow="Analytics"
       title="Operations Analytics"
-      description="A clearer operations view of circulation, collection health, patron activity, and fine exposure."
-      actions={
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-none"
-          onClick={() => void loadDashboard("refresh")}
-          disabled={loading || refreshing}
-        >
-          <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh Data
-        </Button>
-      }
+      actions={<Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh Data</Button>}
     >
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-            Today At A Glance
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            The first row focuses on what library staff usually need to react to immediately.
-          </p>
+      <AdminPanel title="Library status" contentClassName="p-0">
+        <div className="grid divide-y divide-border/70 md:grid-cols-3 md:divide-x md:divide-y-0">
+          <StatusItem
+            icon={data.stats.overdue_borrowings ? AlertTriangle : CheckCircle2}
+            tone={data.stats.overdue_borrowings ? "critical" : "clear"}
+            title={data.stats.overdue_borrowings ? `${data.stats.overdue_borrowings} overdue item${data.stats.overdue_borrowings === 1 ? "" : "s"}` : "No overdue items"}
+            detail={data.stats.overdue_borrowings ? "Requires follow-up" : "All clear"}
+          />
+          <StatusItem
+            icon={data.stats.outstanding_fines > 0 ? Coins : CheckCircle2}
+            tone={data.stats.outstanding_fines > 0 ? "critical" : "clear"}
+            title={data.stats.outstanding_fines > 0 ? `${currencyFormatter.format(data.stats.outstanding_fines)} unsettled` : "No outstanding fines"}
+            detail={data.stats.outstanding_fines > 0 ? "Payment follow-up needed" : "All fines are settled"}
+          />
+          <StatusItem
+            icon={BookMarked}
+            tone={data.stats.ready_reservations ? "attention" : "clear"}
+            title={`${data.stats.ready_reservations} reservation${data.stats.ready_reservations === 1 ? "" : "s"} ready`}
+            detail={data.stats.ready_reservations ? "Awaiting pickup" : "Nothing awaiting pickup"}
+          />
         </div>
+      </AdminPanel>
 
-        <AdminStatGrid>
-          {topStats.map((stat) => (
-            <AdminStatCard
-              key={stat.label}
-              label={stat.label}
-              value={loading ? "..." : stat.value}
-              helperText={stat.helperText}
-              icon={stat.icon}
-            />
-          ))}
-        </AdminStatGrid>
-      </section>
-
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-            Collection And System Health
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            This section keeps broader health indicators separate from today&apos;s operational queue.
-          </p>
+      <AdminPanel title="Today's operations" contentClassName="p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <MetricCard label="Overdue borrowings" value={data.stats.overdue_borrowings} icon={ShieldAlert} tone="critical" loading={loading} />
+          <MetricCard label="Reservations ready" value={data.stats.ready_reservations} icon={BookMarked} tone="attention" loading={loading} />
+          <MetricCard label="Borrowings today" value={data.stats.borrowings_today} icon={ArchiveRestore} loading={loading} />
+          <MetricCard label="Returns today" value={data.stats.returns_today} icon={BookCopy} loading={loading} />
+          <MetricCard label="Attendance today" value={data.stats.attendance_today} icon={DoorOpen} loading={loading} />
         </div>
+      </AdminPanel>
 
-        <AdminStatGrid>
-          {healthStats.map((stat) => (
-            <AdminStatCard
-              key={stat.label}
-              label={stat.label}
-              value={loading ? "..." : stat.value}
-              helperText={stat.helperText}
-              icon={stat.icon}
-            />
-          ))}
-        </AdminStatGrid>
-      </section>
+      <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <AdminPanel title="Core library metrics">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MetricCard label="Active users" value={data.stats.active_users} icon={Users} loading={loading} />
+            <MetricCard label="Catalog titles" value={data.stats.total_books} icon={LibraryBig} loading={loading} />
+            <MetricCard label="Copies on loan" value={data.stats.borrowed_book_copies} icon={BookCopy} loading={loading} />
+            <MetricCard label="Available copies" value={data.stats.available_book_copies} icon={PackageCheck} loading={loading} />
+          </div>
+        </AdminPanel>
+        <AdminPanel title="Reference metrics">
+          <div className="divide-y divide-border/70">
+            <CompactMetric label="Damaged copies" value={data.stats.damaged_book_copies} />
+            <CompactMetric label="Lost copies" value={data.stats.lost_book_copies} />
+            <CompactMetric label="Site visitors today" value={data.stats.unique_visitors_today} />
+            <CompactMetric label="Site page hits today" value={data.stats.visit_hits_today} />
+            <CompactMetric label="Upcoming holidays" value={data.stats.upcoming_holidays} />
+          </div>
+        </AdminPanel>
+      </div>
 
       {error ? (
         <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -337,15 +278,16 @@ const AdminAnalytics = () => {
         </div>
       ) : null}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-            Circulation
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Borrowing, returns, reservations, and the titles driving demand.
-          </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border border-border/80 bg-card/95 px-4 py-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>Quick filters</span>
+        <div className="flex flex-wrap items-center gap-1">
+          {RANGE_OPTIONS.map((option) => (
+            <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`border-b-2 px-3 py-1.5 text-xs font-semibold transition-colors ${range === option.value ? "border-warning text-warning" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{option.label}</button>
+          ))}
         </div>
+      </div>
+
+      {groupViews.circulation === "text" ? <AnalyticsTextView group="circulation" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, circulation: view }))} /> : <AnalyticsGroup title="Circulation and reservations" summary="Trends, demand, and current circulation status." defaultOpen actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, circulation: view }))} />}>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <AdminPanel title="Circulation Trend" description="Borrow and return volume over the last seven days.">
@@ -409,17 +351,9 @@ const AdminAnalytics = () => {
             </div>
           </AdminPanel>
         </div>
-      </section>
+      </AnalyticsGroup>}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-            Collection Health
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Inventory quality, category spread, and who the collection is serving.
-          </p>
-        </div>
+      {groupViews.collection === "text" ? <AnalyticsTextView group="collection" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} /> : <AnalyticsGroup title="Collection health" summary="Inventory mix, condition, and collection use by role." actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} />}>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <AdminPanel title="Catalog by Category" description="Title and copy concentration across the catalog categories currently stored in the books table.">
@@ -484,17 +418,9 @@ const AdminAnalytics = () => {
             </div>
           </AdminPanel>
         </div>
-      </section>
+      </AnalyticsGroup>}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-            Patron And Platform Activity
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Foot traffic, account distribution, site usage, and payment activity.
-          </p>
-        </div>
+      {groupViews.activity === "text" ? <AnalyticsTextView group="activity" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, activity: view }))} /> : <AnalyticsGroup title="Patron and platform activity" summary="Attendance, visitors, account mix, and fine collections." actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, activity: view }))} />}>
 
         <div className="grid gap-6 xl:grid-cols-2">
           <AdminPanel title="Attendance Trend" description="Entry and borrowing scans captured over the last seven days.">
@@ -557,10 +483,142 @@ const AdminAnalytics = () => {
             </ChartContainer>
           </AdminPanel>
         </div>
-      </section>
+      </AnalyticsGroup>}
     </AdminPage>
   );
 };
+
+const AnalyticsTextView = ({ group, data, loading, rangeLabel, onViewChange }: { group: "circulation" | "collection" | "activity"; data: DashboardResponse; loading: boolean; rangeLabel: string; onViewChange: (view: "charts" | "text") => void }) => {
+  const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total, item) => total + Number(item[key] || 0), 0);
+
+  return group === "circulation" ? (
+      <AnalyticsGroup title="Circulation and reservations" summary={`Readable totals for ${rangeLabel.toLowerCase()}.`} defaultOpen actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <AdminPanel title="Circulation totals"><TextMetricGrid loading={loading} metrics={[{ label: "Borrowed", value: sum(data.charts.circulationTrend, "borrowed_count") }, { label: "Returned", value: sum(data.charts.circulationTrend, "returned_count") }, { label: "Currently borrowed", value: data.stats.active_borrowings }, { label: "Overdue", value: data.stats.overdue_borrowings, tone: "critical" }]} /></AdminPanel>
+          <AdminPanel title="Reservation totals"><TextMetricGrid loading={loading} metrics={[{ label: "Created", value: sum(data.charts.reservationTrend, "created_count") }, { label: "Fulfilled", value: sum(data.charts.reservationTrend, "fulfilled_count") }, { label: "Cancelled", value: sum(data.charts.reservationTrend, "cancelled_count") }, { label: "Ready for pickup", value: data.stats.ready_reservations, tone: "attention" }]} /></AdminPanel>
+        </div>
+        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AdminPanel title="Most borrowed books"><RankedList items={data.charts.popularBooks.map((item) => ({ label: item.name, value: item.total }))} emptyText="No borrowing history yet." /></AdminPanel><AdminPanel title="Current circulation"><div className="divide-y divide-border/70"><CompactMetric label="Active reservations" value={data.stats.active_reservations} /><CompactMetric label="Fulfilled today" value={data.stats.fulfilled_reservations_today} /><CompactMetric label="Borrowing attendance" value={data.stats.borrowing_attendance_today} /></div></AdminPanel></div>
+      </AnalyticsGroup>
+  ) : group === "collection" ? (
+
+      <AnalyticsGroup title="Collection health" summary="Catalog and inventory figures in a compact reading layout." actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
+        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Catalog by category"><RankedList items={data.charts.catalogByCategory.map((item) => ({ label: item.name, value: `${item.titles} titles · ${item.copies} copies` }))} emptyText="No catalog categories yet." /></AdminPanel><AdminPanel title="Inventory condition"><RankedList items={data.charts.copyCondition.map((item) => ({ label: item.name, value: item.value, tone: item.name === "damaged" || item.name === "lost" ? "attention" : "neutral" }))} emptyText="No copy conditions recorded." /></AdminPanel></div>
+        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Borrowing by user role"><RankedList items={data.charts.borrowingByRole.map((item) => ({ label: item.name, value: item.value }))} emptyText="No borrowing activity yet." /></AdminPanel><AdminPanel title="Collection reference"><div className="divide-y divide-border/70"><CompactMetric label="Active copies" value={data.stats.total_book_copies} /><CompactMetric label="Available copies" value={data.stats.available_book_copies} /><CompactMetric label="Damaged copies" value={data.stats.damaged_book_copies} /><CompactMetric label="Lost copies" value={data.stats.lost_book_copies} /></div></AdminPanel></div>
+      </AnalyticsGroup>
+  ) : (
+
+      <AnalyticsGroup title="Patron and platform activity" summary="Attendance, website activity, users, and fine collections in text form." actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
+        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Seven-day activity"><TextMetricGrid loading={loading} metrics={[{ label: "Entry / exit scans", value: sum(data.charts.attendanceTrend, "entry_exit_count") }, { label: "Borrowing scans", value: sum(data.charts.attendanceTrend, "borrowing_count") }, { label: "Site visitors", value: sum(data.charts.visitTrend, "unique_visitors") }, { label: "Page hits", value: sum(data.charts.visitTrend, "visit_hits") }]} /></AdminPanel><AdminPanel title="Fine collections"><TextMetricGrid loading={loading} metrics={[{ label: "Settled this period", value: currencyFormatter.format(sum(data.charts.fineCollectionTrend, "settled_amount")) }, { label: "Outstanding fines", value: currencyFormatter.format(data.stats.outstanding_fines), tone: data.stats.outstanding_fines > 0 ? "critical" : "neutral" }, { label: "Active users", value: data.stats.active_users }, { label: "Active notifications", value: data.stats.active_notifications }]} /></AdminPanel></div>
+        <AdminPanel title="User role distribution"><RankedList items={data.charts.userRoles.map((item) => ({ label: item.name, value: item.value }))} emptyText="No active users found." /></AdminPanel>
+      </AnalyticsGroup>
+  );
+};
+
+const TextMetricGrid = ({ loading, metrics }: { loading: boolean; metrics: { label: string; value: number | string; tone?: "neutral" | "attention" | "critical" }[] }) => <div className="grid gap-3 sm:grid-cols-2">{metrics.map((metric) => <TextMetric key={metric.label} {...metric} loading={loading} />)}</div>;
+
+const TextMetric = ({ label, value, tone = "neutral", loading }: { label: string; value: number | string; tone?: "neutral" | "attention" | "critical"; loading: boolean }) => <div className={`border p-4 ${tone === "critical" ? "border-l-4 border-destructive/80 bg-destructive/5" : tone === "attention" ? "border-l-4 border-warning/80 bg-warning/5" : "border-border/80 bg-background"}`}><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>{label}</p><p className="mt-3 text-2xl font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{loading ? "..." : value}</p></div>;
+
+const RankedList = ({ items, emptyText }: { items: { label: string; value: number | string; tone?: "neutral" | "attention" }[]; emptyText: string }) => items.length ? <div className="divide-y divide-border/70">{items.map((item) => <div key={item.label} className={`flex items-center justify-between gap-4 py-3 ${item.tone === "attention" ? "text-warning" : ""}`}><span className="text-sm capitalize text-foreground">{item.label}</span><span className="shrink-0 font-semibold" style={{ fontFamily: "var(--font-heading)" }}>{item.value}</span></div>)}</div> : <p className="text-sm text-muted-foreground">{emptyText}</p>;
+
+const AnalyticsGroup = ({
+  title,
+  summary,
+  defaultOpen = false,
+  actions,
+  children,
+}: {
+  title: string;
+  summary: string;
+  defaultOpen?: boolean;
+  actions?: ReactNode;
+  children: ReactNode;
+}) => (
+  <details open={defaultOpen} className="admin-panel-surface admin-etched-border border border-border/80 bg-card/95">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden sm:px-6">
+      <div>
+        <h2 className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
+      </div>
+      <div className="flex items-center gap-3" onClick={(event) => event.stopPropagation()}>
+        {actions}
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Details</span>
+      </div>
+    </summary>
+    <div className="space-y-6 border-t border-border/70 p-5 sm:p-6">{children}</div>
+  </details>
+);
+
+const AnalyticsModeToggle = ({ value, onChange }: { value: "charts" | "text"; onChange: (view: "charts" | "text") => void }) => (
+  <div className="flex overflow-hidden border border-border" role="group" aria-label="Section display mode">
+    <Button type="button" size="sm" variant={value === "charts" ? "default" : "ghost"} className="rounded-none" onClick={() => onChange("charts")}><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Charts</Button>
+    <Button type="button" size="sm" variant={value === "text" ? "default" : "ghost"} className="rounded-none" onClick={() => onChange("text")}><List className="mr-1.5 h-3.5 w-3.5" />Text</Button>
+  </div>
+);
+
+const StatusItem = ({
+  icon: Icon,
+  tone,
+  title,
+  detail,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  tone: "clear" | "attention" | "critical";
+  title: string;
+  detail: string;
+}) => {
+  const styles = {
+    clear: "text-success border-success/30 bg-success/5",
+    attention: "text-warning border-warning/30 bg-warning/5",
+    critical: "text-destructive border-destructive/30 bg-destructive/5",
+  }[tone];
+
+  return (
+    <div className="flex items-center gap-3 p-5">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center border ${styles}`}><Icon className="h-5 w-5" /></div>
+      <div>
+        <p className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  );
+};
+
+const MetricCard = ({
+  label,
+  value,
+  icon: Icon,
+  tone = "neutral",
+  loading,
+}: {
+  label: string;
+  value: number;
+  icon: ComponentType<{ className?: string }>;
+  tone?: "neutral" | "attention" | "critical";
+  loading: boolean;
+}) => {
+  const styles = {
+    neutral: "border-border/80 bg-background",
+    attention: "border-l-4 border-warning/80 bg-warning/5",
+    critical: "border-l-4 border-destructive/80 bg-destructive/5",
+  }[tone];
+
+  return (
+    <div className={`min-w-0 border p-4 ${styles}`}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.17em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>{label}</span>
+        <Icon className={`h-4 w-4 shrink-0 ${tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-primary"}`} />
+      </div>
+      <p className="mt-4 text-3xl font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{loading ? "..." : value}</p>
+    </div>
+  );
+};
+
+const CompactMetric = ({ label, value }: { label: string; value: number }) => (
+  <div className="flex items-center justify-between gap-4 py-3">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{value}</span>
+  </div>
+);
 
 const SnapshotRow = ({ label, value }: { label: string; value: number | string }) => (
   <div className="flex items-center justify-between border border-border/70 px-4 py-3">

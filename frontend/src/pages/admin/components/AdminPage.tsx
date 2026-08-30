@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AdminPageProps {
   title: string;
@@ -30,7 +30,6 @@ interface AdminStatCardProps {
 
 export function AdminPage({
   title,
-  description,
   eyebrow = "Admin Workspace",
   actions,
   children,
@@ -68,9 +67,6 @@ export function AdminPage({
               >
                 {title}
               </h1>
-              {description ? (
-                <p className="max-w-4xl text-sm leading-7 text-muted-foreground sm:text-[15px]">{description}</p>
-              ) : null}
             </div>
           </div>
 
@@ -85,13 +81,12 @@ export function AdminPage({
 
 export function AdminPanel({
   title,
-  description,
   actions,
   children,
   className,
   contentClassName,
 }: AdminPanelProps) {
-  const hasHeader = title || description || actions;
+  const hasHeader = title || actions;
 
   return (
     <Card className={cn("admin-panel-surface admin-etched-border min-w-0 rounded-sm border-border/80 bg-card/95 shadow-none", className)}>
@@ -107,7 +102,6 @@ export function AdminPanel({
                 {title}
               </CardTitle>
             ) : null}
-            {description ? <CardDescription className="leading-6">{description}</CardDescription> : null}
           </div>
 
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

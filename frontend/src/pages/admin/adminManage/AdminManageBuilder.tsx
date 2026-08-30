@@ -1,11 +1,7 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui";
+import { useEffect, useRef } from "react";
+import { Search, UserPlus } from "lucide-react";
 import { AdminPage, AdminPanel } from "../components/AdminPage";
+import { SegmentedNavigation } from "../components/SegmentedNavigation";
 import type { FunctionType, QrTarget, User, UserFormState } from "./AdminManage.types";
 import {
   CreateForm,
@@ -69,88 +65,96 @@ const AdminManageBuilder = ({
   onBulkDeactivateStudentLikeUsers,
   qrTarget,
   onSetQrTarget,
-}: AdminManageBuilderProps) => (
-  <AdminPage
-    eyebrow="Administration"
-    title="User Management"
-    description="Create, update, archive, and review library users in a single workspace built for quick scanning and fewer layout jumps."
-  >
-    {qrTarget ? <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} /> : null}
+}: AdminManageBuilderProps) => {
+  const editFormRef = useRef<HTMLDivElement>(null);
 
-    <AdminPanel
-      title="Mode"
-      description="Switch between creating a new user and searching or editing an existing one."
-      className="max-w-xl"
-    >
-      <div className="max-w-xs">
-        <Select value={functionType} onValueChange={(v) => onFunctionTypeChange(v as FunctionType)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select mode" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="create">Create User</SelectItem>
-            <SelectItem value="edit">Edit / Search</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </AdminPanel>
+  useEffect(() => {
+    if (selectedUser) {
+      editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedUser]);
 
-    {functionType === "create" ? (
-      <CreateForm
-        form={form}
-        showPassword={showPassword}
-        allowedRoles={allowedRoles}
-        loading={loading}
-        onField={onField}
-        onTogglePassword={onTogglePassword}
-        onSubmit={onCreateUser}
-        onReset={onResetForm}
-      />
-    ) : (
-      <>
-        <SearchBar
-          currentUserRole={currentUserRole}
-          value={searchQuery}
-          loading={loading}
-          showArchived={showArchived}
-          onChange={onSearchQueryChange}
-          onSearch={onSearch}
-          onToggleArchived={onToggleArchived}
-          onBulkDeactivateStudentLikeUsers={onBulkDeactivateStudentLikeUsers}
-        />
+  return (
+    <AdminPage eyebrow="Administration" title="User Management">
+      {qrTarget ? <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} /> : null}
 
-        {searchResults.length > 0 ? (
-          <SearchResultsTable
-            results={searchResults}
-            showArchived={showArchived}
-            onSelect={onSelectUser}
+      <AdminPanel
+        title="User records"
+        className="border-none bg-transparent shadow-none"
+        contentClassName="p-0"
+      >
+        <div className="mt-5">
+          <SegmentedNavigation
+            ariaLabel="User management mode"
+            value={functionType}
+            onChange={onFunctionTypeChange}
+            segments={[
+              { value: "edit", label: "User Records", icon: Search },
+              { value: "create", label: "Create User", icon: UserPlus },
+            ]}
           />
-        ) : null}
+        </div>
 
-        {selectedUser ? (
-          <EditForm
-            selectedUser={selectedUser}
+        {functionType === "create" ? (
+          <CreateForm
             form={form}
             showPassword={showPassword}
             allowedRoles={allowedRoles}
             loading={loading}
-            showArchived={showArchived}
             onField={onField}
             onTogglePassword={onTogglePassword}
-            onSubmit={onUpdateUser}
-            onViewQr={() =>
-              onSetQrTarget({
-                studentId: selectedUser.student_employee_id,
-                name: selectedUser.name,
-              })
-            }
-            onArchive={onArchiveUser}
-            onRestore={onRestoreUser}
+            onSubmit={onCreateUser}
+            onReset={onResetForm}
           />
-        ) : null}
-      </>
-    )}
-  </AdminPage>
-);
+        ) : (
+          <>
+            <SearchBar
+              currentUserRole={currentUserRole}
+              value={searchQuery}
+              loading={loading}
+              showArchived={showArchived}
+              onChange={onSearchQueryChange}
+              onSearch={onSearch}
+              onToggleArchived={onToggleArchived}
+              onBulkDeactivateStudentLikeUsers={onBulkDeactivateStudentLikeUsers}
+            />
+
+            {searchResults.length > 0 ? (
+              <SearchResultsTable
+                results={searchResults}
+                showArchived={showArchived}
+                onSelect={onSelectUser}
+              />
+            ) : null}
+
+            {selectedUser ? (
+              <div ref={editFormRef} className="scroll-mt-6">
+                <EditForm
+                  selectedUser={selectedUser}
+                  form={form}
+                  showPassword={showPassword}
+                  allowedRoles={allowedRoles}
+                  loading={loading}
+                  showArchived={showArchived}
+                  onField={onField}
+                  onTogglePassword={onTogglePassword}
+                  onSubmit={onUpdateUser}
+                  onViewQr={() =>
+                    onSetQrTarget({
+                      studentId: selectedUser.student_employee_id,
+                      name: selectedUser.name,
+                    })
+                  }
+                  onArchive={onArchiveUser}
+                  onRestore={onRestoreUser}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+      </AdminPanel>
+    </AdminPage>
+  );
+};
 
 export default AdminManageBuilder;

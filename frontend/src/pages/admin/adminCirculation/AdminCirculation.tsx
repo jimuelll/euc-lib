@@ -18,6 +18,7 @@ const AdminCirculation = () => {
     foundUser,
     foundCopy,
     activeBorrows,
+    clearance,
     matchedBorrow,
     canSubmit,
     setStudentId,
@@ -36,12 +37,11 @@ const AdminCirculation = () => {
     <AdminPage
       eyebrow="Library Management"
       title="Circulation"
-      description="Process borrowing and return transactions with a simpler layout that keeps the active task, user, and copy details in view."
       contentWidth="wide"
     >
       <AdminPanel
         title={cfg.label}
-        description={foundUser ? `Current user: ${foundUser.name}` : "Select a transaction type, then look up the user and book copy before submitting."}
+        description={foundUser ? `Current user: ${foundUser.name}` : undefined}
       >
         <div className="space-y-5">
           <TransactionTypePicker value={type} onChange={handleTypeChange} />
@@ -53,6 +53,7 @@ const AdminCirculation = () => {
             lookingUp={lookingUpUser}
             foundUser={foundUser}
             activeBorrows={activeBorrows}
+            clearance={clearance}
             type={type}
           />
 
@@ -60,8 +61,9 @@ const AdminCirculation = () => {
             copyBarcode={copyBarcode}
             onCopyBarcodeChange={setCopyBarcode}
             onLookup={handleLookupCopy}
+            onSelectCopy={(barcode) => { setCopyBarcode(barcode); void handleLookupCopy(barcode); }}
             lookingUp={lookingUpCopy}
-            disabled={!foundUser}
+            disabled={false}
             foundCopy={foundCopy}
             matchedBorrow={matchedBorrow}
             type={type}

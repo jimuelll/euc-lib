@@ -1,0 +1,10 @@
+const express = require("express");
+const { authMiddleware } = require("../auth/auth.middleware");
+const controller = require("./clearance.controller");
+const router = express.Router();
+router.get("/clearance/profile", controller.getProfile);
+router.post("/clearance/payment", controller.recordPayment);
+router.post("/clearance/borrowings/:borrowingId/adjust", authMiddleware(["admin", "super_admin"]), controller.adjustFine);
+router.post("/clearance/transactions/:transactionId/reverse", authMiddleware(["admin", "super_admin"]), controller.reverseTransaction);
+router.get("/clearance/receipts/:receiptNumber", controller.getReceipt);
+module.exports = router;

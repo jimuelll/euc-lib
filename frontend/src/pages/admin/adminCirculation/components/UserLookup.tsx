@@ -1,27 +1,47 @@
-import { Loader2, Search } from "lucide-react";
-import type { UserInfo, ActiveBorrow, TransactionType } from "../circulation.types";
+import { useEffect, useState } from "react";
+import { Loader2, Search, TriangleAlert } from "lucide-react";
+import { Link } from "react-router-dom";
+import axiosInstance from "@/utils/AxiosInstance";
+import type { UserInfo, ActiveBorrow, TransactionType, ClearanceStatus } from "../circulation.types";
 
 interface Props {
   studentId: string;
   onStudentIdChange: (v: string) => void;
-  onLookup: () => void;
+  onLookup: (studentIdOverride?: string) => void;
   lookingUp: boolean;
   foundUser: UserInfo | null;
   activeBorrows: ActiveBorrow[];
   type: TransactionType;
+  clearance: ClearanceStatus | null;
 }
+
+type UserSuggestion = Pick<UserInfo, "student_employee_id" | "name" | "role">;
 
 const UserLookup = ({
   studentId, onStudentIdChange, onLookup,
-  lookingUp, foundUser, activeBorrows, type,
-}: Props) => (
-  <div className="space-y-2">
+  lookingUp, foundUser, activeBorrows, type, clearance,
+}: Props) => {
+  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
+  useEffect(() => {
+    const query = studentId.trim();
+    if (query.length < 2 || foundUser?.student_employee_id === query) { setSuggestions([]); return; }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await axiosInstance.get("/api/admin/users", { params: { student_employee_id: query, name: query } });
+        if (active) setSuggestions(response.data.slice(0, 6));
+      } catch { if (active) setSuggestions([]); }
+    }, 180);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [studentId, foundUser?.student_employee_id]);
+
+  return <div className="space-y-2">
 
     <label
       className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
       style={{ fontFamily: "var(--font-heading)" }}
     >
-      Student / Employee ID
+      Student / Employee ID or Name
     </label>
 
     {/* Input + search button fused */}
@@ -30,12 +50,12 @@ const UserLookup = ({
         value={studentId}
         onChange={(e) => onStudentIdChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onLookup())}
-        placeholder="Enter student or employee ID"
+        placeholder="Type a name, student ID, or employee ID"
         className="flex-1 h-9 px-3.5 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none"
       />
       <button
         type="button"
-        onClick={onLookup}
+        onClick={() => onLookup()}
         disabled={lookingUp || !studentId.trim()}
         className="flex items-center justify-center h-9 w-9 border-l border-border bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 disabled:opacity-40 transition-colors"
       >
@@ -46,8 +66,20 @@ const UserLookup = ({
       </button>
     </div>
 
+    {suggestions.length > 0 && (
+      <div className="divide-y divide-border border border-border bg-card shadow-sm">
+        {suggestions.map((user) => (
+          <button key={user.student_employee_id} type="button" onClick={() => { setSuggestions([]); onLookup(user.student_employee_id); }} className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40">
+            <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-[10px] text-muted-foreground">{user.student_employee_id}</span></span>
+            <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{user.role}</span>
+          </button>
+        ))}
+      </div>
+    )}
+
     {/* Found user card */}
     {foundUser && (
+      <div className="space-y-3">
       <div className="flex gap-0 border border-border overflow-hidden">
         {/* Gold left accent — user confirmed */}
         <div className="w-[3px] shrink-0 bg-warning/60" />
@@ -92,8 +124,10 @@ const UserLookup = ({
           </div>
         </div>
       </div>
+      {type === "borrow" && clearance?.status === "blocked" ? <div className="flex flex-col gap-3 border-l-4 border-destructive bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-2"><TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" /><div><p className="text-sm font-semibold text-destructive">Clearance required before borrowing</p>{clearance.reasons.map((reason) => <p key={reason} className="text-xs text-foreground">{reason}</p>)}</div></div><Link to={`/admin/clearance?student_employee_id=${encodeURIComponent(foundUser.student_employee_id)}`} className="text-sm font-medium text-primary underline underline-offset-4">Open Clearance</Link></div> : null}
+      </div>
     )}
-  </div>
-);
+  </div>;
+};
 
 export default UserLookup;

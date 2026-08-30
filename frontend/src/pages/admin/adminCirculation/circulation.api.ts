@@ -1,9 +1,10 @@
 import axiosInstance from "@/utils/AxiosInstance";
-import type { BookInfo, UserInfo, ActiveBorrow } from "./circulation.types";
+import type { BookInfo, UserInfo, ActiveBorrow, ClearanceStatus } from "./circulation.types";
 
 export interface LookupUserResult {
   user: UserInfo;
   activeBorrows: ActiveBorrow[];
+  clearance: ClearanceStatus;
 }
 
 export interface CirculationLogEntry {
@@ -34,25 +35,27 @@ export interface CirculationLogFilters {
   archived?: boolean;          // ← NEW
 }
 
+export interface CirculationLogSummary {
+  total_records: number;
+  borrowed_count: number;
+  overdue_count: number;
+  returned_count: number;
+  unique_borrowers: number;
+}
+
 export interface CirculationLogResult {
   rows: CirculationLogEntry[];
   total: number;
   page: number;
   totalPages: number;
-  summary?: {
-    total_records: number;
-    borrowed_count: number;
-    overdue_count: number;
-    returned_count: number;
-    unique_borrowers: number;
-  };
+  summary?: CirculationLogSummary;
 }
 
 export const lookupUser = async (studentEmployeeId: string): Promise<LookupUserResult> => {
   const res = await axiosInstance.get("/api/borrowing/scan/user", {
     params: { student_employee_id: studentEmployeeId },
   });
-  return { user: res.data.user, activeBorrows: res.data.activeBorrows ?? [] };
+  return { user: res.data.user, activeBorrows: res.data.activeBorrows ?? [], clearance: res.data.clearance };
 };
 
 export const lookupCopy = async (barcode: string): Promise<BookInfo> => {

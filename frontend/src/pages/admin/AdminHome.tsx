@@ -1,136 +1,45 @@
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { ArrowRight, Coins, RefreshCcw, ShieldAlert, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, ArrowRightLeft, BookMarked, BookPlus, CheckCircle2, ClipboardList, Coins, RefreshCcw, UserPlus, Users } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
 
-interface HomeStats {
-  total_books: number;
-  active_users: number;
-  active_borrowings: number;
-  overdue_borrowings: number;
-  outstanding_fines: number;
-  upcoming_holidays: number;
-}
+interface DashboardStats { total_books: number; available_book_copies: number; borrowed_book_copies: number; active_users: number; overdue_borrowings: number; borrowings_today: number; returns_today: number; ready_reservations: number; reservations_today: number; attendance_today: number; entry_exit_attendance_today: number; borrowing_attendance_today: number; unique_visitors_today: number; visit_hits_today: number; damaged_book_copies: number; lost_book_copies: number; active_notifications: number; active_subscriptions: number; upcoming_holidays: number; outstanding_fines: number; }
+interface RecentActivity { occurred_at: string; activity_type: "borrowed" | "returned" | "reserved"; description: string; }
+interface DashboardResponse { stats: DashboardStats; recentActivity: RecentActivity[]; }
+type DeskAction = { title: string; detail: string; href: string; tone: "clear" | "attention" | "critical"; icon: ComponentType<{ className?: string }> };
+const emptyStats: DashboardStats = { total_books: 0, available_book_copies: 0, borrowed_book_copies: 0, active_users: 0, overdue_borrowings: 0, borrowings_today: 0, returns_today: 0, ready_reservations: 0, reservations_today: 0, attendance_today: 0, entry_exit_attendance_today: 0, borrowing_attendance_today: 0, unique_visitors_today: 0, visit_hits_today: 0, damaged_book_copies: 0, lost_book_copies: 0, active_notifications: 0, active_subscriptions: 0, upcoming_holidays: 0, outstanding_fines: 0 };
+const currency = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 
-interface HomeResponse {
-  stats: HomeStats;
-}
-
-const emptyStats: HomeStats = {
-  total_books: 0,
-  active_users: 0,
-  active_borrowings: 0,
-  overdue_borrowings: 0,
-  outstanding_fines: 0,
-  upcoming_holidays: 0,
-};
-
-const adminQuickLinks = [
-  { title: "Analytics", description: "Open the full charts and trends dashboard.", href: "/admin/analytics" },
-  { title: "Circulation", description: "Process borrowing and returns at the desk.", href: "/admin/circulation" },
-  { title: "Reports", description: "Review circulation and reservation records by date range.", href: "/admin/report" },
-  { title: "Payments", description: "Review fine exposure and settle unsettled balances.", href: "/admin/payment" },
-];
-
-const staffQuickLinks = [
-  { title: "Catalog", description: "Check titles, copies, and catalog details.", href: "/admin/catalog" },
-  { title: "Circulation", description: "Process borrowing and returns at the desk.", href: "/admin/circulation" },
-  { title: "Reservations", description: "Handle reservation queues and pickups.", href: "/admin/reservations" },
-  { title: "Holidays", description: "Review configured holiday dates that affect due dates.", href: "/admin/holidays" },
-];
-
-const currencyFormatter = new Intl.NumberFormat("en-PH", {
-  style: "currency",
-  currency: "PHP",
-});
-
-const AdminHome = () => {
+export default function Dashboard() {
   const { user } = useAuth();
-  const canSeeAnalytics = ["admin", "super_admin"].includes(user?.role ?? "");
-  const [stats, setStats] = useState<HomeStats>(emptyStats);
+  const [stats, setStats] = useState<DashboardStats>(emptyStats);
+  const [activity, setActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const load = async (refresh = false) => { refresh ? setRefreshing(true) : setLoading(true); setError(""); try { const response = await axiosInstance.get<DashboardResponse>("/api/admin/dashboard"); setStats(response.data.stats); setActivity(response.data.recentActivity ?? []); } catch (requestError: any) { setError(requestError.response?.data?.message ?? "Dashboard data could not be loaded"); } finally { refresh ? setRefreshing(false) : setLoading(false); } };
+  useEffect(() => { void load(); }, []);
+  const actions = useMemo<DeskAction[]>(() => [
+    { title: stats.overdue_borrowings ? `${stats.overdue_borrowings} overdue return${stats.overdue_borrowings === 1 ? "" : "s"}` : "No overdue returns", detail: stats.overdue_borrowings ? "Return the item before clearing its fine." : "All active loans are within their due date.", href: "/admin/clearance", tone: stats.overdue_borrowings ? "critical" : "clear", icon: stats.overdue_borrowings ? AlertTriangle : CheckCircle2 },
+    { title: stats.outstanding_fines ? `${currency.format(stats.outstanding_fines)} to clear` : "No unpaid fines", detail: stats.outstanding_fines ? "Cash settlements are recorded in Clearance." : "There are no balances waiting for settlement.", href: "/admin/clearance", tone: stats.outstanding_fines ? "critical" : "clear", icon: stats.outstanding_fines ? Coins : CheckCircle2 },
+    { title: `${stats.ready_reservations} reservation${stats.ready_reservations === 1 ? "" : "s"} ready`, detail: stats.ready_reservations ? "Awaiting pickup at the desk." : "Nothing is awaiting pickup.", href: "/admin/reservations", tone: stats.ready_reservations ? "attention" : "clear", icon: BookMarked },
+  ], [stats]);
+  const todayRows = [{ label: "Borrowings today", value: stats.borrowings_today, href: "/admin/circulation" }, { label: "Returns today", value: stats.returns_today, href: "/admin/circulation" }, { label: "Currently on loan", value: stats.borrowed_book_copies, href: "/admin/circulation" }, { label: "Overdue borrowings", value: stats.overdue_borrowings, href: "/admin/clearance" }, { label: "New reservations", value: stats.reservations_today, href: "/admin/reservations" }, { label: "Attendance", value: stats.attendance_today }];
+  const secondaryRows = user?.role === "staff" ? [{ label: "Entry / exit scans", value: stats.entry_exit_attendance_today }, { label: "Borrowing scans", value: stats.borrowing_attendance_today }, { label: "Active users", value: stats.active_users }, { label: "Catalog titles", value: stats.total_books }, { label: "Available copies", value: stats.available_book_copies }, { label: "Ready reservations", value: stats.ready_reservations, href: "/admin/reservations" }] : [{ label: "Site visitors", value: stats.unique_visitors_today }, { label: "Page hits", value: stats.visit_hits_today }, { label: "Entry / exit scans", value: stats.entry_exit_attendance_today }, { label: "Borrowing scans", value: stats.borrowing_attendance_today }, { label: "Active users", value: stats.active_users }, { label: "Available copies", value: stats.available_book_copies }];
+  return <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 pb-8">
+    <section className="relative overflow-hidden border border-border/80 bg-card"><div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--warning)),transparent_64%)]" /><div className="flex flex-col gap-5 px-5 py-6 sm:px-7 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>Library operations · live desk</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-foreground sm:text-4xl" style={{ fontFamily: "var(--font-heading)" }}>Dashboard</h1><p className="mt-2 text-sm text-muted-foreground">{new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p></div><Button type="button" variant="outline" className="self-start rounded-none lg:self-auto" onClick={() => void load(true)} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh desk</Button></div></section>
+    {error ? <div className="border-l-4 border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
+    <section className="border border-border/80 bg-card"><LedgerHeader label="Action ledger" meta={actions.filter((action) => action.tone !== "clear").length ? "Requires review" : "All clear"} /><div className="divide-y divide-border/70">{actions.map((action, index) => <LedgerRow key={action.href + action.title} index={index + 1} {...action} />)}</div></section>
+    <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"><section className="border border-border/80 bg-card"><LedgerHeader label="Today’s register" meta="Desk totals" /><Register rows={todayRows} loading={loading} /></section><section className="border border-border/80 bg-card"><LedgerHeader label={user?.role === "staff" ? "Desk coverage" : "Public reach"} meta={user?.role === "staff" ? "Operational only" : "Reference"} /><Register rows={secondaryRows} loading={loading} /></section></div>
+    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]"><section className="border border-border/80 bg-card"><LedgerHeader label="Library standing" meta="Reference" /><div className="divide-y divide-border/70"><ReferenceRow label="Catalog titles" value={stats.total_books} /><ReferenceRow label="Available copies" value={stats.available_book_copies} /><ReferenceRow label="Currently on loan" value={stats.borrowed_book_copies} /><ReferenceRow label="Active users" value={stats.active_users} /><ReferenceRow label="Ready reservations" value={stats.ready_reservations} /><ReferenceRow label="Unpaid fines" value={currency.format(stats.outstanding_fines)} tone={stats.outstanding_fines ? "attention" : undefined} /><ReferenceRow label="Damaged copies" value={stats.damaged_book_copies} tone={stats.damaged_book_copies ? "attention" : undefined} /><ReferenceRow label="Lost copies" value={stats.lost_book_copies} tone={stats.lost_book_copies ? "critical" : undefined} /><ReferenceRow label="Active subscriptions" value={stats.active_subscriptions} /><ReferenceRow label="Upcoming holidays" value={stats.upcoming_holidays} /><ReferenceRow label="Active notifications" value={stats.active_notifications} /></div></section><section className="border border-border/80 bg-card"><LedgerHeader label="Recent transactions" meta="Circulation & reservations" />{activity.length ? <div className="divide-y divide-border/70">{activity.map((item, index) => <div key={`${item.occurred_at}-${index}`} className="grid grid-cols-[2.5rem_1fr_auto] items-start gap-3 px-5 py-3.5"><span className="font-mono text-[10px] font-semibold text-primary">{String(index + 1).padStart(2, "0")}</span><p className="text-sm text-foreground">{item.description}</p><time className="whitespace-nowrap text-xs text-muted-foreground">{formatTime(item.occurred_at)}</time></div>)}</div> : <p className="px-5 py-8 text-sm text-muted-foreground">No circulation or reservation transactions yet.</p>}</section></div>
+    <section className="border border-border/80 bg-card"><LedgerHeader label="Start a task" meta="Common desk actions" /><div className="grid divide-y divide-border/70 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">{[{ label: "Borrow or return", href: "/admin/circulation", icon: ArrowRightLeft }, { label: "Open clearance", href: "/admin/clearance", icon: ClipboardList }, { label: "Catalog records", href: "/admin/catalog", icon: BookPlus }, { label: "User records", href: "/admin/manage", icon: UserPlus }].map(({ label, href, icon: Icon }) => <Link key={href} to={href} className="flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/30"><span className="flex items-center gap-3 text-sm font-semibold text-foreground"><Icon className="h-4 w-4 text-primary" />{label}</span><ArrowRight className="h-4 w-4 text-muted-foreground" /></Link>)}</div></section>
+  </main>;
+}
 
-  const loadOverview = async (mode: "initial" | "refresh" = "initial") => {
-    if (!canSeeAnalytics) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    if (mode === "initial") setLoading(true);
-    if (mode === "refresh") setRefreshing(true);
-
-    try {
-      const res = await axiosInstance.get<HomeResponse>("/api/admin/dashboard");
-      setStats({
-        total_books: res.data.stats.total_books,
-        active_users: res.data.stats.active_users,
-        active_borrowings: res.data.stats.active_borrowings,
-        overdue_borrowings: res.data.stats.overdue_borrowings,
-        outstanding_fines: res.data.stats.outstanding_fines,
-        upcoming_holidays: res.data.stats.upcoming_holidays,
-      });
-    } finally {
-      if (mode === "initial") setLoading(false);
-      if (mode === "refresh") setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadOverview();
-  }, [canSeeAnalytics]);
-
-  return (
-    <AdminPage
-      eyebrow="Home"
-      title="Library Overview"
-      description={
-        canSeeAnalytics
-          ? "A compact pulse check for today's operations. Use Analytics for the full chart-heavy breakdown."
-          : "A lightweight operations landing page for day-to-day library work."
-      }
-      actions={canSeeAnalytics ? (
-        <Button type="button" variant="outline" className="rounded-none" onClick={() => void loadOverview("refresh")} disabled={loading || refreshing}>
-          <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh Overview
-        </Button>
-      ) : undefined}
-      contentWidth="wide"
-    >
-      {canSeeAnalytics ? (
-        <AdminStatGrid>
-          <AdminStatCard label="Books" value={loading ? "..." : String(stats.total_books)} helperText="Non-archived catalog titles." icon={<ArrowRight className="h-4 w-4" />} />
-          <AdminStatCard label="Active Users" value={loading ? "..." : String(stats.active_users)} helperText="Current active accounts in the system." icon={<Users className="h-4 w-4" />} />
-          <AdminStatCard label="Overdue Borrowings" value={loading ? "..." : String(stats.overdue_borrowings)} helperText={`${stats.active_borrowings} active borrowings in total.`} icon={<ShieldAlert className="h-4 w-4" />} />
-          <AdminStatCard label="Total unsettled payments" value={loading ? "..." : currencyFormatter.format(stats.outstanding_fines)} helperText={`${stats.upcoming_holidays} upcoming holiday date(s) configured.`} icon={<Coins className="h-4 w-4" />} />
-        </AdminStatGrid>
-      ) : null}
-
-      <AdminPanel
-        title="Quick Actions"
-        description={
-          canSeeAnalytics
-            ? "The Home page stays lightweight and operational. Open Analytics when you need trendlines, role charts, and deeper reporting."
-            : "These are the day-to-day tools available to staff from the admin workspace."
-        }
-      >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {(canSeeAnalytics ? adminQuickLinks : staffQuickLinks).map((item) => (
-            <Link key={item.href} to={item.href} className="block border border-border/80 bg-card p-4 transition-colors hover:bg-muted/20">
-              <h3 className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-                {item.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
-            </Link>
-          ))}
-        </div>
-      </AdminPanel>
-    </AdminPage>
-  );
-};
-
-export default AdminHome;
+function LedgerHeader({ label, meta }: { label: string; meta: string }) { return <header className="flex items-center justify-between border-b border-border/70 bg-[linear-gradient(90deg,hsl(var(--primary)/0.06),transparent_65%)] px-5 py-3.5"><div className="flex items-center gap-3"><span className="h-px w-5 bg-warning" /><h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{label}</h2></div><span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{meta}</span></header>; }
+function LedgerRow({ index, icon: Icon, tone, title, detail, href }: { index: number; icon: ComponentType<{ className?: string }>; tone: "clear" | "attention" | "critical"; title: string; detail: string; href: string }) { const toneClass = tone === "critical" ? "border-destructive bg-destructive/5 text-destructive" : tone === "attention" ? "border-warning bg-warning/5 text-warning" : "border-success bg-success/5 text-success"; return <Link to={href} className="grid grid-cols-[2.5rem_2.25rem_1fr_auto] items-center gap-3 px-5 py-4 transition-colors hover:bg-muted/30"><span className="font-mono text-[10px] font-semibold text-muted-foreground">{String(index).padStart(2, "0")}</span><span className={`flex h-8 w-8 items-center justify-center border ${toneClass}`}><Icon className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-foreground">{title}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span></span><ArrowRight className="h-4 w-4 text-muted-foreground" /></Link>; }
+function Register({ rows, loading }: { rows: { label: string; value: number; href?: string }[]; loading: boolean }) { return <div className="divide-y divide-border/70">{rows.map((row, index) => { const content = <><span className="flex items-center gap-3"><span className="font-mono text-[10px] text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span className="text-sm text-foreground">{row.label}</span></span><span className="font-mono text-lg font-semibold text-foreground">{loading ? "…" : row.value}</span></>; return row.href ? <Link key={row.label} to={row.href} className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/30">{content}</Link> : <div key={row.label} className="flex items-center justify-between px-5 py-3.5">{content}</div>; })}</div>; }
+function ReferenceRow({ label, value, tone }: { label: string; value: number | string; tone?: "attention" | "critical" }) { return <div className="flex items-center justify-between px-5 py-3"><span className="text-sm text-muted-foreground">{label}</span><span className={`font-mono text-sm font-semibold ${tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-foreground"}`}>{value}</span></div>; }
+function formatTime(value: string) { return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }

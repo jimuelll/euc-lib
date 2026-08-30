@@ -1,4 +1,5 @@
 const db = require("../../db");
+const MATERIAL_KEYS = ["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"];
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -280,12 +281,12 @@ const createBook = async (data, createdBy) => {
       }
     }
 
-    const allowedKeys = schema
-      .map((f) => f.key)
+    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS])]
       .filter((k) => data[k] !== undefined && data[k] !== "");
 
+    if (!allowedKeys.includes("material_type")) allowedKeys.push("material_type");
     const columns      = ["created_by", ...allowedKeys];
-    const values       = [createdBy, ...allowedKeys.map((k) => data[k] ?? null)];
+    const values       = [createdBy, ...allowedKeys.map((k) => k === "material_type" ? (data[k] || "book") : (data[k] ?? null))];
     const placeholders = columns.map(() => "?").join(", ");
     const columnNames  = columns.map((c) => `\`${c}\``).join(", ");
 
@@ -316,8 +317,7 @@ const updateBook = async (id, data) => {
 
     const schema = await getSchema();
 
-    const allowedKeys = schema
-      .map((f) => f.key)
+    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS])]
       .filter((k) => data[k] !== undefined && data[k] !== "");
 
     if (allowedKeys.length) {
@@ -407,6 +407,7 @@ const getCopyByBarcode = async (barcode) => {
        b.title,
        b.author,
        b.isbn,
+       b.material_type,
        CASE
          WHEN br.id IS NOT NULL THEN 'borrowed'
          ELSE 'available'
@@ -423,9 +424,19 @@ const getCopyByBarcode = async (barcode) => {
   return rows[0] ?? null;
 };
 
+const lookupIsbn = async (value) => {
+  const isbn = String(value || "").replace(/[^0-9Xx]/g, "").toUpperCase();
+  if (!/^\d{9}[\dX]$/.test(isbn) && !/^\d{13}$/.test(isbn)) throw Object.assign(new Error("Enter a valid ISBN-10 or ISBN-13"), { status: 400 });
+  const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
+  if (!response.ok) throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
+  const record = (await response.json())[`ISBN:${isbn}`];
+  if (!record) throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
+  return { isbn, title: record.title || "", author: (record.authors || []).map((item) => item.name).filter(Boolean).join(", "), publication_year: record.publish_date?.match(/\d{4}/)?.[0] || "", edition: record.publishers?.[0]?.name || "" };
+};
+
 module.exports = {
   MAX_CUSTOM_FIELDS,
   getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
   searchBooks, createBook, updateBook, deleteBook, restoreBook,
-  getBookCopies, syncBookCopies, getCopyByBarcode,
+  getBookCopies, syncBookCopies, getCopyByBarcode, lookupIsbn,
 };

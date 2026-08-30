@@ -52,6 +52,11 @@ const getBooks = async (req, res) => {
   }
 };
 
+const lookupIsbn = async (req, res) => {
+  try { res.json(await service.lookupIsbn(req.params.isbn)); }
+  catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "ISBN lookup failed" }); }
+};
+
 const createBook = async (req, res) => {
   try {
     const id = await service.createBook(req.body, req.user.student_employee_id);
@@ -144,6 +149,7 @@ module.exports = {
   getSchema,
   updateSchema,
   getBooks,
+  lookupIsbn,
   createBook,
   updateBook,
   deleteBook,

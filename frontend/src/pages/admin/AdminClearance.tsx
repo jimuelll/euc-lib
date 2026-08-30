@@ -1,68 +1,43 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, CheckCircle2, CircleDollarSign, Loader2, Search, ShieldCheck } from "lucide-react";
+import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { AdminPage, AdminPanel } from "./components/AdminPage";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/sonner";
+import { useAuth } from "@/context/AuthContext";
+import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
 
-const students = [
-  { id: "2024-00012", name: "Maria Santos", status: "cleared" },
-  { id: "2024-00034", name: "Juan Reyes", status: "pending" },
-  { id: "2024-00056", name: "Ana Garcia", status: "pending" },
-];
+type FineRow = { id: number; book_title: string; status: "borrowed" | "overdue" | "returned"; fine_amount: number; settled_amount: number; unsettled_amount: number };
+type Profile = { user: { name: string; student_employee_id: string }; status: "blocked" | "eligible"; reasons: string[]; overdueItems: { id: number; title: string }[]; fineRows: FineRow[]; outstandingAmount: number; reservations: { id: number; status: string; book_title: string }[]; transactions: { id: number; receipt_number: string | null; transaction_type: string; amount: number; reason: string | null; created_at: string; corrected: number }[] };
+type UserSuggestion = { student_employee_id: string; name: string; role: string };
+const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 
-const AdminClearance = () => (
-  <AdminPage
-    eyebrow="Administration"
-    title="Clearance"
-    description="Review student clearance status in a simple list with clear labels and direct actions."
-    contentWidth="wide"
-  >
-    <AdminPanel
-      title="Search students"
-      description="Look up a student by ID or name before processing a clearance request."
-      className="max-w-4xl"
-    >
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Input placeholder="Search student ID or name" className="sm:max-w-sm" />
-        <Button variant="outline" className="sm:w-auto">
-          Search
-        </Button>
-      </div>
-    </AdminPanel>
-
-    <AdminPanel
-      title="Student statuses"
-      description="Pending records stay visible so staff can resolve them without leaving the page."
-      className="max-w-4xl"
-    >
-      <div className="space-y-3">
-        {students.map((student) => (
-          <div
-            key={student.id}
-            className="flex flex-col gap-3 rounded-md border border-border/70 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="text-sm font-medium text-foreground">{student.name}</p>
-              <p className="text-xs leading-5 text-muted-foreground">{student.id}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className={
-                  student.status === "cleared"
-                    ? "border-success/30 bg-success/10 text-success"
-                    : "border-warning/30 bg-warning/10 text-warning"
-                }
-              >
-                {student.status === "cleared" ? "Cleared" : "Pending"}
-              </Badge>
-              {student.status === "pending" ? <Button size="sm">Clear</Button> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-    </AdminPanel>
-  </AdminPage>
-);
-
-export default AdminClearance;
+export default function AdminClearance() {
+  const { user: currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("student_employee_id") ?? ""); const [profile, setProfile] = useState<Profile | null>(null);
+  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
+  const [loading, setLoading] = useState(false); const [paying, setPaying] = useState(false);
+  const [adjustment, setAdjustment] = useState<FineRow | null>(null); const [amount, setAmount] = useState(""); const [reason, setReason] = useState("");
+  const [correction, setCorrection] = useState<number | null>(null); const [correctionReason, setCorrectionReason] = useState("");
+  const canAdjust = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+  useEffect(() => { const query = search.trim(); if (query.length < 2 || profile?.user.student_employee_id === query) { setSuggestions([]); return; } let active = true; const timer = window.setTimeout(async () => { try { const response = await axiosInstance.get("/api/admin/users", { params: { student_employee_id: query, name: query } }); if (active) setSuggestions(response.data.slice(0, 6)); } catch { if (active) setSuggestions([]); } }, 180); return () => { active = false; window.clearTimeout(timer); }; }, [search, profile?.user.student_employee_id]);
+  const loadProfile = async (event?: FormEvent, studentIdOverride?: string) => { event?.preventDefault(); const studentId = (studentIdOverride ?? search).trim(); if (!studentId) return toast.error("Enter a student ID, employee ID, or name"); setLoading(true); try { const response = await axiosInstance.get<Profile>("/api/admin/clearance/profile", { params: { student_employee_id: studentId } }); setSearch(studentId); setProfile(response.data); setSuggestions([]); } catch (error: any) { setProfile(null); toast.error(error.response?.data?.message ?? "Unable to find this user"); } finally { setLoading(false); } };
+  const recordPayment = async () => { if (!profile) return; setPaying(true); try { const response = await axiosInstance.post("/api/admin/clearance/payment", { student_employee_id: profile.user.student_employee_id }); toast.success("Cash payment recorded"); await loadProfile(); window.open(`/admin/clearance/receipt/${encodeURIComponent(response.data.receiptNumber)}`, "_blank", "noopener,noreferrer"); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to record payment"); } finally { setPaying(false); } };
+  const submitAdjustment = async (event: FormEvent) => { event.preventDefault(); if (!adjustment) return; try { await axiosInstance.post(`/api/admin/clearance/borrowings/${adjustment.id}/adjust`, { amount: Number(amount), reason }); toast.success("Fine adjustment recorded"); setAdjustment(null); setAmount(""); setReason(""); await loadProfile(); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to adjust fine"); } };
+  const submitCorrection = async (event: FormEvent) => { event.preventDefault(); if (!correction) return; try { await axiosInstance.post(`/api/admin/clearance/transactions/${correction}/reverse`, { reason: correctionReason }); toast.success("Transaction corrected"); setCorrection(null); setCorrectionReason(""); await loadProfile(); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to correct transaction"); } };
+  return <AdminPage eyebrow="Administration" title="Clearance" contentWidth="wide">
+    <AdminPanel title="Find a patron"><form onSubmit={loadProfile} className="flex flex-col gap-3 sm:flex-row"><div className="relative min-w-0 flex-1"><Label htmlFor="clearance-search">Student / employee ID or name</Label><Input id="clearance-search" className="mt-2" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a name, student ID, or employee ID" />{suggestions.length > 0 ? <div className="absolute z-20 mt-1 w-full divide-y divide-border border border-border bg-card shadow-md">{suggestions.map((user) => <button type="button" key={user.student_employee_id} onClick={() => void loadProfile(undefined, user.student_employee_id)} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span><span className="block text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-[10px] text-muted-foreground">{user.student_employee_id}</span></span><span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{user.role}</span></button>)}</div> : null}</div><Button className="self-end" type="submit" disabled={loading}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Find patron</Button></form></AdminPanel>
+    {profile ? <><section className={`border-l-4 px-5 py-5 ${profile.status === "blocked" ? "border-destructive bg-destructive/5" : "border-success bg-success/5"}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3">{profile.status === "blocked" ? <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 text-success" />}<div><p className="font-semibold text-foreground">{profile.user.name}</p><p className="text-sm text-muted-foreground">{profile.user.student_employee_id} · {profile.status === "blocked" ? "Clearance required" : "Eligible for borrowing and reservations"}</p>{profile.reasons.map((item) => <p key={item} className="mt-2 text-sm text-foreground">{item}</p>)}</div></div><span className={`border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${profile.status === "blocked" ? "border-destructive/30 text-destructive" : "border-success/30 text-success"}`}>{profile.status}</span></div></section>
+      <AdminStatGrid><AdminStatCard label="Overdue returns" value={String(profile.overdueItems.length)} icon={<AlertTriangle className="h-4 w-4" />} /><AdminStatCard label="Outstanding fines" value={money.format(profile.outstandingAmount)} icon={<CircleDollarSign className="h-4 w-4" />} /><AdminStatCard label="Active reservations" value={String(profile.reservations.length)} icon={<ShieldCheck className="h-4 w-4" />} /></AdminStatGrid>
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]"><AdminPanel title="Overdue returns"><div className="divide-y divide-border/70">{profile.overdueItems.length ? profile.overdueItems.map((item) => <div className="flex items-center justify-between gap-3 py-3" key={item.id}><span className="font-medium text-foreground">{item.title}</span><span className="text-sm text-destructive">Return required</span></div>) : <p className="py-3 text-sm text-muted-foreground">No overdue returns.</p>}</div></AdminPanel><AdminPanel title="Active reservations"><div className="divide-y divide-border/70">{profile.reservations.length ? profile.reservations.map((item) => <div className="flex items-center justify-between gap-3 py-3" key={item.id}><span className="font-medium text-foreground">{item.book_title}</span><span className="text-sm capitalize text-muted-foreground">{item.status}</span></div>) : <p className="py-3 text-sm text-muted-foreground">No active reservations.</p>}</div></AdminPanel></div>
+      <AdminPanel title="Fine records" actions={profile.outstandingAmount > 0 ? <Button onClick={recordPayment} disabled={paying}>{paying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CircleDollarSign className="mr-2 h-4 w-4" />}Record full cash payment · {money.format(profile.outstandingAmount)}</Button> : undefined}>{profile.fineRows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-border"><th className="px-3 py-3">Book</th><th className="px-3 py-3">Fine</th><th className="px-3 py-3">Paid / adjusted</th><th className="px-3 py-3">Outstanding</th>{canAdjust ? <th className="px-3 py-3" /> : null}</tr></thead><tbody>{profile.fineRows.map((row) => <tr key={row.id} className="border-b border-border/70"><td className="px-3 py-3"><p className="font-medium">{row.book_title}</p><p className="text-xs capitalize text-muted-foreground">{row.status}</p></td><td className="px-3 py-3">{money.format(row.fine_amount)}</td><td className="px-3 py-3">{money.format(row.settled_amount)}</td><td className="px-3 py-3 font-medium">{money.format(row.unsettled_amount)}</td>{canAdjust ? <td className="px-3 py-3 text-right"><Button size="sm" variant="outline" disabled={row.unsettled_amount <= 0} onClick={() => { setAdjustment(row); setAmount(String(row.unsettled_amount)); setReason(""); }}>Adjust</Button></td> : null}</tr>)}</tbody></table></div> : <p className="py-4 text-sm text-muted-foreground">No unpaid fine records.</p>}</AdminPanel>
+      <AdminPanel title="Clearance activity"><div className="divide-y divide-border/70">{profile.transactions.length ? profile.transactions.map((item) => <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" key={item.id}><div><p className="text-sm font-medium capitalize text-foreground">{item.transaction_type}{item.corrected ? " · corrected" : ""} · {money.format(item.amount)}</p><p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}{item.reason ? ` · ${item.reason}` : ""}</p></div><div className="flex gap-2">{item.receipt_number ? <a className="text-sm text-primary underline underline-offset-4" href={`/admin/clearance/receipt/${encodeURIComponent(item.receipt_number)}`} target="_blank" rel="noreferrer">Receipt</a> : null}{canAdjust && !item.corrected && item.transaction_type !== "reversal" ? <Button variant="outline" size="sm" onClick={() => { setCorrection(item.id); setCorrectionReason(""); }}>Correct</Button> : null}</div></div>) : <p className="py-3 text-sm text-muted-foreground">No clearance activity yet.</p>}</div></AdminPanel>
+    </> : null}
+    <Dialog open={!!adjustment} onOpenChange={(open) => !open && setAdjustment(null)}><DialogContent><DialogHeader><DialogTitle>Adjust fine</DialogTitle><DialogDescription>Record a reduction or waiver for this borrowing. The original fine remains in the audit record.</DialogDescription></DialogHeader><form onSubmit={submitAdjustment} className="space-y-4"><div><Label htmlFor="adjustment-amount">Amount to reduce (PHP)</Label><Input id="adjustment-amount" className="mt-2" min="0.01" max={adjustment?.unsettled_amount} step="0.01" type="number" value={amount} onChange={(event) => setAmount(event.target.value)} /></div><div><Label htmlFor="adjustment-reason">Reason</Label><Input id="adjustment-reason" className="mt-2" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for the audit trail" /></div><DialogFooter><Button type="submit">Record adjustment</Button></DialogFooter></form></DialogContent></Dialog>
+    <Dialog open={!!correction} onOpenChange={(open) => !open && setCorrection(null)}><DialogContent><DialogHeader><DialogTitle>Correct transaction</DialogTitle><DialogDescription>This adds a reversal record. The original transaction is retained for audit purposes.</DialogDescription></DialogHeader><form onSubmit={submitCorrection} className="space-y-4"><div><Label htmlFor="correction-reason">Reason</Label><Input id="correction-reason" className="mt-2" value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} placeholder="Required for the audit trail" /></div><DialogFooter><Button type="submit">Record correction</Button></DialogFooter></form></DialogContent></Dialog>
+  </AdminPage>;
+}

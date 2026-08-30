@@ -51,7 +51,7 @@ interface UseAdminManageReturn {
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
 
-  const [functionType,  setFunctionType]  = useState<FunctionType>("create");
+  const [functionType,  setFunctionType]  = useState<FunctionType>("edit");
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
   const [loading,       setLoading]       = useState(false);
@@ -142,6 +142,12 @@ export const useAdminManage = (): UseAdminManageReturn => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) void handleSearchUsers();
+    // Records are the primary task view; creation stays available as a deliberate mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // ── Select for edit ────────────────────────────────────────────────────────
   const selectUserForEdit = (u: User) => {

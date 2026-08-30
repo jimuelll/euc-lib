@@ -32,8 +32,8 @@ export const DEFAULT_FIELDS: FormField[] = [
     options: ["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"] },
   { key: "copies",           label: "Copies",           type: "number", public: true,   order: 4 },
   { key: "location",         label: "Location",         type: "text",   public: false,  order: 5 },
-  { key: "edition",          label: "Edition",          type: "text",   public: true,   order: 6, archived: true },
-  { key: "publication_year", label: "Publication Year", type: "number", public: true,   order: 7, archived: true },
+  { key: "edition",          label: "Edition",          type: "text",   public: true,   order: 6 },
+  { key: "publication_year", label: "Publication Year", type: "number", public: true,   order: 7 },
 ];
 
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [

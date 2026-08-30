@@ -29,3 +29,13 @@ dist-ssr
 backend/.env
 frontend/.env
 
+# Local AI coding-agent configuration and generated design context
+.agent/
+.agents/
+.claude/
+.codex/
+.gemini/
+.impeccable/
+PRODUCT.md
+SKILL.md
+

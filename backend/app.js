@@ -21,6 +21,7 @@ const myLibraryRoutes = require("./modules/myLibrary/myLibrary.routes");
 const notificationsRoutes = require("./modules/notifications/notifications.routes");
 const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
 const backupRoutes = require("./modules/backup/backup.routes");
+const clearanceRoutes = require("./modules/clearance/clearance.routes");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -76,6 +77,7 @@ app.use("/api",              myLibraryRoutes);
 app.use("/api",              notificationsRoutes);
 app.use("/api/admin",        librarySettingsRoutes);
 app.use("/api/admin",        backupRoutes);
+app.use("/api/admin",        clearanceRoutes);
 
 
 module.exports = app;

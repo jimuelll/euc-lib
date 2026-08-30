@@ -1,11 +1,14 @@
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, AlertCircle, Search } from "lucide-react";
 import BarcodeInput from "./BarcodeInput";
+import axiosInstance from "@/utils/AxiosInstance";
 import type { BookInfo, ActiveBorrow, TransactionType } from "../circulation.types";
 
 interface Props {
   copyBarcode: string;
   onCopyBarcodeChange: (v: string) => void;
   onLookup: () => void;
+  onSelectCopy: (barcode: string) => void;
   lookingUp: boolean;
   disabled: boolean;
   foundCopy: BookInfo | null;
@@ -15,10 +18,37 @@ interface Props {
 
 const BookLookup = ({
   copyBarcode, onCopyBarcodeChange, onLookup,
-  lookingUp, disabled,
+  lookingUp, disabled, onSelectCopy,
   foundCopy, matchedBorrow, type,
-}: Props) => (
-  <div className="space-y-2">
+}: Props) => {
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [results, setResults] = useState<{ id: number; title: string; author?: string; material_type?: string }[]>([]);
+  const [copies, setCopies] = useState<{ id: number; barcode: string; is_active: number; status?: string }[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const query = catalogQuery.trim();
+    if (query.length < 2) { setResults([]); return; }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try { const response = await axiosInstance.get("/api/admin/books", { params: { query } }); if (active) setResults(response.data.slice(0, 6)); }
+      catch { if (active) setResults([]); }
+      finally { if (active) setSearching(false); }
+    }, 180);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [catalogQuery]);
+
+  const chooseBook = async (book: { id: number; material_type?: string }) => {
+    if (book.material_type === "thesis") return;
+    setResults([]); setCopies([]); setSearching(true);
+    try {
+      const response = await axiosInstance.get(`/api/admin/books/${book.id}/copies`);
+      setCopies(response.data.filter((copy: { is_active: number; status?: string }) => copy.is_active && copy.status !== "borrowed"));
+    } finally { setSearching(false); }
+  };
+
+  return <div className="space-y-2">
 
     {/* Field label */}
     <label
@@ -36,6 +66,17 @@ const BookLookup = ({
       disabled={disabled}
       placeholder="Scan book QR code or type barcode"
     />
+
+    <div className="border-t border-border/70 pt-3">
+      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>Can’t scan? Search catalog</label>
+      <div className="flex items-center gap-2 border border-border bg-background px-3 focus-within:border-primary">
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+        <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" />
+        {searching && <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />}
+      </div>
+      {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-[11px] text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
+      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="font-mono text-xs text-foreground">{copy.barcode}</span><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-success">Available copy</span></button>)}</div>}
+    </div>
 
     {/* Found copy card */}
     {foundCopy && (
@@ -101,7 +142,7 @@ const BookLookup = ({
         </div>
       </div>
     )}
-  </div>
-);
+  </div>;
+};
 
 export default BookLookup;

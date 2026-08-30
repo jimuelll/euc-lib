@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
 import {
   Input,
@@ -9,7 +9,8 @@ import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import { FormField, Book } from "./AdminCatalog.types";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
-import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive } from "lucide-react";
+import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText } from "lucide-react";
+import { SegmentedNavigation } from "../components/SegmentedNavigation";
 
 type Copy = {
   id: number;
@@ -140,7 +141,9 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields }: Props) => {
-  const [catalogMode,   setCatalogMode]   = useState<"create" | "edit">("create");
+  const [catalogMode,   setCatalogMode]   = useState<"create" | "edit">("edit");
+  const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
+  const [isbnLookup,    setIsbnLookup]    = useState(false);
   const [formValues,    setFormValues]    = useState<Record<string, any>>({});
   const [loading,       setLoading]       = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
@@ -148,6 +151,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
+  const editFormRef = useRef<HTMLDivElement>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   const activeFields = fields.filter((f) => !f.archived);
@@ -155,9 +159,42 @@ const AdminCatalogData = ({ fields }: Props) => {
   const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
   const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
 
+  const lookupIsbn = async () => {
+    const isbn = String(formValues.isbn ?? "").trim();
+    if (!isbn) return toast.error("Enter an ISBN first");
+    setIsbnLookup(true);
+    try {
+      const response = await axiosInstance.get(`api/admin/books/isbn/${encodeURIComponent(isbn)}`);
+      const metadata = response.data;
+      // The lookup may return more than the active form supports. Keep the
+      // payload aligned with the current form-builder schema so optional
+      // metadata can never become an unknown-field save error.
+      const visibleKeys = new Set(activeFields.map((field) => field.key));
+      setFormValues((current) => {
+        const next = { ...current };
+        const metadataFields: Record<string, unknown> = {
+          isbn: metadata.isbn,
+          title: metadata.title,
+          author: metadata.author,
+          edition: metadata.edition,
+          publication_year: metadata.publication_year,
+        };
+        for (const [key, value] of Object.entries(metadataFields)) {
+          if (visibleKeys.has(key) && value) next[key] = value;
+        }
+        return next;
+      });
+      toast.success("Available ISBN details added — review before saving");
+    } catch (error: any) { toast.error(error.response?.data?.message ?? "ISBN lookup failed"); }
+    finally { setIsbnLookup(false); }
+  };
+
   const validateRequired = () => {
-    for (const f of activeFields.filter((f) => f.required)) {
-      if (!formValues[f.key]) { toast.error(`${f.label} is required`); return false; }
+    for (const key of ["title", "author"]) {
+      if (!String(formValues[key] ?? "").trim()) {
+        toast.error(`${key === "title" ? "Book title" : "Author"} is required`);
+        return false;
+      }
     }
     return true;
   };
@@ -166,7 +203,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!validateRequired()) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.post("api/admin/books", formValues);
+      const res = await axiosInstance.post("api/admin/books", { ...formValues, material_type: materialType });
       toast.success(res.data.message); resetForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to add book");
@@ -192,6 +229,12 @@ const AdminCatalogData = ({ fields }: Props) => {
       toast.error(err.response?.data?.message || err.message || "Search failed");
     } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    void handleSearchBooks(false);
+    // The records table is the primary work surface; creation is an explicit secondary action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Toggle archived view and re-run search if results are showing ──
   const handleToggleArchived = () => {
@@ -257,6 +300,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     const vals: Record<string, any> = {};
     activeFields.forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
     setFormValues(vals);
+    requestAnimationFrame(() => editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
   return (
@@ -271,32 +315,30 @@ const AdminCatalogData = ({ fields }: Props) => {
       )}
 
       {/* ── Mode selector ── */}
-      <div className="mt-5 flex items-center gap-0 border border-border">
-        {(["create", "edit"] as const).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => { setCatalogMode(mode); resetForm(); setSearchResults([]); setShowArchived(false); }}
-            className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors border-r last:border-r-0 border-border ${
-              catalogMode === mode
-                ? "bg-primary text-primary-foreground"
-                : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-            }`}
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            {mode === "create" ? "Add Book" : "Edit / Search / Delete"}
-          </button>
-        ))}
+      <div className="mt-5">
+        <SegmentedNavigation
+          ariaLabel="Catalog mode"
+          value={catalogMode}
+          onChange={(mode) => { setCatalogMode(mode); resetForm(); setSearchResults([]); setShowArchived(false); }}
+          segments={[
+            { value: "edit", label: "Catalog Records", icon: Search },
+            { value: "create", label: "Add Book", icon: Library },
+          ]}
+        />
       </div>
 
       {/* ── Create ────────────────────────────────────────────────────── */}
       {catalogMode === "create" && (
         <div className="mt-5 border border-border">
-          <PanelLabel>New Book Entry</PanelLabel>
+          <PanelLabel>{materialType === "book" ? "New Book Entry" : "New Thesis Entry"}</PanelLabel>
           <div className="p-5">
+            <div className="mb-5"><SegmentedNavigation ariaLabel="Material type" value={materialType} onChange={(value) => { setMaterialType(value); setFormValues({ material_type: value, copies: "1" }); }} segments={[{ value: "book", label: "Book", icon: Library }, { value: "thesis", label: "Thesis", icon: FileText }]} /></div>
+            {materialType === "book" ? <div className="mb-5 border border-warning/30 bg-warning/5 p-4"><FieldLabel>ISBN</FieldLabel><div className="flex gap-2"><input value={formValues.isbn ?? ""} onChange={(event) => setField("isbn", event.target.value)} placeholder="ISBN-10 or ISBN-13" className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-sm" /><button type="button" onClick={lookupIsbn} disabled={isbnLookup} className="flex h-9 shrink-0 items-center gap-2 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">{isbnLookup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}Look up</button></div></div> : <div className="mb-5 border-l-4 border-warning bg-warning/5 px-4 py-3 text-sm text-foreground">Theses are reference-only. They will appear in the catalog but cannot be borrowed or reserved.</div>}
+            {materialType === "thesis" ? <div className="mb-5 grid gap-5 sm:grid-cols-2">{[{ key: "thesis_program", label: "Program" }, { key: "thesis_adviser", label: "Adviser" }, { key: "academic_year", label: "Academic Year" }, { key: "accession_number", label: "Accession Number" }, { key: "thesis_keywords", label: "Keywords", wide: true }].map((field) => <div key={field.key} className={field.wide ? "sm:col-span-2" : ""}><FieldLabel>{field.label}</FieldLabel><input value={formValues[field.key] ?? ""} onChange={(event) => setField(field.key, event.target.value)} className="h-9 w-full border border-border bg-background px-3 text-sm" /></div>)}<div className="sm:col-span-2"><FieldLabel>Abstract</FieldLabel><textarea value={formValues.thesis_abstract ?? ""} onChange={(event) => setField("thesis_abstract", event.target.value)} className="min-h-28 w-full border border-border bg-background p-3 text-sm" /></div></div> : null}
             <div className="grid gap-5 sm:grid-cols-2">
-              {sortedFields.map((f) => (
+              {sortedFields.filter((field) => field.key !== "isbn").map((f) => (
                 <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                  <FieldLabel required={f.required}>{f.label}</FieldLabel>
+                  <FieldLabel required={["title", "author"].includes(f.key)}>{f.label}</FieldLabel>
                   <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
                 </div>
               ))}
@@ -304,14 +346,14 @@ const AdminCatalogData = ({ fields }: Props) => {
 
             <div className="mt-6 flex gap-2.5 border-t border-border pt-5">
               <button
-                onClick={handleCreateBook}
+                onClick={() => void handleCreateBook()}
                 disabled={loading}
                 className="flex items-center gap-2 bg-primary h-9 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {loading
                   ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Adding…</>
-                  : <><Library className="h-3.5 w-3.5" /> Add Book</>
+                  : <>{materialType === "book" ? <Library className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" /> }Add {materialType === "book" ? "Book" : "Thesis"}</>
                 }
               </button>
               <button
@@ -389,7 +431,7 @@ const AdminCatalogData = ({ fields }: Props) => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    {["Title", "Author", "Category", "Copies", ""].map((h) => (
+                    {["Title", "Author", "Type", "Category", "Copies", ""].map((h) => (
                       <th key={h} className="px-4 py-3">
                         <span
                           className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
@@ -414,6 +456,7 @@ const AdminCatalogData = ({ fields }: Props) => {
                     >
                       <td className="px-4 py-3 font-medium text-sm text-foreground max-w-[200px] truncate">{b.title}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.author || "—"}</td>
+                      <td className="px-4 py-3"><span className={`border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${b.material_type === "thesis" ? "border-warning/40 bg-warning/5 text-warning" : "border-border text-muted-foreground"}`}>{b.material_type === "thesis" ? "Thesis" : "Book"}</span></td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.category || "—"}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.copies ?? "—"}</td>
                       <td className="px-4 py-3">
@@ -447,7 +490,7 @@ const AdminCatalogData = ({ fields }: Props) => {
 
           {/* Edit form — only shown in active mode */}
           {selectedBook && !showArchived && (
-            <div className="mt-5 border border-border">
+            <div ref={editFormRef} className="mt-5 scroll-mt-6 border border-border">
               <PanelLabel
                 action={
                   <span className="text-[10px] text-muted-foreground/50 truncate max-w-[220px]">

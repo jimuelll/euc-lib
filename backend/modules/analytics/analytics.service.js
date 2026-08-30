@@ -50,6 +50,16 @@ function buildDateLabels(days) {
   });
 }
 
+function resolveDashboardRange(range) {
+  if (range === "30d") return 30;
+  if (range === "month") return Math.max(new Date().getDate(), 1);
+  if (range === "year") {
+    const now = new Date();
+    return Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000) + 1;
+  }
+  return 7;
+}
+
 function buildMonthLabels(months) {
   return Array.from({ length: months }, (_, index) => {
     const date = new Date();
@@ -366,11 +376,13 @@ async function getAuditLogMeta() {
   };
 }
 
-async function getDashboardOverview() {
+async function getDashboardOverview({ range } = {}) {
   await ensureSiteDailyVisitsTable();
   await syncOverdueBorrowings();
 
-  const dayLabels = buildDateLabels(7);
+  const rangeDays = resolveDashboardRange(range);
+  const daysAgo = rangeDays - 1;
+  const dayLabels = buildDateLabels(rangeDays);
   const monthLabels = buildMonthLabels(6);
 
   const [
@@ -387,6 +399,7 @@ async function getDashboardOverview() {
     [copyCondition],
     [borrowingByRole],
     [fineCollectionTrend],
+    [recentActivity],
     unsettledOverview,
   ] = await Promise.all([
     db.query(
@@ -445,9 +458,10 @@ async function getDashboardOverview() {
          COUNT(*) AS unique_visitors,
          COALESCE(SUM(hit_count), 0) AS visit_hits
        FROM site_daily_visits
-       WHERE visit_date >= CURDATE() - INTERVAL 6 DAY
+       WHERE visit_date >= CURDATE() - INTERVAL ? DAY
        GROUP BY visit_date
-       ORDER BY visit_date ASC`
+       ORDER BY visit_date ASC`,
+      [daysAgo]
     ),
     db.query(
       `SELECT
@@ -458,18 +472,19 @@ async function getDashboardOverview() {
          SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count
          FROM borrowings
          WHERE deleted_at IS NULL
-           AND created_at >= CURDATE() - INTERVAL 6 DAY
+           AND created_at >= CURDATE() - INTERVAL ? DAY
          GROUP BY DATE(created_at)
          UNION ALL
          SELECT DATE_FORMAT(returned_at, '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count
          FROM borrowings
          WHERE deleted_at IS NULL
            AND returned_at IS NOT NULL
-           AND returned_at >= CURDATE() - INTERVAL 6 DAY
+           AND returned_at >= CURDATE() - INTERVAL ? DAY
          GROUP BY DATE(returned_at)
        ) circulation
        GROUP BY label
-       ORDER BY label ASC`
+       ORDER BY label ASC`,
+      [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT
@@ -479,18 +494,19 @@ async function getDashboardOverview() {
        FROM (
          SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS entry_exit_count, 0 AS borrowing_count
          FROM attendance_logs
-         WHERE created_at >= CURDATE() - INTERVAL 6 DAY
+         WHERE created_at >= CURDATE() - INTERVAL ? DAY
            AND purpose = 'entry_exit'
          GROUP BY DATE(created_at)
          UNION ALL
          SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, 0 AS entry_exit_count, COUNT(*) AS borrowing_count
          FROM attendance_logs
-         WHERE created_at >= CURDATE() - INTERVAL 6 DAY
+         WHERE created_at >= CURDATE() - INTERVAL ? DAY
            AND purpose = 'borrowing'
          GROUP BY DATE(created_at)
        ) attendance
        GROUP BY label
-       ORDER BY label ASC`
+       ORDER BY label ASC`,
+      [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT
@@ -502,25 +518,26 @@ async function getDashboardOverview() {
          SELECT DATE_FORMAT(reserved_at, '%Y-%m-%d') AS label, COUNT(*) AS created_count, 0 AS fulfilled_count, 0 AS cancelled_count
          FROM reservations
          WHERE deleted_at IS NULL
-           AND reserved_at >= CURDATE() - INTERVAL 6 DAY
+           AND reserved_at >= CURDATE() - INTERVAL ? DAY
          GROUP BY DATE(reserved_at)
          UNION ALL
          SELECT DATE_FORMAT(fulfilled_at, '%Y-%m-%d') AS label, 0 AS created_count, COUNT(*) AS fulfilled_count, 0 AS cancelled_count
          FROM reservations
          WHERE deleted_at IS NULL
            AND fulfilled_at IS NOT NULL
-           AND fulfilled_at >= CURDATE() - INTERVAL 6 DAY
+           AND fulfilled_at >= CURDATE() - INTERVAL ? DAY
          GROUP BY DATE(fulfilled_at)
          UNION ALL
          SELECT DATE_FORMAT(cancelled_at, '%Y-%m-%d') AS label, 0 AS created_count, 0 AS fulfilled_count, COUNT(*) AS cancelled_count
          FROM reservations
          WHERE deleted_at IS NULL
            AND cancelled_at IS NOT NULL
-           AND cancelled_at >= CURDATE() - INTERVAL 6 DAY
+           AND cancelled_at >= CURDATE() - INTERVAL ? DAY
          GROUP BY DATE(cancelled_at)
        ) reservations_flow
        GROUP BY label
-       ORDER BY label ASC`
+       ORDER BY label ASC`,
+      [daysAgo, daysAgo, daysAgo]
     ),
     db.query(
       `SELECT status AS name, COUNT(*) AS value
@@ -592,6 +609,37 @@ async function getDashboardOverview() {
          AND settled_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
        GROUP BY DATE_FORMAT(settled_at, '%Y-%m')
        ORDER BY label ASC`
+    ),
+    db.query(
+      `SELECT occurred_at, activity_type, description
+       FROM (
+         SELECT b.created_at AS occurred_at,
+           CAST('borrowed' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS activity_type,
+           CONVERT(CONCAT(u.name, ' borrowed "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+         FROM borrowings b
+         JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
+         JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+         WHERE b.deleted_at IS NULL
+         UNION ALL
+         SELECT b.returned_at AS occurred_at,
+           CAST('returned' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS activity_type,
+           CONVERT(CONCAT(u.name, ' returned "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+         FROM borrowings b
+         JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
+         JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+         WHERE b.deleted_at IS NULL AND b.returned_at IS NOT NULL
+         UNION ALL
+         SELECT r.reserved_at AS occurred_at,
+           CAST('reserved' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS activity_type,
+           CONVERT(CONCAT(u.name, ' reserved "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+         FROM reservations r
+         JOIN users u ON u.id = r.user_id AND u.deleted_at IS NULL
+         JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+         WHERE r.deleted_at IS NULL
+       ) recent_activity
+       WHERE occurred_at IS NOT NULL
+       ORDER BY occurred_at DESC
+       LIMIT 6`
     ),
     listUnsettledBorrowings({ limit: null }),
   ]);
@@ -666,6 +714,11 @@ async function getDashboardOverview() {
       })),
       fineCollectionTrend: normalizeSeries(fineCollectionTrend, monthLabels, ["settled_amount"]),
     },
+    recentActivity: recentActivity.map((row) => ({
+      occurred_at: row.occurred_at,
+      activity_type: row.activity_type,
+      description: row.description,
+    })),
   };
 }
 

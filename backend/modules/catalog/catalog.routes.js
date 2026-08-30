@@ -14,6 +14,7 @@ router.get   ("/catalog-schema",                                          contro
 router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",                                                   controller.getBooks);
+router.get   ("/books/isbn/:isbn", requireAdminRole, controller.lookupIsbn);
 router.post  ("/books",          requireAdminRole, validateCreateBookPayload,           controller.createBook);
 router.put   ("/books/:id",      requireAdminRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireAdminRole, validateBookId,        controller.deleteBook);
