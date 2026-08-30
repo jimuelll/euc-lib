@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
   FileBarChart, ClipboardCheck, PenSquare,
-  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText,
+  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
 
@@ -16,6 +16,7 @@ export const sidebarSections: SidebarSection[] = [
       { title: "Catalog",      url: "/admin/catalog",      icon: BookCopy       },
       { title: "Circulation",  url: "/admin/circulation",  icon: ArrowLeftRight },
       { title: "Reservations", url: "/admin/reservations", icon: CalendarDays   },
+      { title: "Clearance",    url: "/admin/clearance",    icon: ClipboardCheck },
     ],
   },
   {
@@ -24,7 +25,7 @@ export const sidebarSections: SidebarSection[] = [
       { title: "User Management", url: "/admin/manage",       icon: ShieldCheck    },
       { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff, roles: ["admin", "super_admin"] },
       { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert    },
-      { title: "Clearance",       url: "/admin/clearance",    icon: ClipboardCheck },
+      { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: ["admin", "super_admin"] },
     ],
   },
   {

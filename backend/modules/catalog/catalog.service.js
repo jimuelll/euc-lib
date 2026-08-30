@@ -281,7 +281,7 @@ const createBook = async (data, createdBy) => {
       }
     }
 
-    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS])]
+    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS, "book_type_id"])]
       .filter((k) => data[k] !== undefined && data[k] !== "");
 
     if (!allowedKeys.includes("material_type")) allowedKeys.push("material_type");
@@ -317,7 +317,7 @@ const updateBook = async (id, data) => {
 
     const schema = await getSchema();
 
-    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS])]
+    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS, "book_type_id"])]
       .filter((k) => data[k] !== undefined && data[k] !== "");
 
     if (allowedKeys.length) {
@@ -424,6 +424,34 @@ const getCopyByBarcode = async (barcode) => {
   return rows[0] ?? null;
 };
 
+const getBookTypes = async () => {
+  const [rows] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE is_active = 1 ORDER BY name");
+  return rows;
+};
+
+const createBookType = async ({ name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
+  const days = Number.parseInt(defaultBorrowDays, 10); const fine = Number(finePerHour);
+  const initial = Number(initialFine);
+  if (!name?.trim() || !Number.isInteger(days) || days < 1 || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) throw Object.assign(new Error("Enter a valid policy with non-negative fines"), { status: 400 });
+  const [result] = await db.query("INSERT INTO book_types (name, default_borrow_days, fine_per_hour, fine_interval, initial_fine) VALUES (?, ?, ?, ?, ?)", [name.trim(), days, fine.toFixed(2), fineInterval, initial.toFixed(2)]);
+  const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [result.insertId]); return row;
+};
+
+const updateBookType = async (id, { name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
+  const days = Number.parseInt(defaultBorrowDays, 10); const fine = Number(finePerHour);
+  const initial = Number(initialFine);
+  if (!name?.trim() || !Number.isInteger(days) || days < 1 || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) throw Object.assign(new Error("Enter a valid policy with non-negative fines"), { status: 400 });
+  const [result] = await db.query("UPDATE book_types SET name = ?, default_borrow_days = ?, fine_per_hour = ?, fine_interval = ?, initial_fine = ? WHERE id = ? AND is_active = 1", [name.trim(), days, fine.toFixed(2), fineInterval, initial.toFixed(2), id]);
+  if (!result.affectedRows) throw Object.assign(new Error("Book type not found"), { status: 404 });
+  const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [id]); return row;
+};
+
+const updateCopyCondition = async (copyId, condition, notes = null) => {
+  if (!['good', 'damaged', 'lost'].includes(condition)) throw Object.assign(new Error("Invalid copy condition"), { status: 400 });
+  const [result] = await db.query("UPDATE book_copies SET `condition` = ?, notes = COALESCE(?, notes) WHERE id = ? AND deleted_at IS NULL", [condition, notes?.trim() || null, copyId]);
+  if (!result.affectedRows) throw Object.assign(new Error("Copy not found"), { status: 404 });
+};
+
 const lookupIsbn = async (value) => {
   const isbn = String(value || "").replace(/[^0-9Xx]/g, "").toUpperCase();
   if (!/^\d{9}[\dX]$/.test(isbn) && !/^\d{13}$/.test(isbn)) throw Object.assign(new Error("Enter a valid ISBN-10 or ISBN-13"), { status: 400 });
@@ -438,5 +466,5 @@ module.exports = {
   MAX_CUSTOM_FIELDS,
   getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
   searchBooks, createBook, updateBook, deleteBook, restoreBook,
-  getBookCopies, syncBookCopies, getCopyByBarcode, lookupIsbn,
+  getBookCopies, syncBookCopies, getCopyByBarcode, lookupIsbn, getBookTypes, createBookType, updateBookType, updateCopyCondition,
 };

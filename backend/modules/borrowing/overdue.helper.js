@@ -71,7 +71,7 @@ const calculateDueDateWithHolidays = async (borrowedAt, daysAllowed, conn = db) 
   return dueDate;
 };
 
-const getFineDetails = ({ dueDate, finePerHour, now = new Date(), returnedAt = null, settledAmount = 0 }) => {
+const getFineDetails = ({ dueDate, finePerHour, fineInterval = "hour", initialFine = 0, now = new Date(), returnedAt = null, settledAmount = 0 }) => {
   if (!dueDate) {
     return { isOverdue: false, hoursOverdue: 0, fineAmount: 0, settledAmount: 0, unsettledAmount: 0 };
   }
@@ -91,7 +91,8 @@ const getFineDetails = ({ dueDate, finePerHour, now = new Date(), returnedAt = n
   }
 
   const hoursOverdue = Math.ceil(diffMs / HOUR_MS);
-  const fineAmount = roundCurrency(hoursOverdue * Number(finePerHour || 0));
+  const intervalsOverdue = fineInterval === "day" ? Math.ceil(diffMs / (HOUR_MS * 24)) : hoursOverdue;
+  const fineAmount = roundCurrency(Number(initialFine || 0) + intervalsOverdue * Number(finePerHour || 0));
   const normalisedSettledAmount = roundCurrency(settledAmount);
 
   return {
@@ -111,7 +112,7 @@ const mapBorrowingsWithFineDetails = async (rows, conn = db) => {
   return rows.map((row) => {
     const { isOverdue, hoursOverdue, fineAmount, settledAmount, unsettledAmount } = getFineDetails({
       dueDate: row.due_date,
-      finePerHour: settings.overdue_fine_per_hour,
+      finePerHour: row.fine_per_hour ?? settings.overdue_fine_per_hour, fineInterval: row.fine_interval ?? "hour", initialFine: row.initial_fine ?? 0,
       now,
       returnedAt: row.returned_at,
       settledAmount: row.settled_amount,
@@ -140,7 +141,7 @@ const syncOverdueBorrowings = async (conn = db) => {
        b.due_date,
        b.returned_at,
        b.last_overdue_notification_at,
-       COALESCE(b.settled_amount, 0) AS settled_amount,
+       COALESCE(b.settled_amount, 0) AS settled_amount, b.fine_per_hour, b.fine_interval, b.initial_fine,
        bk.title
      FROM borrowings b
      JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
@@ -151,7 +152,7 @@ const syncOverdueBorrowings = async (conn = db) => {
   for (const row of rows) {
     const { isOverdue, fineAmount, unsettledAmount } = getFineDetails({
       dueDate: row.due_date,
-      finePerHour: settings.overdue_fine_per_hour,
+      finePerHour: row.fine_per_hour ?? settings.overdue_fine_per_hour, fineInterval: row.fine_interval ?? "hour", initialFine: row.initial_fine ?? 0,
       returnedAt: row.returned_at,
       settledAmount: row.settled_amount,
     });
@@ -178,7 +179,7 @@ const syncOverdueBorrowings = async (conn = db) => {
       await notificationsService.createNotification({
         type: "overdue_fine",
         title: "Borrowed book is overdue",
-        body: `"${row.title}" is overdue. Current unsettled balance: PHP ${unsettledAmount.toFixed(2)}. It increases every hour until the balance is settled or the book is returned.`,
+        body: `"${row.title}" is overdue. Current unsettled balance: PHP ${unsettledAmount.toFixed(2)}. It continues to increase according to this book type's fine policy until the balance is settled or the book is returned.`,
         href: "/my-library",
         audienceType: "user",
         audienceUserId: row.user_id,
@@ -218,7 +219,7 @@ const listUnsettledBorrowings = async ({ userId = null, limit = null } = {}, con
        b.last_overdue_notification_at,
        COALESCE(b.settled_amount, 0) AS settled_amount,
        b.settled_at,
-       b.settled_by,
+       b.settled_by, b.fine_per_hour, b.fine_interval, b.initial_fine,
        u.name AS user_name,
        u.student_employee_id,
        bk.title AS book_title,

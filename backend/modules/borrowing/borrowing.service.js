@@ -165,12 +165,11 @@ const borrowBook = async (
   userId,
   bookIdOrCopyBarcode,
   issuedBy,
-  daysAllowed = 7,
+  daysAllowed = null,
   { isCopyBarcode = false, ipAddress = null } = {}
 ) => {
   await syncOverdueBorrowings();
   const conn = await db.getConnection();
-  const safeDaysAllowed = Math.max(1, Number.parseInt(daysAllowed, 10) || 7);
   try {
     await conn.beginTransaction();
 
@@ -179,9 +178,10 @@ const borrowBook = async (
     if (isCopyBarcode) {
       const [[c]] = await conn.query(
         `SELECT bc.id, bc.book_id, bc.barcode, bc.is_active,
-                bk.copies, bk.material_type
+                bk.copies, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
          FROM book_copies bc
          JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
+         JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
          WHERE bc.barcode = ? AND bc.deleted_at IS NULL
          FOR UPDATE`,
         [bookIdOrCopyBarcode]
@@ -192,7 +192,7 @@ const borrowBook = async (
       copy = c;
     } else {
       const [[book]] = await conn.query(
-        "SELECT id, copies, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+        "SELECT bk.id, bk.copies, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine FROM books bk JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1 WHERE bk.id = ? AND bk.deleted_at IS NULL FOR UPDATE",
         [bookIdOrCopyBarcode]
       );
       if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
@@ -211,7 +211,7 @@ const borrowBook = async (
       if (!copies.length) {
         throw Object.assign(new Error("No copies available"), { status: 409 });
       }
-      copy = { ...copies[0], book_id: bookIdOrCopyBarcode };
+      copy = { ...copies[0], book_id: bookIdOrCopyBarcode, default_borrow_days: book.default_borrow_days, fine_per_hour: book.fine_per_hour, fine_interval: book.fine_interval, initial_fine: book.initial_fine };
     }
 
     const [[activeLoan]] = await conn.query(
@@ -232,12 +232,13 @@ const borrowBook = async (
       throw Object.assign(new Error("User already has this book borrowed"), { status: 409 });
     }
 
+    const safeDaysAllowed = Math.max(1, Number.parseInt(copy.default_borrow_days, 10) || 7);
     const dueDate = await calculateDueDateWithHolidays(new Date(), safeDaysAllowed, conn);
 
     const [result] = await conn.query(
-      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, status, issued_by)
-       VALUES (?, ?, ?, ?, 'borrowed', ?)`,
-      [userId, copy.book_id, copy.id, dueDate, issuedBy ?? null]
+      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, fine_per_hour, fine_interval, initial_fine, status, issued_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'borrowed', ?)`,
+      [userId, copy.book_id, copy.id, dueDate, copy.fine_per_hour, copy.fine_interval, copy.initial_fine, issuedBy ?? null]
     );
 
     const borrowingId = result.insertId;

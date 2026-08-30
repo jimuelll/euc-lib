@@ -15,12 +15,13 @@ import { SegmentedNavigation } from "../components/SegmentedNavigation";
 type Copy = {
   id: number;
   barcode: string;
-  condition: string;
+  condition: "good" | "damaged" | "lost";
   is_active: number;
   status: "available" | "borrowed";
 };
 
 type Props = { fields: FormField[] };
+type BookType = { id: number; name: string; default_borrow_days: number; fine_per_hour: number; fine_interval?: "hour" | "day"; initial_fine?: number };
 
 const loadBarcodeUrl = async (barcode: string): Promise<string> => {
   const res = await axiosInstance.get(
@@ -63,6 +64,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
   const [copies,  setCopies]  = useState<Copy[]>([]);
   const [urls,    setUrls]    = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [updatingCopyId, setUpdatingCopyId] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true); setCopies([]); setUrls({});
@@ -87,6 +89,17 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
       });
     };
   }, [copies]);
+
+  const updateCondition = async (copy: Copy, condition: Copy["condition"]) => {
+    setUpdatingCopyId(copy.id);
+    try {
+      await axiosInstance.patch(`api/admin/copies/${copy.id}`, { condition });
+      setCopies((current) => current.map((item) => item.id === copy.id ? { ...item, condition } : item));
+      toast.success(`Condition updated for ${copy.barcode}`);
+    } catch {
+      toast.error("Could not update this copy's condition");
+    } finally { setUpdatingCopyId(null); }
+  };
 
   if (loading) return (
     <div className="mt-5 flex items-center gap-2 py-4 text-muted-foreground border border-border px-4">
@@ -131,6 +144,12 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
             >
               {copy.status}
             </span>
+            <label className="w-full text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+              Condition
+              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as Copy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
+                <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
+              </select>
+            </label>
           </div>
         ))}
       </div>
@@ -151,6 +170,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
+  const [bookTypes, setBookTypes] = useState<BookType[]>([]);
   const editFormRef = useRef<HTMLDivElement>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
@@ -158,6 +178,8 @@ const AdminCatalogData = ({ fields }: Props) => {
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
   const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
   const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
+
+  useEffect(() => { axiosInstance.get<BookType[]>("api/admin/book-types").then((res) => setBookTypes(res.data)).catch(() => toast.error("Failed to load book types")); }, []);
 
   const lookupIsbn = async () => {
     const isbn = String(formValues.isbn ?? "").trim();
@@ -341,6 +363,7 @@ const AdminCatalogData = ({ fields }: Props) => {
             <div className="mb-5"><SegmentedNavigation ariaLabel="Material type" value={materialType} onChange={(value) => { setMaterialType(value); setFormValues({ material_type: value, copies: "1" }); }} segments={[{ value: "book", label: "Book", icon: Library }, { value: "thesis", label: "Thesis", icon: FileText }]} /></div>
             {materialType === "book" ? <div className="mb-5 border border-warning/30 bg-warning/5 p-4"><FieldLabel>ISBN</FieldLabel><div className="flex gap-2"><input value={formValues.isbn ?? ""} onChange={(event) => setField("isbn", event.target.value)} placeholder="ISBN-10 or ISBN-13" className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-sm" /><button type="button" onClick={lookupIsbn} disabled={isbnLookup} className="flex h-9 shrink-0 items-center gap-2 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">{isbnLookup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}Look up</button></div></div> : <div className="mb-5 border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-foreground">Theses are reference-only. They will appear in the catalog but cannot be borrowed or reserved.</div>}
             {materialType === "thesis" ? <div className="mb-5 grid gap-5 sm:grid-cols-2">{[{ key: "thesis_program", label: "Program" }, { key: "thesis_adviser", label: "Adviser" }, { key: "academic_year", label: "Academic Year" }, { key: "accession_number", label: "Accession Number" }, { key: "thesis_keywords", label: "Keywords", wide: true }].map((field) => <div key={field.key} className={field.wide ? "sm:col-span-2" : ""}><FieldLabel>{field.label}</FieldLabel><input value={formValues[field.key] ?? ""} onChange={(event) => setField(field.key, event.target.value)} className="h-9 w-full border border-border bg-background px-3 text-sm" /></div>)}<div className="sm:col-span-2"><FieldLabel>Abstract</FieldLabel><textarea value={formValues.thesis_abstract ?? ""} onChange={(event) => setField("thesis_abstract", event.target.value)} className="min-h-28 w-full border border-border bg-background p-3 text-sm" /></div></div> : null}
+            <div className="mb-5"><FieldLabel required>Book type</FieldLabel><Select value={String(formValues.book_type_id ?? "")} onValueChange={(value) => setField("book_type_id", value)}><SelectTrigger><SelectValue placeholder="Select the loan and fine policy" /></SelectTrigger><SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent></Select></div>
             <div className="grid gap-5 sm:grid-cols-2">
               {sortedFields.filter((field) => field.key !== "isbn").map((f) => (
                 <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
@@ -511,6 +534,7 @@ const AdminCatalogData = ({ fields }: Props) => {
 
               <div className="p-5">
                 <div className="grid gap-5 sm:grid-cols-2">
+                  <div><FieldLabel required>Book type</FieldLabel><Select value={String(formValues.book_type_id ?? "")} onValueChange={(value) => setField("book_type_id", value)}><SelectTrigger><SelectValue placeholder="Select the loan and fine policy" /></SelectTrigger><SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent></Select></div>
                   {sortedFields.map((f) => (
                     <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
                       <FieldLabel required={f.required}>{f.label}</FieldLabel>

@@ -145,6 +145,11 @@ const restoreBook = async (req, res) => {
   }
 };
 
+const getBookTypes = async (_req, res) => { try { res.json(await service.getBookTypes()); } catch { res.status(500).json({ message: "Failed to fetch book types" }); } };
+const createBookType = async (req, res) => { try { res.status(201).json(await service.createBookType({ name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book type" }); } };
+const updateBookType = async (req, res) => { try { res.json(await service.updateBookType(Number(req.params.id), { name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book type" }); } };
+const updateCopyCondition = async (req, res) => { try { await service.updateCopyCondition(Number(req.params.copyId), req.body?.condition, req.body?.notes); res.json({ message: "Copy condition updated" }); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update copy" }); } };
+
 module.exports = {
   getSchema,
   updateSchema,
@@ -157,4 +162,8 @@ module.exports = {
   getBarcodePng,
   getCopyByBarcode,
   restoreBook,
+  getBookTypes,
+  createBookType,
+  updateBookType,
+  updateCopyCondition,
 };

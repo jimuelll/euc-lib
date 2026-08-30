@@ -11,6 +11,9 @@ const {
 } = require("./catalog.middleware");
 
 router.get   ("/catalog-schema",                                          controller.getSchema);
+router.get   ("/book-types", requireAdminRole, controller.getBookTypes);
+router.post  ("/book-types", requireAdminRole, controller.createBookType);
+router.put   ("/book-types/:id", requireAdminRole, controller.updateBookType);
 router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",                                                   controller.getBooks);
@@ -24,6 +27,7 @@ router.get   ("/books/:id/copies",           requireAdminRole, validateBookId,  
 // Barcode image + copy lookup (used at the desk / scanner)
 router.get   ("/copies/:barcode/barcode-png", requireAdminRole, validateBarcode, controller.getBarcodePng);
 router.get   ("/copies/:barcode",             requireAdminRole, validateBarcode, controller.getCopyByBarcode);
+router.patch ("/copies/:copyId", requireAdminRole, controller.updateCopyCondition);
 
 router.get("/catalogue/search", (req, res, next) => {
   req.publicCatalogue = true;

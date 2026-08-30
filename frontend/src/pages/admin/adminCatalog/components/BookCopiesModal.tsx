@@ -140,6 +140,14 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
     const a = document.createElement("a");
     a.href = url; a.download = `${barcode}.png`; a.click();
   };
+  const handleConditionChange = async (copy: Copy, condition: Copy["condition"]) => {
+    try {
+      await axiosInstance.patch(`api/admin/copies/${copy.id}`, { condition });
+      setCopies((current) => current.map((item) => item.id === copy.id ? { ...item, condition } : item));
+      if (scannedCopy?.id === copy.id) setScannedCopy({ ...scannedCopy, condition });
+      toast.success("Copy condition updated");
+    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to update copy condition"); }
+  };
 
   const available = copies.filter((c) => c.status === "available" && c.is_active).length;
   const borrowed  = copies.filter((c) => c.status === "borrowed").length;
@@ -353,9 +361,9 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
 
                     {/* Condition */}
                     <td className="px-4 py-3">
-                      <Badge className={CONDITION_CONFIG[copy.condition]?.className}>
-                        {CONDITION_CONFIG[copy.condition]?.label ?? copy.condition}
-                      </Badge>
+                      <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} onChange={(event) => void handleConditionChange(copy, event.target.value as Copy["condition"])} className={`h-8 border px-2 text-xs font-semibold ${CONDITION_CONFIG[copy.condition]?.className ?? "border-border"}`}>
+                        <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
+                      </select>
                     </td>
 
                     {/* Borrower / notes */}

@@ -74,10 +74,11 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
 
   for (const key of payloadKeys) {
     const field = schemaByKey.get(key);
-    if (!field && !MATERIAL_KEYS.has(key)) {
+    if (!field && !MATERIAL_KEYS.has(key) && key !== "book_type_id") {
       throw createValidationError(`Unknown field "${key}"`);
     }
     if (key === "material_type") { if (!["book", "thesis"].includes(req.body[key])) throw createValidationError("material_type must be book or thesis"); continue; }
+    if (key === "book_type_id") { if (!Number.isInteger(Number(req.body[key])) || Number(req.body[key]) < 1) throw createValidationError("Book type is required"); continue; }
     if (MATERIAL_KEYS.has(key)) { if (typeof req.body[key] !== "string") throw createValidationError(`Field "${key}" must be text`); continue; }
     validateFieldValue(field, req.body[key]);
   }
@@ -88,6 +89,7 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
         throw createValidationError(`Field "${key}" is required`);
       }
     }
+    if (!Number.isInteger(Number(req.body.book_type_id)) || Number(req.body.book_type_id) < 1) throw createValidationError("Book type is required");
   }
 };
 

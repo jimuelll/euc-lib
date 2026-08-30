@@ -46,6 +46,7 @@ const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications")
 const AdminHolidays = lazy(() => import("./pages/admin/AdminHolidays"));
 const AdminAuditLogs = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminBulletin = lazy(() => import("./pages/admin/AdminBulletin"));
+const AdminBookTypes = lazy(() => import("./pages/admin/AdminBookTypes"));
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,7 @@ const App = () => (
                     />
                     <Route path="manage" element={<AdminManage />} />
                     <Route path="catalog" element={<AdminCatalog />} />
+                    <Route path="book-types" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
                     <Route path="circulation" element={<AdminCirculation />} />
                     <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
                     <Route path="backup" element={<AdminBackup />} />

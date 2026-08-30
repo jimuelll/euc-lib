@@ -68,34 +68,7 @@ const AdminCirculation = () => {
             type={type}
           />
 
-          {type === "borrow" ? (
-            <div className="space-y-2 border-t border-border/70 pt-5">
-              <label
-                className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Loan Duration (days)
-              </label>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={daysAllowed}
-                  onChange={(e) => setDaysAllowed(Number(e.target.value))}
-                className="h-10 w-24 border border-border bg-background px-3 text-center text-sm text-foreground outline-none transition-colors focus:border-primary"
-                />
-                <span className="text-sm text-muted-foreground">
-                  Due{" "}
-                  {new Date(Date.now() + daysAllowed * 86400000).toLocaleDateString([], {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-            </div>
-          ) : null}
+          {type === "borrow" ? <p className="border-t border-border/70 pt-5 text-sm text-muted-foreground">The due date and hourly fine are applied automatically from this book’s configured type.</p> : null}
 
           <div className="border-t border-border/70 pt-5">
             <button
