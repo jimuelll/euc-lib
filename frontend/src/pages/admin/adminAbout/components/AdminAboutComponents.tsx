@@ -17,11 +17,11 @@ export const Field = ({ label, children }: { label: string; children: React.Reac
 );
 
 export const Divider = ({ label }: { label: string }) => (
-  <div className="pt-2 pb-1">
+  <div className="border-b border-border bg-muted/30 px-4 py-3">
     <div className="flex items-center gap-3">
       <div className="h-px w-4 bg-warning shrink-0" />
       <p
-        className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+        className="text-sm font-semibold text-foreground"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         {label}
@@ -105,18 +105,27 @@ const ImageUploader = ({
   return (
     <div className="space-y-2">
       {imageUrl ? (
-        <div className="relative h-32 overflow-hidden rounded-md border border-border group">
+        <div className="group relative aspect-[4/3] w-full max-w-[16rem] overflow-hidden border border-border bg-muted">
           <img
             src={imageUrl}
             alt={alt}
             className="h-full w-full object-cover"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-black/65 p-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 border border-white/35 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/15 disabled:opacity-60"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Replace
+            </button>
             <button
               type="button"
               onClick={handleRemove}
-              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground"
+              className="flex items-center gap-1.5 bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
             >
               <X className="h-3.5 w-3.5" />
               Remove image
@@ -129,9 +138,9 @@ const ImageUploader = ({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="
-            relative w-full rounded-md border-2 border-dashed border-border
-            bg-muted/20 hover:bg-muted/40 transition-colors
-            flex flex-col items-center justify-center gap-1.5 py-6
+            relative aspect-[4/3] w-full max-w-[16rem] border-2 border-dashed border-border
+            bg-muted/20 transition-colors hover:border-warning/50 hover:bg-warning/5
+            flex flex-col items-center justify-center gap-1.5
             disabled:pointer-events-none disabled:opacity-60
           "
         >
@@ -175,10 +184,10 @@ export const StaffEditor = ({
       <Label>Staff Members</Label>
       <div className="space-y-2">
         {staff.map((member, i) => (
-          <div key={i} className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+          <div key={i} className="border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                className="text-xs font-semibold text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Staff #{String(i + 1).padStart(2, "0")}
@@ -196,11 +205,14 @@ export const StaffEditor = ({
               <Input value={member.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="Full name" />
               <Input value={member.role} onChange={(e) => update(i, "role", e.target.value)} placeholder="Job title / role" />
             </div>
-            <ImageUploader
-              imageUrl={member.image_url ?? ""}
-              onUrl={(url) => update(i, "image_url", url)}
-              alt={member.name || "Staff photo"}
-            />
+            <div className="border-t border-border pt-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Staff photo</p>
+              <ImageUploader
+                imageUrl={member.image_url ?? ""}
+                onUrl={(url) => update(i, "image_url", url)}
+                alt={member.name || "Staff photo"}
+              />
+            </div>
           </div>
         ))}
         <Button type="button" variant="outline" size="sm" onClick={add} className="mt-1 gap-1.5 text-xs">
@@ -228,10 +240,10 @@ export const SpacesEditor = ({
       <Label>Library Spaces</Label>
       <div className="space-y-2">
         {spaces.map((space, i) => (
-          <div key={i} className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+          <div key={i} className="border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                className="text-xs font-semibold text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Space #{String(i + 1).padStart(2, "0")}
@@ -256,11 +268,14 @@ export const SpacesEditor = ({
               placeholder="Brief description of this space…"
               rows={2}
             />
-            <ImageUploader
-              imageUrl={space.image_url}
-              onUrl={(url) => update(i, "image_url", url)}
-              alt={space.name || "Space photo"}
-            />
+            <div className="border-t border-border pt-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Space image</p>
+              <ImageUploader
+                imageUrl={space.image_url}
+                onUrl={(url) => update(i, "image_url", url)}
+                alt={space.name || "Space photo"}
+              />
+            </div>
           </div>
         ))}
         <Button type="button" variant="outline" size="sm" onClick={add} className="mt-1 gap-1.5 text-xs">

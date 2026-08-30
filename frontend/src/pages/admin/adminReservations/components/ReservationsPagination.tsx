@@ -16,7 +16,7 @@ const ReservationsPagination = ({
 
     {/* Count */}
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
+      className="text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}{" "}
@@ -28,7 +28,7 @@ const ReservationsPagination = ({
     {totalPages > 1 && (
       <div className="flex items-center gap-3">
         <span
-          className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/40"
+          className="text-sm font-medium text-muted-foreground"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Page {page} of {totalPages}
@@ -37,14 +37,14 @@ const ReservationsPagination = ({
           <button
             disabled={page <= 1 || loading}
             onClick={() => onPageChange(page - 1)}
-            className="flex items-center justify-center h-7 w-7 border-r border-border text-muted-foreground hover:bg-muted/40 disabled:opacity-30 transition-colors"
+            className="flex h-9 w-9 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-30"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <button
             disabled={page >= totalPages || loading}
             onClick={() => onPageChange(page + 1)}
-            className="flex items-center justify-center h-7 w-7 text-muted-foreground hover:bg-muted/40 disabled:opacity-30 transition-colors"
+            className="flex h-9 w-9 items-center justify-center text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-30"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>

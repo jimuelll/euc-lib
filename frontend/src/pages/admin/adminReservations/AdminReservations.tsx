@@ -32,14 +32,13 @@ const AdminReservations = () => {
 
   return (
     <AdminPage
-      eyebrow="Library Management"
+      eyebrow="Service Desk"
       title="Reservations"
-      description="Review pending holds, mark books ready for pickup, and fulfill, cancel, archive, or restore reservations from one list."
       actions={
         <Button
           onClick={handleToggleArchived}
           variant={showArchived ? "default" : "outline"}
-          className="min-w-[110px]"
+          className="min-w-[110px] rounded-none"
         >
           <Archive className="mr-2 h-4 w-4" />
           {showArchived ? "Archived" : "Active"}
@@ -48,16 +47,13 @@ const AdminReservations = () => {
     >
       {confirmDialog}
       {showArchived ? (
-        <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <div className="border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
           Showing archived records. Restore an item to return it to the active reservation list.
         </div>
       ) : null}
 
       <AdminPanel
         title={showArchived ? "Archived records" : "Active reservations"}
-        description={
-          data ? `${data.total} record${data.total === 1 ? "" : "s"} in the current view.` : "Manage reservation records and narrow results using the filters below."
-        }
       >
         <ReservationsToolbar
           search={search}
@@ -82,7 +78,6 @@ const AdminReservations = () => {
 
       <AdminPanel
         title="Reservation table"
-        description="Use row actions to move reservations through the workflow."
         contentClassName="p-0"
       >
         <ReservationsTable

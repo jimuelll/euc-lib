@@ -38,7 +38,7 @@ const UserLookup = ({
   return <div className="space-y-2">
 
     <label
-      className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
+      className="block text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       Student / Employee ID or Name
@@ -51,17 +51,17 @@ const UserLookup = ({
         onChange={(e) => onStudentIdChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onLookup())}
         placeholder="Type a name, student ID, or employee ID"
-        className="flex-1 h-9 px-3.5 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none"
+        className="h-10 flex-1 bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
       />
       <button
         type="button"
         onClick={() => onLookup()}
         disabled={lookingUp || !studentId.trim()}
-        className="flex items-center justify-center h-9 w-9 border-l border-border bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 disabled:opacity-40 transition-colors"
+        className="flex h-10 w-10 shrink-0 items-center justify-center border-l border-border bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
       >
         {lookingUp
-          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          : <Search className="h-3.5 w-3.5" />
+          ? <Loader2 className="h-4 w-4 animate-spin" />
+          : <Search className="h-4 w-4" />
         }
       </button>
     </div>
@@ -87,7 +87,7 @@ const UserLookup = ({
         <div className="flex min-w-0 flex-1 flex-col gap-3 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p
-              className="text-[13px] font-bold text-foreground truncate leading-tight"
+              className="text-base font-semibold text-foreground truncate leading-tight"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {foundUser.name}

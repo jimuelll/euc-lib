@@ -33,7 +33,7 @@ const ActionBtn = ({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center gap-1.5 h-7 px-3 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors disabled:opacity-40 ${colors[variant]}`}
+      className={`flex h-9 items-center gap-1.5 px-3 text-xs font-semibold transition-colors disabled:opacity-40 ${colors[variant]}`}
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {children}

@@ -30,8 +30,8 @@ const ReservationRow = ({
     "bg-border";
 
   return (
-    <tr className={`group border-b border-border last:border-0 hover:bg-muted/15 transition-colors ${
-      index % 2 !== 0 ? "bg-muted/[0.06]" : ""
+    <tr className={`group border-b border-border last:border-0 transition-colors hover:bg-warning/10 ${
+      index % 2 !== 0 ? "bg-muted/35" : "bg-card"
     } ${showArchived ? "opacity-70" : ""}`}>
 
       {/* Status accent — narrow left cell */}
@@ -45,7 +45,7 @@ const ReservationRow = ({
           <BookMarked className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p
-              className="text-[13px] font-bold text-foreground truncate leading-tight"
+              className="text-sm font-semibold text-foreground truncate leading-tight"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {r.book_title}
@@ -85,7 +85,7 @@ const ReservationRow = ({
       <td className="px-4 py-3 hidden md:table-cell">
         <div className="flex flex-col gap-1.5">
           <span
-            className={`inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] w-fit ${cfg.className}`}
+            className={`inline-flex w-fit items-center gap-1 border px-2 py-1 text-xs font-semibold ${cfg.className}`}
             style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
           >
             <StatusIcon className="h-3 w-3 shrink-0" />

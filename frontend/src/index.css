@@ -40,7 +40,7 @@
 
     /* Gold — restrained, articulating, like brass on mahogany */
     --warning: 42 78% 38%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 10 30% 10%;
 
     --info: 214 52% 32%;
     --info-foreground: 0 0% 100%;
@@ -191,7 +191,7 @@
 
   .admin-panel-surface {
     background-image:
-      linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / 0.96)),
+      linear-gradient(180deg, hsl(var(--card)), hsl(var(--card))),
       linear-gradient(90deg, hsl(var(--warning) / 0.05), transparent 14rem);
   }
 

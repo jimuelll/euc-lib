@@ -37,7 +37,7 @@ const PanelLabel = ({ children, action }: { children: React.ReactNode; action?: 
     <div className="flex items-center gap-2.5">
       <div className="h-px w-4 bg-warning shrink-0" />
       <p
-        className="text-[10px] font-bold uppercase tracking-[0.25em] text-foreground"
+        className="text-base font-semibold text-foreground"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         {children}
@@ -49,7 +49,7 @@ const PanelLabel = ({ children, action }: { children: React.ReactNode; action?: 
 
 const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
   <label
-    className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70 mb-1.5"
+    className="mb-2 block text-sm font-medium text-muted-foreground"
     style={{ fontFamily: "var(--font-heading)" }}
   >
     {children}
@@ -90,7 +90,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
 
   if (loading) return (
     <div className="mt-5 flex items-center gap-2 py-4 text-muted-foreground border border-border px-4">
-      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/40" />
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-warning" />
       <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/50"
         style={{ fontFamily: "var(--font-heading)" }}>
         Loading copies…
@@ -315,25 +315,31 @@ const AdminCatalogData = ({ fields }: Props) => {
       )}
 
       {/* ── Mode selector ── */}
-      <div className="mt-5">
-        <SegmentedNavigation
+      <section className="admin-panel-surface admin-etched-border mt-5 flex flex-col gap-4 border border-border bg-card p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>Work with records</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Search the active collection, update a selected record, or add a new item.</p>
+        </div>
+        <div className="w-full lg:max-w-sm">
+          <SegmentedNavigation
           ariaLabel="Catalog mode"
           value={catalogMode}
-          onChange={(mode) => { setCatalogMode(mode); resetForm(); setSearchResults([]); setShowArchived(false); }}
+          onChange={(mode) => { setCatalogMode(mode); resetForm(); setShowArchived(false); }}
           segments={[
             { value: "edit", label: "Catalog Records", icon: Search },
             { value: "create", label: "Add Book", icon: Library },
           ]}
-        />
-      </div>
+          />
+        </div>
+      </section>
 
       {/* ── Create ────────────────────────────────────────────────────── */}
       {catalogMode === "create" && (
-        <div className="mt-5 border border-border">
+        <div className="admin-panel-surface admin-etched-border mt-5 border border-border bg-card">
           <PanelLabel>{materialType === "book" ? "New Book Entry" : "New Thesis Entry"}</PanelLabel>
           <div className="p-5">
             <div className="mb-5"><SegmentedNavigation ariaLabel="Material type" value={materialType} onChange={(value) => { setMaterialType(value); setFormValues({ material_type: value, copies: "1" }); }} segments={[{ value: "book", label: "Book", icon: Library }, { value: "thesis", label: "Thesis", icon: FileText }]} /></div>
-            {materialType === "book" ? <div className="mb-5 border border-warning/30 bg-warning/5 p-4"><FieldLabel>ISBN</FieldLabel><div className="flex gap-2"><input value={formValues.isbn ?? ""} onChange={(event) => setField("isbn", event.target.value)} placeholder="ISBN-10 or ISBN-13" className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-sm" /><button type="button" onClick={lookupIsbn} disabled={isbnLookup} className="flex h-9 shrink-0 items-center gap-2 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">{isbnLookup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}Look up</button></div></div> : <div className="mb-5 border-l-4 border-warning bg-warning/5 px-4 py-3 text-sm text-foreground">Theses are reference-only. They will appear in the catalog but cannot be borrowed or reserved.</div>}
+            {materialType === "book" ? <div className="mb-5 border border-warning/30 bg-warning/5 p-4"><FieldLabel>ISBN</FieldLabel><div className="flex gap-2"><input value={formValues.isbn ?? ""} onChange={(event) => setField("isbn", event.target.value)} placeholder="ISBN-10 or ISBN-13" className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-sm" /><button type="button" onClick={lookupIsbn} disabled={isbnLookup} className="flex h-9 shrink-0 items-center gap-2 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">{isbnLookup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}Look up</button></div></div> : <div className="mb-5 border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-foreground">Theses are reference-only. They will appear in the catalog but cannot be borrowed or reserved.</div>}
             {materialType === "thesis" ? <div className="mb-5 grid gap-5 sm:grid-cols-2">{[{ key: "thesis_program", label: "Program" }, { key: "thesis_adviser", label: "Adviser" }, { key: "academic_year", label: "Academic Year" }, { key: "accession_number", label: "Accession Number" }, { key: "thesis_keywords", label: "Keywords", wide: true }].map((field) => <div key={field.key} className={field.wide ? "sm:col-span-2" : ""}><FieldLabel>{field.label}</FieldLabel><input value={formValues[field.key] ?? ""} onChange={(event) => setField(field.key, event.target.value)} className="h-9 w-full border border-border bg-background px-3 text-sm" /></div>)}<div className="sm:col-span-2"><FieldLabel>Abstract</FieldLabel><textarea value={formValues.thesis_abstract ?? ""} onChange={(event) => setField("thesis_abstract", event.target.value)} className="min-h-28 w-full border border-border bg-background p-3 text-sm" /></div></div> : null}
             <div className="grid gap-5 sm:grid-cols-2">
               {sortedFields.filter((field) => field.key !== "isbn").map((f) => (
@@ -374,11 +380,11 @@ const AdminCatalogData = ({ fields }: Props) => {
         <>
       {confirmDialog}
           {/* Search bar + archived toggle */}
-          <div className="mt-5 flex gap-0 border border-border">
+          <div className="admin-panel-surface admin-etched-border mt-5 flex gap-0 border border-border bg-card">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 pointer-events-none" />
               <input
-                className="w-full h-10 pl-10 pr-4 bg-background text-sm text-foreground placeholder:text-muted-foreground/40 outline-none border-r border-border focus:border-r-primary transition-colors"
+                className="h-10 w-full border-r border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-r-primary"
                 placeholder="Search by title, author, or ISBN…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -390,26 +396,26 @@ const AdminCatalogData = ({ fields }: Props) => {
             <button
               onClick={handleToggleArchived}
               title={showArchived ? "Showing archived — click for active" : "Show archived books"}
-              className={`flex items-center gap-2 px-4 h-10 text-[10px] font-bold uppercase tracking-[0.15em] border-r border-border shrink-0 transition-colors ${
+              className={`flex h-10 shrink-0 items-center gap-2 border-r border-border px-4 text-sm font-semibold transition-colors ${
                 showArchived
-                  ? "bg-warning/10 text-warning border-warning/30 hover:bg-warning/20"
+                  ? "bg-warning/10 text-foreground border-warning/30 hover:bg-warning/20"
                   : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
               }`}
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <Archive className="h-3.5 w-3.5" />
+              <Archive className="h-4 w-4" />
               {showArchived ? "Archived" : "Active"}
             </button>
 
             <button
               onClick={() => handleSearchBooks()}
               disabled={loading}
-              className="flex items-center gap-2 px-5 h-10 text-[10px] font-bold uppercase tracking-[0.18em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
+              className="flex h-10 shrink-0 items-center gap-2 bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {loading
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <><Search className="h-3.5 w-3.5" /> Search</>
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <><Search className="h-4 w-4" /> Search</>
               }
             </button>
           </div>
@@ -417,9 +423,8 @@ const AdminCatalogData = ({ fields }: Props) => {
           {/* Archived banner */}
           {showArchived && (
             <div className="flex items-center gap-2.5 px-4 py-2.5 bg-warning/5 border border-t-0 border-warning/20">
-              <Archive className="h-3 w-3 text-warning/60 shrink-0" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-warning/70"
-                style={{ fontFamily: "var(--font-heading)" }}>
+              <Archive className="h-4 w-4 shrink-0 text-foreground" />
+              <p className="text-sm font-medium text-foreground">
                 Showing archived books — restore to make them active again
               </p>
             </div>
@@ -427,14 +432,14 @@ const AdminCatalogData = ({ fields }: Props) => {
 
           {/* Results table */}
           {searchResults.length > 0 && (
-            <div className="mt-4 border border-border overflow-x-auto">
+            <div className="admin-panel-surface admin-etched-border mt-4 overflow-x-auto border border-border bg-card">
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    {["Title", "Author", "Type", "Category", "Copies", ""].map((h) => (
+                    {["Title", "Author", "Type", "Copies", "Actions"].map((h) => (
                       <th key={h} className="px-4 py-3">
                         <span
-                          className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                          className="text-xs font-semibold text-muted-foreground"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           {h}
@@ -444,41 +449,44 @@ const AdminCatalogData = ({ fields }: Props) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {searchResults.map((b) => (
+                  {searchResults.map((b, index) => (
                     <tr
                       key={b.id}
-                      onClick={() => !showArchived && selectBookForEdit(b)}
-                      className={`transition-colors ${
+                      className={`transition-colors ${index % 2 === 0 ? "bg-card" : "bg-muted/35"} ${
                         showArchived
                           ? "opacity-70"
-                          : "cursor-pointer hover:bg-muted/20"
+                          : "hover:bg-muted/20"
                       } ${selectedBook?.id === b.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
                     >
-                      <td className="px-4 py-3 font-medium text-sm text-foreground max-w-[200px] truncate">{b.title}</td>
+                      <td className="max-w-[260px] px-4 py-3 text-sm font-medium text-foreground">{b.title}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.author || "—"}</td>
-                      <td className="px-4 py-3"><span className={`border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${b.material_type === "thesis" ? "border-warning/40 bg-warning/5 text-warning" : "border-border text-muted-foreground"}`}>{b.material_type === "thesis" ? "Thesis" : "Book"}</span></td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{b.category || "—"}</td>
+                      <td className="px-4 py-3"><span className={`border px-2 py-1 text-xs font-semibold ${b.material_type === "thesis" ? "border-warning/40 bg-warning/5 text-foreground" : "border-border text-muted-foreground"}`}>{b.material_type === "thesis" ? "Thesis" : "Book"}</span></td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{b.copies ?? "—"}</td>
                       <td className="px-4 py-3">
                         {showArchived ? (
                           // ── Restore button ──
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleRestoreBook(b); }}
+                            onClick={() => handleRestoreBook(b)}
                             disabled={loading}
-                            className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-50 transition-colors"
-                            style={{ fontFamily: "var(--font-heading)" }}
+                            className="flex min-h-10 items-center gap-2 border border-warning/40 px-3 text-sm font-semibold text-warning transition-colors hover:bg-warning hover:text-warning-foreground disabled:opacity-50"
                           >
-                            <ArchiveRestore className="h-3 w-3" /> Restore
+                            <ArchiveRestore className="h-4 w-4" /> Restore record
                           </button>
                         ) : (
-                          // ── Copies button ──
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setCopiesBook(b); }}
-                            className="flex items-center gap-1.5 border border-border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                            style={{ fontFamily: "var(--font-heading)" }}
-                          >
-                            <Library className="h-3 w-3" /> Copies
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => selectBookForEdit(b)}
+                              className="min-h-10 border border-warning bg-warning px-3 text-sm font-semibold text-warning-foreground transition-colors hover:bg-warning/90"
+                            >
+                              Edit record
+                            </button>
+                            <button
+                              onClick={() => setCopiesBook(b)}
+                              className="min-h-10 border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-warning hover:text-warning"
+                            >
+                              Copies
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -490,7 +498,7 @@ const AdminCatalogData = ({ fields }: Props) => {
 
           {/* Edit form — only shown in active mode */}
           {selectedBook && !showArchived && (
-            <div ref={editFormRef} className="mt-5 scroll-mt-6 border border-border">
+            <div ref={editFormRef} className="admin-panel-surface admin-etched-border mt-5 scroll-mt-6 border border-border bg-card">
               <PanelLabel
                 action={
                   <span className="text-[10px] text-muted-foreground/50 truncate max-w-[220px]">

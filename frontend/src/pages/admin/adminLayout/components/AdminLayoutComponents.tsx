@@ -13,6 +13,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
+import { useLocation } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -24,6 +25,7 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
   const visibleSections = sidebarSections
     .map((section) => ({
       ...section,
@@ -119,7 +121,7 @@ export function AdminSidebar() {
         <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
       </SidebarHeader>
 
-      <SidebarContent className="px-0 py-2">
+      <SidebarContent className="px-0 py-2 [scrollbar-color:hsl(var(--sidebar-border))_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:bg-sidebar-border [&::-webkit-scrollbar-thumb]:hover:bg-sidebar-primary [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
         {visibleSections.map((section, sectionIndex) => (
           <SidebarGroup key={section.label} className="p-0">
             {sectionIndex > 0 && (
@@ -127,7 +129,7 @@ export function AdminSidebar() {
             )}
 
             {!collapsed ? (
-              <Collapsible defaultOpen>
+              <Collapsible defaultOpen={section.items.some((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))}>
                 <CollapsibleTrigger
                   className="group flex w-full items-center justify-between px-4 py-2 transition-colors"
                   style={{ color: "hsl(var(--sidebar-foreground) / 0.35)" }}

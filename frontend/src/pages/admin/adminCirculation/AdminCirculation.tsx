@@ -35,13 +35,12 @@ const AdminCirculation = () => {
 
   return (
     <AdminPage
-      eyebrow="Library Management"
+      eyebrow="Service Desk"
       title="Circulation"
       contentWidth="wide"
     >
       <AdminPanel
-        title={cfg.label}
-        description={foundUser ? `Current user: ${foundUser.name}` : undefined}
+        title={type === "borrow" ? "Borrow a library copy" : "Return a library copy"}
       >
         <div className="space-y-5">
           <TransactionTypePicker value={type} onChange={handleTypeChange} />
@@ -84,7 +83,7 @@ const AdminCirculation = () => {
                   max={60}
                   value={daysAllowed}
                   onChange={(e) => setDaysAllowed(Number(e.target.value))}
-                  className="h-10 w-24 rounded-md border border-border bg-background px-3 text-center text-sm text-foreground outline-none transition-colors focus:border-primary"
+                className="h-10 w-24 border border-border bg-background px-3 text-center text-sm text-foreground outline-none transition-colors focus:border-primary"
                 />
                 <span className="text-sm text-muted-foreground">
                   Due{" "}
@@ -103,7 +102,7 @@ const AdminCirculation = () => {
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className={`flex h-11 w-full items-center justify-center gap-2 rounded-md text-[11px] font-bold uppercase tracking-[0.18em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`flex h-11 w-full items-center justify-center gap-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                 type === "return"
                   ? "bg-success text-success-foreground hover:bg-success/90"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -117,7 +116,7 @@ const AdminCirculation = () => {
                 </>
               ) : (
                 <>
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-4 w-4" />
                   Process {cfg.label}
                 </>
               )}

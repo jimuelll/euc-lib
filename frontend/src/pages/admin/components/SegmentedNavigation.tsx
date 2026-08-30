@@ -31,9 +31,9 @@ export function SegmentedNavigation<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(segmentValue)}
-            className={`flex h-10 flex-1 items-center justify-center gap-2 border-r border-border text-[11px] font-bold uppercase tracking-[0.15em] transition-colors last:border-r-0 ${
+            className={`flex h-11 flex-1 items-center justify-center gap-2 border-r border-border text-sm font-semibold transition-colors last:border-r-0 ${
               active
-                ? "bg-primary text-primary-foreground"
+                ? "bg-warning text-warning-foreground"
                 : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
             }`}
             style={{ fontFamily: "var(--font-heading)" }}

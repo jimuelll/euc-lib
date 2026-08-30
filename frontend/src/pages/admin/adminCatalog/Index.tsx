@@ -6,7 +6,6 @@ import type { FormField } from "./AdminCatalog.types";
 import AdminCatalogData from "./AdminCatalogData";
 import AdminCatalogBuilder from "./AdminCatalogBuilder";
 import { Button } from "@/components/ui/button";
-import { AdminPage, AdminPanel } from "../components/AdminPage";
 
 const AdminCatalog = () => {
   const { user } = useAuth();
@@ -38,41 +37,31 @@ const AdminCatalog = () => {
   }
 
   return (
-    <AdminPage
-      eyebrow="Library Management"
-      title="Catalog Management"
-      actions={
-        canAccessBuilder ? (
-          <>
-            <Button
-              size="sm"
-              variant={mode === "catalog" ? "default" : "outline"}
-              onClick={() => setMode("catalog")}
-            >
-              Catalog
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 pb-10">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl" style={{ fontFamily: "var(--font-heading)" }}>
+            Catalog management
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Find, maintain, and add the records that keep the library collection available.
+          </p>
+        </div>
+        {canAccessBuilder ? (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className={mode === "catalog" ? "rounded-none border-warning bg-warning text-warning-foreground hover:bg-warning/90" : "rounded-none"} onClick={() => setMode("catalog")}>
+              Catalog records
             </Button>
-            <Button
-              size="sm"
-              variant={mode === "builder" ? "default" : "outline"}
-              onClick={() => setMode("builder")}
-            >
-              Form Builder
+            <Button size="sm" variant="outline" className={mode === "builder" ? "rounded-none border-warning bg-warning text-warning-foreground hover:bg-warning/90" : "rounded-none"} onClick={() => setMode("builder")}>
+              Form builder
             </Button>
-          </>
-        ) : undefined
-      }
-    >
-      <AdminPanel
-        title={mode === "catalog" ? "Catalog records" : "Catalog form builder"}
-        className="border-none bg-transparent shadow-none"
-        contentClassName="p-0"
-      >
-        {mode === "catalog" && <AdminCatalogData fields={fields} />}
-        {mode === "builder" && canAccessBuilder && (
-          <AdminCatalogBuilder fields={fields} onFieldsChange={setFields} />
-        )}
-      </AdminPanel>
-    </AdminPage>
+          </div>
+        ) : null}
+      </header>
+
+      {mode === "catalog" && <AdminCatalogData fields={fields} />}
+      {mode === "builder" && canAccessBuilder && <AdminCatalogBuilder fields={fields} onFieldsChange={setFields} />}
+    </main>
   );
 };
 

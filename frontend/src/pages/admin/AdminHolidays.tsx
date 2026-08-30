@@ -103,7 +103,6 @@ const AdminHolidays = () => {
     <AdminPage
       eyebrow="Administration"
       title="Holiday Calendar"
-      description="Add custom holidays that should be skipped when calculating borrowing due dates."
       contentWidth="wide"
     >
       <AdminStatGrid>
@@ -120,11 +119,8 @@ const AdminHolidays = () => {
         />
       </AdminStatGrid>
 
-      <AdminPanel
-        title={editingHolidayId ? "Edit holiday" : "Add holiday"}
-        description="Holiday dates are excluded from the due-date countdown for active loans."
-        className="max-w-3xl"
-      >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <AdminPanel title={editingHolidayId ? "Edit holiday" : "Add holiday"}>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -185,36 +181,33 @@ const AdminHolidays = () => {
         </form>
       </AdminPanel>
 
-      <AdminPanel
-        title="Configured holidays"
-        description="These dates are skipped during loan countdown calculations."
-      >
+      <AdminPanel title="Configured holidays" contentClassName="p-0">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading holidays...
           </div>
         ) : holidays.length ? (
-          <div className="space-y-3">
-            {holidays.map((holiday) => (
+          <div className="divide-y divide-border">
+            {holidays.map((holiday, index) => (
               <div
                 key={holiday.id}
-                className="flex flex-col gap-3 border border-border/70 p-4 md:flex-row md:items-start md:justify-between"
+                className={`flex flex-col gap-3 px-5 py-4 md:flex-row md:items-start md:justify-between ${index % 2 === 0 ? "bg-card" : "bg-muted/35"}`}
               >
-                <div>
-                  <div className="font-medium text-foreground">{holiday.name}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground">{holiday.name}</div>
                   <div className="mt-1 text-sm text-muted-foreground">{formatDate(holiday.holiday_date)}</div>
                   {holiday.description ? (
                     <div className="mt-2 text-sm text-muted-foreground">{holiday.description}</div>
                   ) : null}
                 </div>
 
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => startEditing(holiday)}>
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" variant="outline" size="sm" className="rounded-none" onClick={() => startEditing(holiday)}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => void handleDelete(holiday.id)}>
+                  <Button type="button" variant="outline" size="sm" className="rounded-none hover:border-destructive/40 hover:text-destructive" onClick={() => void handleDelete(holiday.id)}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Remove
                   </Button>
@@ -228,6 +221,7 @@ const AdminHolidays = () => {
           </div>
         )}
       </AdminPanel>
+      </div>
     </AdminPage>
   );
 };

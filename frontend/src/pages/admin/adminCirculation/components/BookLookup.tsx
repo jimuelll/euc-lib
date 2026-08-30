@@ -52,7 +52,7 @@ const BookLookup = ({
 
     {/* Field label */}
     <label
-      className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
+      className="block text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       Book Copy QR Code
@@ -68,10 +68,10 @@ const BookLookup = ({
     />
 
     <div className="border-t border-border/70 pt-3">
-      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>Can’t scan? Search catalog</label>
+      <label className="mb-2 block text-sm font-medium text-muted-foreground">Can’t scan? Search catalog</label>
       <div className="flex items-center gap-2 border border-border bg-background px-3 focus-within:border-primary">
         <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
-        <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" />
+        <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60" />
         {searching && <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />}
       </div>
       {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-[11px] text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
@@ -89,7 +89,7 @@ const BookLookup = ({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div className="min-w-0">
               <p
-                className="text-[13px] font-bold text-foreground truncate leading-tight"
+                className="text-base font-semibold text-foreground truncate leading-tight"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {foundCopy.title}

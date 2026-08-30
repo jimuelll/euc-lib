@@ -27,14 +27,10 @@ const AdminAboutBuilder = () => {
     <AdminPage
       eyebrow="Content Management"
       title="Edit About Page"
-      description="Manage the content shown on the public About page using clearer sections and a more readable editing surface."
       contentWidth="wide"
     >
-      <AdminPanel
-        title="About content"
-        description="Update the library identity, mission, history, policies, facilities, staff, and spaces before saving changes."
-      >
-        <form className="space-y-5" onSubmit={handleSubmit}>
+      <AdminPanel title="Public page content" className="max-w-5xl">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <Divider label="Library Identity" />
           <Field label="Library Name">
             <Input
@@ -43,8 +39,6 @@ const AdminAboutBuilder = () => {
               placeholder="Enverga-Candelaria Library"
             />
           </Field>
-
-          <hr className="border-border" />
 
           <Divider label="Mission & Vision" />
           <Field label="Section Title">
@@ -63,8 +57,6 @@ const AdminAboutBuilder = () => {
             />
           </Field>
 
-          <hr className="border-border" />
-
           <Divider label="Library History" />
           <Field label="Section Title">
             <Input
@@ -82,8 +74,6 @@ const AdminAboutBuilder = () => {
             />
           </Field>
 
-          <hr className="border-border" />
-
           <Divider label="Rules & Policies" />
           <StringListEditor
             label="Borrowing Policies"
@@ -91,8 +81,6 @@ const AdminAboutBuilder = () => {
             placeholder="e.g. Maximum of 5 books at a time"
             onChange={(v) => setField("policies", v)}
           />
-
-          <hr className="border-border" />
 
           <Divider label="Facilities & Resources" />
           <StringListEditor
@@ -102,18 +90,14 @@ const AdminAboutBuilder = () => {
             onChange={(v) => setField("facilities", v)}
           />
 
-          <hr className="border-border" />
-
           <Divider label="Staff Directory" />
           <StaffEditor staff={form.staff} onChange={(v) => setField("staff", v)} />
-
-          <hr className="border-border" />
 
           <Divider label="Library Spaces" />
           <SpacesEditor spaces={form.spaces} onChange={(v) => setField("spaces", v)} />
 
-          <div className="border-t border-border/70 pt-4">
-            <Button type="submit" disabled={saving}>
+          <div className="sticky bottom-4 z-10 border border-border bg-card p-3 shadow-[0_10px_28px_hsl(var(--primary)/0.12)]">
+            <Button type="submit" disabled={saving} className="w-full rounded-none sm:w-auto">
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>

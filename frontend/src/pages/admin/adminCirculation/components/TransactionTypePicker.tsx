@@ -10,7 +10,7 @@ interface Props {
 const TransactionTypePicker = ({ value, onChange }: Props) => (
   <div className="space-y-2">
     <label
-      className="block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
+      className="block text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       Transaction Type
