@@ -2,7 +2,7 @@ const express    = require("express");
 const router     = express.Router();
 const controller = require("./catalog.controller");
 const {
-  requireAdminRole,
+  requireSuperAdminRole,
   requireCatalogRole,
   validateSchemaPayload,
   validateBookId,
@@ -12,10 +12,10 @@ const {
 } = require("./catalog.middleware");
 
 router.get   ("/catalog-schema",                                          controller.getSchema);
-router.get   ("/book-types", requireAdminRole, controller.getBookTypes);
-router.post  ("/book-types", requireAdminRole, controller.createBookType);
-router.put   ("/book-types/:id", requireAdminRole, controller.updateBookType);
-router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
+router.get   ("/book-types", requireCatalogRole, controller.getBookTypes);
+router.post  ("/book-types", requireSuperAdminRole, controller.createBookType);
+router.put   ("/book-types/:id", requireSuperAdminRole, controller.updateBookType);
+router.put   ("/catalog-schema", requireSuperAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",                                                   controller.getBooks);
 router.get   ("/books/isbn/:isbn", requireCatalogRole, controller.lookupIsbn);

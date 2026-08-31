@@ -80,7 +80,7 @@ const Login = () => {
               </div>
             </div>
 
-            <div className="border border-border border-t-0 divide-y divide-border bg-card">
+            <form onSubmit={handleLogin} className="border border-border border-t-0 divide-y divide-border bg-card">
               <div className="px-6 pt-5 pb-4">
                 <label
                   className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
@@ -222,7 +222,6 @@ const Login = () => {
 
               <button
                 type="submit"
-                onClick={handleLogin}
                 disabled={loading}
                 className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-primary-foreground text-[11px] font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 style={{ fontFamily: "var(--font-heading)" }}
@@ -236,7 +235,7 @@ const Login = () => {
                   "Sign In"
                 )}
               </button>
-            </div>
+            </form>
 
             <div className="mt-5 flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />

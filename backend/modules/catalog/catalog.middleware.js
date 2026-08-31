@@ -15,6 +15,13 @@ const requireAdminRole = (req, res, next) => {
   next();
 };
 
+const requireSuperAdminRole = (req, res, next) => {
+  if (!req.user || req.user.role !== "super_admin") {
+    return res.status(403).json({ message: "Access denied" });
+  }
+  next();
+};
+
 const requireCatalogRole = (req, res, next) => {
   if (!req.user || !CATALOG_ROLES.includes(req.user.role)) {
     return res.status(403).json({ message: "Access denied" });
@@ -168,6 +175,7 @@ const validateUpdateBookPayload = validate(async (req) => {
 
 module.exports = {
   requireAdminRole,
+  requireSuperAdminRole,
   requireCatalogRole,
   validateSchemaPayload,
   validateBookId,

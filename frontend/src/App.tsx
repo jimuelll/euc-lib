@@ -124,10 +124,10 @@ const App = () => (
                     />
                     <Route path="manage" element={<AdminManage />} />
                     <Route path="catalog" element={<AdminCatalog />} />
-                    <Route path="book-types" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
+                    <Route path="book-types" element={<ProtectedRoute roles={["super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
                     <Route path="circulation" element={<AdminCirculation />} />
                     <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
-                    <Route path="backup" element={<AdminBackup />} />
+                    <Route path="backup" element={<ProtectedRoute roles={["super_admin"]}><AdminBackup /></ProtectedRoute>} />
                     <Route
                       path="report"
                       element={

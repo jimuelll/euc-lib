@@ -3,7 +3,7 @@ const db = require("../../db");
 const { authMiddleware } = require("../auth/auth.middleware");
 
 const router = express.Router();
-const adminOnly = authMiddleware(["admin", "super_admin"]);
+const superAdminOnly = authMiddleware(["super_admin"]);
 
 function encodeValue(value) {
   if (Buffer.isBuffer(value)) return { __backupType: "buffer", data: value.toString("base64") };
@@ -26,7 +26,7 @@ async function getTableNames() {
   return rows.map((row) => row.TABLE_NAME);
 }
 
-router.get("/backup/export", adminOnly, async (_req, res) => {
+router.get("/backup/export", superAdminOnly, async (_req, res) => {
   try {
     const tables = await getTableNames();
     const data = {};
@@ -53,7 +53,7 @@ router.get("/backup/export", adminOnly, async (_req, res) => {
   }
 });
 
-router.post("/backup/restore", adminOnly, async (req, res) => {
+router.post("/backup/restore", superAdminOnly, async (req, res) => {
   const backup = req.body;
   if (backup?.format !== "euc-library-backup" || backup.version !== 1 || !backup.tables || typeof backup.tables !== "object") {
     return res.status(400).json({ message: "This file is not a valid EUC Library backup." });

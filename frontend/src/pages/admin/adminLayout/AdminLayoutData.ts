@@ -25,7 +25,7 @@ export const sidebarSections: SidebarSection[] = [
       { title: "User Management", url: "/admin/manage",       icon: ShieldCheck    },
       { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff, roles: ["admin", "super_admin"] },
       { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert    },
-      { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: ["admin", "super_admin"] },
+      { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: ["super_admin"] },
     ],
   },
   {
@@ -49,7 +49,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "System",
     items: [
-      { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["admin", "super_admin"] },
+      { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["super_admin"] },
     ],
   },
 ];

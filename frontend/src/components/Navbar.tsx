@@ -137,17 +137,15 @@ const Navbar = () => {
                     onMarkAllAsRead={markAllAsRead}
                   />
                 </div>
-                <button
-                  className="relative p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors md:hidden"
-                  onClick={() => navigate("/my-library")}
-                >
-                  <Bell className="h-4 w-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-primary">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
+                <div className="md:hidden">
+                  <NotificationsDropdown
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    onNavigate={navigate}
+                    onMarkAsRead={markAsRead}
+                    onMarkAllAsRead={markAllAsRead}
+                  />
+                </div>
                 {/* User dropdown — desktop only, never takes mobile space */}
                 <div className="hidden md:block ml-1">
                   <UserDropdown

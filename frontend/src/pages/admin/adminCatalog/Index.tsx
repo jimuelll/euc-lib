@@ -30,7 +30,7 @@ const AdminCatalog = () => {
       .finally(() => setLoadingSchema(false));
   }, []);
 
-  const canAccessBuilder = user?.role === "admin" || user?.role === "super_admin";
+  const canAccessBuilder = user?.role === "super_admin";
 
   if (loadingSchema) {
     return <p className="mt-6 text-sm text-muted-foreground">Loading...</p>;
