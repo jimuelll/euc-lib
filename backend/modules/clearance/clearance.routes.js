@@ -8,6 +8,7 @@ const staffOrAbove = authMiddleware(["staff", "admin", "super_admin"]);
 // mounted behind authentication in app.js, but still need their own role gate
 // so regular patrons cannot access them directly.
 router.get("/clearance/profile", staffOrAbove, controller.getProfile);
+router.get("/clearance/queue", staffOrAbove, controller.getQueue);
 router.post("/clearance/payment", staffOrAbove, controller.recordPayment);
 router.post("/clearance/borrowings/:borrowingId/adjust", authMiddleware(["admin", "super_admin"]), controller.adjustFine);
 router.post("/clearance/transactions/:transactionId/reverse", authMiddleware(["admin", "super_admin"]), controller.reverseTransaction);

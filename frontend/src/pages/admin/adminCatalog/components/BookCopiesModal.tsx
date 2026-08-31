@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { X, ScanLine, Loader2, Download, BookOpen } from "lucide-react";
+import { X, ScanLine, Loader2, Download, Printer, BookOpen } from "lucide-react";
+import { printCodeLabel } from "@/utils/printCodeLabel";
 
 type Copy = {
   id: number;
@@ -139,6 +140,11 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
     if (!url) { toast.error("Barcode not loaded yet"); return; }
     const a = document.createElement("a");
     a.href = url; a.download = `${barcode}.png`; a.click();
+  };
+  const handlePrint = (barcode: string) => {
+    const url = barcodeUrls[barcode];
+    if (!url) return toast.error("Barcode not loaded yet");
+    if (!printCodeLabel({ imageUrl: url, title: bookTitle, code: barcode, kind: "Library book copy" })) toast.error("Allow pop-ups to print this label.");
   };
   const handleConditionChange = async (copy: Copy, condition: Copy["condition"]) => {
     try {
@@ -392,6 +398,9 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
                       >
                         <Download className="h-3 w-3" />
                         Export
+                      </button>
+                      <button onClick={() => handlePrint(copy.barcode)} disabled={!barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
+                        <Printer className="h-3 w-3" /> Print
                       </button>
                     </td>
                   </tr>

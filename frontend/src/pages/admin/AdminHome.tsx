@@ -40,8 +40,8 @@ export default function Dashboard() {
   useEffect(() => { void load(); }, []);
 
   const attentionItems = useMemo<AttentionItem[]>(() => [
-    { label: "Overdue returns", detail: stats.overdue_borrowings ? "Resolve these loans before completing clearance." : "All active loans are within their due date.", href: "/admin/clearance", status: stats.overdue_borrowings ? "urgent" : "clear", value: String(stats.overdue_borrowings) },
-    { label: "Unpaid fines", detail: stats.outstanding_fines ? "Settlements are recorded through clearance." : "No balances are waiting for settlement.", href: "/admin/clearance", status: stats.outstanding_fines ? "urgent" : "clear", value: currency.format(stats.outstanding_fines) },
+    { label: "Overdue returns", detail: stats.overdue_borrowings ? "Resolve these loans before completing clearance." : "All active loans are within their due date.", href: "/admin/clearance?review=queue", status: stats.overdue_borrowings ? "urgent" : "clear", value: String(stats.overdue_borrowings) },
+    { label: "Unpaid fines", detail: stats.outstanding_fines ? "Settlements are recorded through clearance." : "No balances are waiting for settlement.", href: "/admin/clearance?review=queue", status: stats.outstanding_fines ? "urgent" : "clear", value: currency.format(stats.outstanding_fines) },
     { label: "Ready reservations", detail: stats.ready_reservations ? "Items are waiting for collection at the desk." : "No reservations are awaiting pickup.", href: "/admin/reservations", status: stats.ready_reservations ? "attention" : "clear", value: String(stats.ready_reservations) },
   ], [stats]);
   const primaryAttention = attentionItems.find((item) => item.status === "urgent") ?? attentionItems.find((item) => item.status === "attention");

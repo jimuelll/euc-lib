@@ -1,5 +1,6 @@
 const { randomUUID } = require("crypto");
 const db = require("../../db");
+const { ensureClearanceTables } = require("../clearance/clearance.service");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
 
@@ -272,6 +273,28 @@ function buildAuditFeedQuery() {
         CONVERT(CONCAT('Notification created: ', n.title) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
       FROM notifications n
       LEFT JOIN users creator ON creator.id = n.created_by
+
+      UNION ALL
+
+      SELECT
+        ct.created_at AS occurred_at,
+        CAST('clearance' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
+        CONVERT(ct.transaction_type USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
+        CONVERT(staff.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
+        CONVERT(staff.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
+        CONVERT(CONCAT(
+          patron.name, ' - ',
+          CASE ct.transaction_type
+            WHEN 'payment' THEN 'fine payment recorded'
+            WHEN 'adjustment' THEN 'fine adjustment recorded'
+            WHEN 'reversal' THEN 'clearance transaction corrected'
+          END,
+          ': PHP ', FORMAT(ABS(ct.amount), 2),
+          IF(ct.reason IS NULL OR ct.reason = '', '', CONCAT(' - ', ct.reason))
+        ) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+      FROM clearance_transactions ct
+      JOIN users patron ON patron.id = ct.user_id
+      LEFT JOIN users staff ON staff.id = ct.created_by
     ) audit_feed`;
 }
 
@@ -313,6 +336,7 @@ async function getAuditLog({
   dateFrom = "",
   dateTo = "",
 } = {}) {
+  await ensureClearanceTables();
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safeLimit;
@@ -353,6 +377,7 @@ async function getAuditLog({
 }
 
 async function getAuditLogMeta() {
+  await ensureClearanceTables();
   const auditFeedQuery = buildAuditFeedQuery();
   const [actionRows] = await db.query(
     `SELECT DISTINCT category, action
@@ -370,7 +395,7 @@ async function getAuditLogMeta() {
   }
 
   return {
-    categories: ["all", "auth", "users", "attendance", "borrowing", "reservation", "bulletin", "subscriptions", "notifications"],
+    categories: ["all", "auth", "users", "attendance", "borrowing", "reservation", "bulletin", "subscriptions", "notifications", "clearance"],
     actions: [...new Set(actionRows.map((row) => row.action))],
     actionsByCategory,
   };

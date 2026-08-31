@@ -129,7 +129,7 @@ export function AdminSidebar() {
             )}
 
             {!collapsed ? (
-              <Collapsible defaultOpen={section.items.some((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))}>
+              <Collapsible defaultOpen>
                 <CollapsibleTrigger
                   className="group flex w-full items-center justify-between px-4 py-2 transition-colors"
                   style={{ color: "hsl(var(--sidebar-foreground) / 0.35)" }}

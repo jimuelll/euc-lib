@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, X, Archive, ArchiveRestore } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import type { User, UserFormState, QrTarget } from "../AdminManage.types";
 import { formatRole } from "../AdminManage.data";
+import { printCodeLabel } from "@/utils/printCodeLabel";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -123,6 +124,11 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
     }
   };
 
+  const handlePrint = () => {
+    if (!qrUrl) return toast.error("The code is still loading.");
+    if (!printCodeLabel({ imageUrl: qrUrl, title: target.name, code: target.studentId, kind: "Library patron" })) toast.error("Allow pop-ups to print this label.");
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
@@ -173,6 +179,10 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
           <ActionButton onClick={handleDownload} className="w-full justify-center">
             <Download className="h-3.5 w-3.5" />
             Download PNG
+          </ActionButton>
+          <ActionButton onClick={handlePrint} disabled={!qrUrl} className="w-full justify-center">
+            <Printer className="h-3.5 w-3.5" />
+            Print label
           </ActionButton>
         </div>
       </div>

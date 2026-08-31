@@ -68,6 +68,58 @@ const getClearanceProfile = async (studentEmployeeId) => {
   return { user, ...clearance, reservations, transactions };
 };
 
+const getClearanceQueue = async () => {
+  await ensureClearanceTables();
+  await syncOverdueBorrowings();
+  const [overdueRows] = await db.query(
+    `SELECT u.id AS user_id, u.name, u.student_employee_id,
+       COUNT(b.id) AS overdue_count, MIN(b.due_date) AS oldest_due_date,
+       GROUP_CONCAT(bk.title ORDER BY b.due_date ASC SEPARATOR ' | ') AS overdue_titles
+     FROM borrowings b
+     JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
+     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     WHERE b.deleted_at IS NULL AND b.status = 'overdue'
+     GROUP BY u.id, u.name, u.student_employee_id
+     ORDER BY oldest_due_date ASC`
+  );
+  const fines = await listUnsettledBorrowings();
+  const queue = new Map();
+
+  for (const row of overdueRows) {
+    queue.set(row.user_id, {
+      userId: row.user_id,
+      name: row.name,
+      studentEmployeeId: row.student_employee_id,
+      overdueCount: Number(row.overdue_count),
+      oldestDueDate: row.oldest_due_date,
+      overdueTitles: row.overdue_titles ? row.overdue_titles.split(" | ") : [],
+      outstandingAmount: 0,
+      fineRecords: 0,
+    });
+  }
+  for (const fine of fines.rows) {
+    const existing = queue.get(fine.user_id) || {
+      userId: fine.user_id,
+      name: fine.user_name,
+      studentEmployeeId: fine.student_employee_id,
+      overdueCount: 0,
+      oldestDueDate: null,
+      overdueTitles: [],
+      outstandingAmount: 0,
+      fineRecords: 0,
+    };
+    existing.outstandingAmount = roundCurrency(existing.outstandingAmount + Number(fine.unsettled_amount));
+    existing.fineRecords += 1;
+    queue.set(fine.user_id, existing);
+  }
+
+  return Array.from(queue.values()).sort((left, right) => {
+    if (right.overdueCount !== left.overdueCount) return right.overdueCount - left.overdueCount;
+    if (right.outstandingAmount !== left.outstandingAmount) return right.outstandingAmount - left.outstandingAmount;
+    return String(left.name).localeCompare(String(right.name));
+  });
+};
+
 const assertEligible = async (userId, conn = db) => {
   const profile = await buildStatus(userId, conn);
   if (profile.status === "blocked") {
@@ -155,4 +207,4 @@ const getReceipt = async (receiptNumber) => {
   return { transaction, items };
 };
 
-module.exports = { ensureClearanceTables, getClearanceProfile, assertEligible, recordFullPayment, adjustFine, reverseTransaction, getReceipt };
+module.exports = { ensureClearanceTables, getClearanceProfile, getClearanceQueue, assertEligible, recordFullPayment, adjustFine, reverseTransaction, getReceipt };

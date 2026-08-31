@@ -1,12 +1,31 @@
-import { useRef, useState } from "react";
-import { DatabaseBackup, Download, Loader2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArchiveRestore, DatabaseBackup, Download, FileDown, Loader2, ShieldAlert, Upload } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AdminPage, AdminPanel } from "./components/AdminPage";
 
 const MAX_BACKUP_SIZE = 25 * 1024 * 1024;
+
+type Snapshot = {
+  id: number;
+  filename: string;
+  sizeBytes: number;
+  kind: "manual" | "pre_restore";
+  createdAt: string;
+  createdBy: string | null;
+};
 
 function filenameFromHeader(header?: string) {
   return header?.match(/filename=\"?([^\";]+)\"?/)?.[1] ?? `euc-library-backup-${new Date().toISOString().slice(0, 10)}.json`;
@@ -15,8 +34,26 @@ function filenameFromHeader(header?: string) {
 const AdminBackup = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(true);
+  const [snapshotToRestore, setSnapshotToRestore] = useState<Snapshot | null>(null);
   const [lastBackup, setLastBackup] = useState<{ name: string; size: number; createdAt: string } | null>(null);
+
+  const loadSnapshots = async () => {
+    setLoadingSnapshots(true);
+    try {
+      const { data } = await axiosInstance.get("/api/admin/backup/snapshots");
+      setSnapshots(data.snapshots ?? []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not load saved snapshots.");
+    } finally {
+      setLoadingSnapshots(false);
+    }
+  };
+
+  useEffect(() => { void loadSnapshots(); }, []);
 
   const handleExport = async () => {
     setExporting(true);
@@ -37,6 +74,50 @@ const AdminBackup = () => {
       toast.error(error.response?.data?.message || "Could not create the backup.");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleCreateSnapshot = async () => {
+    setSavingSnapshot(true);
+    try {
+      await axiosInstance.post("/api/admin/backup/snapshots");
+      toast.success("Snapshot saved securely.");
+      await loadSnapshots();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not save the snapshot.");
+    } finally {
+      setSavingSnapshot(false);
+    }
+  };
+
+  const handleDownloadSnapshot = async (snapshot: Snapshot) => {
+    try {
+      const response = await axiosInstance.get(`/api/admin/backup/snapshots/${snapshot.id}/download`, { responseType: "blob" });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filenameFromHeader(response.headers["content-disposition"]);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not download the snapshot.");
+    }
+  };
+
+  const handleRestoreSnapshot = async () => {
+    if (!snapshotToRestore) return;
+    setRestoring(true);
+    try {
+      await axiosInstance.post(`/api/admin/backup/snapshots/${snapshotToRestore.id}/restore`);
+      toast.success("Snapshot restored. A pre-restore recovery point was saved.");
+      setSnapshotToRestore(null);
+      await loadSnapshots();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not restore the snapshot.");
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -70,19 +151,23 @@ const AdminBackup = () => {
     <AdminPage
       eyebrow="System"
       title="Backup"
-      description="Export a complete portable copy of the database or restore a previously downloaded library backup."
+      description="Save secure recovery points, download a portable copy, or restore the complete library database to a previous point in time."
       contentWidth="wide"
     >
       <AdminPanel
-        title="Backup actions"
-        description="Backups include all current database records. Restoring replaces the entire current database."
+        title="Create a recovery point"
+        description="Saved snapshots are retained in secure cloud storage. The latest 30 are kept automatically."
         actions={
           <>
-            <Button type="button" onClick={handleExport} disabled={exporting || restoring}>
-              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
-              {exporting ? "Creating backup..." : "Create Backup"}
+            <Button type="button" onClick={handleCreateSnapshot} disabled={exporting || savingSnapshot || restoring}>
+              {savingSnapshot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
+              {savingSnapshot ? "Saving snapshot..." : "Save Snapshot"}
             </Button>
-            <Button type="button" variant="outline" disabled={exporting || restoring} asChild>
+            <Button type="button" variant="outline" onClick={handleExport} disabled={exporting || savingSnapshot || restoring}>
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
+              {exporting ? "Creating download..." : "Download Backup"}
+            </Button>
+            <Button type="button" variant="outline" disabled={exporting || savingSnapshot || restoring} asChild>
               <label htmlFor="restore-input" className="cursor-pointer">
                 {restoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 {restoring ? "Restoring..." : "Restore"}
@@ -94,8 +179,42 @@ const AdminBackup = () => {
       >
         <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
         <p className="text-sm leading-6 text-muted-foreground">
-          Only restore backup files created by this system with the same database structure. Restore is protected by a confirmation prompt.
+          Every snapshot includes all database records and the catalog's custom-field layout. Only restore a downloaded file made by this system.
         </p>
+      </AdminPanel>
+
+      <AdminPanel
+        title="Saved snapshots"
+        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point."
+        className="max-w-4xl"
+      >
+        {loadingSnapshots ? (
+          <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading saved snapshots...</div>
+        ) : snapshots.length ? (
+          <div className="divide-y divide-border/70 border-y border-border/70">
+            {snapshots.map((snapshot) => (
+              <div key={snapshot.id} className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{new Date(snapshot.createdAt).toLocaleString()}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {(snapshot.sizeBytes / 1024).toFixed(1)} KB · {snapshot.kind === "pre_restore" ? "Automatic pre-restore point" : "Manual snapshot"}
+                    {snapshot.createdBy ? ` · Saved by ${snapshot.createdBy}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadSnapshot(snapshot)} disabled={restoring}>
+                    <FileDown className="mr-2 h-3.5 w-3.5" /> Download
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setSnapshotToRestore(snapshot)} disabled={restoring}>
+                    <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> Restore
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">No saved snapshots yet. Save one before any major catalog or account changes.</p>
+        )}
       </AdminPanel>
 
       <AdminPanel
@@ -117,6 +236,24 @@ const AdminBackup = () => {
           <p className="text-sm text-muted-foreground">No backup has been exported in this session.</p>
         )}
       </AdminPanel>
+
+      <AlertDialog open={Boolean(snapshotToRestore)} onOpenChange={(open) => !open && !restoring && setSnapshotToRestore(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
+            <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
+            <AlertDialogDescription className="leading-6">
+              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={restoring} onClick={(event) => { event.preventDefault(); void handleRestoreSnapshot(); }}>
+              {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Restore snapshot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminPage>
   );
 };

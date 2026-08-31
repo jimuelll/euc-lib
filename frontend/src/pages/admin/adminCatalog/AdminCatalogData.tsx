@@ -9,7 +9,8 @@ import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import { FormField, Book } from "./AdminCatalog.types";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
-import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText } from "lucide-react";
+import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText, Printer } from "lucide-react";
+import { printCodeLabel } from "@/utils/printCodeLabel";
 import { SegmentedNavigation } from "../components/SegmentedNavigation";
 
 type Copy = {
@@ -134,6 +135,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
               </div>
             )}
             <span className="font-mono text-[10px] text-muted-foreground/50">{copy.barcode}</span>
+            <button type="button" aria-label={`Print label for ${copy.barcode}`} onClick={() => { const url = urls[copy.barcode]; if (!url) return toast.error("Barcode not loaded yet"); if (!printCodeLabel({ imageUrl: url, title: "Library book copy", code: copy.barcode, kind: "Library book copy" })) toast.error("Allow pop-ups to print this label."); }} disabled={!urls[copy.barcode]} className="flex items-center gap-1 border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}><Printer className="h-3 w-3" />Print</button>
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.12em] border px-2 py-0.5 ${
                 copy.status === "borrowed"

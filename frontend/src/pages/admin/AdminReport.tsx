@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { RefreshCcw } from "lucide-react";
+import { Download, RefreshCcw } from "lucide-react";
+import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,11 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 };
 
+type ClearanceQueueEntry = { userId: number; name: string; studentEmployeeId: string; overdueCount: number; oldestDueDate: string | null; overdueTitles: string[]; outstandingAmount: number; fineRecords: number };
+const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) => { const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"); const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
+
 const AdminReport = () => {
   const [circulationStatus, setCirculationStatus] = useState("all");
   const [circulationDateFrom, setCirculationDateFrom] = useState("");
@@ -70,6 +76,8 @@ const AdminReport = () => {
     totalPages: 1,
   });
   const [reservationLoading, setReservationLoading] = useState(true);
+  const [clearanceRows, setClearanceRows] = useState<ClearanceQueueEntry[]>([]);
+  const [clearanceLoading, setClearanceLoading] = useState(true);
 
   const loadCirculationReport = async () => {
     setCirculationLoading(true);
@@ -114,8 +122,14 @@ const AdminReport = () => {
     }
   };
 
+  const loadClearanceReport = async () => {
+    setClearanceLoading(true);
+    try { const response = await axiosInstance.get<ClearanceQueueEntry[]>("/api/admin/clearance/queue"); setClearanceRows(response.data); }
+    finally { setClearanceLoading(false); }
+  };
+
   useEffect(() => {
-    void Promise.all([loadCirculationReport(), loadReservationReport()]);
+    void Promise.all([loadCirculationReport(), loadReservationReport(), loadClearanceReport()]);
   }, []);
 
   const handleCirculationSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -139,6 +153,7 @@ const AdminReport = () => {
         <TabsList className="h-auto flex-wrap justify-start rounded-none border border-border/70 bg-background p-1">
           <TabsTrigger value="circulation" className="rounded-none">Circulation</TabsTrigger>
           <TabsTrigger value="reservations" className="rounded-none">Reservations</TabsTrigger>
+          <TabsTrigger value="clearance" className="rounded-none">Clearance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="circulation" className="space-y-6">
@@ -178,6 +193,7 @@ const AdminReport = () => {
               </div>
 
               <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-4">
+                <Button type="button" variant="outline" className="rounded-none" disabled={!circulationRows.length} onClick={() => downloadCsv("circulation-report.csv", ["Student", "Student ID", "Book", "Borrowed at", "Due at", "Returned at", "Status"], circulationRows.map((row) => [row.user_name, row.student_employee_id, row.book_title, row.borrowed_at, row.due_date, row.returned_at, row.status]))}><Download className="mr-2 h-4 w-4" />Export CSV (Excel)</Button>
                 <Button type="button" variant="outline" className="rounded-none" onClick={() => void loadCirculationReport()} disabled={circulationLoading}>
                   <RefreshCcw className={`mr-2 h-4 w-4 ${circulationLoading ? "animate-spin" : ""}`} />
                   Refresh circulation
@@ -281,6 +297,7 @@ const AdminReport = () => {
               </div>
 
               <div className="flex flex-wrap justify-end gap-2 border-t border-border/70 pt-4">
+                <Button type="button" variant="outline" className="rounded-none" disabled={!reservationRows.length} onClick={() => downloadCsv("reservations-report.csv", ["Student", "Student ID", "Book", "Author", "Reserved at", "Expires at", "Status"], reservationRows.map((row) => [row.user_name, row.student_employee_id, row.book_title, row.book_author, row.reserved_at, row.expires_at, row.status]))}><Download className="mr-2 h-4 w-4" />Export CSV (Excel)</Button>
                 <Button type="button" variant="outline" className="rounded-none" onClick={() => void loadReservationReport(1)} disabled={reservationLoading}>
                   <RefreshCcw className={`mr-2 h-4 w-4 ${reservationLoading ? "animate-spin" : ""}`} />
                   Refresh reservations
@@ -362,6 +379,12 @@ const AdminReport = () => {
                 <p className="text-sm text-muted-foreground">No reservation records matched the selected filters.</p>
               </div>
             )}
+          </AdminPanel>
+        </TabsContent>
+
+        <TabsContent value="clearance" className="space-y-6">
+          <AdminPanel title="Clearance exceptions" description="Current patrons with overdue returns, unpaid fines, or both. Export this list for follow-up and reconciliation." actions={<div className="flex gap-2"><Button type="button" variant="outline" className="rounded-none" disabled={!clearanceRows.length} onClick={() => downloadCsv("clearance-exceptions-report.csv", ["Patron", "Student / employee ID", "Overdue returns", "Oldest due date", "Overdue titles", "Unpaid fines", "Fine records"], clearanceRows.map((row) => [row.name, row.studentEmployeeId, row.overdueCount, row.oldestDueDate, row.overdueTitles.join("; "), row.outstandingAmount, row.fineRecords]))}><Download className="mr-2 h-4 w-4" />Export CSV (Excel)</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => void loadClearanceReport()} disabled={clearanceLoading}><RefreshCcw className={`mr-2 h-4 w-4 ${clearanceLoading ? "animate-spin" : ""}`} />Refresh</Button></div>}>
+            {clearanceRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/20">{["Patron", "Overdue returns", "Unpaid fines", "Fine records"].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{heading}</th>)}</tr></thead><tbody>{clearanceRows.map((row) => <tr key={row.userId} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-3"><div className="font-medium text-foreground">{row.name}</div><div className="text-xs text-muted-foreground">{row.studentEmployeeId}</div></td><td className="px-4 py-3">{row.overdueCount ? <><div className="font-medium text-destructive">{row.overdueCount} item{row.overdueCount === 1 ? "" : "s"}</div><div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground" title={row.overdueTitles.join(", ")}>{row.overdueTitles.join(", ")}</div></> : <span className="text-muted-foreground">None</span>}</td><td className="px-4 py-3 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</td><td className="px-4 py-3 text-muted-foreground">{row.fineRecords || "-"}</td></tr>)}</tbody></table></div> : <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center"><p className="text-sm text-muted-foreground">{clearanceLoading ? "Loading clearance exceptions..." : "No overdue returns or unpaid fines are waiting for review."}</p></div>}
           </AdminPanel>
         </TabsContent>
       </Tabs>

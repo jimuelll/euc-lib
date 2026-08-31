@@ -164,6 +164,7 @@ Incremental backend SQL updates for newer features:
 - `backend/sql/2026-03-30-notifications-websocket.sql`
 - `backend/sql/2026-04-01-add-employees-role.sql`
 - `backend/sql/2026-04-02-align-catalog-schema.sql`
+- `db/2026-08-31-backup-snapshots.sql` (required for saved cloud snapshots)
 
 If your database predates the latest analytics, notifications, role, or catalog changes, apply the relevant SQL files before running the app.
 
@@ -175,6 +176,7 @@ If your database predates the latest analytics, notifications, role, or catalog 
   - `http://localhost:5173`
   - `https://euc-lib.vercel.app`
   - `https://euc-lib-git-master-jimuellls-projects.vercel.app`
+- Saved database snapshots are stored as authenticated raw files in Cloudinary, while their metadata remains in MySQL. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the deployed backend environment. The system retains the newest 30 snapshots and creates a recovery snapshot before a saved-snapshot restore.
 
 ## Repository Status
 
