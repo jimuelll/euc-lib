@@ -86,10 +86,17 @@ const returnBook = async (req, res) => {
  */
 const scanBorrow = async (req, res) => {
   try {
-    const { userBarcode, copyBarcode, daysAllowed = 7 } = req.body;
+    const { userBarcode, copyBarcode, daysAllowed = 7, reservationId } = req.body;
 
     if (!userBarcode?.trim() || !copyBarcode?.trim()) {
       return res.status(400).json({ message: "userBarcode and copyBarcode are required" });
+    }
+
+    const parsedReservationId = reservationId === undefined || reservationId === null
+      ? null
+      : Number.parseInt(reservationId, 10);
+    if (parsedReservationId !== null && (!Number.isInteger(parsedReservationId) || parsedReservationId < 1)) {
+      return res.status(400).json({ message: "reservationId must be a valid reservation ID" });
     }
 
     const patron = await service.resolveUserByBarcode(userBarcode.trim());
@@ -102,7 +109,7 @@ const scanBorrow = async (req, res) => {
       copyBarcode.trim(),
       req.user.id,
       daysAllowed,
-      { isCopyBarcode: true, ipAddress: req.ip }
+      { isCopyBarcode: true, ipAddress: req.ip, reservationId: parsedReservationId }
     );
 
     res.status(201).json({

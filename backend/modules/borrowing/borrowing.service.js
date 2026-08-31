@@ -166,12 +166,14 @@ const borrowBook = async (
   bookIdOrCopyBarcode,
   issuedBy,
   daysAllowed = null,
-  { isCopyBarcode = false, ipAddress = null } = {}
+  { isCopyBarcode = false, ipAddress = null, reservationId = null } = {}
 ) => {
   await syncOverdueBorrowings();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+
+    await assertEligible(userId, conn);
 
     let copy = null;
 
@@ -232,6 +234,19 @@ const borrowBook = async (
       throw Object.assign(new Error("User already has this book borrowed"), { status: 409 });
     }
 
+    if (reservationId !== null) {
+      const [[reservation]] = await conn.query(
+        `SELECT id FROM reservations
+         WHERE id = ? AND user_id = ? AND book_id = ?
+           AND status = 'ready' AND deleted_at IS NULL
+         FOR UPDATE`,
+        [reservationId, userId, copy.book_id]
+      );
+      if (!reservation) {
+        throw Object.assign(new Error("This ready reservation does not match the patron and selected copy"), { status: 409 });
+      }
+    }
+
     const safeDaysAllowed = Math.max(1, Number.parseInt(copy.default_borrow_days, 10) || 7);
     const dueDate = await calculateDueDateWithHolidays(new Date(), safeDaysAllowed, conn);
 
@@ -242,6 +257,13 @@ const borrowBook = async (
     );
 
     const borrowingId = result.insertId;
+
+    if (reservationId !== null) {
+      await conn.query(
+        "UPDATE reservations SET status = 'fulfilled', fulfilled_at = NOW() WHERE id = ?",
+        [reservationId]
+      );
+    }
 
     await conn.commit();
 
@@ -553,8 +575,6 @@ const settleUserPayments = async ({ studentEmployeeId, amount, settledBy }) => {
 
   try {
     await conn.beginTransaction();
-
-    await assertEligible(userId, conn);
 
     const [[user]] = await conn.query(
       `SELECT id, name, student_employee_id

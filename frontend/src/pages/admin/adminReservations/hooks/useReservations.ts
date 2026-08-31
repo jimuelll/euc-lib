@@ -1,18 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import {
   getAdminReservations,
   markReservationReady,
-  fulfillReservation,
   cancelReservationAdmin,
   archiveReservation,
   restoreReservation,
 } from "../reservations.api";
 import { PAGE_SIZE } from "../reservations.types";
-import type { ReservationsResult } from "../reservations.types";
+import type { AdminReservation, ReservationsResult } from "../reservations.types";
 import { useAdminConfirmDialog } from "../../components/useAdminConfirmDialog";
 
 export const useReservations = () => {
+  const navigate = useNavigate();
   const [data,         setData]         = useState<ReservationsResult | null>(null);
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState("");
@@ -79,17 +80,14 @@ export const useReservations = () => {
     }
   };
 
-  const handleFulfill = async (id: number, title: string) => {
-    setActionId(id);
-    try {
-      await fulfillReservation(id);
-      toast.success(`Reservation for "${title}" fulfilled`);
-      fetchReservations();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Action failed");
-    } finally {
-      setActionId(null);
-    }
+  const handleFulfill = async (reservation: AdminReservation) => {
+    const shouldStartCheckout = await confirm({
+      title: `Fulfill "${reservation.book_title}"?`,
+      description: `Continue to Circulation to scan a physical copy for ${reservation.user_name}. The reservation stays ready until checkout succeeds.`,
+      actionLabel: "Start Checkout",
+    });
+    if (!shouldStartCheckout) return;
+    navigate("/admin/circulation", { state: { checkoutReservation: reservation } });
   };
 
   const handleCancel = async (id: number, title: string) => {

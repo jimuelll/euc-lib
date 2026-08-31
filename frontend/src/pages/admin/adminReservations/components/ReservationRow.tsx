@@ -9,7 +9,7 @@ interface ReservationRowProps {
   index:       number;
   showArchived: boolean;
   onMarkReady: (id: number, title: string) => void;
-  onFulfill:   (id: number, title: string) => void;
+  onFulfill:   (reservation: AdminReservation) => void;
   onCancel:    (id: number, title: string) => void;
   onArchive:   (id: number, title: string) => void;
   onRestore:   (id: number, title: string) => void;
@@ -112,7 +112,7 @@ const ReservationRow = ({
           isActing={isActing}
           showArchived={showArchived}
           onMarkReady={onMarkReady}
-          onFulfill={onFulfill}
+          onFulfill={() => onFulfill(r)}
           onCancel={onCancel}
           onArchive={onArchive}
           onRestore={onRestore}

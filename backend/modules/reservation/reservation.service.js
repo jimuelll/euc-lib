@@ -27,7 +27,7 @@ const syncExpired = async () => {
        bk.title
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     WHERE r.status = 'pending'
+     WHERE r.status IN ('pending', 'ready')
        AND r.expires_at IS NOT NULL
        AND r.expires_at < NOW()
        AND r.deleted_at IS NULL`
@@ -38,7 +38,7 @@ const syncExpired = async () => {
   await db.query(
     `UPDATE reservations
      SET status = 'expired'
-     WHERE status = 'pending'
+     WHERE status IN ('pending', 'ready')
        AND expires_at IS NOT NULL
        AND expires_at < NOW()
        AND deleted_at IS NULL`
@@ -99,10 +99,15 @@ const searchCatalogue = async (query) => {
        bk.isbn,
        bk.copies,
        bk.location,
-       GREATEST(0, bk.copies - COUNT(br.id)) AS available
+       GREATEST(0,
+         COUNT(DISTINCT bc.id) -
+         COUNT(DISTINCT CASE WHEN br.status IN ('borrowed', 'overdue') THEN br.id END)
+       ) AS available
      FROM books bk
+     LEFT JOIN book_copies bc
+       ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
      LEFT JOIN borrowings br
-       ON br.book_id = bk.id AND br.status IN ('borrowed', 'overdue')
+       ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
      WHERE bk.deleted_at IS NULL
        AND (bk.title  LIKE ?
         OR bk.author LIKE ?
@@ -213,13 +218,14 @@ const getAdminReservations = async ({
   status,
   dateFrom,
   dateTo,
+  archived = false,
   page = 1,
   limit = 15,
 }) => {
   await syncExpired();
 
   const offset = (page - 1) * limit;
-  const conditions = ["r.deleted_at IS NULL"];
+  const conditions = [`r.deleted_at IS ${archived ? "NOT NULL" : "NULL"}`];
   const params = [];
 
   if (status && status !== "all") {
@@ -277,6 +283,7 @@ const getAdminReservations = async ({
   const [rows] = await db.query(
     `SELECT
        r.id,
+       r.book_id,
        r.status,
        r.reserved_at,
        r.expires_at,

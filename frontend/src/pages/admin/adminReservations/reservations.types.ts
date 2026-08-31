@@ -10,6 +10,7 @@ export type ReservationStatus =
 
 export interface AdminReservation {
   id: number;
+  book_id: number;
   user_name: string;
   student_employee_id: string;
   book_title: string;

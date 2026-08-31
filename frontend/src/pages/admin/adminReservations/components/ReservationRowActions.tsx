@@ -103,7 +103,7 @@ const ReservationRowActions = ({
             ? <Loader2 className="h-3 w-3 animate-spin" />
             : <CheckCircle2 className="h-3 w-3" />
           }
-          Fulfil
+          Fulfill
         </ActionBtn>
         <ActionBtn
           variant="danger"

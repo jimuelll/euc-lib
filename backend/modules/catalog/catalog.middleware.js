@@ -1,14 +1,22 @@
 const { validate, createValidationError } = require("../../middlewares/validate");
 const { MAX_CUSTOM_FIELDS, getSchema } = require("./catalog.service");
 
-const ALLOWED_ROLES = ["admin", "super_admin"];
+const ADMIN_ROLES = ["admin", "super_admin"];
+const CATALOG_ROLES = ["staff", ...ADMIN_ROLES];
 const VALID_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
 const VALID_TYPES = ["text", "textarea", "number", "date", "select"];
 const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
 const MATERIAL_KEYS = new Set(["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"]);
 
 const requireAdminRole = (req, res, next) => {
-  if (!req.user || !ALLOWED_ROLES.includes(req.user.role)) {
+  if (!req.user || !ADMIN_ROLES.includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+  next();
+};
+
+const requireCatalogRole = (req, res, next) => {
+  if (!req.user || !CATALOG_ROLES.includes(req.user.role)) {
     return res.status(403).json({ message: "Access denied" });
   }
   next();
@@ -160,6 +168,7 @@ const validateUpdateBookPayload = validate(async (req) => {
 
 module.exports = {
   requireAdminRole,
+  requireCatalogRole,
   validateSchemaPayload,
   validateBookId,
   validateBarcode,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import {
   lookupUser as apiLookupUser,
@@ -9,7 +10,16 @@ import {
 import { DEFAULT_LOAN_DAYS } from "../circulation.types";
 import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus } from "../circulation.types";
 
-export const useCirculation = () => {
+interface ReservationCheckout {
+  id: number;
+  book_id: number;
+  book_title: string;
+  student_employee_id: string;
+  user_name: string;
+}
+
+export const useCirculation = (reservationCheckout: ReservationCheckout | null = null) => {
+  const navigate = useNavigate();
   const [type, setType]                   = useState<TransactionType>("borrow");
   const [studentId, setStudentId]         = useState("");
   const [copyBarcode, setCopyBarcode]     = useState("");
@@ -65,6 +75,13 @@ export const useCirculation = () => {
     }
   };
 
+  useEffect(() => {
+    if (!reservationCheckout) return;
+    setType("borrow");
+    setStudentId(reservationCheckout.student_employee_id);
+    void handleLookupUser(reservationCheckout.student_employee_id);
+  }, [reservationCheckout?.id]);
+
 const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
   if (!lookupBarcode) return;
@@ -114,8 +131,16 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     try {
       if (type === "borrow") {
         // Backend expects a barcode OR student_employee_id as userBarcode
-        await processBorrow(studentId.trim(), copyBarcode.trim(), daysAllowed);
-        toast.success(`"${foundCopy.title}" borrowed by ${foundUser.name}`);
+        await processBorrow(studentId.trim(), copyBarcode.trim(), daysAllowed, reservationCheckout?.id);
+        toast.success(
+          reservationCheckout
+            ? `Reservation fulfilled and "${foundCopy.title}" borrowed by ${foundUser.name}`
+            : `"${foundCopy.title}" borrowed by ${foundUser.name}`
+        );
+        if (reservationCheckout) {
+          navigate("/admin/reservations");
+          return;
+        }
       } else if (type === "return") {
         await processReturn(copyBarcode.trim());
         toast.success(`"${foundCopy.title}" returned by ${foundUser.name}`);
@@ -146,5 +171,6 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     handleLookupUser,
     handleLookupCopy,
     handleSubmit,
+    reservationCheckout,
   };
 };

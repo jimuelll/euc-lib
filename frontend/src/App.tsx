@@ -73,7 +73,14 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/services" element={<Services />} />
-                  <Route path="/services/borrowing" element={<LibraryServices />} />
+                  <Route
+                    path="/services/borrowing"
+                    element={
+                      <ProtectedRoute>
+                        <LibraryServices />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/services/subscriptions" element={<AcademicSubscriptions />} />
                   <Route path="/catalogue" element={<Catalogue />} />
                   <Route path="/bulletin" element={<Bulletin />} />

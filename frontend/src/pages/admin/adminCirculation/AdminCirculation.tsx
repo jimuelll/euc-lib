@@ -1,4 +1,5 @@
 import { AdminPage, AdminPanel } from "../components/AdminPage";
+import { useLocation } from "react-router-dom";
 import { useCirculation } from "./hooks/useCirculation";
 import { TRANSACTION_CONFIG } from "./circulation.types";
 import BookLookup from "./components/BookLookup";
@@ -7,6 +8,8 @@ import TransactionTypePicker from "./components/TransactionTypePicker";
 import UserLookup from "./components/UserLookup";
 
 const AdminCirculation = () => {
+  const location = useLocation();
+  const checkoutReservation = (location.state as { checkoutReservation?: Parameters<typeof useCirculation>[0] } | null)?.checkoutReservation ?? null;
   const {
     type,
     studentId,
@@ -28,7 +31,8 @@ const AdminCirculation = () => {
     handleLookupUser,
     handleLookupCopy,
     handleSubmit,
-  } = useCirculation();
+    reservationCheckout,
+  } = useCirculation(checkoutReservation);
 
   const cfg = TRANSACTION_CONFIG[type];
   const Icon = cfg.icon;
@@ -43,6 +47,11 @@ const AdminCirculation = () => {
         title={type === "borrow" ? "Borrow a library copy" : "Return a library copy"}
       >
         <div className="space-y-5">
+          {reservationCheckout ? (
+            <div className="border border-info/30 bg-info/5 px-4 py-3 text-sm text-foreground">
+              Complete checkout for <strong>{reservationCheckout.user_name}</strong> by scanning an available copy of <strong>{reservationCheckout.book_title}</strong>. The reservation will be fulfilled only after the borrow succeeds.
+            </div>
+          ) : null}
           <TransactionTypePicker value={type} onChange={handleTypeChange} />
 
           <UserLookup

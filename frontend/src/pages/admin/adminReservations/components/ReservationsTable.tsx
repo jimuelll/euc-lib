@@ -8,7 +8,7 @@ interface ReservationsTableProps {
   actionId:     number | null;
   showArchived: boolean;
   onMarkReady:  (id: number, title: string) => void;
-  onFulfill:    (id: number, title: string) => void;
+  onFulfill:    (reservation: AdminReservation) => void;
   onCancel:     (id: number, title: string) => void;
   onArchive:    (id: number, title: string) => void;
   onRestore:    (id: number, title: string) => void;

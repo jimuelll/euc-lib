@@ -27,8 +27,9 @@ const getAdminReservations = async (req, res) => {
     const status = req.query.status ?? "all";
     const dateFrom = req.query.dateFrom ?? "";
     const dateTo = req.query.dateTo ?? "";
+    const archived = req.query.archived === "true";
 
-    const result = await service.getAdminReservations({ search, status, dateFrom, dateTo, page, limit });
+    const result = await service.getAdminReservations({ search, status, dateFrom, dateTo, archived, page, limit });
     res.json(result);
   } catch (err) {
     console.error("[admin/reservations] getAdminReservations:", err);
@@ -63,29 +64,9 @@ const markReservationReady = async (req, res) => {
 };
 
 const fulfillReservation = async (req, res) => {
-  try {
-    const reservationId = parseInt(req.params.reservationId, 10);
-    if (isNaN(reservationId) || reservationId < 1) {
-      return res.status(400).json({ message: "Invalid reservation ID" });
-    }
-    await service.fulfillReservation(reservationId);
-    const target = await getReservationNotificationTarget(reservationId);
-    if (target) {
-      await notificationsService.createNotification({
-        type: "reservation_fulfilled",
-        title: "Reservation completed",
-        body: `Your reservation for ${target.title} has been fulfilled successfully.`,
-        href: "/my-library",
-        audienceType: "user",
-        audienceUserId: target.user_id,
-        createdBy: req.user.id,
-      });
-    }
-    res.json({ message: "Reservation fulfilled" });
-  } catch (err) {
-    console.error("[admin/reservations] fulfillReservation:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
-  }
+  res.status(409).json({
+    message: "Complete checkout in Circulation to fulfill this reservation.",
+  });
 };
 
 const cancelReservationAdmin = async (req, res) => {

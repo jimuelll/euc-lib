@@ -25,15 +25,6 @@ export const markReservationReady = async (
   return res.data;
 };
 
-export const fulfillReservation = async (
-  reservationId: number
-): Promise<AdminReservation> => {
-  const res = await axiosInstance.post(
-    `/api/admin/reservations/${reservationId}/fulfill`
-  );
-  return res.data;
-};
-
 export const cancelReservationAdmin = async (
   reservationId: number
 ): Promise<AdminReservation> => {

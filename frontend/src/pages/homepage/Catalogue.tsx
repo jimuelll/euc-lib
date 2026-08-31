@@ -16,6 +16,7 @@ interface Book {
   edition?: string;
   publication_year?: number;
   copies?: number;
+  available?: number;
   [key: string]: unknown;
 }
 
@@ -113,9 +114,9 @@ const Catalogue = () => {
 
   const getLabelForKey = (key: string) => schema.find((f) => f.key === key)?.label ?? key;
 
-  const getCopiesLabel = (copies?: number) => {
-    if (copies === undefined || copies === null) return null;
-    return copies <= 0 ? { available: false } : { available: true };
+  const getAvailabilityLabel = (available?: number) => {
+    if (available === undefined || available === null) return null;
+    return { available: available > 0 };
   };
 
   return (
@@ -223,7 +224,7 @@ const Catalogue = () => {
           {books.length > 0 && (
             <div className="border-l border-border">
               {books.map((book, index) => {
-                const copies = getCopiesLabel(book.copies as number | undefined);
+                const availability = getAvailabilityLabel(book.available);
                 return (
                   <div
                     key={book.id}
@@ -268,17 +269,17 @@ const Catalogue = () => {
                       )}
                     </div>
 
-                    {copies && (
+                    {availability && (
                       <div className="ml-2 flex shrink-0 flex-col items-end gap-1 pt-0.5 text-right sm:ml-4">
                         <span
                           className="text-[10px] font-bold uppercase tracking-[0.15em]"
-                          style={{ fontFamily: "var(--font-heading)", color: copies.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
+                          style={{ fontFamily: "var(--font-heading)", color: availability.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
                         >
-                          {copies.available ? "Available" : "Checked Out"}
+                          {availability.available ? "Available" : "Checked Out"}
                         </span>
-                        {copies.available && book.copies && (
+                        {book.copies !== undefined && (
                           <span className="text-[10px] tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
-                            {book.copies} cop{book.copies === 1 ? "y" : "ies"}
+                            {book.available ?? 0} of {book.copies} cop{book.copies === 1 ? "y" : "ies"} available
                           </span>
                         )}
                       </div>

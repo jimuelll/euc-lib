@@ -3,6 +3,7 @@ const router     = express.Router();
 const controller = require("./catalog.controller");
 const {
   requireAdminRole,
+  requireCatalogRole,
   validateSchemaPayload,
   validateBookId,
   validateBarcode,
@@ -17,23 +18,23 @@ router.put   ("/book-types/:id", requireAdminRole, controller.updateBookType);
 router.put   ("/catalog-schema", requireAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",                                                   controller.getBooks);
-router.get   ("/books/isbn/:isbn", requireAdminRole, controller.lookupIsbn);
-router.post  ("/books",          requireAdminRole, validateCreateBookPayload,           controller.createBook);
-router.put   ("/books/:id",      requireAdminRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
-router.delete("/books/:id",      requireAdminRole, validateBookId,        controller.deleteBook);
+router.get   ("/books/isbn/:isbn", requireCatalogRole, controller.lookupIsbn);
+router.post  ("/books",          requireCatalogRole, validateCreateBookPayload,           controller.createBook);
+router.put   ("/books/:id",      requireCatalogRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
+router.delete("/books/:id",      requireCatalogRole, validateBookId,        controller.deleteBook);
 
-router.get   ("/books/:id/copies",           requireAdminRole, validateBookId,  controller.getBookCopies);
+router.get   ("/books/:id/copies",           requireCatalogRole, validateBookId,  controller.getBookCopies);
 
 // Barcode image + copy lookup (used at the desk / scanner)
-router.get   ("/copies/:barcode/barcode-png", requireAdminRole, validateBarcode, controller.getBarcodePng);
-router.get   ("/copies/:barcode",             requireAdminRole, validateBarcode, controller.getCopyByBarcode);
-router.patch ("/copies/:copyId", requireAdminRole, controller.updateCopyCondition);
+router.get   ("/copies/:barcode/barcode-png", requireCatalogRole, validateBarcode, controller.getBarcodePng);
+router.get   ("/copies/:barcode",             requireCatalogRole, validateBarcode, controller.getCopyByBarcode);
+router.patch ("/copies/:copyId", requireCatalogRole, controller.updateCopyCondition);
 
 router.get("/catalogue/search", (req, res, next) => {
   req.publicCatalogue = true;
   next();
 }, controller.getBooks);
 
-router.post("/books/:id/restore", requireAdminRole, validateBookId, controller.restoreBook);
+router.post("/books/:id/restore", requireCatalogRole, validateBookId, controller.restoreBook);
 
 module.exports = router;

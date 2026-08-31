@@ -66,12 +66,14 @@ export const lookupCopy = async (barcode: string): Promise<BookInfo> => {
 export const processBorrow = async (
   userBarcode: string,
   copyBarcode: string,
-  daysAllowed: number
+  daysAllowed: number,
+  reservationId?: number
 ) => {
   const res = await axiosInstance.post("/api/borrowing/scan/borrow", {
     userBarcode,
     copyBarcode,
     daysAllowed,
+    reservationId,
   });
   return res.data;
 };
