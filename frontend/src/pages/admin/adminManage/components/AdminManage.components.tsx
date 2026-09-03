@@ -347,14 +347,19 @@ interface SearchBarProps {
   value:            string;
   loading:          boolean;
   showArchived:     boolean;
+  roleFilter:       string;
+  statusFilter:     string;
+  allowedRoles:     string[];
   onChange:         (v: string) => void;
+  onRoleFilterChange: (v: string) => void;
+  onStatusFilterChange: (v: string) => void;
   onSearch:         () => void;
   onToggleArchived: () => void;
   onBulkDeactivateStudentLikeUsers: () => void;
 }
 
 export const SearchBar = ({
-  currentUserRole, value, loading, showArchived, onChange, onSearch, onToggleArchived, onBulkDeactivateStudentLikeUsers,
+  currentUserRole, value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange, onRoleFilterChange, onStatusFilterChange, onSearch, onToggleArchived, onBulkDeactivateStudentLikeUsers,
 }: SearchBarProps) => (
   <div className="mt-6 space-y-0">
     {/* Section header with toggle */}
@@ -409,6 +414,10 @@ export const SearchBar = ({
     )}
 
     {/* Input */}
+    <div className="flex flex-wrap gap-2 border border-t-0 border-border bg-muted/10 p-2">
+      <select aria-label="Filter users by role" value={roleFilter} onChange={(event) => onRoleFilterChange(event.target.value)} className="h-9 min-w-32 border border-border bg-background px-2 text-sm"><option value="all">All roles</option>{allowedRoles.map((role) => <option key={role} value={role}>{formatRole(role)}</option>)}</select>
+      {!showArchived && <select aria-label="Filter users by account status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-9 min-w-28 border border-border bg-background px-2 text-sm"><option value="all">All status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>}
+    </div>
     <div className="flex gap-0">
       <Input
         placeholder="Search by ID or name, or leave blank to show all…"

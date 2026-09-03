@@ -25,8 +25,13 @@ interface UseAdminManageReturn {
   // Search
   searchQuery:          string;
   setSearchQuery:       (v: string) => void;
+  roleFilter:           string;
+  setRoleFilter:        (v: string) => void;
+  statusFilter:         string;
+  setStatusFilter:      (v: string) => void;
   searchResults:        User[];
-  handleSearchUsers:    () => Promise<void>;
+  userPagination:       { page: number; limit: number; total: number; totalPages: number };
+  handleSearchUsers:    (page?: number) => Promise<void>;
   showArchived:         boolean;
   handleToggleArchived: () => void;
 
@@ -57,7 +62,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [loading,       setLoading]       = useState(false);
   const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
   const [searchQuery,   setSearchQuery]   = useState("");
+  const [roleFilter,    setRoleFilter]    = useState("all");
+  const [statusFilter,  setStatusFilter]  = useState("all");
   const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);
@@ -82,10 +90,17 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Toggle archived view ───────────────────────────────────────────────────
   const handleToggleArchived = () => {
-    setShowArchived((prev) => !prev);
-    setSearchResults([]);
+    const next = !showArchived;
+    setShowArchived(next);
     setSelectedUser(null);
-    setSearchQuery("");
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await axiosInstance.get("/api/admin/users", { params: { student_employee_id: searchQuery.trim() || undefined, name: searchQuery.trim() || undefined, role: roleFilter === "all" ? undefined : roleFilter, status: statusFilter === "all" ? undefined : statusFilter, archived: next ? "true" : undefined } });
+        setSearchResults(res.data);
+      } catch (err: any) { toast.error(err.response?.data?.message || "Failed to load users"); }
+      finally { setLoading(false); }
+    })();
   };
 
   // ── Create ─────────────────────────────────────────────────────────────────
@@ -112,6 +127,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       toast.success(res.data.message);
       setQrTarget({ studentId: id, name: fullName });
       resetForm();
+      await handleSearchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to create user");
     } finally {
@@ -120,7 +136,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
 
   // ── Search ─────────────────────────────────────────────────────────────────
-  const handleSearchUsers = async () => {
+  const handleSearchUsers = async (page = 1) => {
     const trimmedQuery = searchQuery.trim();
 
     setLoading(true);
@@ -129,11 +145,17 @@ export const useAdminManage = (): UseAdminManageReturn => {
         params: {
           student_employee_id: trimmedQuery || undefined,
           name:                trimmedQuery || undefined,
+          role:                roleFilter === "all" ? undefined : roleFilter,
+          status:              statusFilter === "all" ? undefined : statusFilter,
           archived:            showArchived ? "true" : undefined,
+          page,
+          limit: 25,
         },
       });
-      setSearchResults(res.data);
-      if (!res.data.length) {
+      const rows = res.data.rows ?? res.data;
+      setSearchResults(rows);
+      setUserPagination(res.data.pagination ?? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 });
+      if (!rows.length) {
         toast.info(trimmedQuery ? "No users found" : `No ${showArchived ? "archived" : "active"} users found`);
       }
     } catch (err: any) {
@@ -148,6 +170,12 @@ export const useAdminManage = (): UseAdminManageReturn => {
     // Records are the primary task view; creation stays available as a deliberate mode.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (user) void handleSearchUsers();
+    // Filters update the persistent records table immediately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, statusFilter]);
 
   // ── Select for edit ────────────────────────────────────────────────────────
   const selectUserForEdit = (u: User) => {
@@ -183,7 +211,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       );
       toast.success(res.data.message);
       resetForm();
-      setSearchResults([]);
+      await handleSearchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Update failed");
     } finally {
@@ -208,10 +236,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
         `/api/admin/users/${selectedUser.student_employee_id}`
       );
       toast.success(res.data.message || "User archived");
-      setSearchResults((prev) =>
-        prev.filter((u) => u.student_employee_id !== selectedUser.student_employee_id)
-      );
       resetForm();
+      await handleSearchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Archive failed");
     } finally {
@@ -235,10 +261,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
         `/api/admin/users/${selectedUser.student_employee_id}/restore`
       );
       toast.success(res.data.message || "User restored");
-      setSearchResults((prev) =>
-        prev.filter((u) => u.student_employee_id !== selectedUser.student_employee_id)
-      );
       resetForm();
+      await handleSearchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Restore failed");
     } finally {
@@ -275,8 +299,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
         );
       }
 
-      setSearchResults([]);
       setSelectedUser(null);
+      await handleSearchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Bulk deactivation failed");
     } finally {
@@ -296,7 +320,12 @@ export const useAdminManage = (): UseAdminManageReturn => {
     allowedRoles,
     searchQuery,
     setSearchQuery,
+    roleFilter,
+    setRoleFilter,
+    statusFilter,
+    setStatusFilter,
     searchResults,
+    userPagination,
     handleSearchUsers,
     showArchived,
     handleToggleArchived,

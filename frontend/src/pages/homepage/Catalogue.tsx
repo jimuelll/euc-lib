@@ -4,8 +4,8 @@ import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Book {
   id: number;
@@ -28,6 +28,7 @@ interface SchemaField {
   locked?: boolean;
   public?: boolean;
 }
+interface SearchResponse { rows: Book[]; pagination: { page: number; limit: number; total: number; totalPages: number } }
 
 const CORE_KEYS = new Set(["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies"]);
 
@@ -44,7 +45,6 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 );
 
 const Catalogue = () => {
-  const { isLoggedIn, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
 
@@ -53,6 +53,7 @@ const Catalogue = () => {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [pagination, setPagination]   = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
 
   const debouncedQuery = useDebounce(query, 400);
 
@@ -78,35 +79,27 @@ const Catalogue = () => {
   }, [debouncedQuery, searchParams, setSearchParams]);
 
   useEffect(() => {
-    axiosInstance.get("api/admin/catalog-schema")
+    axiosInstance.get("/api/catalogue/schema")
       .then((res) => setSchema(res.data))
       .catch(() => {});
   }, []);
 
-  const searchBooks = useCallback(async (q: string) => {
-    if (!q.trim()) { setBooks([]); setHasSearched(false); return; }
-    if (authLoading) return;
-
-    if (!isLoggedIn) {
-      setBooks([]);
-      setHasSearched(true);
-      setError("Catalogue search requires login access.");
-      return;
-    }
-
+  const searchBooks = useCallback(async (q: string, page = 1) => {
+    if (!q.trim()) { setBooks([]); setHasSearched(false); setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 }); return; }
     setLoading(true); setError(null); setHasSearched(true);
     try {
-      const res = await axiosInstance.get("api/admin/catalogue/search", { params: { query: q.trim() } });
-      setBooks(res.data);
+      const res = await axiosInstance.get<SearchResponse>("/api/catalogue/search", { params: { query: q.trim(), page, limit: 20 } });
+      setBooks(res.data.rows ?? []);
+      setPagination(res.data.pagination);
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Something went wrong");
       setBooks([]);
     } finally {
       setLoading(false);
     }
-  }, [authLoading, isLoggedIn]);
+  }, []);
 
-  useEffect(() => { searchBooks(debouncedQuery); }, [debouncedQuery, searchBooks]);
+  useEffect(() => { void searchBooks(debouncedQuery, 1); }, [debouncedQuery, searchBooks]);
 
   const extraFields = schema
     .filter((f) => f.public && !CORE_KEYS.has(f.key))
@@ -217,11 +210,13 @@ const Catalogue = () => {
 
           {!loading && !error && hasSearched && books.length > 0 && (
             <div className="flex items-center border-b border-border pb-4">
-              <SectionLabel>{books.length} result{books.length !== 1 ? "s" : ""} found</SectionLabel>
+              <SectionLabel>{pagination.total} result{pagination.total !== 1 ? "s" : ""} found</SectionLabel>
             </div>
           )}
 
-          {books.length > 0 && (
+          {loading ? <div className="space-y-3 border-l border-border py-1">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-24 w-full rounded-none" />)}</div> : null}
+
+          {!loading && books.length > 0 && (
             <div className="border-l border-border">
               {books.map((book, index) => {
                 const availability = getAvailabilityLabel(book.available);
@@ -289,6 +284,7 @@ const Catalogue = () => {
               })}
             </div>
           )}
+          {!loading && pagination.totalPages > 1 ? <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => void searchBooks(debouncedQuery, pagination.page - 1)}>Previous</button><span className="text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => void searchBooks(debouncedQuery, pagination.page + 1)}>Next</button></div> : null}
         </div>
       </main>
 

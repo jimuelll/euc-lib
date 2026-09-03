@@ -24,6 +24,19 @@ import type { BulletinPost } from "./types";
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
 
+const getPageItems = (currentPage: number, totalPages: number): Array<number | "start-gap" | "end-gap"> => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const ordered = Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  const items: Array<number | "start-gap" | "end-gap"> = [];
+  ordered.forEach((page, index) => {
+    const previous = ordered[index - 1];
+    if (previous && page - previous > 1) items.push(page === totalPages ? "end-gap" : "start-gap");
+    items.push(page);
+  });
+  return items;
+};
+
 const SectionLabel = ({ children, light = false }: { children: React.ReactNode; light?: boolean }) => (
   <div className="flex items-center gap-3">
     <div className={`h-px w-6 shrink-0 ${light ? "bg-warning" : "bg-warning"}`} />
@@ -272,20 +285,20 @@ export function BulletinPage() {
                       </button>
 
                       <div className="flex flex-1 overflow-x-auto">
-                        {Array.from({ length: totalPages }, (_, i) => (
+                        {getPageItems(currentPage, totalPages).map((item) => typeof item === "number" ? (
                           <button
-                            key={i + 1}
-                            onClick={() => setCurrentPage(i + 1)}
+                            key={item}
+                            onClick={() => setCurrentPage(item)}
                             className={`h-10 min-w-[2.5rem] flex-1 flex items-center justify-center border-r border-border text-[11px] font-bold tracking-[0.1em] transition-colors ${
-                              currentPage === i + 1
+                              currentPage === item
                                 ? "bg-primary text-primary-foreground"
                                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                             }`}
                             style={{ fontFamily: "var(--font-heading)" }}
                           >
-                            {i + 1}
+                            {item}
                           </button>
-                        ))}
+                        ) : <span key={item} className="flex h-10 min-w-[2.5rem] items-center justify-center border-r border-border text-xs text-muted-foreground">…</span>)}
                       </div>
 
                       <button

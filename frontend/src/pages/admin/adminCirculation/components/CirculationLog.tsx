@@ -283,6 +283,7 @@ const CirculationLog = () => {
                   <td className="px-4 py-3 max-w-[180px]">
                     <p className="text-sm font-medium text-foreground truncate leading-tight">{row.book_title}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/50 truncate">{row.isbn ?? "—"}</p>
+                    {row.is_legacy ? <span className="mt-1 inline-block border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-warning">Legacy loan</span> : null}
                   </td>
 
                   {/* Borrowed */}

@@ -3,6 +3,7 @@ import { Activity, RefreshCcw } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPanel } from "./components/AdminPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -263,6 +264,7 @@ const AdminAuditLogs = () => {
         title="Audit Feed"
         description="Each item represents an event that can be inferred directly from existing database timestamps and actor relationships."
       >
+        {loading ? <div className="space-y-3" aria-label="Loading audit records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-20 w-full rounded-none" />)}</div> : null}
         {error ? (
           <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}

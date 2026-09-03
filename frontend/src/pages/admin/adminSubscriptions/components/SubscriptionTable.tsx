@@ -1,4 +1,5 @@
-import { AlertTriangle, Globe, Loader2 } from "lucide-react";
+import { AlertTriangle, Globe } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FONT, LABEL_CLS } from "../subscriptions.styles";
 import type { Subscription } from "../subscriptions.types";
 import { SubscriptionRow } from "./SubscriptionRow";
@@ -42,10 +43,7 @@ export const SubscriptionTable = ({
 
     {/* States */}
     {loading && (
-      <div className="flex items-center justify-center gap-3 py-20 text-muted-foreground bg-background">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className={LABEL_CLS} style={FONT}>Loading…</span>
-      </div>
+      <div className="space-y-2 bg-background p-4">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-16 w-full rounded-none" />)}</div>
     )}
 
     {!loading && error && (

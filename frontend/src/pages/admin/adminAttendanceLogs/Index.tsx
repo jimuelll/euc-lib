@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +54,7 @@ interface AttendanceHistoryResponse {
     unique_users: number;
     borrowing_scan_count: number;
   };
+  sessions?: Array<{ id: number; name: string; student_employee_id: string; checked_in_at: string; checked_out_at: string | null; duration_minutes: number | null; status: "complete" | "incomplete" }>;
 }
 
 const emptyHistorySummary = {
@@ -105,6 +107,7 @@ const AdminAttendanceLogs = () => {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [historySessions, setHistorySessions] = useState<AttendanceHistoryResponse["sessions"]>([]);
 
   const loadHistoryLogs = async (
     loadMode: "initial" | "refresh" = "initial",
@@ -131,6 +134,7 @@ const AdminAttendanceLogs = () => {
       setHistoryRows(res.data.rows);
       setHistorySummary(res.data.summary ?? emptyHistorySummary);
       setHistoryPagination(res.data.pagination);
+      setHistorySessions(res.data.sessions ?? []);
     } catch (err: any) {
       setHistoryError(err.response?.data?.message || err.message || "Failed to load attendance history");
     } finally {
@@ -311,7 +315,14 @@ const AdminAttendanceLogs = () => {
             <AdminStatCard label="Unique Users" value={String(historySummary.unique_users)} helperText={`${historySummary.borrowing_scan_count} borrowing-linked scan(s) included.`} />
           </AdminStatGrid>
 
+          {historyFilters.dateFrom && historyFilters.dateFrom === historyFilters.dateTo ? <AdminPanel title="Sessions for selected day" description="Each check-in is paired with its next check-out. Incomplete sessions still need a time-out scan."><div className="space-y-2">{historySessions.length ? historySessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 border border-border px-4 py-3 text-sm"><div><span className="font-medium text-foreground">{session.name}</span><span className="ml-2 text-muted-foreground">{session.student_employee_id}</span></div><div className="text-muted-foreground">{formatDateTime(session.checked_in_at)} → {session.checked_out_at ? formatDateTime(session.checked_out_at) : "Incomplete"}</div><span className={session.status === "complete" ? "text-success" : "text-warning"}>{session.duration_minutes === null ? "Needs time out" : `${session.duration_minutes} min`}</span></div>) : <p className="text-sm text-muted-foreground">No entry/exit sessions for this date.</p>}</div></AdminPanel> : null}
+
           <AdminPanel title="Attendance history" description="Historical attendance activity ordered from newest to oldest.">
+            {historyLoading ? (
+              <div className="space-y-3" aria-label="Loading attendance history">
+                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-none" />)}
+              </div>
+            ) : null}
             {historyError ? (
               <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                 {historyError}

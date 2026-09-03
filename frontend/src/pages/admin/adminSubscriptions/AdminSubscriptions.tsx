@@ -17,6 +17,7 @@ const AdminSubscriptions = () => {
     deleteTarget,
     toastMsg,
     activeCount,
+    pagination,
     loadAll,
     handleCreate,
     handleEdit,
@@ -86,6 +87,7 @@ const AdminSubscriptions = () => {
           onEdit={openEdit}
           onDelete={setDelete}
         />
+        {!loading && subs.length > 0 ? <div className="mt-3 flex items-center justify-between gap-3 text-sm text-muted-foreground"><button type="button" className="border border-border px-3 py-2 disabled:opacity-50" disabled={pagination.page <= 1} onClick={() => void loadAll(pagination.page - 1)}>Previous</button><span>Page {pagination.page} of {pagination.totalPages} · {pagination.total} record(s)</span><button type="button" className="border border-border px-3 py-2 disabled:opacity-50" disabled={pagination.page >= pagination.totalPages} onClick={() => void loadAll(pagination.page + 1)}>Next</button></div> : null}
       </AdminPanel>
 
       {modal?.mode === "create" ? (

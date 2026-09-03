@@ -1,5 +1,6 @@
 const { randomUUID } = require("crypto");
 const db = require("../../db");
+const { ensureAuthAuditTable } = require("../auth/auth.service");
 const { ensureClearanceTables } = require("../clearance/clearance.service");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
@@ -108,14 +109,14 @@ function buildAuditFeedQuery() {
   return `SELECT *
     FROM (
       SELECT
-        u.last_login AS occurred_at,
+        ae.created_at AS occurred_at,
         CAST('auth' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS category,
-        CAST('login' AS CHAR CHARACTER SET utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
+        CONVERT(ae.event_type USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
         CONVERT(u.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
         CONVERT(u.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT(u.name, ' signed in') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
-      FROM users u
-      WHERE u.last_login IS NOT NULL
+        CONVERT(CONCAT(u.name, ' signed ', IF(ae.event_type = 'login', 'in', 'out')) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+      FROM auth_audit_events ae
+      JOIN users u ON u.id = ae.user_id
 
       UNION ALL
 
@@ -336,6 +337,7 @@ async function getAuditLog({
   dateFrom = "",
   dateTo = "",
 } = {}) {
+  await ensureAuthAuditTable();
   await ensureClearanceTables();
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
@@ -377,6 +379,7 @@ async function getAuditLog({
 }
 
 async function getAuditLogMeta() {
+  await ensureAuthAuditTable();
   await ensureClearanceTables();
   const auditFeedQuery = buildAuditFeedQuery();
   const [actionRows] = await db.query(
@@ -435,7 +438,7 @@ async function getDashboardOverview({ range } = {}) {
             FROM book_copies bc
            WHERE bc.deleted_at IS NULL
              AND bc.is_active = 1
-             AND bc.condition = 'good'
+             AND bc.condition IN ('good', 'damaged')
              AND NOT EXISTS (
                SELECT 1
                FROM borrowings b
@@ -588,7 +591,7 @@ async function getDashboardOverview({ range } = {}) {
     db.query(
       `SELECT bk.title AS name, COUNT(*) AS total
        FROM borrowings b
-       JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+       JOIN books bk ON bk.id = b.book_id
        WHERE b.deleted_at IS NULL
        GROUP BY b.book_id, bk.title
        ORDER BY total DESC, bk.title ASC
@@ -643,7 +646,7 @@ async function getDashboardOverview({ range } = {}) {
            CONVERT(CONCAT(u.name, ' borrowed "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
          FROM borrowings b
          JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
-         JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+         JOIN books bk ON bk.id = b.book_id
          WHERE b.deleted_at IS NULL
          UNION ALL
          SELECT b.returned_at AS occurred_at,
@@ -651,7 +654,7 @@ async function getDashboardOverview({ range } = {}) {
            CONVERT(CONCAT(u.name, ' returned "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
          FROM borrowings b
          JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
-         JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+         JOIN books bk ON bk.id = b.book_id
          WHERE b.deleted_at IS NULL AND b.returned_at IS NOT NULL
          UNION ALL
          SELECT r.reserved_at AS occurred_at,
@@ -659,7 +662,7 @@ async function getDashboardOverview({ range } = {}) {
            CONVERT(CONCAT(u.name, ' reserved "', bk.title, '"') USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
          FROM reservations r
          JOIN users u ON u.id = r.user_id AND u.deleted_at IS NULL
-         JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+         JOIN books bk ON bk.id = r.book_id
          WHERE r.deleted_at IS NULL
        ) recent_activity
        WHERE occurred_at IS NOT NULL

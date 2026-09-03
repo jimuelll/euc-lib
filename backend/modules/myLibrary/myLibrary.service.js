@@ -30,7 +30,7 @@ const getActiveBorrows = async (userId) => {
        b.notes,
        bc.barcode AS copy_barcode
      FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = b.book_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ?
        AND b.status IN ('borrowed', 'overdue')
@@ -54,13 +54,13 @@ const getBorrowHistory = async (userId) => {
        b.status,
        bc.barcode AS copy_barcode
      FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = b.book_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ?
        AND b.status = 'returned'
        AND b.deleted_at IS NULL
      ORDER BY b.returned_at DESC
-     LIMIT 5`,
+     LIMIT 50`,
     [userId]
   );
 
@@ -79,7 +79,7 @@ const getActiveReservations = async (userId) => {
        r.expires_at,
        r.notes
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ?
        AND r.status IN ('pending', 'ready')
        AND r.deleted_at IS NULL
@@ -102,12 +102,12 @@ const getReservationHistory = async (userId) => {
        r.fulfilled_at,
        r.cancelled_at
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ?
        AND r.status IN ('cancelled', 'expired', 'fulfilled')
        AND r.deleted_at IS NULL
      ORDER BY r.reserved_at DESC
-     LIMIT 5`,
+     LIMIT 50`,
     [userId]
   );
 
@@ -121,11 +121,43 @@ const getAttendanceLogs = async (userId) => {
      WHERE user_id = ?
        AND purpose = 'entry_exit'
      ORDER BY created_at DESC
-     LIMIT 30`,
+     LIMIT 100`,
     [userId]
   );
 
   return rows;
+};
+
+const getHistory = async (userId, { page = 1, limit = 20 } = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [[{ total }]] = await db.query(
+    `SELECT (
+       (SELECT COUNT(*) FROM borrowings WHERE user_id = ? AND status = 'returned' AND deleted_at IS NULL) +
+       (SELECT COUNT(*) FROM reservations WHERE user_id = ? AND status IN ('cancelled', 'expired', 'fulfilled') AND deleted_at IS NULL)
+     ) AS total`,
+    [userId, userId]
+  );
+  const [rows] = await db.query(
+    `SELECT * FROM (
+       SELECT b.id, bk.title, bk.author, 'borrowing' AS kind, b.status,
+              b.returned_at AS occurred_at, b.borrowed_at, b.returned_at, NULL AS reserved_at
+       FROM borrowings b
+       JOIN books bk ON bk.id = b.book_id
+       WHERE b.user_id = ? AND b.status = 'returned' AND b.deleted_at IS NULL
+       UNION ALL
+       SELECT r.id, bk.title, bk.author, 'reservation' AS kind, r.status,
+              COALESCE(r.fulfilled_at, r.cancelled_at, r.reserved_at) AS occurred_at,
+              NULL AS borrowed_at, NULL AS returned_at, r.reserved_at
+       FROM reservations r
+       JOIN books bk ON bk.id = r.book_id
+       WHERE r.user_id = ? AND r.status IN ('cancelled', 'expired', 'fulfilled') AND r.deleted_at IS NULL
+     ) AS history
+     ORDER BY occurred_at DESC, id DESC
+     LIMIT ? OFFSET ?`,
+    [userId, userId, safeLimit, (safePage - 1) * safeLimit]
+  );
+  return { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } };
 };
 
 const toIsoDate = (value) => {
@@ -171,9 +203,24 @@ const buildAttendanceSessions = (logs) => {
     sessions.push(openSession);
   }
 
-  return sessions
-    .reverse()
-    .slice(0, 8);
+  return sessions.reverse();
+};
+
+const getAttendanceHistory = async (userId, { page = 1, limit = 20 } = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [logs] = await db.query(
+    `SELECT id, type, created_at AS timestamp
+     FROM attendance_logs
+     WHERE user_id = ? AND purpose = 'entry_exit'
+     ORDER BY created_at DESC`,
+    [userId]
+  );
+  const sessions = buildAttendanceSessions(logs);
+  return {
+    rows: sessions.slice((safePage - 1) * safeLimit, safePage * safeLimit),
+    pagination: { page: safePage, limit: safeLimit, total: sessions.length, totalPages: Math.ceil(sessions.length / safeLimit) },
+  };
 };
 
 const getDashboard = async (userId) => {
@@ -228,7 +275,7 @@ const getDashboard = async (userId) => {
     borrow_history: borrowHistory,
     active_reservations: activeReservations,
     reservation_history: reservationHistory,
-    attendance_sessions: buildAttendanceSessions(attendanceLogs),
+    attendance_sessions: buildAttendanceSessions(attendanceLogs).slice(0, 8),
     subscriptions: subscriptions.slice(0, 3),
     notifications,
   };
@@ -236,4 +283,6 @@ const getDashboard = async (userId) => {
 
 module.exports = {
   getDashboard,
+  getHistory,
+  getAttendanceHistory,
 };

@@ -19,7 +19,7 @@ const attachWebSocketServer = (server) => {
 
       const user = verifyAccessToken(token);
       socket.user = user;
-      hub.registerConnection(user.id, socket);
+      hub.registerConnection(user.id, socket, user.role);
 
       const unreadCount = await notificationsService.getUnreadCountForUser({
         userId: user.id,

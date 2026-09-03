@@ -14,7 +14,7 @@ const getActiveBorrows = async (req, res) => {
 
 const getBorrowHistory = async (req, res) => {
   try {
-    const rows = await service.getBorrowHistory(req.user.id);
+    const rows = await service.getBorrowHistory(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
     console.error("[borrowing] getBorrowHistory:", err);
@@ -236,8 +236,9 @@ const adminRestoreBorrowing = async (req, res) => {
 
 const getAdminPaymentOverview = async (req, res) => {
   try {
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
-    const result = await service.getAdminPaymentOverview({ limit });
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const page = req.query.page === undefined ? null : Math.max(1, parseInt(req.query.page, 10) || 1);
+    const result = await service.getAdminPaymentOverview({ page, limit });
     res.json(result);
   } catch (err) {
     console.error("[borrowing] getAdminPaymentOverview:", err);

@@ -13,12 +13,17 @@ import HistoryTab from "./tabs/HistoryTab";
 
 import type { CatalogBook, ActiveReservation, ReservationHistory } from "./types";
 
+type Pagination = { page: number; limit: number; total: number; totalPages: number };
+type PagedResponse<T> = { rows: T[]; pagination: Pagination };
+
 const LibraryServices = () => {
   const { loading: authLoading } = useAuth();
   const [search, setSearch]                         = useState("");
   const [catalog, setCatalog]                       = useState<CatalogBook[]>([]);
   const [activeReservations, setActiveReservations] = useState<ActiveReservation[]>([]);
   const [history, setHistory]                       = useState<ReservationHistory[]>([]);
+  const [catalogPagination, setCatalogPagination]   = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [historyPagination, setHistoryPagination]   = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [catalogLoading, setCatalogLoading]         = useState(false);
   const [dataLoading, setDataLoading]               = useState(true);
   const [error, setError]                           = useState<string | null>(null);
@@ -33,10 +38,11 @@ const LibraryServices = () => {
       try {
         const [activeRes, historyRes] = await Promise.all([
           axiosInstance.get("api/reservations/active"),
-          axiosInstance.get("api/reservations/history"),
+          axiosInstance.get<PagedResponse<ReservationHistory>>("api/reservations/history", { params: { page: 1, limit: 20 } }),
         ]);
         setActiveReservations(activeRes.data);
-        setHistory(historyRes.data);
+        setHistory(historyRes.data.rows ?? []);
+        setHistoryPagination(historyRes.data.pagination);
       } catch (err: any) {
         setError(err.response?.data?.message ?? "Failed to load your reservations");
       } finally {
@@ -47,14 +53,15 @@ const LibraryServices = () => {
   }, [authLoading]);
 
   // Catalogue search — also gated on auth being ready
-  const fetchCatalogue = useCallback(async (q: string) => {
+  const fetchCatalogue = useCallback(async (q: string, page = 1) => {
     if (!q.trim() || authLoading) { setCatalog([]); return; }
     setCatalogLoading(true);
     try {
       const res = await axiosInstance.get("api/reservations/catalogue/search", {
-        params: { query: q.trim() },
+        params: { query: q.trim(), page, limit: 20 },
       });
-      setCatalog(res.data);
+      setCatalog(res.data.rows ?? []);
+      setCatalogPagination(res.data.pagination);
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Catalogue search failed");
     } finally {
@@ -63,7 +70,7 @@ const LibraryServices = () => {
   }, [authLoading]);
 
   useEffect(() => {
-    fetchCatalogue(debouncedSearch);
+    void fetchCatalogue(debouncedSearch, 1);
   }, [debouncedSearch, fetchCatalogue]);
 
   const handleReserveSuccess = useCallback(
@@ -168,13 +175,15 @@ const LibraryServices = () => {
                 catalogLoading={catalogLoading}
                 dataLoading={dataLoading}
                 hasSearched={!!debouncedSearch.trim()}
+                pagination={catalogPagination}
+                onPageChange={(page) => void fetchCatalogue(debouncedSearch, page)}
                 onReserveSuccess={handleReserveSuccess}
                 onCancelSuccess={handleCancelSuccess}
               />
             </TabsContent>
 
             <TabsContent value="history" className="mt-5">
-              <HistoryTab history={history} loading={dataLoading} />
+              <HistoryTab history={history} loading={dataLoading} pagination={historyPagination} onPageChange={async (page) => { setDataLoading(true); try { const response = await axiosInstance.get<PagedResponse<ReservationHistory>>("api/reservations/history", { params: { page, limit: 20 } }); setHistory(response.data.rows ?? []); setHistoryPagination(response.data.pagination); } finally { setDataLoading(false); } }} />
             </TabsContent>
           </Tabs>
 

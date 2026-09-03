@@ -11,8 +11,14 @@ const deleteFromCloudinary = async (publicId) => {
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
-const getAllSubscriptions = async (showArchived = false) => {
+const getAllSubscriptions = async (showArchived = false, { page, limit } = {}) => {
   const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
+  if (page !== undefined) {
+    const safePage = Math.max(1, Number(page) || 1); const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM academic_subscriptions WHERE deleted_at ${deletedFilter}`);
+    const [rows] = await pool.query(`SELECT * FROM academic_subscriptions WHERE deleted_at ${deletedFilter} ORDER BY sort_order ASC, id ASC LIMIT ? OFFSET ?`, [safeLimit, (safePage - 1) * safeLimit]);
+    return { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
+  }
   const [rows] = await pool.query(
     `SELECT * FROM academic_subscriptions
      WHERE deleted_at ${deletedFilter}
@@ -21,7 +27,13 @@ const getAllSubscriptions = async (showArchived = false) => {
   return rows;
 };
 
-const getActiveSubscriptions = async () => {
+const getActiveSubscriptions = async ({ page, limit } = {}) => {
+  if (page !== undefined) {
+    const safePage = Math.max(1, Number(page) || 1); const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+    const [[{ total }]] = await pool.query("SELECT COUNT(*) AS total FROM academic_subscriptions WHERE is_active = 1 AND deleted_at IS NULL");
+    const [rows] = await pool.query("SELECT * FROM academic_subscriptions WHERE is_active = 1 AND deleted_at IS NULL ORDER BY sort_order ASC, id ASC LIMIT ? OFFSET ?", [safeLimit, (safePage - 1) * safeLimit]);
+    return { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
+  }
   const [rows] = await pool.query(
     `SELECT * FROM academic_subscriptions
      WHERE is_active = 1 AND deleted_at IS NULL

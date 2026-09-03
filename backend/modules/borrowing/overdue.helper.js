@@ -198,7 +198,7 @@ const syncOverdueBorrowings = async (conn = db) => {
   }
 };
 
-const listUnsettledBorrowings = async ({ userId = null, limit = null } = {}, conn = db) => {
+const listUnsettledBorrowings = async ({ userId = null, limit = null, page = null } = {}, conn = db) => {
   await ensureBorrowingPaymentColumns(conn);
 
   const params = [];
@@ -245,9 +245,13 @@ const listUnsettledBorrowings = async ({ userId = null, limit = null } = {}, con
       return leftDate - rightDate;
     });
 
-  const limitedRows = typeof limit === "number" ? unsettledRows.slice(0, Math.max(limit, 0)) : unsettledRows;
+  const safeLimit = typeof limit === "number" ? Math.max(1, limit) : null;
+  const safePage = Number.isFinite(Number(page)) ? Math.max(1, Number(page)) : null;
+  const limitedRows = safeLimit
+    ? unsettledRows.slice(safePage ? (safePage - 1) * safeLimit : 0, safePage ? safePage * safeLimit : safeLimit)
+    : unsettledRows;
 
-  return {
+  const result = {
     rows: limitedRows,
     summary: {
       total_records: unsettledRows.length,
@@ -257,6 +261,15 @@ const listUnsettledBorrowings = async ({ userId = null, limit = null } = {}, con
       ),
     },
   };
+  if (safePage && safeLimit) {
+    result.pagination = {
+      page: safePage,
+      limit: safeLimit,
+      total: unsettledRows.length,
+      totalPages: Math.ceil(unsettledRows.length / safeLimit),
+    };
+  }
+  return result;
 };
 
 module.exports = {

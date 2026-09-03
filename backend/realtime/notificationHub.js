@@ -8,9 +8,9 @@ const ensureSocketSet = (userId) => {
   return userSockets.get(key);
 };
 
-const registerConnection = (userId, socket) => {
+const registerConnection = (userId, socket, role) => {
   const sockets = ensureSocketSet(userId);
-  sockets.add(socket);
+  sockets.add({ socket, role });
 };
 
 const unregisterConnection = (userId, socket) => {
@@ -18,7 +18,9 @@ const unregisterConnection = (userId, socket) => {
   const sockets = userSockets.get(key);
   if (!sockets) return;
 
-  sockets.delete(socket);
+  for (const connection of sockets) {
+    if (connection.socket === socket) sockets.delete(connection);
+  }
   if (sockets.size === 0) {
     userSockets.delete(key);
   }
@@ -33,8 +35,8 @@ const pushToUser = (userId, payload) => {
   const sockets = userSockets.get(String(userId));
   if (!sockets) return;
 
-  for (const socket of sockets) {
-    send(socket, payload);
+  for (const connection of sockets) {
+    send(connection.socket, payload);
   }
 };
 
@@ -49,9 +51,20 @@ const pushNotification = (userId, payload) => {
   pushToUser(userId, payload);
 };
 
+const pushAudienceChanged = ({ audienceType, audienceRole }) => {
+  for (const connections of userSockets.values()) {
+    for (const connection of connections) {
+      if (audienceType === "all" || (audienceType === "role" && connection.role === audienceRole)) {
+        send(connection.socket, { type: "notification.audience_changed" });
+      }
+    }
+  }
+};
+
 module.exports = {
   registerConnection,
   unregisterConnection,
   pushUnreadCount,
   pushNotification,
+  pushAudienceChanged,
 };

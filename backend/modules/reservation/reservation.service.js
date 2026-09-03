@@ -71,25 +71,40 @@ const getActiveReservations = async (userId) => {
   return rows;
 };
 
-const getReservationHistory = async (userId) => {
+const getReservationHistory = async (userId, { page, limit } = {}) => {
+  const paged = Number.isFinite(Number(page));
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [[{ total }]] = paged ? await db.query(
+    `SELECT COUNT(*) AS total FROM reservations
+     WHERE user_id = ? AND status IN ('cancelled', 'expired', 'fulfilled') AND deleted_at IS NULL`,
+    [userId]
+  ) : [[{ total: 0 }]];
   const [rows] = await db.query(
     `SELECT r.id, bk.title, bk.author,
             r.status, r.reserved_at, r.expires_at,
             r.fulfilled_at, r.cancelled_at
      FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ?
        AND r.status IN ('cancelled', 'expired', 'fulfilled')
        AND r.deleted_at IS NULL
-     ORDER BY r.reserved_at DESC
-     LIMIT 50`,
-    [userId]
+     ORDER BY r.reserved_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
+    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
   );
-  return rows;
+  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
 };
 
-const searchCatalogue = async (query) => {
+const searchCatalogue = async (query, { page, limit } = {}) => {
   const like = `%${query}%`;
+  const paged = Number.isFinite(Number(page));
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [[{ total }]] = paged ? await db.query(
+    `SELECT COUNT(*) AS total FROM books bk
+     WHERE bk.deleted_at IS NULL AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
+    [like, like, like]
+  ) : [[{ total: 0 }]];
   const [rows] = await db.query(
     `SELECT
        bk.id,
@@ -105,7 +120,7 @@ const searchCatalogue = async (query) => {
        ) AS available
      FROM books bk
      LEFT JOIN book_copies bc
-       ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
+       ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings br
        ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
      WHERE bk.deleted_at IS NULL
@@ -113,11 +128,10 @@ const searchCatalogue = async (query) => {
         OR bk.author LIKE ?
         OR bk.isbn   LIKE ?)
      GROUP BY bk.id
-     ORDER BY bk.title ASC
-     LIMIT 50`,
-    [like, like, like]
+     ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
+    paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
   );
-  return rows;
+  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
 };
 
 const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
@@ -321,7 +335,7 @@ const markReservationReady = async (reservationId) => {
     await conn.beginTransaction();
 
     const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+      "SELECT id, book_id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [reservationId]
     );
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
@@ -331,6 +345,17 @@ const markReservationReady = async (reservationId) => {
         { status: 409 }
       );
     }
+
+    const [[copy]] = await conn.query(
+      `SELECT bc.id
+       FROM book_copies bc
+       WHERE bc.book_id = ? AND bc.is_active = 1
+         AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM borrowings b WHERE b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue'))
+       LIMIT 1 FOR UPDATE`,
+      [row.book_id]
+    );
+    if (!copy) throw Object.assign(new Error("No borrowable copy is available to prepare for pickup"), { status: 409 });
 
     await conn.query(
       "UPDATE reservations SET status = 'ready' WHERE id = ?",

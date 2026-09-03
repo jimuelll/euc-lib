@@ -4,6 +4,7 @@ import {
   Input,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import { FormField, Book } from "./AdminCatalog.types";
@@ -12,6 +13,7 @@ import BookCopiesModal from "./components/BookCopiesModal";
 import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText, Printer } from "lucide-react";
 import { printCodeLabel } from "@/utils/printCodeLabel";
 import { SegmentedNavigation } from "../components/SegmentedNavigation";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Copy = {
   id: number;
@@ -49,8 +51,9 @@ const PanelLabel = ({ children, action }: { children: React.ReactNode; action?: 
   </div>
 );
 
-const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
+const FieldLabel = ({ children, required, htmlFor }: { children: React.ReactNode; required?: boolean; htmlFor?: string }) => (
   <label
+    htmlFor={htmlFor}
     className="mb-2 block text-sm font-medium text-muted-foreground"
     style={{ fontFamily: "var(--font-heading)" }}
   >
@@ -135,7 +138,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
               </div>
             )}
             <span className="font-mono text-[10px] text-muted-foreground/50">{copy.barcode}</span>
-            <button type="button" aria-label={`Print label for ${copy.barcode}`} onClick={() => { const url = urls[copy.barcode]; if (!url) return toast.error("Barcode not loaded yet"); if (!printCodeLabel({ imageUrl: url, title: "Library book copy", code: copy.barcode, kind: "Library book copy" })) toast.error("Allow pop-ups to print this label."); }} disabled={!urls[copy.barcode]} className="flex items-center gap-1 border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}><Printer className="h-3 w-3" />Print</button>
+            <button type="button" aria-label={`Print label for ${copy.barcode}`} onClick={() => { const url = urls[copy.barcode]; if (!url) return toast.error("Barcode not loaded yet"); if (!printCodeLabel({ imageUrl: url, title: "Library book copy", code: copy.barcode, kind: "Library book copy" })) toast.error("Allow pop-ups to print this label."); }} disabled={!copy.is_active || !urls[copy.barcode]} className="flex items-center gap-1 border border-border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}><Printer className="h-3 w-3" />Print</button>
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.12em] border px-2 py-0.5 ${
                 copy.status === "borrowed"
@@ -148,7 +151,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
             </span>
             <label className="w-full text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
               Condition
-              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as Copy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
+              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status === "borrowed" || updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as Copy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
                 <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
               </select>
             </label>
@@ -168,7 +171,9 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [formValues,    setFormValues]    = useState<Record<string, any>>({});
   const [loading,       setLoading]       = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
+  const [catalogFilter, setCatalogFilter] = useState<"all" | "book" | "thesis">("all");
   const [searchResults, setSearchResults] = useState<Book[]>([]);
+  const [catalogPagination, setCatalogPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
@@ -228,21 +233,23 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.post("api/admin/books", { ...formValues, material_type: materialType });
-      toast.success(res.data.message); resetForm();
+      toast.success(res.data.message); resetForm(); setCatalogMode("edit"); await handleSearchBooks(false);
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to add book");
     } finally { setLoading(false); }
   };
 
-  const handleSearchBooks = async (archivedOverride?: boolean) => {
+  const handleSearchBooks = async (archivedOverride?: boolean, materialOverride?: "all" | "book" | "thesis", pageOverride = 1) => {
     setLoading(true);
     const archived = archivedOverride ?? showArchived;
     try {
       const res = await axiosInstance.get("api/admin/books", {
-        params: { query: searchQuery, ...(archived && { archived: "true" }) },
+        params: { query: searchQuery, materialType: materialOverride ?? catalogFilter, page: pageOverride, limit: 25, ...(archived && { archived: "true" }) },
       });
-      setSearchResults(res.data);
-      if (!res.data.length) {
+      const rows = res.data.rows ?? res.data;
+      setSearchResults(rows);
+      setCatalogPagination(res.data.pagination ?? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 });
+      if (!rows.length) {
         toast.info(
           searchQuery.trim()
             ? (archived ? "No archived books found" : "No books found")
@@ -265,9 +272,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     const next = !showArchived;
     setShowArchived(next);
     setSelectedBook(null);
-    if (searchResults.length || searchQuery.trim()) {
-      handleSearchBooks(next);
-    }
+    void handleSearchBooks(next);
   };
 
   const handleUpdateBook = async () => {
@@ -275,7 +280,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.put(`api/admin/books/${selectedBook.id}`, formValues);
-      toast.success(res.data.message); resetForm(); setSearchResults([]);
+      toast.success(res.data.message); resetForm(); await handleSearchBooks();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Update failed");
     } finally { setLoading(false); }
@@ -293,8 +298,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     try {
       const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
-      toast.success(res.data.message); resetForm();
-      setSearchResults((prev) => prev.filter((b) => b.id !== selectedBook.id));
+      toast.success(res.data.message); resetForm(); await handleSearchBooks();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Delete failed");
     } finally { setLoading(false); }
@@ -312,7 +316,7 @@ const AdminCatalogData = ({ fields }: Props) => {
     try {
       const res = await axiosInstance.post(`api/admin/books/${book.id}/restore`);
       toast.success(res.data.message);
-      setSearchResults((prev) => prev.filter((b) => b.id !== book.id));
+      await handleSearchBooks(true);
       if (selectedBook?.id === book.id) resetForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Restore failed");
@@ -369,8 +373,8 @@ const AdminCatalogData = ({ fields }: Props) => {
             <div className="grid gap-5 sm:grid-cols-2">
               {sortedFields.filter((field) => field.key !== "isbn").map((f) => (
                 <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                  <FieldLabel required={["title", "author"].includes(f.key)}>{f.label}</FieldLabel>
-                  <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
+                  <FieldLabel required={f.required} htmlFor={`create-field-${f.key}`}>{f.label}</FieldLabel>
+                  <FieldInput id={`create-field-${f.key}`} field={f} value={formValues[f.key]} onChange={setField} />
                 </div>
               ))}
             </div>
@@ -432,6 +436,11 @@ const AdminCatalogData = ({ fields }: Props) => {
               {showArchived ? "Archived" : "Active"}
             </button>
 
+            <Select value={catalogFilter} onValueChange={(value: "all" | "book" | "thesis") => { setCatalogFilter(value); void handleSearchBooks(undefined, value); }}>
+              <SelectTrigger className="h-10 w-32 rounded-none border-y-0 border-l-0"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="book">Books</SelectItem><SelectItem value="thesis">Theses</SelectItem></SelectContent>
+            </Select>
+
             <button
               onClick={() => handleSearchBooks()}
               disabled={loading}
@@ -456,7 +465,8 @@ const AdminCatalogData = ({ fields }: Props) => {
           )}
 
           {/* Results table */}
-          {searchResults.length > 0 && (
+          {loading && <div className="mt-4 space-y-2 border border-border p-4" aria-label="Loading catalog records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-12 w-full rounded-none" />)}</div>}
+          {!loading && searchResults.length > 0 && (
             <div className="admin-panel-surface admin-etched-border mt-4 overflow-x-auto border border-border bg-card">
               <table className="w-full text-left">
                 <thead>
@@ -520,6 +530,14 @@ const AdminCatalogData = ({ fields }: Props) => {
               </table>
             </div>
           )}
+          {!loading && searchResults.length > 0 && (
+            <div className="mt-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+              <Button type="button" variant="outline" className="rounded-none" disabled={catalogPagination.page <= 1} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page - 1)}>Previous</Button>
+              <span>Page {catalogPagination.page} of {catalogPagination.totalPages} · {catalogPagination.total} record(s)</span>
+              <Button type="button" variant="outline" className="rounded-none" disabled={catalogPagination.page >= catalogPagination.totalPages} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page + 1)}>Next</Button>
+            </div>
+          )}
+          {!loading && searchResults.length === 0 && <div className="mt-4 border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground">No {showArchived ? "archived " : ""}catalog records match the current filters.</div>}
 
           {/* Edit form — only shown in active mode */}
           {selectedBook && !showArchived && (
@@ -539,8 +557,8 @@ const AdminCatalogData = ({ fields }: Props) => {
                   <div><FieldLabel required>Book type</FieldLabel><Select value={String(formValues.book_type_id ?? "")} onValueChange={(value) => setField("book_type_id", value)}><SelectTrigger><SelectValue placeholder="Select the loan and fine policy" /></SelectTrigger><SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent></Select></div>
                   {sortedFields.map((f) => (
                     <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                      <FieldLabel required={f.required}>{f.label}</FieldLabel>
-                      <FieldInput field={f} value={formValues[f.key]} onChange={setField} />
+                      <FieldLabel required={f.required} htmlFor={`edit-field-${f.key}`}>{f.label}</FieldLabel>
+                      <FieldInput id={`edit-field-${f.key}`} field={f} value={formValues[f.key]} onChange={setField} />
                     </div>
                   ))}
                 </div>

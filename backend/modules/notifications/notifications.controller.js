@@ -118,12 +118,13 @@ const createAdminNotification = async (req, res) => {
 const listAdminNotifications = async (req, res) => {
   try {
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
-    const [stats, notifications] = await Promise.all([
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const [stats, notificationPage] = await Promise.all([
       service.getAdminStats(),
-      service.listAdminNotifications({ limit }),
+      service.listAdminNotifications({ page, limit }),
     ]);
 
-    res.json({ stats, notifications });
+    res.json({ stats, notifications: notificationPage.rows, pagination: notificationPage.pagination });
   } catch (err) {
     console.error("[notifications] listAdminNotifications:", err);
     res.status(500).json({ message: "Failed to fetch admin notifications" });

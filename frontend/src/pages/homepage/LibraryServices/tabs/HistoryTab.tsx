@@ -1,5 +1,6 @@
-import { BookMarked, Loader2 } from "lucide-react";
+import { BookMarked } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import BookRow from "../components/BookRow";
 import type { ReservationHistory } from "../types";
 import { reservationHistoryStatusConfig } from "../types";
@@ -7,21 +8,17 @@ import { reservationHistoryStatusConfig } from "../types";
 interface HistoryTabProps {
   history: ReservationHistory[];
   loading: boolean;
+  pagination: { page: number; totalPages: number; total: number };
+  onPageChange: (page: number) => void;
 }
 
-const HistoryTab = ({ history, loading }: HistoryTabProps) => {
+const HistoryTab = ({ history, loading, pagination, onPageChange }: HistoryTabProps) => {
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Loading history…
-        </p>
+      <div className="space-y-2.5">
+        {Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-20 w-full rounded-none" />)}
       </div>
     );
   }
@@ -101,6 +98,7 @@ const HistoryTab = ({ history, loading }: HistoryTabProps) => {
           />
         );
       })}
+      {pagination.totalPages > 1 ? <div className="flex items-center justify-between border-t border-border pt-3"><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Previous</button><span className="text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Next</button></div> : null}
     </div>
   );
 };

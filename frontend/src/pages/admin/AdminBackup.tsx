@@ -111,7 +111,7 @@ const AdminBackup = () => {
     setRestoring(true);
     try {
       await axiosInstance.post(`/api/admin/backup/snapshots/${snapshotToRestore.id}/restore`);
-      toast.success("Snapshot restored. A pre-restore recovery point was saved.");
+      toast.success("Snapshot restored. A pre-restore recovery point was saved. Refresh the page to load restored data.");
       setSnapshotToRestore(null);
       await loadSnapshots();
     } catch (error: any) {
@@ -129,14 +129,14 @@ const AdminBackup = () => {
       toast.error("The backup file must be 25 MB or smaller.");
       return;
     }
-    if (!window.confirm("Restore this backup? It will replace all current library data and cannot be undone.")) return;
+    if (!window.confirm("Restore this backup? It will replace all current library data. The current state will be saved automatically first as a recovery point.")) return;
 
     setRestoring(true);
     try {
       const contents = await file.text();
       const backup = JSON.parse(contents);
       await axiosInstance.post("/api/admin/backup/restore", backup);
-      toast.success("Database restored successfully. Please refresh the page to load restored data.");
+      toast.success("Database restored. A pre-restore recovery point was saved. Please refresh the page to load restored data.");
     } catch (error: any) {
       const message = error instanceof SyntaxError
         ? "The selected file is not valid JSON."
@@ -179,13 +179,13 @@ const AdminBackup = () => {
       >
         <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
         <p className="text-sm leading-6 text-muted-foreground">
-          Every snapshot includes all database records and the catalog's custom-field layout. Only restore a downloaded file made by this system.
+          Every snapshot includes all database records and the catalog's custom-field layout. Restore is allowed only when the current database schema exactly matches the snapshot.
         </p>
       </AdminPanel>
 
       <AdminPanel
         title="Saved snapshots"
-        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point."
+        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point; schema-mismatched snapshots remain available to download."
         className="max-w-4xl"
       >
         {loadingSnapshots ? (
@@ -243,7 +243,7 @@ const AdminBackup = () => {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
             <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
-              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first.
+              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. It will continue only if the database schema matches exactly. The current state will be saved automatically first.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

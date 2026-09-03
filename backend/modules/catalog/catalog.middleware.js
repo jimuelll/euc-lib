@@ -7,6 +7,10 @@ const VALID_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
 const VALID_TYPES = ["text", "textarea", "number", "date", "select"];
 const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
 const MATERIAL_KEYS = new Set(["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"]);
+const REQUIRED_SYSTEM_FIELDS = {
+  title: { type: "text", required: true, locked: true },
+  author: { type: "text", required: true, locked: true },
+};
 
 const requireAdminRole = (req, res, next) => {
   if (!req.user || !ADMIN_ROLES.includes(req.user.role)) {
@@ -95,6 +99,9 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
     if (key === "material_type") { if (!["book", "thesis"].includes(req.body[key])) throw createValidationError("material_type must be book or thesis"); continue; }
     if (key === "book_type_id") { if (!Number.isInteger(Number(req.body[key])) || Number(req.body[key]) < 1) throw createValidationError("Book type is required"); continue; }
     if (MATERIAL_KEYS.has(key)) { if (typeof req.body[key] !== "string") throw createValidationError(`Field "${key}" must be text`); continue; }
+    if (field.required && (req.body[key] === "" || req.body[key] === null)) {
+      throw createValidationError(`Field "${field.label}" is required`);
+    }
     validateFieldValue(field, req.body[key]);
   }
 
@@ -105,6 +112,11 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
       }
     }
     if (!Number.isInteger(Number(req.body.book_type_id)) || Number(req.body.book_type_id) < 1) throw createValidationError("Book type is required");
+    for (const field of schema) {
+      if (field.required && (req.body[field.key] === undefined || String(req.body[field.key]).trim() === "")) {
+        throw createValidationError(`Field "${field.label}" is required`);
+      }
+    }
   }
 };
 
@@ -145,6 +157,16 @@ const validateSchemaPayload = validate((req) => {
     }
     if (typeof f.order !== "number") {
       throw createValidationError(`Field "${f.key}" is missing a numeric order`);
+    }
+    for (const [key, contract] of Object.entries(REQUIRED_SYSTEM_FIELDS)) {
+      if (f.key === key && (f.archived || f.type !== contract.type || !f.required || !f.locked)) {
+        throw createValidationError(`System field "${key}" must remain a required, locked ${contract.type} field`);
+      }
+    }
+  }
+  for (const key of Object.keys(REQUIRED_SYSTEM_FIELDS)) {
+    if (!fields.some((field) => field.key === key)) {
+      throw createValidationError(`System field "${key}" cannot be removed`);
     }
   }
 });

@@ -14,7 +14,12 @@ const AdminManage = () => {
     allowedRoles,
     searchQuery,
     setSearchQuery,
+    roleFilter,
+    setRoleFilter,
+    statusFilter,
+    setStatusFilter,
     searchResults,
+    userPagination,
     handleSearchUsers,
     showArchived,
     handleToggleArchived,
@@ -47,7 +52,12 @@ const AdminManage = () => {
         onResetForm={resetForm}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        roleFilter={roleFilter}
+        onRoleFilterChange={setRoleFilter}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
         searchResults={searchResults}
+        userPagination={userPagination}
         onSearch={handleSearchUsers}
         showArchived={showArchived}
         onToggleArchived={handleToggleArchived}

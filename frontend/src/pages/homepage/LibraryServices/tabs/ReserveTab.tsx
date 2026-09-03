@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BookMarked, Clock, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import BookRow from "../components/BookRow";
@@ -14,6 +15,8 @@ interface ReserveTabProps {
   catalogLoading: boolean;
   dataLoading: boolean;
   hasSearched: boolean;
+  pagination: { page: number; totalPages: number; total: number };
+  onPageChange: (page: number) => void;
   onReserveSuccess: (reservation: ActiveReservation, bookId: number) => void;
   onCancelSuccess: (reservationId: number) => void;
 }
@@ -24,6 +27,8 @@ const ReserveTab = ({
   catalogLoading,
   dataLoading,
   hasSearched,
+  pagination,
+  onPageChange,
   onReserveSuccess,
   onCancelSuccess,
 }: ReserveTabProps) => {
@@ -98,15 +103,7 @@ const ReserveTab = ({
 
         {/* Loading */}
         {catalogLoading && (
-          <div className="flex flex-col items-center justify-center py-14 gap-3 border border-border bg-card">
-            <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Searching catalogue…
-            </p>
-          </div>
+          <div className="space-y-2.5">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-20 w-full rounded-none" />)}</div>
         )}
 
         {/* Pre-search prompt */}
@@ -200,6 +197,7 @@ const ReserveTab = ({
               />
             );
           })}
+        {!catalogLoading && pagination.totalPages > 1 ? <div className="flex items-center justify-between border-t border-border pt-3"><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Previous</button><span className="text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Next</button></div> : null}
       </div>
 
       {/* ── My active reservations ────────────────────────────────────────── */}

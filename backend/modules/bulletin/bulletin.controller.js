@@ -8,10 +8,14 @@ const getPosts = async (req, res) => {
     const limit        = Math.min(200, parseInt(req.query.limit) || 4);
     const userId       = req.user?.id ?? null;
     const search       = typeof req.query.search === "string" ? req.query.search.trim() : "";
-    const showArchived = req.user && ["admin", "super_admin"].includes(req.user.role)
-      ? req.query.archived === "true"
-      : false;
-    const result = await service.getPosts(userId, page, limit, showArchived, search);
+    const canReviewArchived = req.user && ["admin", "super_admin"].includes(req.user.role);
+    const archiveScope = canReviewArchived && req.query.scope === "all"
+      ? "all"
+      : canReviewArchived && req.query.archived === "true"
+        ? "archived"
+        : "active";
+    const month = typeof req.query.month === "string" ? req.query.month.trim() : "";
+    const result = await service.getPosts(userId, page, limit, archiveScope, search, month);
     res.json(result);
   } catch (err) {
     console.error("[bulletin] getPosts:", err);

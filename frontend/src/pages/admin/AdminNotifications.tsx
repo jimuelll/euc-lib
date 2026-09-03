@@ -4,6 +4,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ interface AdminNotificationStats {
 interface AdminNotificationsResponse {
   stats: AdminNotificationStats;
   notifications: AdminNotification[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 const emptyStats: AdminNotificationStats = {
@@ -79,20 +81,22 @@ const AdminNotifications = () => {
   const [form, setForm] = useState(defaultForm);
   const [stats, setStats] = useState<AdminNotificationStats>(emptyStats);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const loadData = async () => {
+  const loadData = async (page = 1) => {
     setLoading(true);
     setError("");
     try {
       const res = await axiosInstance.get<AdminNotificationsResponse>("/api/admin/notifications", {
-        params: { limit: 20 },
+        params: { page, limit: 20 },
       });
       setStats(res.data.stats);
       setNotifications(res.data.notifications);
+      setPagination(res.data.pagination);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to load notifications");
     } finally {
@@ -316,7 +320,7 @@ const AdminNotifications = () => {
           description="The latest notifications stored in the database and available for live delivery."
         >
           <div className="space-y-3">
-            {notifications.length > 0 ? notifications.map((notification) => (
+            {loading ? <div className="space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-24 w-full rounded-none" />)}</div> : notifications.length > 0 ? notifications.map((notification) => (
               <div key={notification.id} className="border border-border/80 bg-background px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1.5">
@@ -347,6 +351,7 @@ const AdminNotifications = () => {
                 No notifications have been sent yet.
               </div>
             )}
+            {!loading && notifications.length > 0 ? <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-sm text-muted-foreground"><Button type="button" variant="outline" disabled={pagination.page <= 1} onClick={() => void loadData(pagination.page - 1)}>Previous</Button><span>Page {pagination.page} of {pagination.totalPages}</span><Button type="button" variant="outline" disabled={pagination.page >= pagination.totalPages} onClick={() => void loadData(pagination.page + 1)}>Next</Button></div> : null}
           </div>
         </AdminPanel>
       </div>

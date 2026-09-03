@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, FileText } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
 import { CreatePostModal } from "../homepage/bulletin";
 
@@ -25,6 +26,7 @@ interface BulletinResponse {
   total: number;
   page: number;
   totalPages: number;
+  months?: string[];
 }
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -49,8 +51,11 @@ const STATUS_FILTERS = [
 type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
 
 const AdminBulletin = () => {
-  const [activePosts, setActivePosts] = useState<BulletinPostRecord[]>([]);
-  const [archivedPosts, setArchivedPosts] = useState<BulletinPostRecord[]>([]);
+  const [posts, setPosts] = useState<BulletinPostRecord[]>([]);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -58,21 +63,29 @@ const AdminBulletin = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const loadPosts = async () => {
+  const loadPosts = async (requestedPage = 1) => {
     setLoading(true);
     setError("");
     try {
-      const [activeRes, archivedRes] = await Promise.all([
-        axiosInstance.get<BulletinResponse>("/api/bulletin", {
-          params: { page: 1, limit: 200 },
-        }),
-        axiosInstance.get<BulletinResponse>("/api/bulletin", {
-          params: { page: 1, limit: 200, archived: true },
-        }),
-      ]);
-
-      setActivePosts(activeRes.data.data ?? []);
-      setArchivedPosts(archivedRes.data.data ?? []);
+      const response = await axiosInstance.get<BulletinResponse>("/api/bulletin", {
+        params: {
+          page: requestedPage,
+          limit: 20,
+          scope: statusFilter === "all" ? "all" : undefined,
+          archived: statusFilter === "archived" ? true : undefined,
+          month: selectedMonth === "all" ? undefined : selectedMonth,
+        },
+      });
+      const result = response.data;
+      if (requestedPage > 1 && result.totalPages > 0 && requestedPage > result.totalPages) {
+        await loadPosts(result.totalPages);
+        return;
+      }
+      setPosts(result.data ?? []);
+      setTotalPosts(result.total ?? 0);
+      setCurrentPage(result.page ?? requestedPage);
+      setTotalPages(result.totalPages ?? 0);
+      setAvailableMonths(result.months ?? []);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to load bulletin posts");
     } finally {
@@ -81,45 +94,26 @@ const AdminBulletin = () => {
   };
 
   useEffect(() => {
-    loadPosts();
-  }, []);
-
-  const allPosts = useMemo(() => {
-    return [...activePosts, ...archivedPosts].sort((a, b) => {
-      if (Boolean(b.is_pinned) !== Boolean(a.is_pinned)) {
-        return Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
-      }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [activePosts, archivedPosts]);
+    void loadPosts(1);
+  }, [statusFilter, selectedMonth]);
 
   const monthOptions = useMemo(() => {
     const seen = new Map<string, string>();
-    allPosts.forEach((post) => {
-      const key = post.created_at.slice(0, 7);
-      if (!seen.has(key)) {
-        seen.set(key, MONTH_FORMATTER.format(new Date(post.created_at)));
+    availableMonths.forEach((value) => {
+      if (!seen.has(value)) {
+        seen.set(value, MONTH_FORMATTER.format(new Date(`${value}-01T00:00:00`)));
       }
     });
 
     return Array.from(seen.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([value, label]) => ({ value, label }));
-  }, [allPosts]);
-
-  const filteredPosts = useMemo(() => {
-    return allPosts.filter((post) => {
-      if (statusFilter === "active" && post.deleted_at) return false;
-      if (statusFilter === "archived" && !post.deleted_at) return false;
-      if (selectedMonth !== "all" && !post.created_at.startsWith(selectedMonth)) return false;
-      return true;
-    });
-  }, [allPosts, selectedMonth, statusFilter]);
+  }, [availableMonths]);
 
   const groupedPosts = useMemo(() => {
     const groups = new Map<string, { label: string; posts: BulletinPostRecord[] }>();
 
-    filteredPosts.forEach((post) => {
+    posts.forEach((post) => {
       const key = post.created_at.slice(0, 7);
       if (!groups.has(key)) {
         groups.set(key, {
@@ -133,13 +127,13 @@ const AdminBulletin = () => {
     return Array.from(groups.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([, value]) => value);
-  }, [filteredPosts]);
+  }, [posts]);
 
   const handlePinToggle = async (postId: number, nextPinned: boolean) => {
     setBusyId(postId);
     try {
       await axiosInstance.patch(`/api/bulletin/${postId}/pin`, { pinned: nextPinned });
-      await loadPosts();
+      await loadPosts(currentPage);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to update pin status");
     } finally {
@@ -155,7 +149,7 @@ const AdminBulletin = () => {
       } else {
         await axiosInstance.delete(`/api/bulletin/${post.id}`);
       }
-      await loadPosts();
+      await loadPosts(currentPage);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to update archive status");
     } finally {
@@ -171,7 +165,7 @@ const AdminBulletin = () => {
       contentWidth="wide"
       actions={(
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={loadPosts} disabled={loading}>
+          <Button type="button" variant="outline" onClick={() => void loadPosts(currentPage)} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -183,9 +177,9 @@ const AdminBulletin = () => {
       )}
     >
       <AdminStatGrid>
-        <AdminStatCard label="Total Posts" value={loading ? "-" : String(allPosts.length)} icon={<Newspaper className="h-4 w-4" />} />
-        <AdminStatCard label="Published" value={loading ? "-" : String(activePosts.length)} icon={<Pin className="h-4 w-4" />} />
-        <AdminStatCard label="Archived" value={loading ? "-" : String(archivedPosts.length)} icon={<ArchiveRestore className="h-4 w-4" />} />
+        <AdminStatCard label="Matching posts" value={loading ? "-" : String(totalPosts)} icon={<Newspaper className="h-4 w-4" />} />
+        <AdminStatCard label="Current page" value={loading ? "-" : `${currentPage} / ${Math.max(1, totalPages)}`} icon={<Pin className="h-4 w-4" />} />
+        <AdminStatCard label="View" value={STATUS_FILTERS.find((item) => item.value === statusFilter)?.label ?? "All posts"} icon={<ArchiveRestore className="h-4 w-4" />} />
         <AdminStatCard label="Month Groups" value={loading ? "-" : String(monthOptions.length)} icon={<CalendarRange className="h-4 w-4" />} />
       </AdminStatGrid>
 
@@ -254,6 +248,11 @@ const AdminBulletin = () => {
           </div>
 
           <div className="space-y-6">
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-44 w-full rounded-md" />)}
+              </div>
+            ) : null}
             {!loading && groupedPosts.length === 0 ? (
               <div className="rounded-md border border-dashed border-border px-4 py-10 text-sm text-muted-foreground">
                 No bulletin posts match the current filters.
@@ -364,6 +363,16 @@ const AdminBulletin = () => {
                 </div>
               </section>
             ))}
+
+            {!loading && totalPages > 1 ? (
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <p className="text-sm text-muted-foreground">Page {currentPage} of {totalPages} · {totalPosts} posts</p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => void loadPosts(currentPage - 1)}>Previous</Button>
+                  <Button type="button" variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => void loadPosts(currentPage + 1)}>Next</Button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </AdminPanel>
@@ -373,7 +382,7 @@ const AdminBulletin = () => {
         onClose={() => setShowCreate(false)}
         onCreated={() => {
           setShowCreate(false);
-          loadPosts();
+          void loadPosts(1);
         }}
       />
     </AdminPage>

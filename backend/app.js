@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 const authRoutes        = require("./modules/auth/auth.routes");
 const adminRoutes       = require("./modules/admin/admin.routes");
 const catalogRoutes     = require("./modules/catalog/catalog.routes");
+const publicCatalogRoutes = require("./modules/catalog/catalog.public.routes");
 const borrowingRoutes   = require("./modules/borrowing/borrowing.routes");
 const reservationRoutes = require("./modules/reservation/reservation.routes");
 const adminReservationRoutes = require("./modules/reservation/adminReservation.routes");
@@ -57,6 +58,7 @@ app.use("/api/auth",     authRoutes);
 app.use("/api/bulletin", bulletinRoutes);
 app.use("/api/about",    aboutRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api", publicCatalogRoutes);
 app.use("/api/admin/users", require("./modules/admin/barcode.routes"));
 
 // --- Global Protection ---

@@ -147,20 +147,19 @@ const markAsRead = async ({ notificationId, userId, role }) => {
 };
 
 const markAllAsRead = async ({ userId, role }) => {
-  const notifications = await listForUser({ userId, role, limit: MAX_LIMIT, unreadOnly: true });
-
-  if (notifications.length) {
-    const values = notifications.map((notification) => [notification.id, userId]);
-    await db.query(
-      `INSERT INTO notification_reads (notification_id, user_id, read_at)
-       VALUES ${values.map(() => "(?, ?, NOW())").join(", ")}
-       ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
-      values.flat()
-    );
-  }
-
-  hub.pushUnreadCount(userId, 0);
-  return { success: true, unreadCount: 0 };
+  await ensureNotificationSourceColumns();
+  await db.query(
+    `INSERT INTO notification_reads (notification_id, user_id, read_at)
+     SELECT n.id, ?, NOW()
+     FROM notifications n
+     LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ?
+     WHERE ${buildAudienceWhere()} AND nr.read_at IS NULL
+     ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
+    [userId, userId, userId, role]
+  );
+  const unreadCount = await getUnreadCountForUser({ userId, role });
+  hub.pushUnreadCount(userId, unreadCount);
+  return { success: true, unreadCount };
 };
 
 const resolveRecipients = async ({ audienceType, audienceUserId, audienceRole }) => {
@@ -232,7 +231,6 @@ const createNotification = async ({
 }) => {
   await ensureNotificationSourceColumns();
 
-  const recipients = await resolveRecipients({ audienceType, audienceUserId, audienceRole });
   const existingNotification = replaceExisting
     ? await findExistingNotification({
         type,
@@ -297,17 +295,13 @@ const createNotification = async ({
     is_read: false,
   };
 
-  for (const userId of recipients) {
-    const unreadCount = await getUnreadCountForUser({
-      userId,
-      role: audienceType === "role" ? audienceRole : (await getUserRole(userId)),
-    });
-
-    hub.pushNotification(userId, {
-      type: "notification.created",
-      notification: baseNotification,
-      unreadCount,
-    });
+  if (audienceType === "user" && audienceUserId) {
+    const unreadCount = await getUnreadCountForUser({ userId: audienceUserId, role: await getUserRole(audienceUserId) });
+    hub.pushNotification(audienceUserId, { type: "notification.created", notification: baseNotification, unreadCount });
+  } else {
+    // Broadcast once to currently connected matching clients. Each client fetches
+    // its own unread count; the request no longer queries or pushes every user.
+    hub.pushAudienceChanged({ audienceType, audienceRole });
   }
 
   return baseNotification;
@@ -325,9 +319,11 @@ const getUserRole = async (userId) => {
   return row?.role ?? "student";
 };
 
-const listAdminNotifications = async ({ limit = DEFAULT_LIMIT } = {}) => {
+const listAdminNotifications = async ({ page = 1, limit = DEFAULT_LIMIT } = {}) => {
   await ensureNotificationSourceColumns();
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
+  const safePage = Math.max(1, Number(page) || 1);
+  const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM notifications");
 
   const [rows] = await db.query(
     `SELECT
@@ -336,14 +332,14 @@ const listAdminNotifications = async ({ limit = DEFAULT_LIMIT } = {}) => {
      FROM notifications n
      LEFT JOIN users creator ON creator.id = n.created_by
      ORDER BY n.created_at DESC
-     LIMIT ?`,
-    [safeLimit]
+     LIMIT ? OFFSET ?`,
+    [safeLimit, (safePage - 1) * safeLimit]
   );
 
-  return rows.map((row) => ({
+  return { rows: rows.map((row) => ({
     ...normaliseNotification(row),
     creator_name: row.creator_name ?? null,
-  }));
+  })), pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
 };
 
 const getAdminStats = async () => {

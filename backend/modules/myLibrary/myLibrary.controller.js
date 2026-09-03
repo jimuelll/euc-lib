@@ -10,6 +10,26 @@ const getDashboard = async (req, res) => {
   }
 };
 
+const getHistory = async (req, res) => {
+  try {
+    res.json(await service.getHistory(req.user.id, { page: req.query.page, limit: req.query.limit }));
+  } catch (err) {
+    console.error("[my-library] getHistory:", err);
+    res.status(500).json({ message: "Failed to fetch library history" });
+  }
+};
+
+const getAttendanceHistory = async (req, res) => {
+  try {
+    res.json(await service.getAttendanceHistory(req.user.id, { page: req.query.page, limit: req.query.limit }));
+  } catch (err) {
+    console.error("[my-library] getAttendanceHistory:", err);
+    res.status(500).json({ message: "Failed to fetch attendance history" });
+  }
+};
+
 module.exports = {
   getDashboard,
+  getHistory,
+  getAttendanceHistory,
 };

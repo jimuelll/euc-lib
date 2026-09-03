@@ -1,5 +1,6 @@
 const express = require("express");
 const { Readable } = require("stream");
+const { createHash } = require("crypto");
 const cloudinary = require("cloudinary").v2;
 const db = require("../../db");
 const { authMiddleware } = require("../auth/auth.middleware");
@@ -29,55 +30,95 @@ function decodeValue(value) {
   return value;
 }
 
-async function getTableNames() {
-  const [rows] = await db.query(
+async function getTableNames(connection = db) {
+  const [rows] = await connection.query(
     "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME != ? ORDER BY TABLE_NAME",
     [SNAPSHOT_TABLE]
   );
   return rows.map((row) => row.TABLE_NAME);
 }
 
-async function createBackupPayload() {
-  const tables = await getTableNames();
-  const data = {};
-  for (const table of tables) {
-    const [rows] = await db.query(`SELECT * FROM \`${table}\``);
-    data[table] = rows.map((row) => Object.fromEntries(
-      Object.entries(row).map(([key, value]) => [key, encodeValue(value)])
-    ));
-  }
-  const [bookColumns] = await db.query(
-    `SELECT COLUMN_NAME AS name, COLUMN_TYPE AS columnType, IS_NULLABLE AS isNullable, EXTRA AS extra
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'books'
-     ORDER BY ORDINAL_POSITION`
+async function getSchemaManifest(connection = db) {
+  const [columns] = await connection.query(
+    `SELECT TABLE_NAME AS tableName, COLUMN_NAME AS name, COLUMN_TYPE AS columnType,
+            IS_NULLABLE AS isNullable, EXTRA AS extra
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME != ?
+      ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+    [SNAPSHOT_TABLE]
   );
-  return {
-    format: "euc-library-backup",
-    version: 2,
-    createdAt: new Date().toISOString(),
-    tables: data,
-    schema: { booksColumns: bookColumns },
-  };
+  const tables = {};
+  for (const column of columns) {
+    (tables[column.tableName] ??= { columns: [] }).columns.push({
+      name: column.name,
+      columnType: column.columnType,
+      isNullable: column.isNullable,
+      extra: column.extra,
+    });
+  }
+  // Column metadata alone misses indexes and foreign keys. Keep a normalized
+  // CREATE TABLE definition so a restore only runs against the same constraints.
+  for (const table of Object.keys(tables)) {
+    const [definitionRows] = await connection.query(`SHOW CREATE TABLE \`${table}\``);
+    const definition = Object.values(definitionRows[0])[1];
+    tables[table].definition = String(definition).replace(/ AUTO_INCREMENT=\d+/g, " AUTO_INCREMENT=?");
+  }
+  return tables;
+}
+
+function schemaFingerprint(tables) {
+  return createHash("sha256").update(JSON.stringify(tables)).digest("hex");
+}
+
+async function createBackupPayload() {
+  const connection = await db.getConnection();
+  try {
+    // One read-only, repeatable-read transaction makes every table represent the same instant.
+    await connection.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+    await connection.query("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
+    const tables = await getTableNames(connection);
+    const data = {};
+    for (const table of tables) {
+      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+      data[table] = rows.map((row) => Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, encodeValue(value)])
+      ));
+    }
+    const schemaTables = await getSchemaManifest(connection);
+    await connection.commit();
+    return {
+      format: "euc-library-backup",
+      version: 3,
+      createdAt: new Date().toISOString(),
+      tables: data,
+      schema: { tables: schemaTables, fingerprint: schemaFingerprint(schemaTables) },
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 function validateBackup(backup) {
-  return backup?.format === "euc-library-backup" && [1, 2].includes(backup.version) && backup.tables && typeof backup.tables === "object";
+  return backup?.format === "euc-library-backup"
+    && backup.version === 3
+    && backup.tables && typeof backup.tables === "object"
+    && backup.schema?.tables && typeof backup.schema.tables === "object"
+    && typeof backup.schema.fingerprint === "string";
 }
 
-async function restoreMissingBookColumns(backup) {
-  const columns = backup.schema?.booksColumns;
-  if (!Array.isArray(columns)) return;
-  const [current] = await db.query(
-    `SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'books'`
-  );
-  const currentNames = new Set(current.map((column) => column.name));
-  for (const column of columns) {
-    if (!column?.name || !column?.columnType || currentNames.has(column.name) || column.extra) continue;
-    // Column details originate from MySQL's information_schema at snapshot time, never from the client.
-    await db.query(`ALTER TABLE \`books\` ADD COLUMN \`${column.name}\` ${column.columnType} ${column.isNullable === "NO" ? "NOT NULL" : "NULL"} DEFAULT NULL`);
+async function assertSchemaCompatible(backup) {
+  const currentTables = await getSchemaManifest();
+  const currentFingerprint = schemaFingerprint(currentTables);
+  if (backup.schema.fingerprint !== schemaFingerprint(backup.schema.tables)) {
+    throw Object.assign(new Error("The backup schema fingerprint is invalid."), { status: 400 });
   }
+  if (backup.schema.fingerprint !== currentFingerprint) {
+    throw Object.assign(new Error("This backup was created with a different database schema and cannot be restored safely. Download it for archival use or migrate the database to the matching version first."), { status: 409 });
+  }
+  return currentTables;
 }
 
 async function uploadSnapshot(payload, createdBy, kind = "manual") {
@@ -128,18 +169,21 @@ async function getSnapshotPayload(snapshot) {
   return response.json();
 }
 
+async function createPreRestoreSnapshot(createdBy) {
+  return uploadSnapshot(await createBackupPayload(), createdBy, "pre_restore");
+}
+
 async function restoreBackup(backup) {
   const tables = await getTableNames();
   const backupTables = Object.keys(backup.tables).sort();
-  const missingTables = backupTables.filter((table) => !tables.includes(table));
-  if (missingTables.length) {
-    throw Object.assign(new Error(`This backup needs database tables that are no longer available: ${missingTables.join(", ")}.`), { status: 400 });
+  if (backupTables.length !== tables.length || backupTables.some((table, index) => table !== tables[index])) {
+    throw Object.assign(new Error("This backup does not contain exactly the current database tables and cannot be restored safely."), { status: 409 });
   }
   if (backupTables.some((table) => !Array.isArray(backup.tables[table]))) {
     throw Object.assign(new Error("The backup contains invalid table data."), { status: 400 });
   }
 
-  await restoreMissingBookColumns(backup);
+  const schemaTables = await assertSchemaCompatible(backup);
 
   let connection;
   try {
@@ -149,7 +193,14 @@ async function restoreBackup(backup) {
     for (const table of backupTables) await connection.query(`DELETE FROM \`${table}\``);
     for (const table of backupTables) {
       for (const row of backup.tables[table]) {
+        if (!row || typeof row !== "object" || Array.isArray(row)) {
+          throw Object.assign(new Error(`The backup contains an invalid row for ${table}.`), { status: 400 });
+        }
         const columns = Object.keys(row);
+        const allowedColumns = new Set((schemaTables[table]?.columns ?? []).map((column) => column.name));
+        if (columns.some((column) => !allowedColumns.has(column))) {
+          throw Object.assign(new Error(`The backup contains unsupported columns for ${table}.`), { status: 400 });
+        }
         if (!columns.length) continue;
         const values = columns.map((column) => decodeValue(row[column]));
         const names = columns.map((column) => `\`${column}\``).join(", ");
@@ -224,14 +275,14 @@ router.post("/backup/snapshots/:id/restore", superAdminOnly, async (req, res) =>
   try {
     const [[snapshot]] = await db.query(`SELECT * FROM ${SNAPSHOT_TABLE} WHERE id = ?`, [req.params.id]);
     if (!snapshot) return res.status(404).json({ message: "Snapshot not found." });
-    const preRestoreSnapshot = await uploadSnapshot(await createBackupPayload(), req.user.id, "pre_restore");
     const backup = await getSnapshotPayload(snapshot);
     if (!validateBackup(backup)) throw Object.assign(new Error("The saved snapshot is invalid."), { status: 400 });
+    const preRestoreSnapshot = await createPreRestoreSnapshot(req.user.id);
     await restoreBackup(backup);
     res.json({ message: "Database restored successfully.", preRestoreSnapshot });
   } catch (err) {
     console.error("[backup] restore snapshot:", err);
-    res.status(err.status || 500).json({ message: err.message || "Restore failed. The current database was left unchanged." });
+    res.status(err.status || 500).json({ message: err.message || "Restore failed before any database records were changed." });
   }
 });
 
@@ -242,11 +293,12 @@ router.post("/backup/restore", superAdminOnly, async (req, res) => {
   }
 
   try {
+    const preRestoreSnapshot = await createPreRestoreSnapshot(req.user.id);
     await restoreBackup(backup);
-    res.json({ message: "Database restored successfully.", restoredAt: new Date().toISOString() });
+    res.json({ message: "Database restored successfully.", restoredAt: new Date().toISOString(), preRestoreSnapshot });
   } catch (err) {
     console.error("[backup] restore:", err);
-    res.status(err.status || 500).json({ message: err.message || "Restore failed. The current database was left unchanged." });
+    res.status(err.status || 500).json({ message: err.message || "Restore failed before any database records were changed." });
   }
 });
 

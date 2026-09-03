@@ -34,7 +34,7 @@ const ensureClearanceTables = async (conn = db) => {
 const buildStatus = async (userId, conn = db) => {
   const [overdueRows] = await conn.query(
     `SELECT b.id, bk.title, b.due_date
-     FROM borrowings b JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     FROM borrowings b JOIN books bk ON bk.id = b.book_id
      WHERE b.user_id = ? AND b.status = 'overdue' AND b.deleted_at IS NULL
      ORDER BY b.due_date ASC`, [userId]
   );
@@ -56,7 +56,7 @@ const getClearanceProfile = async (studentEmployeeId) => {
   const clearance = await buildStatus(user.id);
   const [reservations] = await db.query(
     `SELECT r.id, r.status, r.reserved_at, r.expires_at, bk.title AS book_title
-     FROM reservations r JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     FROM reservations r JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ? AND r.status IN ('pending', 'ready') AND r.deleted_at IS NULL
      ORDER BY r.reserved_at DESC`, [user.id]
   );
@@ -68,7 +68,7 @@ const getClearanceProfile = async (studentEmployeeId) => {
   return { user, ...clearance, reservations, transactions };
 };
 
-const getClearanceQueue = async () => {
+const getClearanceQueue = async ({ page, limit } = {}) => {
   await ensureClearanceTables();
   await syncOverdueBorrowings();
   const [overdueRows] = await db.query(
@@ -77,7 +77,7 @@ const getClearanceQueue = async () => {
        GROUP_CONCAT(bk.title ORDER BY b.due_date ASC SEPARATOR ' | ') AS overdue_titles
      FROM borrowings b
      JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
-     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN books bk ON bk.id = b.book_id
      WHERE b.deleted_at IS NULL AND b.status = 'overdue'
      GROUP BY u.id, u.name, u.student_employee_id
      ORDER BY oldest_due_date ASC`
@@ -113,11 +113,20 @@ const getClearanceQueue = async () => {
     queue.set(fine.user_id, existing);
   }
 
-  return Array.from(queue.values()).sort((left, right) => {
+  const rows = Array.from(queue.values()).sort((left, right) => {
     if (right.overdueCount !== left.overdueCount) return right.overdueCount - left.overdueCount;
     if (right.outstandingAmount !== left.outstandingAmount) return right.outstandingAmount - left.outstandingAmount;
     return String(left.name).localeCompare(String(right.name));
   });
+
+  if (!Number.isFinite(Number(page))) return rows;
+  const safePage = Math.max(1, Number(page));
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+  const total = rows.length;
+  return {
+    rows: rows.slice((safePage - 1) * safeLimit, safePage * safeLimit),
+    pagination: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
+  };
 };
 
 const assertEligible = async (userId, conn = db) => {

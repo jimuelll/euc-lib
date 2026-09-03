@@ -60,6 +60,9 @@ const getLogs = async (req, res) => {
     };
 
     const result = await service.getLogs(filters);
+    if (filters.dateFrom && filters.dateFrom === filters.dateTo && (!filters.purpose || filters.purpose === "all" || filters.purpose === "entry_exit")) {
+      result.sessions = await service.getSessionsForDate(filters.dateFrom);
+    }
     res.json(result);
   } catch (err) {
     console.error("[attendance] getLogs:", err);
@@ -69,7 +72,7 @@ const getLogs = async (req, res) => {
 
 const getMy = async (req, res) => {
   try {
-    const rows = await service.getMyLogs(req.user.id);
+    const rows = await service.getMyLogs(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
     console.error("[attendance] getMy:", err);

@@ -126,6 +126,13 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
       toast.error("No matching active borrow found");
       return;
     }
+    if (type === "borrow" && foundCopy.condition === "lost") {
+      toast.error("Lost copies cannot be borrowed");
+      return;
+    }
+    if (type === "borrow" && foundCopy.condition === "damaged" && !window.confirm("This copy is marked damaged. Confirm that you inspected it and want to continue checkout.")) {
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -158,6 +165,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     !!foundUser &&
     !!foundCopy &&
     foundCopy.is_active &&
+    foundCopy.condition !== "lost" &&
     !(type === "return" && !matchedBorrow);
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 

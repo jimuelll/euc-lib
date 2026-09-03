@@ -90,11 +90,13 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const saveSchema = async (updated: FormField[]) => {
     setSaving(true);
     try {
-      await axiosInstance.put("api/admin/catalog-schema", { fields: updated });
+      await axiosInstance.put("api/admin/catalog-schema", { fields: updated, baseFields: fields });
       toast.success("Schema saved");
       onFieldsChange(updated);
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save schema");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -108,9 +110,9 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     }
     const key = toKey(newFieldLabel);
     if (!key || key.length < 2) { toast.error("Label produces an invalid key — try a longer name"); return; }
-    if (fields.find((f) => f.key === key && !f.archived)) { toast.error("A field with that name already exists"); return; }
+    if (fields.find((f) => f.key === key)) { toast.error("A field with that name already exists. Restore the archived field instead."); return; }
 
-    await saveSchema([
+    const saved = await saveSchema([
       ...fields,
       {
         key,
@@ -126,6 +128,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
             : undefined,
       },
     ]);
+    if (!saved) return;
     setNewFieldLabel("");
     setNewFieldType("text");
     setNewFieldOptions("");

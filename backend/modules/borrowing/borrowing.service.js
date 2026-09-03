@@ -30,7 +30,7 @@ const getActiveBorrows = async (userId) => {
             COALESCE(b.settled_amount, 0) AS settled_amount,
             bc.barcode AS copy_barcode, bc.condition AS copy_condition
      FROM borrowings b
-     JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN books bk      ON bk.id = b.book_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status IN ('borrowed', 'overdue')
      ORDER BY b.due_date ASC`,
@@ -39,21 +39,27 @@ const getActiveBorrows = async (userId) => {
   return mapBorrowingsWithFineDetails(rows);
 };
 
-const getBorrowHistory = async (userId) => {
+const getBorrowHistory = async (userId, { page, limit } = {}) => {
+  const paged = Number.isFinite(Number(page));
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [[{ total }]] = paged ? await db.query(
+    "SELECT COUNT(*) AS total FROM borrowings WHERE user_id = ? AND status = 'returned' AND deleted_at IS NULL",
+    [userId]
+  ) : [[{ total: 0 }]];
   const [rows] = await db.query(
     `SELECT b.id, bk.title, bk.author,
             b.borrowed_at, b.returned_at, b.due_date, b.status,
             COALESCE(b.settled_amount, 0) AS settled_amount,
             bc.barcode AS copy_barcode
      FROM borrowings b
-     JOIN books bk      ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN books bk      ON bk.id = b.book_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status = 'returned'
-    ORDER BY b.returned_at DESC
-     LIMIT 50`,
-    [userId]
+    ORDER BY b.returned_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
+    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
   );
-  return rows;
+  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
 };
 
 /**
@@ -79,7 +85,7 @@ const searchCatalogueWithAvailability = async (query) => {
          END)
        )                                                           AS available
      FROM books bk
-     LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
+     LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings   br ON br.copy_id  = bc.id
                                AND br.status IN ('borrowed','overdue')
      WHERE bk.deleted_at IS NULL
@@ -179,7 +185,7 @@ const borrowBook = async (
 
     if (isCopyBarcode) {
       const [[c]] = await conn.query(
-        `SELECT bc.id, bc.book_id, bc.barcode, bc.is_active,
+        `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active,
                 bk.copies, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
          FROM book_copies bc
          JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
@@ -191,6 +197,7 @@ const borrowBook = async (
       if (!c) throw Object.assign(new Error("Copy barcode not found"), { status: 404 });
       if (c.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
       if (!c.is_active) throw Object.assign(new Error("This copy is not available"), { status: 409 });
+      if (c.condition === "lost") throw Object.assign(new Error("This copy is marked lost and cannot be borrowed"), { status: 409 });
       copy = c;
     } else {
       const [[book]] = await conn.query(
@@ -201,8 +208,8 @@ const borrowBook = async (
       if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
 
       const [copies] = await conn.query(
-        `SELECT bc.id, bc.barcode FROM book_copies bc
-         WHERE bc.book_id = ? AND bc.is_active = 1 AND bc.deleted_at IS NULL
+        `SELECT bc.id, bc.barcode, bc.condition FROM book_copies bc
+         WHERE bc.book_id = ? AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
            AND bc.id NOT IN (
              SELECT copy_id FROM borrowings
              WHERE status IN ('borrowed','overdue') AND copy_id IS NOT NULL
@@ -286,7 +293,13 @@ const borrowBook = async (
       });
     }
 
-    return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate };
+    return {
+      borrowingId,
+      copyId: copy.id,
+      barcode: copy.barcode,
+      dueDate,
+      warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null,
+    };
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -482,6 +495,7 @@ const adminGetBorrowings = async ({
        u.name                AS user_name,
        u.student_employee_id,
        bc.barcode            AS copy_barcode,
+       CASE WHEN b.copy_id IS NULL THEN 1 ELSE 0 END AS is_legacy,
        issuer.name           AS issued_by_name
      FROM borrowings b
      JOIN books bk      ON bk.id = b.book_id
@@ -523,14 +537,15 @@ const adminGetBorrowings = async ({
   };
 };
 
-const getAdminPaymentOverview = async ({ limit = 50 } = {}) => {
+const getAdminPaymentOverview = async ({ page = null, limit = 20 } = {}) => {
   await syncOverdueBorrowings();
 
-  const paymentOverview = await listUnsettledBorrowings({ limit });
+  const paymentOverview = await listUnsettledBorrowings({ page, limit });
 
   return {
     rows: paymentOverview.rows,
     summary: paymentOverview.summary,
+    pagination: paymentOverview.pagination,
   };
 };
 

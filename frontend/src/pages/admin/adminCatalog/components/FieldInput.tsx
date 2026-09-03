@@ -13,17 +13,19 @@ type Props = {
   field: FormField;
   value: any;
   onChange: (key: string, value: any) => void;
+  id?: string;
 };
 
 // Slightly taller inputs for admin readability — h-9 instead of h-8
 const inputClass =
   "rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors h-9";
 
-const FieldInput = ({ field, value, onChange }: Props) => {
+const FieldInput = ({ field, value, onChange, id }: Props) => {
   switch (field.type) {
     case "textarea":
       return (
         <Textarea
+          id={id}
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
           rows={4}
@@ -33,7 +35,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
     case "select":
       return (
         <Select value={value ?? ""} onValueChange={(v) => onChange(field.key, v)}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger id={id} className={inputClass}>
             <SelectValue placeholder={`Select ${field.label}`} />
           </SelectTrigger>
           <SelectContent className="rounded-none border-border">
@@ -48,6 +50,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
     case "number":
       return (
         <Input
+          id={id}
           type="number"
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
@@ -58,6 +61,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
     case "date":
       return (
         <Input
+          id={id}
           type="date"
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
@@ -67,6 +71,7 @@ const FieldInput = ({ field, value, onChange }: Props) => {
     default:
       return (
         <Input
+          id={id}
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
           className={inputClass}

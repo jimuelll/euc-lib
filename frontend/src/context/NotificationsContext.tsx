@@ -111,6 +111,11 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
               return [payload.notification, ...deduped].slice(0, 20);
             });
             setUnreadCount(payload.unreadCount ?? 0);
+            return;
+          }
+
+          if (payload.type === "notification.audience_changed") {
+            void refreshRef.current();
           }
         } catch {
           // Ignore malformed socket payloads.

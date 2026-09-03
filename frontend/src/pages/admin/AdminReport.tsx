@@ -51,6 +51,7 @@ const formatDateTime = (value?: string | null) => {
 };
 
 type ClearanceQueueEntry = { userId: number; name: string; studentEmployeeId: string; overdueCount: number; oldestDueDate: string | null; overdueTitles: string[]; outstandingAmount: number; fineRecords: number };
+type ClearanceQueueResponse = { rows: ClearanceQueueEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) => { const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"); const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
@@ -62,6 +63,7 @@ const AdminReport = () => {
   const [circulationSummary, setCirculationSummary] = useState<CirculationLogSummary>(emptyCirculationSummary);
   const [circulationRows, setCirculationRows] = useState<CirculationLogEntry[]>([]);
   const [circulationLoading, setCirculationLoading] = useState(true);
+  const [circulationPagination, setCirculationPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
 
   const [reservationSearch, setReservationSearch] = useState("");
   const [reservationStatus, setReservationStatus] = useState("all");
@@ -78,20 +80,22 @@ const AdminReport = () => {
   const [reservationLoading, setReservationLoading] = useState(true);
   const [clearanceRows, setClearanceRows] = useState<ClearanceQueueEntry[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(true);
+  const [clearancePagination, setClearancePagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
 
-  const loadCirculationReport = async () => {
+  const loadCirculationReport = async (page = 1) => {
     setCirculationLoading(true);
     try {
       const result: CirculationLogResult = await getCirculationLog({
         status: circulationStatus === "all" ? undefined : circulationStatus,
         dateFrom: circulationDateFrom || undefined,
         dateTo: circulationDateTo || undefined,
-        page: 1,
-        limit: 50,
+        page,
+        limit: 20,
       });
 
       setCirculationRows(result.rows);
       setCirculationSummary(result.summary ?? emptyCirculationSummary);
+      setCirculationPagination({ page: result.page, limit: 20, total: result.total, totalPages: result.totalPages });
     } finally {
       setCirculationLoading(false);
     }
@@ -122,9 +126,9 @@ const AdminReport = () => {
     }
   };
 
-  const loadClearanceReport = async () => {
+  const loadClearanceReport = async (page = 1) => {
     setClearanceLoading(true);
-    try { const response = await axiosInstance.get<ClearanceQueueEntry[]>("/api/admin/clearance/queue"); setClearanceRows(response.data); }
+    try { const response = await axiosInstance.get<ClearanceQueueResponse>("/api/admin/clearance/queue", { params: { page, limit: 25 } }); setClearanceRows(response.data.rows ?? []); setClearancePagination(response.data.pagination); }
     finally { setClearanceLoading(false); }
   };
 
@@ -134,7 +138,7 @@ const AdminReport = () => {
 
   const handleCirculationSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await loadCirculationReport();
+    await loadCirculationReport(1);
   };
 
   const handleReservationSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -210,7 +214,7 @@ const AdminReport = () => {
             <AdminStatCard label="Returned" value={String(circulationSummary.returned_count)} helperText={`${circulationSummary.unique_borrowers} unique borrower(s) included.`} />
           </AdminStatGrid>
 
-          <AdminPanel title="Circulation records" description="The latest 50 matching circulation records from the current data.">
+          <AdminPanel title="Circulation records" description="Paged circulation records matching the current filters.">
             {circulationRows.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -248,6 +252,7 @@ const AdminReport = () => {
                 <p className="text-sm text-muted-foreground">No circulation records matched the selected filters.</p>
               </div>
             )}
+            {circulationPagination.totalPages > 1 ? <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-4"><Button type="button" variant="outline" className="rounded-none" disabled={circulationLoading || circulationPagination.page <= 1} onClick={() => void loadCirculationReport(circulationPagination.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {circulationPagination.page} of {circulationPagination.totalPages} with {circulationPagination.total} record(s)</p><Button type="button" variant="outline" className="rounded-none" disabled={circulationLoading || circulationPagination.page >= circulationPagination.totalPages} onClick={() => void loadCirculationReport(circulationPagination.page + 1)}>Next</Button></div> : null}
           </AdminPanel>
         </TabsContent>
 
@@ -383,8 +388,8 @@ const AdminReport = () => {
         </TabsContent>
 
         <TabsContent value="clearance" className="space-y-6">
-          <AdminPanel title="Clearance exceptions" description="Current patrons with overdue returns, unpaid fines, or both. Export this list for follow-up and reconciliation." actions={<div className="flex gap-2"><Button type="button" variant="outline" className="rounded-none" disabled={!clearanceRows.length} onClick={() => downloadCsv("clearance-exceptions-report.csv", ["Patron", "Student / employee ID", "Overdue returns", "Oldest due date", "Overdue titles", "Unpaid fines", "Fine records"], clearanceRows.map((row) => [row.name, row.studentEmployeeId, row.overdueCount, row.oldestDueDate, row.overdueTitles.join("; "), row.outstandingAmount, row.fineRecords]))}><Download className="mr-2 h-4 w-4" />Export CSV (Excel)</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => void loadClearanceReport()} disabled={clearanceLoading}><RefreshCcw className={`mr-2 h-4 w-4 ${clearanceLoading ? "animate-spin" : ""}`} />Refresh</Button></div>}>
-            {clearanceRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/20">{["Patron", "Overdue returns", "Unpaid fines", "Fine records"].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{heading}</th>)}</tr></thead><tbody>{clearanceRows.map((row) => <tr key={row.userId} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-3"><div className="font-medium text-foreground">{row.name}</div><div className="text-xs text-muted-foreground">{row.studentEmployeeId}</div></td><td className="px-4 py-3">{row.overdueCount ? <><div className="font-medium text-destructive">{row.overdueCount} item{row.overdueCount === 1 ? "" : "s"}</div><div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground" title={row.overdueTitles.join(", ")}>{row.overdueTitles.join(", ")}</div></> : <span className="text-muted-foreground">None</span>}</td><td className="px-4 py-3 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</td><td className="px-4 py-3 text-muted-foreground">{row.fineRecords || "-"}</td></tr>)}</tbody></table></div> : <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center"><p className="text-sm text-muted-foreground">{clearanceLoading ? "Loading clearance exceptions..." : "No overdue returns or unpaid fines are waiting for review."}</p></div>}
+          <AdminPanel title="Clearance exceptions" description="Current patrons with overdue returns, unpaid fines, or both. Export this list for follow-up and reconciliation." actions={<div className="flex gap-2"><Button type="button" variant="outline" className="rounded-none" disabled={!clearanceRows.length} onClick={() => downloadCsv("clearance-exceptions-report.csv", ["Patron", "Student / employee ID", "Overdue returns", "Oldest due date", "Overdue titles", "Unpaid fines", "Fine records"], clearanceRows.map((row) => [row.name, row.studentEmployeeId, row.overdueCount, row.oldestDueDate, row.overdueTitles.join("; "), row.outstandingAmount, row.fineRecords]))}><Download className="mr-2 h-4 w-4" />Export current page</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => void loadClearanceReport(clearancePagination.page)} disabled={clearanceLoading}><RefreshCcw className={`mr-2 h-4 w-4 ${clearanceLoading ? "animate-spin" : ""}`} />Refresh</Button></div>}>
+            {clearanceRows.length ? <><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/20">{["Patron", "Overdue returns", "Unpaid fines", "Fine records"].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{heading}</th>)}</tr></thead><tbody>{clearanceRows.map((row) => <tr key={row.userId} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-3"><div className="font-medium text-foreground">{row.name}</div><div className="text-xs text-muted-foreground">{row.studentEmployeeId}</div></td><td className="px-4 py-3">{row.overdueCount ? <><div className="font-medium text-destructive">{row.overdueCount} item{row.overdueCount === 1 ? "" : "s"}</div><div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground" title={row.overdueTitles.join(", ")}>{row.overdueTitles.join(", ")}</div></> : <span className="text-muted-foreground">None</span>}</td><td className="px-4 py-3 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</td><td className="px-4 py-3 text-muted-foreground">{row.fineRecords || "-"}</td></tr>)}</tbody></table></div>{clearancePagination.totalPages > 1 ? <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-4"><Button type="button" variant="outline" className="rounded-none" disabled={clearanceLoading || clearancePagination.page <= 1} onClick={() => void loadClearanceReport(clearancePagination.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {clearancePagination.page} of {clearancePagination.totalPages} with {clearancePagination.total} patron(s)</p><Button type="button" variant="outline" className="rounded-none" disabled={clearanceLoading || clearancePagination.page >= clearancePagination.totalPages} onClick={() => void loadClearanceReport(clearancePagination.page + 1)}>Next</Button></div> : null}</> : <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center"><p className="text-sm text-muted-foreground">{clearanceLoading ? "Loading clearance exceptions..." : "No overdue returns or unpaid fines are waiting for review."}</p></div>}
           </AdminPanel>
         </TabsContent>
       </Tabs>

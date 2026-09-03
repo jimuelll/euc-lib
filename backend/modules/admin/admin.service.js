@@ -202,13 +202,27 @@ async function searchUsers(query, requesterRole) {
 
   if (query.role) {
     if (!allowedRoles.includes(query.role)) {
+      if (query.page !== undefined) return { rows: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
       return [];
     }
     sql += " AND role = ?";
     values.push(query.role);
   }
 
-  const [results] = await db.query(sql, values);
+  if (query.status === "active") {
+    sql += " AND is_active = 1";
+  } else if (query.status === "inactive") {
+    sql += " AND is_active = 0";
+  }
+
+  if (query.page !== undefined) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 25));
+    const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM (${sql}) AS matching_users`, values);
+    const [results] = await db.query(`${sql} ORDER BY name ASC LIMIT ? OFFSET ?`, [...values, limit, (page - 1) * limit]);
+    return { rows: results, pagination: { page, limit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / limit)) } };
+  }
+  const [results] = await db.query(`${sql} ORDER BY name ASC`, values);
   return results;
 }
 

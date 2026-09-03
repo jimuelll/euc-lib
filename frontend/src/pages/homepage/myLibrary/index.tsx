@@ -9,7 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useMyLibrary } from "./hooks/useMyLibrary";
+import { fetchMyLibraryAttendance, fetchMyLibraryHistory } from "./api";
 import type {
   ActiveBorrow,
   ActiveReservation,
   AttendanceSession,
   DashboardSubscription,
-  ReservationHistoryItem,
+  MyLibraryHistoryItem,
+  MyLibraryPage,
 } from "./types";
 
 const fadeUp = (delay = 0) => ({
@@ -38,12 +40,6 @@ const borrowStatusConfig: Record<ActiveBorrow["status"], { label: string; classN
 const reservationStatusConfig: Record<ActiveReservation["status"], { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-info/10 text-info border-info/20" },
   ready: { label: "Ready", className: "bg-success/10 text-success border-success/20" },
-};
-
-const historyStatusConfig: Record<ReservationHistoryItem["status"], { label: string }> = {
-  fulfilled: { label: "Fulfilled" },
-  cancelled: { label: "Cancelled" },
-  expired: { label: "Expired" },
 };
 
 const notificationStyles: Record<string, string> = {
@@ -274,6 +270,10 @@ const SubscriptionItem = ({ subscription }: { subscription: DashboardSubscriptio
 const MyLibrary = () => {
   const { user, loading: authLoading } = useAuth();
   const { data, loading, error } = useMyLibrary(!authLoading);
+  const [historyPage, setHistoryPage] = useState<MyLibraryPage<MyLibraryHistoryItem> | null>(null);
+  const [attendancePage, setAttendancePage] = useState<MyLibraryPage<AttendanceSession> | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const {
     notifications: liveNotifications,
     unreadCount,
@@ -284,7 +284,21 @@ const MyLibrary = () => {
   const profile = data?.profile;
   const summary = data?.summary;
   const notifications = liveNotifications.length ? liveNotifications : (data?.notifications ?? []);
-  const activityCount = (data?.borrow_history.length ?? 0) + (data?.reservation_history.length ?? 0);
+  const loadHistory = useCallback(async (page = 1) => {
+    setHistoryLoading(true);
+    try { setHistoryPage(await fetchMyLibraryHistory(page)); } finally { setHistoryLoading(false); }
+  }, []);
+  const loadAttendance = useCallback(async (page = 1) => {
+    setAttendanceLoading(true);
+    try { setAttendancePage(await fetchMyLibraryAttendance(page)); } finally { setAttendanceLoading(false); }
+  }, []);
+  useEffect(() => {
+    if (!authLoading && user) {
+      void loadHistory(1);
+      void loadAttendance(1);
+    }
+  }, [authLoading, user?.id, loadAttendance, loadHistory]);
+  const activityCount = historyPage?.pagination.total ?? 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -511,34 +525,26 @@ const MyLibrary = () => {
 
                 <TabsContent value="history" className="mt-0 grid gap-5 lg:grid-cols-2">
                   <Surface title="Recent Activity">
-                    {activityCount ? (
+                    {historyLoading ? <div className="space-y-3 px-5 py-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-14 animate-pulse bg-muted/60" />)}</div> : activityCount ? (
                       <PanelList>
-                        {data?.borrow_history.map((item) => (
+                        {historyPage?.rows.map((item) => (
                           <HistoryItem
-                            key={`borrow-${item.id}`}
+                            key={`${item.kind}-${item.id}`}
                             title={item.title}
                             subtitle={item.author || "Unknown author"}
-                            meta={`Returned ${formatDate(item.returned_at)}`}
-                            badgeLabel="Borrowing"
-                          />
-                        ))}
-                        {data?.reservation_history.map((item) => (
-                          <HistoryItem
-                            key={`reservation-${item.id}`}
-                            title={item.title}
-                            subtitle={item.author || "Unknown author"}
-                            meta={`${historyStatusConfig[item.status].label} | ${formatDate(item.reserved_at)}`}
-                            badgeLabel="Reservation"
+                            meta={item.kind === "borrowing" ? `Returned ${formatDate(item.returned_at)}` : `${item.status[0].toUpperCase()}${item.status.slice(1)} | ${formatDate(item.reserved_at)}`}
+                            badgeLabel={item.kind === "borrowing" ? "Borrowing" : "Reservation"}
                           />
                         ))}
                       </PanelList>
                     ) : (
                       <EmptyPanel message="Your recent borrowing and reservation history will appear here." />
                     )}
+                    {!historyLoading && (historyPage?.pagination.totalPages ?? 0) > 1 ? <div className="flex items-center justify-between border-t border-border/70 px-5 py-3"><span className="text-xs text-muted-foreground">Page {historyPage?.pagination.page} of {historyPage?.pagination.totalPages}</span><div className="flex gap-2"><button type="button" className="text-xs text-primary disabled:opacity-40" disabled={historyPage?.pagination.page === 1} onClick={() => void loadHistory((historyPage?.pagination.page ?? 1) - 1)}>Previous</button><button type="button" className="text-xs text-primary disabled:opacity-40" disabled={historyPage?.pagination.page === historyPage?.pagination.totalPages} onClick={() => void loadHistory((historyPage?.pagination.page ?? 1) + 1)}>Next</button></div></div> : null}
                   </Surface>
 
                   <Surface title="Attendance History">
-                    {data?.attendance_sessions.length ? (
+                    {attendanceLoading ? <div className="space-y-3 px-5 py-4">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-10 animate-pulse bg-muted/60" />)}</div> : (attendancePage?.rows ?? data?.attendance_sessions ?? []).length ? (
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
@@ -555,7 +561,7 @@ const MyLibrary = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/70">
-                            {data.attendance_sessions.map((session, index) => (
+                            {(attendancePage?.rows ?? data?.attendance_sessions ?? []).map((session, index) => (
                               <AttendanceRow key={`${session.date ?? "attendance"}-${index}`} session={session} />
                             ))}
                           </tbody>
@@ -564,6 +570,7 @@ const MyLibrary = () => {
                     ) : (
                       <EmptyPanel message="No attendance logs found yet." />
                     )}
+                    {!attendanceLoading && (attendancePage?.pagination.totalPages ?? 0) > 1 ? <div className="flex items-center justify-between border-t border-border/70 px-5 py-3"><span className="text-xs text-muted-foreground">Page {attendancePage?.pagination.page} of {attendancePage?.pagination.totalPages}</span><div className="flex gap-2"><button type="button" className="text-xs text-primary disabled:opacity-40" disabled={attendancePage?.pagination.page === 1} onClick={() => void loadAttendance((attendancePage?.pagination.page ?? 1) - 1)}>Previous</button><button type="button" className="text-xs text-primary disabled:opacity-40" disabled={attendancePage?.pagination.page === attendancePage?.pagination.totalPages} onClick={() => void loadAttendance((attendancePage?.pagination.page ?? 1) + 1)}>Next</button></div></div> : null}
                   </Surface>
                 </TabsContent>
 

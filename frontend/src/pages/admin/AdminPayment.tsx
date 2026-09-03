@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
 import { fetchLibrarySettings, updateLibrarySettings } from "./adminLibrarySettings/api";
@@ -37,6 +38,7 @@ interface PaymentOverviewResponse {
     affected_users: number;
     total_unsettled_amount: number;
   };
+  pagination?: { page: number; limit: number; total: number; totalPages: number };
 }
 
 interface UserPaymentOverviewResponse extends PaymentOverviewResponse {
@@ -77,13 +79,14 @@ const AdminPayment = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [overviewRefreshing, setOverviewRefreshing] = useState(false);
   const [overview, setOverview] = useState<PaymentOverviewResponse>(emptyOverview);
+  const [paymentPage, setPaymentPage] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [lookupId, setLookupId] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [settling, setSettling] = useState(false);
   const [settlementAmount, setSettlementAmount] = useState("");
   const [userOverview, setUserOverview] = useState<UserPaymentOverviewResponse | null>(null);
 
-  const loadOverview = async (mode: "initial" | "refresh" = "initial") => {
+  const loadOverview = async (mode: "initial" | "refresh" = "initial", page = 1) => {
     if (mode === "initial") setPageLoading(true);
     if (mode === "refresh") setOverviewRefreshing(true);
 
@@ -91,12 +94,13 @@ const AdminPayment = () => {
       const [settingsPayload, overviewPayload] = await Promise.all([
         fetchLibrarySettings(),
         axiosInstance.get<PaymentOverviewResponse>("/api/borrowing/admin/payments", {
-          params: { limit: 50 },
+          params: { page, limit: 20 },
         }),
       ]);
 
       setHourlyFine(String(settingsPayload.settings.overdue_fine_per_hour ?? 0));
       setOverview(overviewPayload.data);
+      setPaymentPage(overviewPayload.data.pagination ?? { page, limit: 20, total: overviewPayload.data.summary.total_records, totalPages: 1 });
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? "Failed to load payment overview");
     } finally {
@@ -116,7 +120,7 @@ const AdminPayment = () => {
     try {
       await updateLibrarySettings(Number(hourlyFine));
       toast.success("Hourly overdue fine updated");
-      await loadOverview("refresh");
+      await loadOverview("refresh", paymentPage.page);
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? "Failed to save fine settings");
     } finally {
@@ -177,7 +181,7 @@ const AdminPayment = () => {
       });
 
       toast.success(res.data.message ?? "Payment recorded successfully");
-      await Promise.all([loadOverview("refresh"), handleLookupUser()]);
+      await Promise.all([loadOverview("refresh", paymentPage.page), handleLookupUser()]);
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? "Failed to settle payment");
     } finally {
@@ -260,7 +264,7 @@ const AdminPayment = () => {
                 type="button"
                 variant="outline"
                 className="rounded-none"
-                onClick={() => void loadOverview("refresh")}
+                onClick={() => void loadOverview("refresh", paymentPage.page)}
                 disabled={pageLoading || overviewRefreshing}
               >
                 {overviewRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -269,10 +273,7 @@ const AdminPayment = () => {
             }
           >
             {pageLoading ? (
-              <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading payment overview...
-              </div>
+              <div className="space-y-3 py-2">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-14 w-full rounded-none" />)}</div>
             ) : overview.rows.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -315,6 +316,7 @@ const AdminPayment = () => {
                 No unsettled payments are open right now.
               </div>
             )}
+            {!pageLoading && paymentPage.totalPages > 1 ? <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-4"><Button type="button" variant="outline" className="rounded-none" disabled={overviewRefreshing || paymentPage.page <= 1} onClick={() => void loadOverview("refresh", paymentPage.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {paymentPage.page} of {paymentPage.totalPages} · {paymentPage.total} unsettled records</p><Button type="button" variant="outline" className="rounded-none" disabled={overviewRefreshing || paymentPage.page >= paymentPage.totalPages} onClick={() => void loadOverview("refresh", paymentPage.page + 1)}>Next</Button></div> : null}
           </AdminPanel>
         </TabsContent>
 

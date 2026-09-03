@@ -74,6 +74,23 @@ export interface AttendanceSession {
   time_out: string | null;
 }
 
+export interface MyLibraryHistoryItem {
+  id: number;
+  title: string;
+  author: string | null;
+  kind: "borrowing" | "reservation";
+  status: "returned" | "cancelled" | "expired" | "fulfilled";
+  occurred_at: string;
+  borrowed_at: string | null;
+  returned_at: string | null;
+  reserved_at: string | null;
+}
+
+export interface MyLibraryPage<T> {
+  rows: T[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
 export interface DashboardSubscription {
   id: number;
   title: string;

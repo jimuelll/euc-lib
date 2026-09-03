@@ -1,5 +1,6 @@
 const db = require("../../db");
 const MATERIAL_KEYS = ["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"];
+const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies"];
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -139,12 +140,27 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
     [bookId]
   );
 
-  const currentCount = existing.length;
+  const [[{ activeCount }]] = await conn.query(
+    "SELECT COUNT(*) AS activeCount FROM book_copies WHERE book_id = ? AND deleted_at IS NULL AND is_active = 1",
+    [bookId]
+  );
+  const currentCount = Number(activeCount);
 
   if (targetCount > currentCount) {
-    const toAdd = targetCount - currentCount;
+    // Restore retired copies first. A physical copy keeps its identity and label
+    // when stock is lowered and raised again.
+    const [inactiveCopies] = await conn.query(
+      "SELECT id FROM book_copies WHERE book_id = ? AND deleted_at IS NULL AND is_active = 0 ORDER BY id ASC",
+      [bookId]
+    );
+    const toReactivate = inactiveCopies.slice(0, targetCount - currentCount).map((copy) => copy.id);
+    if (toReactivate.length) {
+      await conn.query("UPDATE book_copies SET is_active = 1 WHERE id IN (?)", [toReactivate]);
+    }
+
+    const toAdd = targetCount - currentCount - toReactivate.length;
     for (let i = 0; i < toAdd; i++) {
-      const copyNumber = currentCount + i + 1;
+      const copyNumber = existing.length + i + 1;
       const barcode    = generateBarcode(bookId, copyNumber);
       await conn.query(
         "INSERT INTO book_copies (book_id, barcode) VALUES (?, ?)",
@@ -155,8 +171,7 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
     const [[{ borrowed }]] = await conn.query(
       `SELECT COUNT(*) AS borrowed
        FROM borrowings b
-       JOIN book_copies bc ON bc.id = b.copy_id
-       WHERE bc.book_id = ? AND bc.deleted_at IS NULL AND b.status IN ('borrowed', 'overdue')`,
+       WHERE b.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
       [bookId]
     );
 
@@ -169,7 +184,11 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
       );
     }
 
-    const toDeactivate = existing.slice(targetCount).map((c) => c.id);
+    const [activeCopies] = await conn.query(
+      "SELECT id FROM book_copies WHERE book_id = ? AND deleted_at IS NULL AND is_active = 1 ORDER BY id DESC",
+      [bookId]
+    );
+    const toDeactivate = activeCopies.slice(0, currentCount - targetCount).map((c) => c.id);
 
     if (toDeactivate.length) {
       await conn.query(
@@ -211,19 +230,30 @@ const getBookCopies = async (bookId) => {
 
 // ─── Books CRUD ───────────────────────────────────────────────────────────────
 
-const searchBooks = async (query, publicOnly = false, showArchived = false) => {
+const searchBooks = async (query, publicOnly = false, showArchived = false, materialType = "all", page = null, limit = 20) => {
   const like = `%${query}%`;
   const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
 
   if (publicOnly) {
+    const paged = Number.isFinite(Number(page));
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const schema = await getSchema();
     const publicKeys = schema
       .filter((f) => f.public)
       .map((f) => f.key);
 
-    const columns    = ["id", ...publicKeys.filter((k) => k !== "id")];
+    const columns = [...new Set([
+      ...PUBLIC_CATALOGUE_CORE_KEYS,
+      ...publicKeys,
+    ])];
     const columnList = columns.map((c) => `bk.\`${c}\``).join(", ");
 
+    const [[{ total }]] = paged ? await db.query(
+      `SELECT COUNT(*) AS total FROM books bk
+       WHERE bk.deleted_at ${deletedFilter} AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
+      [like, like, like]
+    ) : [[{ total: 0 }]];
     const [rows] = await db.query(
       `SELECT ${columnList},
               COUNT(DISTINCT bc.id) AS total_copies,
@@ -232,20 +262,21 @@ const searchBooks = async (query, publicOnly = false, showArchived = false) => {
                 COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
               ) AS available
        FROM books bk
-       LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
+       LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
        LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
        WHERE bk.deleted_at ${deletedFilter}
          AND (bk.title  LIKE ?
           OR bk.author LIKE ?
           OR bk.isbn   LIKE ?)
        GROUP BY bk.id
-       ORDER BY bk.title ASC
-       LIMIT 50`,
-      [like, like, like]
+       ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
+      paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
     );
-    return rows;
+    return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
   }
 
+  const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
+  const params = [like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
   const [rows] = await db.query(
     `SELECT bk.*,
             COUNT(DISTINCT bc.id) AS total_copies,
@@ -254,16 +285,17 @@ const searchBooks = async (query, publicOnly = false, showArchived = false) => {
               COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
             ) AS available
      FROM books bk
-     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.deleted_at IS NULL
+     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
      WHERE bk.deleted_at ${deletedFilter}
        AND (bk.title  LIKE ?
         OR bk.author LIKE ?
         OR bk.isbn   LIKE ?)
+       ${materialFilter}
      GROUP BY bk.id
      ORDER BY bk.title ASC
      LIMIT 50`,
-    [like, like, like]
+    params
   );
   return rows;
 };
@@ -274,12 +306,6 @@ const createBook = async (data, createdBy) => {
     await conn.beginTransaction();
 
     const schema = await getSchema();
-
-    for (const field of schema) {
-      if (!RESERVED_KEYS.has(field.key)) {
-        await addColumnIfMissing(field.key, field.type);
-      }
-    }
 
     const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS, "book_type_id"])]
       .filter((k) => data[k] !== undefined && data[k] !== "");
@@ -349,8 +375,7 @@ const deleteBook = async (id, deletedBy) => {
   const [[{ borrowed }]] = await db.query(
     `SELECT COUNT(*) AS borrowed
      FROM borrowings b
-     JOIN book_copies bc ON bc.id = b.copy_id
-     WHERE bc.book_id = ? AND bc.deleted_at IS NULL AND b.status IN ('borrowed', 'overdue')`,
+     WHERE b.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
     [id]
   );
 
@@ -372,25 +397,24 @@ const deleteBook = async (id, deletedBy) => {
 };
 
 const restoreBook = async (id) => {
-  const [[book]] = await db.query(
-    "SELECT id FROM books WHERE id = ? AND deleted_at IS NOT NULL",
-    [id]
-  );
-  if (!book) throw Object.assign(new Error("Archived book not found"), { status: 404 });
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[book]] = await conn.query(
+      "SELECT id FROM books WHERE id = ? AND deleted_at IS NOT NULL FOR UPDATE",
+      [id]
+    );
+    if (!book) throw Object.assign(new Error("Archived book not found"), { status: 404 });
 
-  await db.query(
-    "UPDATE books SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
-    [id]
-  );
-  // Only restore copies that were deleted at the same time as the book,
-  // not ones that were manually deactivated beforehand
-  await db.query(
-    `UPDATE book_copies SET deleted_at = NULL, deleted_by = NULL
-     WHERE book_id = ? AND deleted_at >= (
-       SELECT deleted_at FROM (SELECT deleted_at FROM books WHERE id = ?) AS t
-     )`,
-    [id, id]
-  );
+    await conn.query("UPDATE book_copies SET deleted_at = NULL, deleted_by = NULL WHERE book_id = ? AND deleted_at IS NOT NULL", [id]);
+    await conn.query("UPDATE books SET deleted_at = NULL, deleted_by = NULL WHERE id = ?", [id]);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 
   return { message: "Book restored successfully" };
 };
@@ -424,6 +448,29 @@ const getCopyByBarcode = async (barcode) => {
   return rows[0] ?? null;
 };
 
+const searchBooksPage = async ({ query = "", showArchived = false, materialType = "all", page = 1, limit = 25 } = {}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+  const like = `%${String(query).trim()}%`;
+  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
+  const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
+  const params = [like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
+  const where = `WHERE bk.deleted_at ${deletedFilter}
+    AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?) ${materialFilter}`;
+  const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
+  const [rows] = await db.query(
+    `SELECT bk.*, COUNT(DISTINCT bc.id) AS total_copies,
+      GREATEST(0, COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)) AS available
+     FROM books bk
+     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bc.deleted_at IS NULL
+     LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue')
+     ${where}
+     GROUP BY bk.id ORDER BY bk.title ASC LIMIT ? OFFSET ?`,
+    [...params, safeLimit, (safePage - 1) * safeLimit]
+  );
+  return { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
+};
+
 const getBookTypes = async () => {
   const [rows] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE is_active = 1 ORDER BY name");
   return rows;
@@ -448,8 +495,23 @@ const updateBookType = async (id, { name, defaultBorrowDays, finePerHour, fineIn
 
 const updateCopyCondition = async (copyId, condition, notes = null) => {
   if (!['good', 'damaged', 'lost'].includes(condition)) throw Object.assign(new Error("Invalid copy condition"), { status: 400 });
-  const [result] = await db.query("UPDATE book_copies SET `condition` = ?, notes = COALESCE(?, notes) WHERE id = ? AND deleted_at IS NULL", [condition, notes?.trim() || null, copyId]);
-  if (!result.affectedRows) throw Object.assign(new Error("Copy not found"), { status: 404 });
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[copy]] = await conn.query("SELECT id FROM book_copies WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [copyId]);
+    if (!copy) throw Object.assign(new Error("Copy not found"), { status: 404 });
+    if (condition === "lost") {
+      const [[loan]] = await conn.query("SELECT id FROM borrowings WHERE copy_id = ? AND status IN ('borrowed', 'overdue') FOR UPDATE", [copyId]);
+      if (loan) throw Object.assign(new Error("Return this copy before marking it lost"), { status: 409 });
+    }
+    await conn.query("UPDATE book_copies SET `condition` = ?, notes = COALESCE(?, notes) WHERE id = ?", [condition, notes?.trim() || null, copyId]);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 };
 
 const lookupIsbn = async (value) => {
@@ -465,6 +527,6 @@ const lookupIsbn = async (value) => {
 module.exports = {
   MAX_CUSTOM_FIELDS,
   getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
-  searchBooks, createBook, updateBook, deleteBook, restoreBook,
+  searchBooks, searchBooksPage, createBook, updateBook, deleteBook, restoreBook,
   getBookCopies, syncBookCopies, getCopyByBarcode, lookupIsbn, getBookTypes, createBookType, updateBookType, updateCopyCondition,
 };

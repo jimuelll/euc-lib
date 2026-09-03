@@ -15,6 +15,7 @@ import type {
 
 export function useAdminSubscriptions() {
   const [subs, setSubs]           = useState<Subscription[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [modal, setModal]         = useState<ModalState | null>(null);
@@ -32,12 +33,12 @@ export function useAdminSubscriptions() {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  const loadAll = async () => {
+  const loadAll = async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchSubscriptions();
-      setSubs(data);
+      const data = await fetchSubscriptions(page);
+      setSubs(data.rows); setPagination(data.pagination);
     } catch {
       setError("Failed to load subscriptions.");
     } finally {
@@ -125,6 +126,7 @@ export function useAdminSubscriptions() {
     deleteTarget,
     toastMsg,
     activeCount,
+    pagination,
     // actions
     loadAll,
     handleCreate,

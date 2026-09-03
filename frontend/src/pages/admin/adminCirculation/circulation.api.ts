@@ -15,6 +15,7 @@ export interface CirculationLogEntry {
   book_author: string;
   isbn: string | null;
   copy_barcode: string | null;
+  is_legacy?: boolean | number;
   borrowed_at: string;
   due_date: string;
   returned_at: string | null;

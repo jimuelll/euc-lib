@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Search, UserPlus } from "lucide-react";
 import { AdminPage, AdminPanel } from "../components/AdminPage";
 import { SegmentedNavigation } from "../components/SegmentedNavigation";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { FunctionType, QrTarget, User, UserFormState } from "./AdminManage.types";
 import {
   CreateForm,
@@ -24,8 +25,13 @@ interface AdminManageBuilderProps {
   onResetForm: () => void;
   searchQuery: string;
   onSearchQueryChange: (v: string) => void;
+  roleFilter: string;
+  onRoleFilterChange: (v: string) => void;
+  statusFilter: string;
+  onStatusFilterChange: (v: string) => void;
   searchResults: User[];
-  onSearch: () => void;
+  userPagination: { page: number; limit: number; total: number; totalPages: number };
+  onSearch: (page?: number) => void;
   showArchived: boolean;
   onToggleArchived: () => void;
   selectedUser: User | null;
@@ -52,7 +58,12 @@ const AdminManageBuilder = ({
   onResetForm,
   searchQuery,
   onSearchQueryChange,
+  roleFilter,
+  onRoleFilterChange,
+  statusFilter,
+  onStatusFilterChange,
   searchResults,
+  userPagination,
   onSearch,
   showArchived,
   onToggleArchived,
@@ -113,19 +124,26 @@ const AdminManageBuilder = ({
               value={searchQuery}
               loading={loading}
               showArchived={showArchived}
+              roleFilter={roleFilter}
+              statusFilter={statusFilter}
+              allowedRoles={allowedRoles}
               onChange={onSearchQueryChange}
+              onRoleFilterChange={onRoleFilterChange}
+              onStatusFilterChange={onStatusFilterChange}
               onSearch={onSearch}
               onToggleArchived={onToggleArchived}
               onBulkDeactivateStudentLikeUsers={onBulkDeactivateStudentLikeUsers}
             />
 
-            {searchResults.length > 0 ? (
+            {loading ? <div className="mt-4 space-y-2 border border-border p-4" aria-label="Loading user records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-12 w-full rounded-none" />)}</div> : null}
+            {!loading && searchResults.length > 0 ? (
               <SearchResultsTable
                 results={searchResults}
                 showArchived={showArchived}
                 onSelect={onSelectUser}
               />
             ) : null}
+            {!loading && searchResults.length > 0 ? <div className="mt-3 flex items-center justify-between gap-3 text-sm text-muted-foreground"><button type="button" className="border border-border px-3 py-2 disabled:opacity-50" disabled={userPagination.page <= 1} onClick={() => onSearch(userPagination.page - 1)}>Previous</button><span>Page {userPagination.page} of {userPagination.totalPages} · {userPagination.total} user(s)</span><button type="button" className="border border-border px-3 py-2 disabled:opacity-50" disabled={userPagination.page >= userPagination.totalPages} onClick={() => onSearch(userPagination.page + 1)}>Next</button></div> : null}
 
             {selectedUser ? (
               <div ref={editFormRef} className="scroll-mt-6">

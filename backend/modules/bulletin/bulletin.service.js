@@ -22,9 +22,13 @@ const destroyCloudinaryImage = async (publicId) => {
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-const getPosts = async (userId, page = 1, limit = 4, showArchived = false, search = "") => {
+const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", search = "", month = "") => {
   const offset = (page - 1) * limit;
-  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
+  const deletedFilter = archiveScope === "archived"
+    ? "bp.deleted_at IS NOT NULL"
+    : archiveScope === "all"
+      ? "(bp.deleted_at IS NULL OR bp.deleted_at IS NOT NULL)"
+      : "bp.deleted_at IS NULL";
   const normalizedSearch = search.trim();
   const hasSearch = normalizedSearch.length > 0;
   const searchFilter = hasSearch
@@ -33,12 +37,24 @@ const getPosts = async (userId, page = 1, limit = 4, showArchived = false, searc
   const searchParams = hasSearch
     ? Array(4).fill(`%${normalizedSearch}%`)
     : [];
+  const normalizedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : "";
+  const monthFilter = normalizedMonth ? "AND DATE_FORMAT(bp.created_at, '%Y-%m') = ?" : "";
+  const filterParams = [...searchParams, ...(normalizedMonth ? [normalizedMonth] : [])];
 
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE bp.deleted_at ${deletedFilter} ${searchFilter}`,
+     WHERE ${deletedFilter} ${searchFilter} ${monthFilter}`,
+    filterParams
+  );
+
+  const [monthRows] = await db.query(
+    `SELECT DISTINCT DATE_FORMAT(bp.created_at, '%Y-%m') AS value
+     FROM bulletin_posts bp
+     JOIN users u ON u.id = bp.author_id
+     WHERE ${deletedFilter} ${searchFilter}
+     ORDER BY value DESC`,
     searchParams
   );
 
@@ -46,7 +62,7 @@ const getPosts = async (userId, page = 1, limit = 4, showArchived = false, searc
   if (userId) {
     queryParams.push(userId);
   }
-  queryParams.push(...searchParams, limit, offset);
+  queryParams.push(...filterParams, limit, offset);
 
   const [rows] = await db.query(
     `SELECT
@@ -69,14 +85,21 @@ const getPosts = async (userId, page = 1, limit = 4, showArchived = false, searc
        AS liked_by_me
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE bp.deleted_at ${deletedFilter}
+     WHERE ${deletedFilter}
      ${searchFilter}
+     ${monthFilter}
      ORDER BY bp.is_pinned DESC, bp.created_at DESC
      LIMIT ? OFFSET ?`,
     queryParams
   );
 
-  return { data: rows, total, page, totalPages: Math.ceil(total / limit) };
+  return {
+    data: rows,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+    months: monthRows.map((row) => row.value),
+  };
 };
 
 const getPostById = async (postId, userId) => {

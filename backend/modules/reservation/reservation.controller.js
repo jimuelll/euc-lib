@@ -6,7 +6,7 @@ const searchCatalogue = async (req, res) => {
     if (!query?.trim()) {
       return res.status(400).json({ message: "Search query is required" });
     }
-    const books = await service.searchCatalogue(query.trim());
+    const books = await service.searchCatalogue(query.trim(), { page: req.query.page, limit: req.query.limit });
     res.json(books);
   } catch (err) {
     console.error("[reservation] searchCatalogue:", err);
@@ -26,7 +26,7 @@ const getActiveReservations = async (req, res) => {
 
 const getReservationHistory = async (req, res) => {
   try {
-    const rows = await service.getReservationHistory(req.user.id);
+    const rows = await service.getReservationHistory(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
     console.error("[reservation] getReservationHistory:", err);

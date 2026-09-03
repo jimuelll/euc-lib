@@ -1,6 +1,6 @@
 const express = require("express");
 const { signToken, verifyRefreshToken } = require("./jwt.util");
-const { loginUser } = require("./auth.service");
+const { loginUser, recordAuthAuditEvent } = require("./auth.service");
 const { getUserByID } = require("../../users/users.service");
 const { loginLimiter } = require("../../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
@@ -76,6 +76,7 @@ router.post("/logout", async (req, res) => {
       const payload = verifyRefreshToken(refreshToken);
       if (payload?.id && payload?.jti) {
         await revokeRefreshSession(payload.id, payload.jti);
+        await recordAuthAuditEvent(payload.id, "logout");
       }
     }
   } catch {

@@ -246,19 +246,62 @@ const getLogs = async ({
   };
 };
 
+const getSessionsForDate = async (date) => {
+  if (!date) return [];
+  const [rows] = await db.query(
+    `SELECT
+       in_log.id,
+       u.name,
+       u.student_employee_id,
+       in_log.created_at AS checked_in_at,
+       (
+         SELECT out_log.created_at
+         FROM attendance_logs out_log
+         WHERE out_log.user_id = in_log.user_id
+           AND out_log.purpose = 'entry_exit'
+           AND out_log.type = 'check_out'
+           AND out_log.created_at > in_log.created_at
+           AND out_log.created_at < DATE_ADD(?, INTERVAL 1 DAY)
+           AND NOT EXISTS (
+             SELECT 1 FROM attendance_logs next_in
+             WHERE next_in.user_id = in_log.user_id
+               AND next_in.purpose = 'entry_exit'
+               AND next_in.type = 'check_in'
+               AND next_in.created_at > in_log.created_at
+               AND next_in.created_at < out_log.created_at
+           )
+         ORDER BY out_log.created_at ASC LIMIT 1
+       ) AS checked_out_at
+     FROM attendance_logs in_log
+     JOIN users u ON u.id = in_log.user_id
+     WHERE in_log.purpose = 'entry_exit'
+       AND in_log.type = 'check_in'
+       AND in_log.created_at >= ? AND in_log.created_at < DATE_ADD(?, INTERVAL 1 DAY)
+     ORDER BY in_log.created_at ASC`,
+    [date, date, date]
+  );
+  return rows.map((row) => ({ ...row, duration_minutes: row.checked_out_at ? Math.max(0, Math.round((new Date(row.checked_out_at) - new Date(row.checked_in_at)) / 60000)) : null, status: row.checked_out_at ? "complete" : "incomplete" }));
+};
+
 /**
  * Logged-in user's own attendance history.
  */
-const getMyLogs = async (userId) => {
+const getMyLogs = async (userId, { page, limit } = {}) => {
+  const paged = Number.isFinite(Number(page));
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const [[{ total }]] = paged ? await db.query(
+    "SELECT COUNT(*) AS total FROM attendance_logs WHERE user_id = ? AND purpose = 'entry_exit'",
+    [userId]
+  ) : [[{ total: 0 }]];
   const [rows] = await db.query(
     `SELECT id, type, created_at AS timestamp
      FROM attendance_logs
      WHERE user_id = ? AND purpose = 'entry_exit'
-     ORDER BY created_at DESC
-     LIMIT 100`,
-    [userId]
+     ORDER BY created_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 100"}`,
+    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
   );
-  return rows;
+  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
 };
 
-module.exports = { recordScan, getTodayLogs, getLogs, getMyLogs };
+module.exports = { recordScan, getTodayLogs, getLogs, getSessionsForDate, getMyLogs };

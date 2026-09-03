@@ -1,6 +1,20 @@
 const qr = require("qrcode");
 const service = require("./catalog.service");
 
+const comparableSchema = (fields) => fields
+  .map((field) => ({
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    options: typeof field.options === "string" ? JSON.parse(field.options || "null") : (field.options ?? null),
+    required: Boolean(field.required),
+    locked: Boolean(field.locked),
+    public: Boolean(field.public),
+    order: Number(field.order),
+    archived: Boolean(field.archived),
+  }))
+  .sort((a, b) => a.key.localeCompare(b.key));
+
 const getSchema = async (req, res) => {
   try {
     const canIncludeArchived = req.user && ["admin", "super_admin"].includes(req.user.role);
@@ -15,13 +29,29 @@ const getSchema = async (req, res) => {
 
 const updateSchema = async (req, res) => {
   try {
-    const { fields } = req.body;
+    const { fields, baseFields } = req.body;
+    const oldFields = await service.getSchema({ includeArchived: true });
+    if (!Array.isArray(baseFields)) {
+      return res.status(400).json({ message: "The form schema is missing its revision. Refresh the page and try again." });
+    }
+    if (JSON.stringify(comparableSchema(baseFields)) !== JSON.stringify(comparableSchema(oldFields))) {
+      return res.status(409).json({ message: "The form schema changed in another session. Refresh to review the latest fields before saving." });
+    }
+    const oldByKey = new Map(oldFields.map((field) => [field.key, field]));
+
+    // SQL column types are deliberately immutable. Changing a UI type without
+    // migrating the stored values creates a form that lies about its data.
+    for (const field of fields) {
+      const existing = oldByKey.get(field.key);
+      if (existing && existing.type !== field.type) {
+        return res.status(409).json({ message: `The type of "${field.label}" cannot be changed after the field is created. Add a replacement field and migrate records instead.` });
+      }
+    }
 
     for (const f of fields) {
       await service.addColumnIfMissing(f.key, f.type);
     }
 
-    const oldFields     = await service.getSchema({ includeArchived: true });
     const newKeys       = new Set(fields.map((f) => f.key));
     const removedFields = oldFields.filter((f) => !f.archived && !f.locked && !newKeys.has(f.key));
 
@@ -40,10 +70,22 @@ const updateSchema = async (req, res) => {
 const getBooks = async (req, res) => {
   try {
     const query = String(req.query.query ?? "").trim();
+    if (!req.publicCatalogue && req.query.page !== undefined) {
+      return res.json(await service.searchBooksPage({
+        query,
+        showArchived: req.query.archived === "true",
+        materialType: String(req.query.materialType ?? "all"),
+        page: Number(req.query.page),
+        limit: Number(req.query.limit) || 25,
+      }));
+    }
     const books = await service.searchBooks(
       query,
       !!req.publicCatalogue,
-      !req.publicCatalogue && req.query.archived === "true"
+      !req.publicCatalogue && req.query.archived === "true",
+      req.publicCatalogue ? "all" : String(req.query.materialType ?? "all"),
+      req.publicCatalogue ? req.query.page : null,
+      req.publicCatalogue ? Number(req.query.limit) || 20 : undefined,
     );
     res.json(books);
   } catch (err) {
@@ -55,6 +97,16 @@ const getBooks = async (req, res) => {
 const lookupIsbn = async (req, res) => {
   try { res.json(await service.lookupIsbn(req.params.isbn)); }
   catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "ISBN lookup failed" }); }
+};
+
+const getPublicSchema = async (_req, res) => {
+  try {
+    const fields = await service.getSchema();
+    res.json(fields.filter((field) => field.public));
+  } catch (err) {
+    console.error("[catalog] getPublicSchema:", err);
+    res.status(500).json({ message: "Failed to fetch public catalogue schema" });
+  }
 };
 
 const createBook = async (req, res) => {
@@ -152,6 +204,7 @@ const updateCopyCondition = async (req, res) => { try { await service.updateCopy
 
 module.exports = {
   getSchema,
+  getPublicSchema,
   updateSchema,
   getBooks,
   lookupIsbn,

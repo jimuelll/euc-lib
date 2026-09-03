@@ -52,10 +52,10 @@ const lookupBook = async (isbn) => {
   const [[book]] = await db.query(
     `SELECT
        bk.id, bk.title, bk.author, bk.isbn, bk.copies,
-       GREATEST(0, bk.copies - COUNT(br.id)) AS available
+       COUNT(DISTINCT bc.id) - COUNT(DISTINCT br.id) AS available
      FROM books bk
-     LEFT JOIN borrowings br
-       ON br.book_id = bk.id AND br.status IN ('borrowed', 'overdue')
+     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
+     LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
      WHERE bk.isbn = ? AND bk.deleted_at IS NULL
      GROUP BY bk.id`,
     [isbn.trim()]
@@ -77,20 +77,11 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
     await assertEligible(userId, conn);
 
     const [[book]] = await conn.query(
-      "SELECT id, copies, material_type FROM books WHERE id = ? FOR UPDATE",
+      "SELECT id, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
     if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
-
-    const [[{ borrowed_count }]] = await conn.query(
-      `SELECT COUNT(*) AS borrowed_count FROM borrowings
-       WHERE book_id = ? AND status IN ('borrowed', 'overdue')`,
-      [bookId]
-    );
-    if (borrowed_count >= book.copies) {
-      throw Object.assign(new Error("No copies available"), { status: 409 });
-    }
 
     const [[existing]] = await conn.query(
       `SELECT id FROM borrowings
@@ -101,10 +92,21 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
       throw Object.assign(new Error("User already has this book borrowed"), { status: 409 });
     }
 
+    const [[copy]] = await conn.query(
+      `SELECT bc.id, bc.barcode, bc.condition
+       FROM book_copies bc
+       WHERE bc.book_id = ? AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM borrowings b WHERE b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue'))
+       ORDER BY bc.condition = 'good' DESC, bc.id ASC
+       LIMIT 1 FOR UPDATE`,
+      [bookId]
+    );
+    if (!copy) throw Object.assign(new Error("No borrowable copies are available"), { status: 409 });
+
     const [result] = await conn.query(
-      `INSERT INTO borrowings (user_id, book_id, due_date, status, issued_by)
-       VALUES (?, ?, ?, 'borrowed', ?)`,
-      [userId, bookId, dueDate, issuedBy]
+      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, status, issued_by)
+       VALUES (?, ?, ?, ?, 'borrowed', ?)`,
+      [userId, bookId, copy.id, dueDate, issuedBy]
     );
 
     await conn.commit();
@@ -128,7 +130,7 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
       });
     }
 
-    return { message: "Book borrowed successfully", borrowingId: result.insertId };
+    return { message: "Book borrowed successfully", borrowingId: result.insertId, barcode: copy.barcode, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
   } catch (err) {
     await conn.rollback();
     throw err;

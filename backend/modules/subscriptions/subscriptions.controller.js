@@ -17,9 +17,9 @@ const getPublicSubscriptions = async (_req, res) => {
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 /** GET /api/admin/subscriptions */
-const getAllSubscriptions = async (_req, res) => {
+const getAllSubscriptions = async (req, res) => {
   try {
-    const data = await SubscriptionService.getAllSubscriptions();
+    const data = await SubscriptionService.getAllSubscriptions(false, { page: req.query.page, limit: req.query.limit });
     return res.json({ success: true, data });
   } catch (err) {
     console.error("[subscriptions] getAllSubscriptions:", err);

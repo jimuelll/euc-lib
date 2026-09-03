@@ -155,7 +155,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
     } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to update copy condition"); }
   };
 
-  const available = copies.filter((c) => c.status === "available" && c.is_active).length;
+  const available = copies.filter((c) => c.status === "available" && c.is_active && c.condition !== "lost").length;
   const borrowed  = copies.filter((c) => c.status === "borrowed").length;
 
   return (
@@ -367,7 +367,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
 
                     {/* Condition */}
                     <td className="px-4 py-3">
-                      <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} onChange={(event) => void handleConditionChange(copy, event.target.value as Copy["condition"])} className={`h-8 border px-2 text-xs font-semibold ${CONDITION_CONFIG[copy.condition]?.className ?? "border-border"}`}>
+                      <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status === "borrowed"} onChange={(event) => void handleConditionChange(copy, event.target.value as Copy["condition"])} className={`h-8 border px-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${CONDITION_CONFIG[copy.condition]?.className ?? "border-border"}`}>
                         <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
                       </select>
                     </td>
@@ -392,14 +392,14 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleDownload(copy.barcode)}
-                        disabled={!barcodeUrls[copy.barcode]}
+                        disabled={!copy.is_active || !barcodeUrls[copy.barcode]}
                         className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         <Download className="h-3 w-3" />
                         Export
                       </button>
-                      <button onClick={() => handlePrint(copy.barcode)} disabled={!barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
+                      <button onClick={() => handlePrint(copy.barcode)} disabled={!copy.is_active || !barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
                         <Printer className="h-3 w-3" /> Print
                       </button>
                     </td>
