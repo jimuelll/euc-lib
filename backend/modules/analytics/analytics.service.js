@@ -1,39 +1,7 @@
 const { randomUUID } = require("crypto");
 const db = require("../../db");
-const { ensureAuthAuditTable } = require("../auth/auth.service");
-const { ensureClearanceTables } = require("../clearance/clearance.service");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
-
-let ensured = false;
-
-async function ensureSiteDailyVisitsTable() {
-  if (ensured) return;
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS site_daily_visits (
-      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      visit_date DATE NOT NULL,
-      visitor_id VARCHAR(64) NOT NULL,
-      user_id BIGINT UNSIGNED DEFAULT NULL,
-      first_path VARCHAR(255) DEFAULT NULL,
-      last_path VARCHAR(255) DEFAULT NULL,
-      first_visited_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      last_visited_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      hit_count INT UNSIGNED NOT NULL DEFAULT 1,
-      ip_address VARCHAR(45) DEFAULT NULL,
-      user_agent VARCHAR(255) DEFAULT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (id),
-      UNIQUE KEY uq_site_daily_visits_date_visitor (visit_date, visitor_id),
-      KEY idx_site_daily_visits_user_date (user_id, visit_date),
-      KEY idx_site_daily_visits_last_visited_at (last_visited_at)
-    )
-  `);
-
-  ensured = true;
-}
 
 function toSafePath(value) {
   if (!value || typeof value !== "string") return "/";
@@ -86,8 +54,6 @@ function normalizeSeries(rows, labels, fields) {
 }
 
 async function logSiteVisit({ visitorId, userId = null, path = "/", ipAddress = null, userAgent = null }) {
-  await ensureSiteDailyVisitsTable();
-
   const safePath = toSafePath(path);
   await db.query(
     `INSERT INTO site_daily_visits
@@ -337,8 +303,6 @@ async function getAuditLog({
   dateFrom = "",
   dateTo = "",
 } = {}) {
-  await ensureAuthAuditTable();
-  await ensureClearanceTables();
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safeLimit;
@@ -379,8 +343,6 @@ async function getAuditLog({
 }
 
 async function getAuditLogMeta() {
-  await ensureAuthAuditTable();
-  await ensureClearanceTables();
   const auditFeedQuery = buildAuditFeedQuery();
   const [actionRows] = await db.query(
     `SELECT DISTINCT category, action
@@ -405,7 +367,6 @@ async function getAuditLogMeta() {
 }
 
 async function getDashboardOverview({ range } = {}) {
-  await ensureSiteDailyVisitsTable();
   await syncOverdueBorrowings();
 
   const rangeDays = resolveDashboardRange(range);
@@ -751,7 +712,6 @@ async function getDashboardOverview({ range } = {}) {
 }
 
 module.exports = {
-  ensureSiteDailyVisitsTable,
   getAuditLog,
   getAuditLogMeta,
   getDashboardOverview,

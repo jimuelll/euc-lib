@@ -217,18 +217,6 @@ function validateSnapshotUniqueStudentIds(backup) {
   }
 }
 
-async function ensureRestoreAuditTable() {
-  await db.query(`CREATE TABLE IF NOT EXISTS restore_audit_events (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    snapshot_id BIGINT UNSIGNED NULL,
-    snapshot_kind VARCHAR(32) NULL,
-    restored_by BIGINT UNSIGNED NULL,
-    pre_restore_snapshot_id BIGINT UNSIGNED NULL,
-    restored_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id), KEY idx_restore_audit_time (restored_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
-}
-
 async function uploadSnapshot(payload, createdBy, kind = "manual") {
   if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
     throw Object.assign(new Error("Cloudinary storage is not configured."), { status: 503 });
@@ -332,7 +320,6 @@ async function restoreBackup(backup) {
 }
 
 async function performRestore(backup, { restoredBy, snapshotId = null, snapshotKind = "uploaded" }) {
-  await ensureRestoreAuditTable();
   const preRestoreSnapshot = await createPreRestoreSnapshot(restoredBy);
   await restoreBackup(backup);
   await invalidateAllSessionsAfterRestore();

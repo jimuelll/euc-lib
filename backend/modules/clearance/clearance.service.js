@@ -4,33 +4,6 @@ const notificationsService = require("../notifications/notifications.service");
 
 const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
-const ensureClearanceTables = async (conn = db) => {
-  await conn.query(`CREATE TABLE IF NOT EXISTS clearance_transactions (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    receipt_number VARCHAR(48) NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
-    transaction_type ENUM('payment', 'adjustment', 'reversal') NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('cash') NULL,
-    reason TEXT NULL,
-    reverses_transaction_id BIGINT UNSIGNED NULL,
-    created_by BIGINT UNSIGNED NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id), UNIQUE KEY uq_clearance_receipt_number (receipt_number),
-    KEY idx_clearance_user_created (user_id, created_at), KEY idx_clearance_reversal (reverses_transaction_id),
-    CONSTRAINT fk_clearance_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_clearance_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT fk_clearance_reverses FOREIGN KEY (reverses_transaction_id) REFERENCES clearance_transactions(id) ON DELETE RESTRICT ON UPDATE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
-  await conn.query(`CREATE TABLE IF NOT EXISTS clearance_transaction_items (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    transaction_id BIGINT UNSIGNED NOT NULL, borrowing_id INT NOT NULL, amount DECIMAL(10,2) NOT NULL,
-    PRIMARY KEY (id), KEY idx_clearance_item_borrowing (borrowing_id), KEY idx_clearance_item_transaction (transaction_id),
-    CONSTRAINT fk_clearance_item_transaction FOREIGN KEY (transaction_id) REFERENCES clearance_transactions(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT fk_clearance_item_borrowing FOREIGN KEY (borrowing_id) REFERENCES borrowings(id) ON DELETE RESTRICT ON UPDATE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
-};
-
 const buildStatus = async (userId, conn = db) => {
   const [overdueRows] = await conn.query(
     `SELECT b.id, bk.title, b.due_date
@@ -46,7 +19,6 @@ const buildStatus = async (userId, conn = db) => {
 };
 
 const getClearanceProfile = async (studentEmployeeId) => {
-  await ensureClearanceTables();
   await syncOverdueBorrowings();
   const [[user]] = await db.query(
     `SELECT id, name, role, student_employee_id, is_active FROM users
@@ -69,7 +41,6 @@ const getClearanceProfile = async (studentEmployeeId) => {
 };
 
 const getClearanceQueue = async ({ page, limit } = {}) => {
-  await ensureClearanceTables();
   await syncOverdueBorrowings();
   const [overdueRows] = await db.query(
     `SELECT u.id AS user_id, u.name, u.student_employee_id,
@@ -158,7 +129,6 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await ensureClearanceTables(conn);
     const [[user]] = await conn.query("SELECT id, name, student_employee_id FROM users WHERE student_employee_id = ? AND deleted_at IS NULL FOR UPDATE", [String(studentEmployeeId).trim()]);
     if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
     const fines = await listUnsettledBorrowings({ userId: user.id }, conn);
@@ -178,7 +148,7 @@ const adjustFine = async ({ borrowingId, amount, reason, createdBy }) => {
   await syncOverdueBorrowings();
   const conn = await db.getConnection();
   try {
-    await conn.beginTransaction(); await ensureClearanceTables(conn);
+    await conn.beginTransaction();
     const [[borrowing]] = await conn.query("SELECT id, user_id FROM borrowings WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [borrowingId]);
     if (!borrowing) throw Object.assign(new Error("Borrowing not found"), { status: 404 });
     const fines = await listUnsettledBorrowings({ userId: borrowing.user_id }, conn);
@@ -193,7 +163,7 @@ const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
   if (!String(reason || "").trim()) throw Object.assign(new Error("A written correction reason is required"), { status: 400 });
   const conn = await db.getConnection();
   try {
-    await conn.beginTransaction(); await ensureClearanceTables(conn);
+    await conn.beginTransaction();
     const [[tx]] = await conn.query("SELECT * FROM clearance_transactions WHERE id = ? FOR UPDATE", [transactionId]);
     if (!tx) throw Object.assign(new Error("Transaction not found"), { status: 404 });
     if (tx.transaction_type === "reversal") throw Object.assign(new Error("A reversal cannot be reversed"), { status: 409 });
@@ -206,7 +176,6 @@ const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
 };
 
 const getReceipt = async (receiptNumber) => {
-  await ensureClearanceTables();
   const [[transaction]] = await db.query(`SELECT ct.*, u.name AS user_name, u.student_employee_id, staff.name AS recorded_by_name
     FROM clearance_transactions ct JOIN users u ON u.id = ct.user_id LEFT JOIN users staff ON staff.id = ct.created_by
     WHERE ct.receipt_number = ? LIMIT 1`, [receiptNumber]);
@@ -216,4 +185,4 @@ const getReceipt = async (receiptNumber) => {
   return { transaction, items };
 };
 
-module.exports = { ensureClearanceTables, getClearanceProfile, getClearanceQueue, assertEligible, recordFullPayment, adjustFine, reverseTransaction, getReceipt };
+module.exports = { getClearanceProfile, getClearanceQueue, assertEligible, recordFullPayment, adjustFine, reverseTransaction, getReceipt };

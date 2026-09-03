@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 02, 2026 at 05:14 AM
+-- Generation Time: Sep 03, 2026 at 07:48 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -44,11 +44,6 @@ CREATE TABLE `about_settings` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `about_settings`
---
-
-
 -- --------------------------------------------------------
 
 --
@@ -73,11 +68,6 @@ CREATE TABLE `academic_subscriptions` (
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `academic_subscriptions`
---
-
-
 -- --------------------------------------------------------
 
 --
@@ -96,10 +86,18 @@ CREATE TABLE `attendance_logs` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `attendance_logs`
+-- Table structure for table `auth_audit_events`
 --
 
+CREATE TABLE `auth_audit_events` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `event_type` enum('login','logout') NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -116,10 +114,21 @@ CREATE TABLE `auth_refresh_sessions` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `auth_refresh_sessions`
+-- Table structure for table `backup_snapshots`
 --
 
+CREATE TABLE `backup_snapshots` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `cloudinary_public_id` varchar(255) NOT NULL,
+  `filename` varchar(255) NOT NULL,
+  `size_bytes` bigint(20) UNSIGNED NOT NULL,
+  `kind` enum('manual','pre_restore') NOT NULL DEFAULT 'manual',
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -130,9 +139,17 @@ CREATE TABLE `auth_refresh_sessions` (
 CREATE TABLE `books` (
   `id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
+  `material_type` enum('book','thesis') NOT NULL DEFAULT 'book',
+  `book_type_id` bigint(20) UNSIGNED NOT NULL,
   `author` varchar(255) DEFAULT NULL,
+  `thesis_program` varchar(255) DEFAULT NULL,
+  `thesis_adviser` varchar(255) DEFAULT NULL,
+  `academic_year` varchar(32) DEFAULT NULL,
+  `thesis_abstract` text DEFAULT NULL,
+  `thesis_keywords` text DEFAULT NULL,
   `category` varchar(100) DEFAULT NULL,
   `isbn` varchar(20) DEFAULT NULL,
+  `accession_number` varchar(100) DEFAULT NULL,
   `edition` varchar(50) DEFAULT NULL,
   `publication_year` year(4) DEFAULT NULL,
   `copies` int(11) DEFAULT 1,
@@ -141,14 +158,8 @@ CREATE TABLE `books` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `location` text DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL,
-  `try` text DEFAULT NULL
+  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `books`
---
-
 
 -- --------------------------------------------------------
 
@@ -169,10 +180,23 @@ CREATE TABLE `book_copies` (
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `book_copies`
+-- Table structure for table `book_types`
 --
 
+CREATE TABLE `book_types` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `default_borrow_days` int(11) NOT NULL,
+  `fine_per_hour` decimal(10,2) NOT NULL,
+  `fine_interval` enum('hour','day') NOT NULL DEFAULT 'hour',
+  `initial_fine` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -187,6 +211,9 @@ CREATE TABLE `borrowings` (
   `copy_id` int(11) DEFAULT NULL,
   `borrowed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `due_date` datetime NOT NULL,
+  `fine_per_hour` decimal(10,2) DEFAULT NULL,
+  `fine_interval` enum('hour','day') DEFAULT NULL,
+  `initial_fine` decimal(10,2) DEFAULT NULL,
   `returned_at` timestamp NULL DEFAULT NULL,
   `status` enum('borrowed','returned','overdue') NOT NULL DEFAULT 'borrowed',
   `notes` text DEFAULT NULL,
@@ -200,11 +227,6 @@ CREATE TABLE `borrowings` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `borrowings`
---
-
 
 -- --------------------------------------------------------
 
@@ -222,11 +244,6 @@ CREATE TABLE `bulletin_comments` (
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `bulletin_comments`
---
-
-
 -- --------------------------------------------------------
 
 --
@@ -239,11 +256,6 @@ CREATE TABLE `bulletin_likes` (
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `bulletin_likes`
---
-
 
 -- --------------------------------------------------------
 
@@ -266,11 +278,6 @@ CREATE TABLE `bulletin_posts` (
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `bulletin_posts`
---
-
-
 -- --------------------------------------------------------
 
 --
@@ -290,21 +297,37 @@ CREATE TABLE `catalog_schema` (
   `archived` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = field removed from active schema but data retained in books table'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `catalog_schema`
+-- Table structure for table `clearance_transactions`
 --
 
-INSERT INTO `catalog_schema` (`id`, `key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`) VALUES
-(87, 'title', 'Book Title', 'text', NULL, 1, 1, 0, 1, 0),
-(88, 'author', 'Author', 'text', NULL, 1, 1, 1, 1, 0),
-(89, 'isbn', 'ISBN', 'text', NULL, 0, 0, 2, 1, 0),
-(90, 'category', 'Category', 'select', '[\"Computer Science\",\"Engineering\",\"Mathematics\",\"Science\",\"Literature\",\"History\",\"Business\",\"Other\"]', 0, 0, 3, 1, 0),
-(91, 'edition', 'Edition', 'text', NULL, 0, 0, 6, 1, 1),
-(92, 'publication_year', 'Publication Year', 'number', NULL, 0, 0, 7, 1, 1),
-(93, 'copies', 'Copies', 'number', NULL, 0, 0, 4, 1, 0),
-(94, 'location', 'Location', 'text', NULL, 0, 0, 5, 0, 0),
-(103, 'try', 'try', 'text', NULL, 0, 0, 8, 1, 1);
+CREATE TABLE `clearance_transactions` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `receipt_number` varchar(48) DEFAULT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `transaction_type` enum('payment','adjustment','reversal') NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` enum('cash') DEFAULT NULL,
+  `reason` text DEFAULT NULL,
+  `reverses_transaction_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `clearance_transaction_items`
+--
+
+CREATE TABLE `clearance_transaction_items` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `transaction_id` bigint(20) UNSIGNED NOT NULL,
+  `borrowing_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -318,12 +341,7 @@ CREATE TABLE `library_circulation_settings` (
   `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
-
---
--- Dumping data for table `library_circulation_settings`
---
-
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -366,11 +384,6 @@ CREATE TABLE `notifications` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `notifications`
---
-
-
 -- --------------------------------------------------------
 
 --
@@ -383,11 +396,6 @@ CREATE TABLE `notification_reads` (
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `read_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `notification_reads`
---
-
 
 -- --------------------------------------------------------
 
@@ -408,11 +416,6 @@ CREATE TABLE `reservations` (
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `reservations`
---
-
 
 -- --------------------------------------------------------
 
@@ -435,11 +438,6 @@ CREATE TABLE `site_daily_visits` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `site_daily_visits`
---
-
 
 -- --------------------------------------------------------
 
@@ -474,9 +472,6 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `student_employee_id`, `barcode`, `email`, `profile_picture`, `name`, `password_hash`, `role`, `is_active`, `must_change_password`, `last_login`, `created_at`, `updated_at`, `address`, `contact`, `deleted_at`, `deleted_by`) VALUES
-(5, 'SA0001', NULL, NULL, NULL, 'Initial SuperAdmin', '$2b$12$85a3/NrWKHjMobGWqufeSe1BANBRnvZkQw2n3Oty2qK9K.s9uIA1a', 'super_admin', 1, 0, '2026-04-02 03:03:14', '2026-03-18 08:03:59', '2026-04-02 03:03:14', '', '0', NULL, NULL);
-
 --
 -- Indexes for dumped tables
 --
@@ -509,6 +504,13 @@ ALTER TABLE `attendance_logs`
   ADD KEY `idx_purpose_date` (`purpose`,`created_at`,`id`);
 
 --
+-- Indexes for table `auth_audit_events`
+--
+ALTER TABLE `auth_audit_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_auth_audit_user_time` (`user_id`,`created_at`);
+
+--
 -- Indexes for table `auth_refresh_sessions`
 --
 ALTER TABLE `auth_refresh_sessions`
@@ -518,11 +520,23 @@ ALTER TABLE `auth_refresh_sessions`
   ADD KEY `idx_auth_refresh_sessions_expires_at` (`expires_at`);
 
 --
+-- Indexes for table `backup_snapshots`
+--
+ALTER TABLE `backup_snapshots`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_backup_snapshots_cloudinary_public_id` (`cloudinary_public_id`),
+  ADD KEY `idx_backup_snapshots_created_at` (`created_at`),
+  ADD KEY `idx_backup_snapshots_created_by` (`created_by`);
+
+--
 -- Indexes for table `books`
 --
 ALTER TABLE `books`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_books_deleted` (`deleted_at`);
+  ADD UNIQUE KEY `uq_books_accession_number` (`accession_number`),
+  ADD KEY `idx_books_deleted` (`deleted_at`),
+  ADD KEY `idx_books_material_type` (`material_type`),
+  ADD KEY `fk_books_book_type` (`book_type_id`);
 
 --
 -- Indexes for table `book_copies`
@@ -532,6 +546,13 @@ ALTER TABLE `book_copies`
   ADD UNIQUE KEY `uq_barcode` (`barcode`),
   ADD KEY `idx_book_id` (`book_id`),
   ADD KEY `idx_copies_deleted` (`deleted_at`);
+
+--
+-- Indexes for table `book_types`
+--
+ALTER TABLE `book_types`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_book_types_name` (`name`);
 
 --
 -- Indexes for table `borrowings`
@@ -579,6 +600,24 @@ ALTER TABLE `catalog_schema`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_key` (`key`),
   ADD UNIQUE KEY `uq_catalog_schema_key` (`key`);
+
+--
+-- Indexes for table `clearance_transactions`
+--
+ALTER TABLE `clearance_transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_clearance_receipt_number` (`receipt_number`),
+  ADD KEY `idx_clearance_user_created` (`user_id`,`created_at`),
+  ADD KEY `idx_clearance_reversal` (`reverses_transaction_id`),
+  ADD KEY `fk_clearance_created_by` (`created_by`);
+
+--
+-- Indexes for table `clearance_transaction_items`
+--
+ALTER TABLE `clearance_transaction_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_clearance_item_borrowing` (`borrowing_id`),
+  ADD KEY `idx_clearance_item_transaction` (`transaction_id`);
 
 --
 -- Indexes for table `library_circulation_settings`
@@ -652,67 +691,97 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `about_settings`
 --
 ALTER TABLE `about_settings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `academic_subscriptions`
 --
 ALTER TABLE `academic_subscriptions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `attendance_logs`
 --
 ALTER TABLE `attendance_logs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `auth_audit_events`
+--
+ALTER TABLE `auth_audit_events`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `auth_refresh_sessions`
 --
 ALTER TABLE `auth_refresh_sessions`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `backup_snapshots`
+--
+ALTER TABLE `backup_snapshots`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `books`
 --
 ALTER TABLE `books`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `book_copies`
 --
 ALTER TABLE `book_copies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `book_types`
+--
+ALTER TABLE `book_types`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `borrowings`
 --
 ALTER TABLE `borrowings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `bulletin_comments`
 --
 ALTER TABLE `bulletin_comments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `bulletin_likes`
 --
 ALTER TABLE `bulletin_likes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `bulletin_posts`
 --
 ALTER TABLE `bulletin_posts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `catalog_schema`
 --
 ALTER TABLE `catalog_schema`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `clearance_transactions`
+--
+ALTER TABLE `clearance_transactions`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `clearance_transaction_items`
+--
+ALTER TABLE `clearance_transaction_items`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `library_holidays`
@@ -724,31 +793,31 @@ ALTER TABLE `library_holidays`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `notification_reads`
 --
 ALTER TABLE `notification_reads`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `site_daily_visits`
 --
 ALTER TABLE `site_daily_visits`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables
@@ -774,6 +843,18 @@ ALTER TABLE `attendance_logs`
   ADD CONSTRAINT `fk_att_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_att_scanned_by` FOREIGN KEY (`scanned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_att_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `auth_audit_events`
+--
+ALTER TABLE `auth_audit_events`
+  ADD CONSTRAINT `fk_auth_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `books`
+--
+ALTER TABLE `books`
+  ADD CONSTRAINT `fk_books_book_type` FOREIGN KEY (`book_type_id`) REFERENCES `book_types` (`id`);
 
 --
 -- Constraints for table `book_copies`
@@ -811,6 +892,21 @@ ALTER TABLE `bulletin_posts`
   ADD CONSTRAINT `fk_bp_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
+-- Constraints for table `clearance_transactions`
+--
+ALTER TABLE `clearance_transactions`
+  ADD CONSTRAINT `fk_clearance_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_clearance_reverses` FOREIGN KEY (`reverses_transaction_id`) REFERENCES `clearance_transactions` (`id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_clearance_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `clearance_transaction_items`
+--
+ALTER TABLE `clearance_transaction_items`
+  ADD CONSTRAINT `fk_clearance_item_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_clearance_item_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `clearance_transactions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
 -- Constraints for table `library_circulation_settings`
 --
 ALTER TABLE `library_circulation_settings`
@@ -843,6 +939,47 @@ ALTER TABLE `notification_reads`
 ALTER TABLE `reservations`
   ADD CONSTRAINT `fk_res_book` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+
+-- Development bootstrap configuration. Change the starter password on first login.
+CREATE TABLE `auth_restore_state` (
+  `id` tinyint NOT NULL,
+  `invalid_before` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `restore_audit_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `snapshot_id` bigint unsigned DEFAULT NULL,
+  `snapshot_kind` varchar(32) DEFAULT NULL,
+  `restored_by` bigint unsigned DEFAULT NULL,
+  `pre_restore_snapshot_id` bigint unsigned DEFAULT NULL,
+  `restored_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_restore_audit_time` (`restored_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `users` (`student_employee_id`, `name`, `password_hash`, `role`, `is_active`, `must_change_password`, `address`, `contact`)
+VALUES ('SA0001', 'Development Super Admin', '$2b$12$buA8cKPLUl3yVNMs01sibeSWY4/0AFzv/FNPNUa61RLI3CryzEHpG', 'super_admin', 1, 1, '', '');
+
+INSERT INTO `about_settings` (`id`, `library_name`, `mission_title`, `mission_text`, `history_title`, `history_text`, `policies`, `facilities`, `staff`, `spaces`)
+VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '', '[]', '[]', '[]', '[]');
+
+INSERT INTO `book_types` (`name`, `default_borrow_days`, `fine_per_hour`, `fine_interval`, `initial_fine`, `is_active`)
+VALUES ('General collection', 7, 1.00, 'hour', 0.00, 1);
+
+INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`) VALUES
+('title', 'Book Title', 'text', NULL, 1, 1, 0, 1, 0),
+('author', 'Author', 'text', NULL, 1, 1, 1, 1, 0),
+('isbn', 'ISBN', 'text', NULL, 0, 0, 2, 1, 0),
+('category', 'Category', 'select', '["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"]', 0, 0, 3, 1, 0),
+('copies', 'Copies', 'number', NULL, 0, 0, 4, 1, 0),
+('edition', 'Edition', 'text', NULL, 0, 0, 5, 1, 0),
+('publication_year', 'Publication Year', 'number', NULL, 0, 0, 6, 1, 0),
+('location', 'Location', 'text', NULL, 0, 0, 7, 0, 0);
+
+INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00);
+INSERT INTO `auth_restore_state` (`id`) VALUES (1);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

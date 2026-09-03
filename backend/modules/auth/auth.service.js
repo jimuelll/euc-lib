@@ -7,20 +7,7 @@ const {
 const db = require("../../db");
 const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
 
-const ensureAuthAuditTable = async () => {
-  await db.query(`CREATE TABLE IF NOT EXISTS auth_audit_events (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    event_type ENUM('login','logout') NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_auth_audit_user_time (user_id, created_at),
-    CONSTRAINT fk_auth_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
-};
-
 const recordAuthAuditEvent = async (userId, eventType) => {
-  await ensureAuthAuditTable();
   await db.query("INSERT INTO auth_audit_events (user_id, event_type) VALUES (?, ?)", [userId, eventType]);
 };
 
@@ -106,4 +93,4 @@ async function changePassword(userId, oldPassword, newPassword, rememberMe = fal
   };
 }
 
-module.exports = { loginUser, changePassword, recordAuthAuditEvent, ensureAuthAuditTable };
+module.exports = { loginUser, changePassword, recordAuthAuditEvent };
