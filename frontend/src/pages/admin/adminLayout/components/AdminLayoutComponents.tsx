@@ -62,7 +62,7 @@ export function AdminSidebar() {
               </span>
               <span
                 className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em]"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
               >
                 Admin Dashboard
               </span>
@@ -95,7 +95,7 @@ export function AdminSidebar() {
               </p>
               <p
                 className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] capitalize"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
+                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
               >
                 {user?.role?.replace("_", " ") ?? "Administrator"}
               </p>
@@ -132,7 +132,7 @@ export function AdminSidebar() {
               <Collapsible defaultOpen>
                 <CollapsibleTrigger
                   className="group flex w-full items-center justify-between px-4 py-2 transition-colors"
-                  style={{ color: "hsl(var(--sidebar-foreground) / 0.35)" }}
+                  style={{ color: "hsl(var(--sidebar-muted-foreground))" }}
                 >
                   <div className="flex items-center gap-2">
                     <div className="h-px w-2 shrink-0" style={{ background: "hsl(var(--sidebar-primary) / 0.5)" }} />
@@ -160,7 +160,7 @@ export function AdminSidebar() {
                                 fontFamily: "var(--font-heading)",
                                 color: isActive
                                   ? "hsl(var(--sidebar-primary))"
-                                  : "hsl(var(--sidebar-foreground) / 0.65)",
+                                  : "hsl(var(--sidebar-muted-foreground))",
                                 background: isActive
                                   ? "linear-gradient(90deg, hsl(var(--sidebar-primary) / 0.16), transparent)"
                                   : "transparent",
@@ -193,7 +193,7 @@ export function AdminSidebar() {
                           style={({ isActive }: { isActive: boolean }) => ({
                             color: isActive
                               ? "hsl(var(--sidebar-primary))"
-                              : "hsl(var(--sidebar-foreground) / 0.5)",
+                              : "hsl(var(--sidebar-muted-foreground))",
                             background: isActive
                               ? "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.18), transparent)"
                               : "transparent",
@@ -220,12 +220,12 @@ export function AdminSidebar() {
               "flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors",
               collapsed ? "justify-center" : "w-full",
             )}
-            style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground) / 0.4)" }}
+            style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.color = "hsl(var(--destructive))";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-foreground) / 0.4)";
+              (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-muted-foreground))";
             }}
           >
             <LogOut className="h-3.5 w-3.5 shrink-0" />

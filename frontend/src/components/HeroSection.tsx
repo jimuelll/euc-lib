@@ -35,7 +35,7 @@ const HeroSection = () => {
   }
 
   return (
-    <section className="relative flex min-h-[580px] flex-col items-center justify-center overflow-hidden px-4 py-24 sm:py-28 md:min-h-[640px] md:py-32">
+    <section className="relative flex min-h-[clamp(34rem,72svh,48rem)] flex-col items-center justify-center overflow-hidden px-5 py-20 sm:min-h-[clamp(38rem,76svh,54rem)] sm:px-6 sm:py-24 lg:min-h-[clamp(42rem,78svh,58rem)] lg:px-10 lg:py-28 2xl:min-h-[min(82svh,64rem)] 2xl:px-16 2xl:py-36">
 
       {/* Background photo — let it breathe */}
       <div className="absolute inset-0">
@@ -51,8 +51,8 @@ const HeroSection = () => {
         className="absolute inset-0 transition-colors duration-300"
         style={{
           background: isDark
-            ? "linear-gradient(105deg, hsl(348 72% 10% / 0.92) 0%, hsl(348 72% 14% / 0.82) 55%, hsl(348 72% 18% / 0.55) 100%)"
-            : "linear-gradient(105deg, hsl(348 72% 24% / 0.78) 0%, hsl(348 72% 28% / 0.60) 55%, hsl(348 60% 32% / 0.25) 100%)",
+            ? "linear-gradient(105deg, hsl(0 100% 12% / 0.92) 0%, hsl(0 100% 18% / 0.82) 55%, hsl(0 100% 25.1% / 0.55) 100%)"
+            : "linear-gradient(105deg, hsl(0 100% 25.1% / 0.78) 0%, hsl(0 100% 31% / 0.60) 55%, hsl(0 100% 37% / 0.25) 100%)",
         }}
       />
 
@@ -72,7 +72,7 @@ const HeroSection = () => {
       />
 
       {/* Content — left-anchored like institutional signage */}
-      <div className="container relative z-10 max-w-4xl">
+      <div className="container relative z-10 max-w-4xl 2xl:max-w-6xl">
 
         {/* Cornerstone label */}
         <motion.div
@@ -95,7 +95,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65 }}
-          className="font-heading text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.05]"
+          className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl 2xl:text-7xl"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Enverga-Candelaria
@@ -108,7 +108,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="mt-5 max-w-xl text-[15px] leading-7 text-white/75"
+          className="mt-5 max-w-xl text-[15px] leading-7 text-white/75 2xl:max-w-2xl 2xl:text-base 2xl:leading-8"
         >
           Digitalized inventory tracking, book reservations, and seamless access
           to library services — built for academic excellence.
@@ -119,7 +119,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.28 }}
-          className="mt-10"
+          className="mt-10 2xl:mt-12"
         >
           <div
             onClick={!searchActive ? handleSearchClick : undefined}
@@ -166,7 +166,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.42 }}
-          className="mt-6 flex flex-col items-start gap-3 sm:flex-row"
+          className="mt-6 flex flex-col items-start gap-3 sm:flex-row 2xl:mt-8"
         >
           <Link to="/catalogue">
             <button
@@ -195,7 +195,7 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="mt-12 flex flex-wrap items-center gap-0 border-t border-white/15 pt-6"
+          className="mt-12 flex flex-wrap items-center gap-0 border-t border-white/15 pt-6 2xl:mt-16 2xl:pt-8"
         >
           {[
             { value: "12,000+", label: "Volumes" },

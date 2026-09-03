@@ -172,7 +172,7 @@ const currencyFormatter = new Intl.NumberFormat("en-PH", {
   currency: "PHP",
 });
 
-const chartPalette = ["#7f1d1d", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
+const chartPalette = ["#800000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
 export type AnalyticsRange = "7d" | "30d" | "month" | "year";
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
@@ -360,7 +360,7 @@ const AdminAnalytics = () => {
             <ChartContainer
               className="h-[280px] w-full sm:h-[320px]"
               config={{
-                titles: { label: "Titles", color: "#7f1d1d" },
+                titles: { label: "Titles", color: "#800000" },
                 copies: { label: "Copies", color: "#b45309" },
               }}
             >
@@ -427,7 +427,7 @@ const AdminAnalytics = () => {
             <ChartContainer
               className="h-[240px] w-full sm:h-[280px]"
               config={{
-                entry_exit_count: { label: "Entry / Exit", color: "#7f1d1d" },
+                entry_exit_count: { label: "Entry / Exit", color: "#800000" },
                 borrowing_count: { label: "Borrowing", color: "#0f766e" },
               }}
             >
@@ -444,7 +444,7 @@ const AdminAnalytics = () => {
           </AdminPanel>
 
           <AdminPanel title="Site Traffic Trend" description="Unique visitors and total tracked hits over the last seven days.">
-            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ unique_visitors: { label: "Unique Visitors", color: "#7f1d1d" }, visit_hits: { label: "Visit Hits", color: "#b45309" } }}>
+            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ unique_visitors: { label: "Unique Visitors", color: "#800000" }, visit_hits: { label: "Visit Hits", color: "#b45309" } }}>
               <LineChart data={data.charts.visitTrend}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
@@ -460,7 +460,7 @@ const AdminAnalytics = () => {
 
         <div className="grid gap-6 xl:grid-cols-2">
           <AdminPanel title="User Role Distribution" description="Current account mix across roles in the users table.">
-            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ value: { label: "Users", color: "#7f1d1d" } }}>
+            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ value: { label: "Users", color: "#800000" } }}>
               <BarChart data={data.charts.userRoles} layout="vertical" margin={{ left: 8, right: 8 }}>
                 <CartesianGrid horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />

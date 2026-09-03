@@ -17,8 +17,8 @@
     --popover: 36 15% 99%;
     --popover-foreground: 10 30% 10%;
 
-    /* Crimson-maroon — the dominant structural field */
-    --primary: 348 72% 24%;
+    /* MSEUF maroon (#800000) — the dominant structural field */
+    --primary: 0 100% 25.1%;
     --primary-foreground: 36 30% 97%;
 
     /* Warm muted clay — secondary surfaces */
@@ -47,18 +47,19 @@
 
     --border: 24 12% 84%;
     --input: 24 12% 84%;
-    --ring: 348 72% 24%;
+    --ring: 0 100% 25.1%;
 
     /* Slightly tighter radius — rectilinear authority */
     --radius: 0.25rem;
 
-    --sidebar-background: 348 30% 18%;
+    --sidebar-background: 0 100% 25.1%;
     --sidebar-foreground: 36 25% 88%;
+    --sidebar-muted-foreground: 36 20% 80%;
     --sidebar-primary: 42 78% 48%;
     --sidebar-primary-foreground: 10 30% 10%;
-    --sidebar-accent: 348 25% 24%;
+    --sidebar-accent: 0 100% 25.1%;
     --sidebar-accent-foreground: 36 20% 92%;
-    --sidebar-border: 348 20% 28%;
+    --sidebar-border: 0 100% 25.1%;
     --sidebar-ring: 42 78% 48%;
   }
 
@@ -73,8 +74,8 @@
     --popover: 10 15% 13%;
     --popover-foreground: 36 20% 93%;
 
-    /* Primary holds — maroon is sovereign in both modes */
-    --primary: 0 100% 19%;
+    /* MSEUF maroon remains the primary brand color in dark mode. */
+    --primary: 0 100% 25.1%;
     --primary-foreground: 36 25% 97%;
 
     --secondary: 10 12% 22%;
@@ -101,15 +102,17 @@
 
     --border: 10 12% 22%;
     --input: 10 12% 22%;
-    --ring: 348 65% 36%;
+    --ring: 0 100% 25.1%;
 
-    --sidebar-background: 10 20% 6%;
-    --sidebar-foreground: 36 20% 78%;
+    /* Darker maroon surfaces preserve separation around the #800000 primary. */
+    --sidebar-background: 0 100% 15%;
+    --sidebar-foreground: 36 20% 93%;
+    --sidebar-muted-foreground: 36 18% 82%;
     --sidebar-primary: 42 72% 52%;
     --sidebar-primary-foreground: 10 30% 10%;
-    --sidebar-accent: 10 15% 14%;
+    --sidebar-accent: 0 75% 21%;
     --sidebar-accent-foreground: 36 15% 90%;
-    --sidebar-border: 10 15% 18%;
+    --sidebar-border: 0 55% 38%;
     --sidebar-ring: 42 72% 52%;
   }
 }
