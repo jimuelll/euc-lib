@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AdminPage, AdminPanel } from "./components/AdminPage";
+import { useAuth } from "@/context/AuthContext";
 
 const MAX_BACKUP_SIZE = 25 * 1024 * 1024;
 
@@ -32,6 +33,7 @@ function filenameFromHeader(header?: string) {
 }
 
 const AdminBackup = () => {
+  const { logout } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [savingSnapshot, setSavingSnapshot] = useState(false);
@@ -110,10 +112,10 @@ const AdminBackup = () => {
     if (!snapshotToRestore) return;
     setRestoring(true);
     try {
-      await axiosInstance.post(`/api/admin/backup/snapshots/${snapshotToRestore.id}/restore`);
-      toast.success("Snapshot restored. A pre-restore recovery point was saved. Refresh the page to load restored data.");
+      await axiosInstance.post(`/api/admin/backup/snapshots/${snapshotToRestore.id}/restore`, {}, { headers: { "x-restore-confirmation": "global-sign-out" } });
+      toast.success("Snapshot restored. All sessions, including yours, are ending now.");
       setSnapshotToRestore(null);
-      await loadSnapshots();
+      await logout();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Could not restore the snapshot.");
     } finally {
@@ -129,14 +131,15 @@ const AdminBackup = () => {
       toast.error("The backup file must be 25 MB or smaller.");
       return;
     }
-    if (!window.confirm("Restore this backup? It will replace all current library data. The current state will be saved automatically first as a recovery point.")) return;
+    if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
 
     setRestoring(true);
     try {
       const contents = await file.text();
       const backup = JSON.parse(contents);
-      await axiosInstance.post("/api/admin/backup/restore", backup);
-      toast.success("Database restored. A pre-restore recovery point was saved. Please refresh the page to load restored data.");
+      await axiosInstance.post("/api/admin/backup/restore", backup, { headers: { "x-restore-confirmation": "global-sign-out" } });
+      toast.success("Database restored. All sessions, including yours, are ending now.");
+      await logout();
     } catch (error: any) {
       const message = error instanceof SyntaxError
         ? "The selected file is not valid JSON."
@@ -179,13 +182,13 @@ const AdminBackup = () => {
       >
         <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
         <p className="text-sm leading-6 text-muted-foreground">
-          Every snapshot includes all database records and the catalog's custom-field layout. Restore is allowed only when the current database schema exactly matches the snapshot.
+          Every snapshot includes all database records and the catalog's custom-field layout. A restore reconciles snapshot custom fields but blocks incompatible core-schema changes. It is an emergency action: a successful restore signs out every user, including you.
         </p>
       </AdminPanel>
 
       <AdminPanel
         title="Saved snapshots"
-        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point; schema-mismatched snapshots remain available to download."
+        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point, then signs out all users; incompatible snapshots remain available to download."
         className="max-w-4xl"
       >
         {loadingSnapshots ? (
@@ -243,7 +246,7 @@ const AdminBackup = () => {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
             <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
-              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. It will continue only if the database schema matches exactly. The current state will be saved automatically first.
+              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first. After a successful restore, every user—including you—will be signed out and must log in again. Snapshot custom fields can be reconciled; incompatible core-schema changes still block the restore.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

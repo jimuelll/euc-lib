@@ -3,6 +3,20 @@ const db = require("../../db");
 const { signRefreshToken } = require("./jwt.util");
 
 let ensured = false;
+let ensuredRestoreState = false;
+
+async function ensureRestoreStateTable() {
+  if (ensuredRestoreState) return;
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS auth_restore_state (
+      id TINYINT NOT NULL PRIMARY KEY,
+      invalid_before DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00',
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  await db.query("INSERT IGNORE INTO auth_restore_state (id) VALUES (1)");
+  ensuredRestoreState = true;
+}
 
 async function ensureRefreshSessionsTable() {
   if (ensured) return;
@@ -91,10 +105,26 @@ async function revokeAllRefreshSessionsForUser(userId) {
   );
 }
 
+async function invalidateAllSessionsAfterRestore(conn = db) {
+  await ensureRestoreStateTable();
+  await conn.query("UPDATE auth_restore_state SET invalid_before = UTC_TIMESTAMP() WHERE id = 1");
+  await conn.query("UPDATE auth_refresh_sessions SET revoked_at = UTC_TIMESTAMP() WHERE revoked_at IS NULL");
+}
+
+async function isAccessTokenCurrent(payload) {
+  await ensureRestoreStateTable();
+  const [[state]] = await db.query("SELECT UNIX_TIMESTAMP(invalid_before) AS invalidBeforeSeconds FROM auth_restore_state WHERE id = 1");
+  if (!state?.invalidBeforeSeconds) return true;
+  const invalidBeforeSeconds = Number(state.invalidBeforeSeconds);
+  return Number(payload?.iat || 0) > invalidBeforeSeconds;
+}
+
 module.exports = {
   issueRefreshSession,
   getActiveRefreshSession,
   revokeRefreshSession,
   rotateRefreshSession,
   revokeAllRefreshSessionsForUser,
+  invalidateAllSessionsAfterRestore,
+  isAccessTokenCurrent,
 };

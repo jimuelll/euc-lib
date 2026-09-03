@@ -61,10 +61,21 @@ const pushAudienceChanged = ({ audienceType, audienceRole }) => {
   }
 };
 
+const closeAllConnections = (payload) => {
+  for (const connections of userSockets.values()) {
+    for (const connection of connections) {
+      send(connection.socket, payload);
+      try { connection.socket.close(1012, "System restored; sign in again"); } catch { /* Socket may already be closing. */ }
+    }
+  }
+  userSockets.clear();
+};
+
 module.exports = {
   registerConnection,
   unregisterConnection,
   pushUnreadCount,
   pushNotification,
   pushAudienceChanged,
+  closeAllConnections,
 };

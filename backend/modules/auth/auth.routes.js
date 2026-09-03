@@ -8,6 +8,7 @@ const { handleChangePassword } = require("./auth.controller");
 const {
   revokeRefreshSession,
   rotateRefreshSession,
+  isAccessTokenCurrent,
 } = require("./authSession.service");
 const {
   clearRefreshAuthCookies,
@@ -41,6 +42,7 @@ router.post("/refresh", async (req, res) => {
 
     const payload = verifyRefreshToken(refreshToken);
     if (!payload?.jti) throw new Error("Missing refresh token session");
+    if (!(await isAccessTokenCurrent(payload))) throw new Error("Refresh token predates the most recent system restore");
 
     const user = await getUserByID(payload.id);
     if (!user) throw new Error("User not found");

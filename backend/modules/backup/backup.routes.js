@@ -4,11 +4,15 @@ const { createHash } = require("crypto");
 const cloudinary = require("cloudinary").v2;
 const db = require("../../db");
 const { authMiddleware } = require("../auth/auth.middleware");
+const { invalidateAllSessionsAfterRestore } = require("../auth/authSession.service");
+const notificationHub = require("../../realtime/notificationHub");
 
 const router = express.Router();
 const superAdminOnly = authMiddleware(["super_admin"]);
 const SNAPSHOT_TABLE = "backup_snapshots";
 const MAX_SNAPSHOTS = 30;
+const SYSTEM_TABLES = [SNAPSHOT_TABLE, "auth_restore_state", "restore_audit_events"];
+const FORM_FIELD_SQL_TYPES = { text: "TEXT", textarea: "TEXT", number: "DECIMAL(15,4)", date: "DATE", select: "VARCHAR(255)" };
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -56,8 +60,10 @@ function decodeValue(value, columnType) {
 
 async function getTableNames(connection = db) {
   const [rows] = await connection.query(
-    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME != ? ORDER BY TABLE_NAME",
-    [SNAPSHOT_TABLE]
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+       AND TABLE_NAME NOT IN (${SYSTEM_TABLES.map(() => "?").join(", ")}) ORDER BY TABLE_NAME`,
+    SYSTEM_TABLES
   );
   return rows.map((row) => row.TABLE_NAME);
 }
@@ -67,9 +73,9 @@ async function getSchemaManifest(connection = db) {
     `SELECT TABLE_NAME AS tableName, COLUMN_NAME AS name, COLUMN_TYPE AS columnType,
             IS_NULLABLE AS isNullable, EXTRA AS extra
        FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME != ?
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME NOT IN (${SYSTEM_TABLES.map(() => "?").join(", ")})
       ORDER BY TABLE_NAME, ORDINAL_POSITION`,
-    [SNAPSHOT_TABLE]
+    SYSTEM_TABLES
   );
   const tables = {};
   for (const column of columns) {
@@ -135,14 +141,92 @@ function validateBackup(backup) {
 
 async function assertSchemaCompatible(backup) {
   const currentTables = await getSchemaManifest();
-  const currentFingerprint = schemaFingerprint(currentTables);
   if (backup.schema.fingerprint !== schemaFingerprint(backup.schema.tables)) {
     throw Object.assign(new Error("The backup schema fingerprint is invalid."), { status: 400 });
   }
-  if (backup.schema.fingerprint !== currentFingerprint) {
-    throw Object.assign(new Error("This backup was created with a different database schema and cannot be restored safely. Download it for archival use or migrate the database to the matching version first."), { status: 409 });
+  const backupTableNames = Object.keys(backup.schema.tables).sort();
+  const currentTableNames = Object.keys(currentTables).sort();
+  if (JSON.stringify(backupTableNames) !== JSON.stringify(currentTableNames)) {
+    throw Object.assign(new Error("This backup has different core database tables and cannot be restored safely."), { status: 409 });
+  }
+  for (const table of currentTableNames) {
+    if (table === "books") continue;
+    if (backup.schema.tables[table].definition !== currentTables[table].definition) {
+      throw Object.assign(new Error(`The ${table} table has changed since this snapshot and cannot be restored safely.`), { status: 409 });
+    }
   }
   return currentTables;
+}
+
+function requireRestoreSignOutAcknowledgement(req) {
+  if (req.get("x-restore-confirmation") !== "global-sign-out") {
+    throw Object.assign(new Error("Restore confirmation is required: this operation signs out every user, including the restorer."), { status: 400 });
+  }
+}
+
+function getSnapshotFormFields(backup) {
+  return new Map((backup.tables.catalog_schema ?? [])
+    .filter((field) => field && !Boolean(field.locked) && FORM_FIELD_SQL_TYPES[field.type])
+    .map((field) => [String(field.key), field.type]));
+}
+
+async function reconcileFormBuilderSchema(backup) {
+  const snapshotFields = getSnapshotFormFields(backup);
+  const snapshotColumns = new Map((backup.schema.tables.books?.columns ?? []).map((column) => [column.name, column]));
+  const currentTables = await getSchemaManifest();
+  const currentColumns = new Map((currentTables.books?.columns ?? []).map((column) => [column.name, column]));
+
+  for (const [key, type] of snapshotFields) {
+    const snapshotColumn = snapshotColumns.get(key);
+    if (!snapshotColumn) throw Object.assign(new Error(`The snapshot form field "${key}" has no matching book column.`), { status: 400 });
+    const currentColumn = currentColumns.get(key);
+    if (!currentColumn) {
+      await db.query(`ALTER TABLE books ADD COLUMN \`${key}\` ${FORM_FIELD_SQL_TYPES[type]} DEFAULT NULL`);
+      continue;
+    }
+    if (String(currentColumn.columnType).toLowerCase() !== String(snapshotColumn.columnType).toLowerCase()) {
+      throw Object.assign(new Error(`Form field "${key}" has an incompatible stored type and cannot be restored automatically.`), { status: 409 });
+    }
+  }
+
+  const refreshedTables = await getSchemaManifest();
+  const refreshedColumns = new Map((refreshedTables.books?.columns ?? []).map((column) => [column.name, column]));
+  const currentFormFields = new Set((await db.query("SELECT `key` FROM catalog_schema WHERE locked = 0"))[0].map((field) => String(field.key)));
+  const flexibleBookColumns = new Set([...snapshotFields.keys(), ...currentFormFields]);
+  for (const snapshotColumn of backup.schema.tables.books?.columns ?? []) {
+    const currentColumn = refreshedColumns.get(snapshotColumn.name);
+    if (!currentColumn) throw Object.assign(new Error(`The ${snapshotColumn.name} book column is missing and is not a form-builder field.`), { status: 409 });
+    if (!flexibleBookColumns.has(snapshotColumn.name) && JSON.stringify(snapshotColumn) !== JSON.stringify(currentColumn)) {
+      throw Object.assign(new Error(`The core books column "${snapshotColumn.name}" has changed and cannot be restored safely.`), { status: 409 });
+    }
+  }
+  return refreshedTables;
+}
+
+function validateSnapshotUniqueStudentIds(backup) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const user of backup.tables.users ?? []) {
+    if (!user || user.deleted_at || !user.student_employee_id) continue;
+    const sid = String(user.student_employee_id).trim();
+    if (!sid) continue;
+    if (seen.has(sid)) duplicates.add(sid); else seen.add(sid);
+  }
+  if (duplicates.size) {
+    throw Object.assign(new Error(`The snapshot has duplicate active student/employee IDs: ${Array.from(duplicates).slice(0, 5).join(", ")}. Resolve them in the source data before restoring.`), { status: 400 });
+  }
+}
+
+async function ensureRestoreAuditTable() {
+  await db.query(`CREATE TABLE IF NOT EXISTS restore_audit_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    snapshot_id BIGINT UNSIGNED NULL,
+    snapshot_kind VARCHAR(32) NULL,
+    restored_by BIGINT UNSIGNED NULL,
+    pre_restore_snapshot_id BIGINT UNSIGNED NULL,
+    restored_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id), KEY idx_restore_audit_time (restored_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 
 async function uploadSnapshot(payload, createdBy, kind = "manual") {
@@ -206,7 +290,9 @@ async function restoreBackup(backup) {
   if (backupTables.some((table) => !Array.isArray(backup.tables[table]))) {
     throw Object.assign(new Error("The backup contains invalid table data."), { status: 400 });
   }
+  validateSnapshotUniqueStudentIds(backup);
 
+  await reconcileFormBuilderSchema(backup);
   const schemaTables = await assertSchemaCompatible(backup);
 
   let connection;
@@ -225,10 +311,11 @@ async function restoreBackup(backup) {
         if (columns.some((column) => !columnDefinitions.has(column))) {
           throw Object.assign(new Error(`The backup contains unsupported columns for ${table}.`), { status: 400 });
         }
-        if (!columns.length) continue;
-        const values = columns.map((column) => decodeValue(row[column], columnDefinitions.get(column)?.columnType));
-        const names = columns.map((column) => `\`${column}\``).join(", ");
-        await connection.query(`INSERT INTO \`${table}\` (${names}) VALUES (${columns.map(() => "?").join(", ")})`, values);
+        const insertColumns = columns.filter((column) => !/generated/i.test(String(columnDefinitions.get(column)?.extra ?? "")));
+        if (!insertColumns.length) continue;
+        const values = insertColumns.map((column) => decodeValue(row[column], columnDefinitions.get(column)?.columnType));
+        const names = insertColumns.map((column) => `\`${column}\``).join(", ");
+        await connection.query(`INSERT INTO \`${table}\` (${names}) VALUES (${insertColumns.map(() => "?").join(", ")})`, values);
       }
     }
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
@@ -242,6 +329,20 @@ async function restoreBackup(backup) {
       connection.release();
     }
   }
+}
+
+async function performRestore(backup, { restoredBy, snapshotId = null, snapshotKind = "uploaded" }) {
+  await ensureRestoreAuditTable();
+  const preRestoreSnapshot = await createPreRestoreSnapshot(restoredBy);
+  await restoreBackup(backup);
+  await invalidateAllSessionsAfterRestore();
+  await db.query(
+    `INSERT INTO restore_audit_events (snapshot_id, snapshot_kind, restored_by, pre_restore_snapshot_id)
+     VALUES (?, ?, ?, ?)`,
+    [snapshotId, snapshotKind, restoredBy || null, preRestoreSnapshot.id]
+  );
+  notificationHub.closeAllConnections({ type: "system.restored", message: "The library system was restored. Please sign in again." });
+  return preRestoreSnapshot;
 }
 
 router.get("/backup/export", superAdminOnly, async (_req, res) => {
@@ -297,12 +398,12 @@ router.get("/backup/snapshots/:id/download", superAdminOnly, async (req, res) =>
 
 router.post("/backup/snapshots/:id/restore", superAdminOnly, async (req, res) => {
   try {
+    requireRestoreSignOutAcknowledgement(req);
     const [[snapshot]] = await db.query(`SELECT * FROM ${SNAPSHOT_TABLE} WHERE id = ?`, [req.params.id]);
     if (!snapshot) return res.status(404).json({ message: "Snapshot not found." });
     const backup = await getSnapshotPayload(snapshot);
     if (!validateBackup(backup)) throw Object.assign(new Error("The saved snapshot is invalid."), { status: 400 });
-    const preRestoreSnapshot = await createPreRestoreSnapshot(req.user.id);
-    await restoreBackup(backup);
+    const preRestoreSnapshot = await performRestore(backup, { restoredBy: req.user.id, snapshotId: snapshot.id, snapshotKind: snapshot.kind });
     res.json({ message: "Database restored successfully.", preRestoreSnapshot });
   } catch (err) {
     console.error("[backup] restore snapshot:", err);
@@ -312,13 +413,17 @@ router.post("/backup/snapshots/:id/restore", superAdminOnly, async (req, res) =>
 
 router.post("/backup/restore", superAdminOnly, async (req, res) => {
   const backup = req.body;
+  try {
+    requireRestoreSignOutAcknowledgement(req);
+  } catch (err) {
+    return res.status(err.status || 400).json({ message: err.message });
+  }
   if (!validateBackup(backup)) {
     return res.status(400).json({ message: "This file is not a valid EUC Library backup." });
   }
 
   try {
-    const preRestoreSnapshot = await createPreRestoreSnapshot(req.user.id);
-    await restoreBackup(backup);
+    const preRestoreSnapshot = await performRestore(backup, { restoredBy: req.user.id });
     res.json({ message: "Database restored successfully.", restoredAt: new Date().toISOString(), preRestoreSnapshot });
   } catch (err) {
     console.error("[backup] restore:", err);

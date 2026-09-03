@@ -1,7 +1,8 @@
 const { verifyAccessToken } = require("./jwt.util");
+const { isAccessTokenCurrent } = require("./authSession.service");
 
 function authMiddleware(roles = []) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -10,6 +11,9 @@ function authMiddleware(roles = []) {
 
       const token = authHeader.split(" ")[1];
       const payload = verifyAccessToken(token);
+      if (!(await isAccessTokenCurrent(payload))) {
+        return res.status(401).json({ message: "Your session ended because the system was restored. Please log in again." });
+      }
 
       if (roles.length && !roles.includes(payload.role)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -24,7 +28,7 @@ function authMiddleware(roles = []) {
 }
 
 function optionalAuthMiddleware() {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader) return next();
@@ -32,7 +36,8 @@ function optionalAuthMiddleware() {
       const token = authHeader.split(" ")[1];
       if (!token) return next();
 
-      req.user = verifyAccessToken(token);
+      const payload = verifyAccessToken(token);
+      req.user = (await isAccessTokenCurrent(payload)) ? payload : undefined;
     } catch {
       req.user = undefined;
     }
