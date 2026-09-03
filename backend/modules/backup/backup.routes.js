@@ -22,11 +22,35 @@ function encodeValue(value) {
   return value;
 }
 
-function decodeValue(value) {
+const pad = (value, length = 2) => String(value).padStart(length, "0");
+
+function formatDateForMySql(isoValue, columnType = "") {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) {
+    throw Object.assign(new Error("The backup contains an invalid date value."), { status: 400 });
+  }
+
+  const type = String(columnType).toLowerCase();
+  const datePart = `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+  const timePart = `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+  if (type === "date") return datePart;
+  if (/^time(?:\(|$)/.test(type)) return timePart;
+  if (type.startsWith("year")) return String(date.getUTCFullYear());
+
+  const precision = Number(type.match(/\((\d+)\)/)?.[1] ?? 0);
+  const fraction = precision > 0
+    ? `.${pad(date.getUTCMilliseconds(), 3).padEnd(Math.min(precision, 6), "0").slice(0, Math.min(precision, 6))}`
+    : "";
+  return `${datePart} ${timePart}${fraction}`;
+}
+
+function decodeValue(value, columnType) {
   if (value && typeof value === "object" && value.__backupType === "buffer") {
     return Buffer.from(value.data, "base64");
   }
-  if (value && typeof value === "object" && value.__backupType === "date") return value.data;
+  if (value && typeof value === "object" && value.__backupType === "date") {
+    return formatDateForMySql(value.data, columnType);
+  }
   return value;
 }
 
@@ -197,12 +221,12 @@ async function restoreBackup(backup) {
           throw Object.assign(new Error(`The backup contains an invalid row for ${table}.`), { status: 400 });
         }
         const columns = Object.keys(row);
-        const allowedColumns = new Set((schemaTables[table]?.columns ?? []).map((column) => column.name));
-        if (columns.some((column) => !allowedColumns.has(column))) {
+        const columnDefinitions = new Map((schemaTables[table]?.columns ?? []).map((column) => [column.name, column]));
+        if (columns.some((column) => !columnDefinitions.has(column))) {
           throw Object.assign(new Error(`The backup contains unsupported columns for ${table}.`), { status: 400 });
         }
         if (!columns.length) continue;
-        const values = columns.map((column) => decodeValue(row[column]));
+        const values = columns.map((column) => decodeValue(row[column], columnDefinitions.get(column)?.columnType));
         const names = columns.map((column) => `\`${column}\``).join(", ");
         await connection.query(`INSERT INTO \`${table}\` (${names}) VALUES (${columns.map(() => "?").join(", ")})`, values);
       }
