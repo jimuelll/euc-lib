@@ -7,7 +7,7 @@ const {
 } = require("./overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
 const { assertEligible, getClearanceProfile } = require("../clearance/clearance.service");
-const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
+const { getPagination, roundCurrency } = require("./borrowing.helpers");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,9 +40,7 @@ const getActiveBorrows = async (userId) => {
 };
 
 const getBorrowHistory = async (userId, { page, limit } = {}) => {
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const { paged, safePage, safeLimit, offset } = getPagination({ page, limit });
   const [[{ total }]] = paged ? await db.query(
     "SELECT COUNT(*) AS total FROM borrowings WHERE user_id = ? AND status = 'returned' AND deleted_at IS NULL",
     [userId]
@@ -57,7 +55,7 @@ const getBorrowHistory = async (userId, { page, limit } = {}) => {
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      WHERE b.user_id = ? AND b.status = 'returned'
     ORDER BY b.returned_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
+    paged ? [userId, safeLimit, offset] : [userId]
   );
   return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
 };

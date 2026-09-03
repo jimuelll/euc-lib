@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import type { FormField } from "./AdminCatalog.types";
 import AdminCatalogData from "./AdminCatalogData";
 import AdminCatalogBuilder from "./AdminCatalogBuilder";
 import { Button } from "@/components/ui/button";
+import { fetchCatalogSchema } from "./catalog.api";
 
 const AdminCatalog = () => {
   const { user } = useAuth();
@@ -14,18 +14,8 @@ const AdminCatalog = () => {
   const [loadingSchema, setLoadingSchema] = useState(true);
 
   useEffect(() => {
-    axiosInstance.get("api/admin/catalog-schema", { params: { includeArchived: "true" } })
-      .then((res) => {
-        const parsed = res.data.map((f: any) => ({
-          ...f,
-          options:  typeof f.options  === "string" ? JSON.parse(f.options)  : f.options,
-          required: Boolean(f.required),
-          locked:   Boolean(f.locked),
-          public:   Boolean(f.public),
-          archived: Boolean(f.archived),
-        }));
-        setFields(parsed);
-      })
+    fetchCatalogSchema()
+      .then(setFields)
       .catch(() => toast.error("Failed to load form schema"))
       .finally(() => setLoadingSchema(false));
   }, []);

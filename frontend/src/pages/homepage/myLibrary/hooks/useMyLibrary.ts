@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getApiErrorMessage, isRequestCancelled } from "@/utils/apiError";
 import { fetchMyLibraryDashboard } from "../api";
 import type { MyLibraryDashboard } from "../types";
 
@@ -22,9 +23,9 @@ export function useMyLibrary(enabled = true) {
       try {
         const next = await fetchMyLibraryDashboard(controller.signal);
         setData(next);
-      } catch (err: any) {
-        if (err.name === "CanceledError" || err.name === "AbortError") return;
-        setError(err.response?.data?.message ?? "Failed to load your library dashboard");
+      } catch (error: unknown) {
+        if (isRequestCancelled(error) || (error instanceof DOMException && error.name === "AbortError")) return;
+        setError(getApiErrorMessage(error, "Failed to load your library dashboard"));
       } finally {
         setLoading(false);
       }

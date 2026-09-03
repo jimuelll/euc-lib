@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -27,7 +27,8 @@ import {
   List,
   Users,
 } from "lucide-react";
-import axiosInstance from "@/utils/AxiosInstance";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { fetchAdminDashboard } from "./adminAnalytics.api";
 import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
@@ -38,7 +39,7 @@ import {
 } from "@/components/ui/chart";
 import { AdminPage, AdminPanel } from "./components/AdminPage";
 
-interface DashboardStats {
+export interface DashboardStats {
   total_books: number;
   total_book_copies: number;
   available_book_copies: number;
@@ -70,12 +71,12 @@ interface DashboardStats {
   outstanding_fines: number;
 }
 
-interface NamedValue {
+export interface NamedValue {
   name: string;
   value: number;
 }
 
-interface TrendPoint {
+export interface TrendPoint {
   label: string;
   unique_visitors?: number;
   visit_hits?: number;
@@ -89,18 +90,18 @@ interface TrendPoint {
   settled_amount?: number;
 }
 
-interface PopularBookPoint {
+export interface PopularBookPoint {
   name: string;
   total: number;
 }
 
-interface CategoryPoint {
+export interface CategoryPoint {
   name: string;
   titles: number;
   copies: number;
 }
 
-interface DashboardResponse {
+export interface DashboardResponse {
   stats: DashboardStats;
   charts: {
     visitTrend: TrendPoint[];
@@ -172,7 +173,7 @@ const currencyFormatter = new Intl.NumberFormat("en-PH", {
 });
 
 const chartPalette = ["#7f1d1d", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
-type AnalyticsRange = "7d" | "30d" | "month" | "year";
+export type AnalyticsRange = "7d" | "30d" | "month" | "year";
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
   { value: "7d", label: "7 days" },
@@ -193,25 +194,24 @@ const AdminAnalytics = () => {
     activity: "charts" as "charts" | "text",
   });
 
-  const loadDashboard = async (mode: "initial" | "refresh" = "initial") => {
+  const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") setLoading(true);
     if (mode === "refresh") setRefreshing(true);
     setError("");
 
     try {
-      const res = await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range } });
-      setData(res.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to load dashboard data");
+      setData(await fetchAdminDashboard(range));
+    } catch (error: unknown) {
+      setError(getApiErrorMessage(error, "Failed to load dashboard data"));
     } finally {
       if (mode === "initial") setLoading(false);
       if (mode === "refresh") setRefreshing(false);
     }
-  };
+  }, [range]);
 
   useEffect(() => {
     void loadDashboard();
-  }, [range]);
+  }, [loadDashboard]);
 
   return (
     <AdminPage

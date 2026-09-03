@@ -9,7 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
@@ -17,14 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useMyLibrary } from "./hooks/useMyLibrary";
-import { fetchMyLibraryAttendance, fetchMyLibraryHistory } from "./api";
+import { useMyLibraryActivity } from "./hooks/useMyLibraryActivity";
 import type {
   ActiveBorrow,
   ActiveReservation,
   AttendanceSession,
   DashboardSubscription,
-  MyLibraryHistoryItem,
-  MyLibraryPage,
 } from "./types";
 
 const fadeUp = (delay = 0) => ({
@@ -270,10 +268,7 @@ const SubscriptionItem = ({ subscription }: { subscription: DashboardSubscriptio
 const MyLibrary = () => {
   const { user, loading: authLoading } = useAuth();
   const { data, loading, error } = useMyLibrary(!authLoading);
-  const [historyPage, setHistoryPage] = useState<MyLibraryPage<MyLibraryHistoryItem> | null>(null);
-  const [attendancePage, setAttendancePage] = useState<MyLibraryPage<AttendanceSession> | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const { attendanceLoading, attendancePage, historyLoading, historyPage, loadAttendance, loadHistory } = useMyLibraryActivity(!authLoading && Boolean(user));
   const {
     notifications: liveNotifications,
     unreadCount,
@@ -284,20 +279,6 @@ const MyLibrary = () => {
   const profile = data?.profile;
   const summary = data?.summary;
   const notifications = liveNotifications.length ? liveNotifications : (data?.notifications ?? []);
-  const loadHistory = useCallback(async (page = 1) => {
-    setHistoryLoading(true);
-    try { setHistoryPage(await fetchMyLibraryHistory(page)); } finally { setHistoryLoading(false); }
-  }, []);
-  const loadAttendance = useCallback(async (page = 1) => {
-    setAttendanceLoading(true);
-    try { setAttendancePage(await fetchMyLibraryAttendance(page)); } finally { setAttendanceLoading(false); }
-  }, []);
-  useEffect(() => {
-    if (!authLoading && user) {
-      void loadHistory(1);
-      void loadAttendance(1);
-    }
-  }, [authLoading, user?.id, loadAttendance, loadHistory]);
   const activityCount = historyPage?.pagination.total ?? 0;
 
   return (

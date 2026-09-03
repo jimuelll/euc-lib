@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axiosInstance from "@/utils/AxiosInstance";
 import {
   Input,
   Select,
@@ -15,6 +14,8 @@ import {
   Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp, Lock, LockOpen,
 } from "lucide-react";
 import { FormField, FieldType, FIELD_TYPES, MAX_CUSTOM_FIELDS } from "./AdminCatalog.types";
+import { saveCatalogSchema } from "./catalog.api";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 type Props = {
   fields: FormField[];
@@ -90,12 +91,12 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const saveSchema = async (updated: FormField[]) => {
     setSaving(true);
     try {
-      await axiosInstance.put("api/admin/catalog-schema", { fields: updated, baseFields: fields });
+      await saveCatalogSchema(updated, fields);
       toast.success("Schema saved");
       onFieldsChange(updated);
       return true;
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to save schema");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to save schema"));
       return false;
     } finally {
       setSaving(false);

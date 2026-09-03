@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Download, RefreshCcw } from "lucide-react";
-import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +25,7 @@ import {
 } from "./adminCirculation/circulation.api";
 import { getAdminReservations } from "./adminReservations/reservations.api";
 import type { AdminReservation, ReservationsResult } from "./adminReservations/reservations.types";
+import { fetchClearanceQueue, type ClearanceQueueEntry } from "./adminReports.api";
 
 const emptyCirculationSummary: CirculationLogSummary = {
   total_records: 0,
@@ -50,8 +50,6 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 };
 
-type ClearanceQueueEntry = { userId: number; name: string; studentEmployeeId: string; overdueCount: number; oldestDueDate: string | null; overdueTitles: string[]; outstandingAmount: number; fineRecords: number };
-type ClearanceQueueResponse = { rows: ClearanceQueueEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } };
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) => { const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"); const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
@@ -82,7 +80,7 @@ const AdminReport = () => {
   const [clearanceLoading, setClearanceLoading] = useState(true);
   const [clearancePagination, setClearancePagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
 
-  const loadCirculationReport = async (page = 1) => {
+  const loadCirculationReport = useCallback(async (page = 1) => {
     setCirculationLoading(true);
     try {
       const result: CirculationLogResult = await getCirculationLog({
@@ -99,9 +97,9 @@ const AdminReport = () => {
     } finally {
       setCirculationLoading(false);
     }
-  };
+  }, [circulationDateFrom, circulationDateTo, circulationStatus]);
 
-  const loadReservationReport = async (page = 1) => {
+  const loadReservationReport = useCallback(async (page = 1) => {
     setReservationLoading(true);
     try {
       const result: ReservationsResult = await getAdminReservations({
@@ -124,17 +122,17 @@ const AdminReport = () => {
     } finally {
       setReservationLoading(false);
     }
-  };
+  }, [reservationDateFrom, reservationDateTo, reservationSearch, reservationStatus]);
 
-  const loadClearanceReport = async (page = 1) => {
+  const loadClearanceReport = useCallback(async (page = 1) => {
     setClearanceLoading(true);
-    try { const response = await axiosInstance.get<ClearanceQueueResponse>("/api/admin/clearance/queue", { params: { page, limit: 25 } }); setClearanceRows(response.data.rows ?? []); setClearancePagination(response.data.pagination); }
+    try { const response = await fetchClearanceQueue(page); setClearanceRows(response.rows ?? []); setClearancePagination(response.pagination); }
     finally { setClearanceLoading(false); }
-  };
+  }, []);
 
   useEffect(() => {
     void Promise.all([loadCirculationReport(), loadReservationReport(), loadClearanceReport()]);
-  }, []);
+  }, [loadCirculationReport, loadClearanceReport, loadReservationReport]);
 
   const handleCirculationSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

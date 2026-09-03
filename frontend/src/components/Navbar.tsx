@@ -11,18 +11,15 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import type { NotificationItem } from "@/services/notifications.service";
+import { getNavigationPermissions, getUserInitials, isNavigationLinkActive, type NavigationLink } from "./navbar.utils";
 
-const navLinks = [
+const navLinks: NavigationLink[] = [
   { label: "Home",      to: "/",          matchPrefix: false },
   { label: "About",     to: "/about",     matchPrefix: true  },
   { label: "Services",  to: "/services",  matchPrefix: true  },
   { label: "Catalogue", to: "/catalogue", matchPrefix: true  },
   { label: "Bulletin",  to: "/bulletin",  matchPrefix: true  },
 ];
-
-const ROLES_WITH_MY_LIBRARY  = new Set(["student", "employee", "alumni", "scanner", "staff", "admin", "super_admin"]);
-const ROLES_WITH_SCANNER     = new Set(["scanner"]);
-const ROLES_WITH_ADMIN_PANEL = new Set(["admin", "super_admin", "staff"]);
 
 const AuthSkeleton = () => (
   <div className="h-8 w-8 bg-primary/20 animate-pulse" />
@@ -47,9 +44,7 @@ const Navbar = () => {
   const role       = user?.role ?? "guest";
   const isLoggedIn = !!user && !loading;
 
-  const showMyLibrary    = ROLES_WITH_MY_LIBRARY.has(role);
-  const showScannerTools = ROLES_WITH_SCANNER.has(role);
-  const showAdminPanel   = ROLES_WITH_ADMIN_PANEL.has(role);
+  const { showAdminPanel, showMyLibrary, showScannerTools } = getNavigationPermissions(role);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
@@ -58,19 +53,7 @@ const Navbar = () => {
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
-  const getInitials = () => {
-    if (!user?.name) return "?";
-    const parts = user.name.trim().split(" ").filter(Boolean);
-    if (parts.length === 0) return "?";
-    if (parts.length === 1) return parts[0][0].toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  const isNavActive = (link: typeof navLinks[number]) => {
-    if (!link.matchPrefix) return location.pathname === link.to;
-    if (link.to === "/") return location.pathname === "/";
-    return location.pathname === link.to || location.pathname.startsWith(link.to + "/");
-  };
+  const isNavActive = (link: NavigationLink) => isNavigationLinkActive(location.pathname, link);
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -151,7 +134,7 @@ const Navbar = () => {
                   <UserDropdown
                     name={user?.name}
                     role={role}
-                    initials={getInitials()}
+                    initials={getUserInitials(user?.name)}
                     showAdminPanel={showAdminPanel}
                     onNavigate={navigate}
                     onLogout={logout}
@@ -205,7 +188,7 @@ const Navbar = () => {
                   className="h-8 w-8 border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground text-[11px] font-bold tracking-widest flex shrink-0 items-center justify-center"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
-                  {getInitials()}
+                  {getUserInitials(user?.name)}
                 </div>
                 <div>
                   <p

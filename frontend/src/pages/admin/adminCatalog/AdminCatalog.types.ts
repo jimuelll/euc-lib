@@ -21,8 +21,24 @@ export type Book = {
   edition?: string;
   publication_year?: number;
   copies?: number;
-  [key: string]: any;
+  material_type?: "book" | "thesis";
+  book_type_id?: number | string;
+  [key: string]: unknown;
 };
+
+export type CatalogFormValue = string | number | boolean | null | undefined;
+export type CatalogFormValues = Record<string, CatalogFormValue>;
+
+export type BookType = {
+  id: number;
+  name: string;
+  default_borrow_days: number;
+  fine_per_hour: number;
+  fine_interval?: "hour" | "day";
+  initial_fine?: number;
+};
+
+export type CatalogPagination = { page: number; limit: number; total: number; totalPages: number };
 
 export const DEFAULT_FIELDS: FormField[] = [
   { key: "title",            label: "Book Title",       type: "text",   required: true, locked: true, public: true, order: 0 },

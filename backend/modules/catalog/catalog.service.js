@@ -1,4 +1,5 @@
 const db = require("../../db");
+const { httpError, validateBookTypeInput, validateIsbn } = require("./catalog.validation");
 const MATERIAL_KEYS = ["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"];
 const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies"];
 
@@ -477,19 +478,15 @@ const getBookTypes = async () => {
 };
 
 const createBookType = async ({ name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
-  const days = Number.parseInt(defaultBorrowDays, 10); const fine = Number(finePerHour);
-  const initial = Number(initialFine);
-  if (!name?.trim() || !Number.isInteger(days) || days < 1 || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) throw Object.assign(new Error("Enter a valid policy with non-negative fines"), { status: 400 });
-  const [result] = await db.query("INSERT INTO book_types (name, default_borrow_days, fine_per_hour, fine_interval, initial_fine) VALUES (?, ?, ?, ?, ?)", [name.trim(), days, fine.toFixed(2), fineInterval, initial.toFixed(2)]);
+  const { name: safeName, days, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, finePerHour, fineInterval, initialFine });
+  const [result] = await db.query("INSERT INTO book_types (name, default_borrow_days, fine_per_hour, fine_interval, initial_fine) VALUES (?, ?, ?, ?, ?)", [safeName, days, fine.toFixed(2), safeInterval, initial.toFixed(2)]);
   const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [result.insertId]); return row;
 };
 
 const updateBookType = async (id, { name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
-  const days = Number.parseInt(defaultBorrowDays, 10); const fine = Number(finePerHour);
-  const initial = Number(initialFine);
-  if (!name?.trim() || !Number.isInteger(days) || days < 1 || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) throw Object.assign(new Error("Enter a valid policy with non-negative fines"), { status: 400 });
-  const [result] = await db.query("UPDATE book_types SET name = ?, default_borrow_days = ?, fine_per_hour = ?, fine_interval = ?, initial_fine = ? WHERE id = ? AND is_active = 1", [name.trim(), days, fine.toFixed(2), fineInterval, initial.toFixed(2), id]);
-  if (!result.affectedRows) throw Object.assign(new Error("Book type not found"), { status: 404 });
+  const { name: safeName, days, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, finePerHour, fineInterval, initialFine });
+  const [result] = await db.query("UPDATE book_types SET name = ?, default_borrow_days = ?, fine_per_hour = ?, fine_interval = ?, initial_fine = ? WHERE id = ? AND is_active = 1", [safeName, days, fine.toFixed(2), safeInterval, initial.toFixed(2), id]);
+  if (!result.affectedRows) throw httpError("Book type not found", 404);
   const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [id]); return row;
 };
 
@@ -515,8 +512,7 @@ const updateCopyCondition = async (copyId, condition, notes = null) => {
 };
 
 const lookupIsbn = async (value) => {
-  const isbn = String(value || "").replace(/[^0-9Xx]/g, "").toUpperCase();
-  if (!/^\d{9}[\dX]$/.test(isbn) && !/^\d{13}$/.test(isbn)) throw Object.assign(new Error("Enter a valid ISBN-10 or ISBN-13"), { status: 400 });
+  const isbn = validateIsbn(value);
   const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
   if (!response.ok) throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
   const record = (await response.json())[`ISBN:${isbn}`];

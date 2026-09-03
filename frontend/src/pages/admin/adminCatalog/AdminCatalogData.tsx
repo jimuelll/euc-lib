@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import axiosInstance from "@/utils/AxiosInstance";
 import {
   Input,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -7,7 +6,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
-import { FormField, Book } from "./AdminCatalog.types";
+import { FormField, Book, type BookType, type CatalogFormValue, type CatalogFormValues } from "./AdminCatalog.types";
+import { archiveCatalogBook, createCatalogBook, fetchBookTypes, fetchCatalogBarcode, fetchCatalogBookCopies, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook, updateCatalogCopyCondition, type CatalogCopy } from "./catalog.api";
+import { getApiErrorMessage } from "@/utils/apiError";
 import FieldInput from "./components/FieldInput";
 import BookCopiesModal from "./components/BookCopiesModal";
 import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText, Printer } from "lucide-react";
@@ -15,24 +16,7 @@ import { printCodeLabel } from "@/utils/printCodeLabel";
 import { SegmentedNavigation } from "../components/SegmentedNavigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Copy = {
-  id: number;
-  barcode: string;
-  condition: "good" | "damaged" | "lost";
-  is_active: number;
-  status: "available" | "borrowed";
-};
-
 type Props = { fields: FormField[] };
-type BookType = { id: number; name: string; default_borrow_days: number; fine_per_hour: number; fine_interval?: "hour" | "day"; initial_fine?: number };
-
-const loadBarcodeUrl = async (barcode: string): Promise<string> => {
-  const res = await axiosInstance.get(
-    `api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`,
-    { responseType: "blob" }
-  );
-  return URL.createObjectURL(res.data);
-};
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -65,16 +49,16 @@ const FieldLabel = ({ children, required, htmlFor }: { children: React.ReactNode
 // ─── Barcode strip ────────────────────────────────────────────────────────────
 
 const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
-  const [copies,  setCopies]  = useState<Copy[]>([]);
+  const [copies,  setCopies]  = useState<CatalogCopy[]>([]);
   const [urls,    setUrls]    = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [updatingCopyId, setUpdatingCopyId] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true); setCopies([]); setUrls({});
-    axiosInstance.get(`api/admin/books/${bookId}/copies`)
-      .then((res) => setCopies(res.data))
-      .catch(() => {})
+    fetchCatalogBookCopies(bookId)
+      .then(setCopies)
+      .catch(() => setCopies([]))
       .finally(() => setLoading(false));
   }, [bookId]);
 
@@ -82,9 +66,11 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
     if (!copies.length) return;
     copies.forEach(async (copy) => {
       try {
-        const url = await loadBarcodeUrl(copy.barcode);
+        const url = await fetchCatalogBarcode(copy.barcode);
         setUrls((prev) => ({ ...prev, [copy.barcode]: url }));
-      } catch {}
+      } catch {
+        return;
+      }
     });
     return () => {
       setUrls((prev) => {
@@ -94,10 +80,10 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
     };
   }, [copies]);
 
-  const updateCondition = async (copy: Copy, condition: Copy["condition"]) => {
+  const updateCondition = async (copy: CatalogCopy, condition: CatalogCopy["condition"]) => {
     setUpdatingCopyId(copy.id);
     try {
-      await axiosInstance.patch(`api/admin/copies/${copy.id}`, { condition });
+      await updateCatalogCopyCondition(copy.id, condition);
       setCopies((current) => current.map((item) => item.id === copy.id ? { ...item, condition } : item));
       toast.success(`Condition updated for ${copy.barcode}`);
     } catch {
@@ -151,7 +137,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
             </span>
             <label className="w-full text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
               Condition
-              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status === "borrowed" || updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as Copy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
+              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status === "borrowed" || updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as CatalogCopy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
                 <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
               </select>
             </label>
@@ -168,7 +154,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [catalogMode,   setCatalogMode]   = useState<"create" | "edit">("edit");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [isbnLookup,    setIsbnLookup]    = useState(false);
-  const [formValues,    setFormValues]    = useState<Record<string, any>>({});
+  const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
   const [loading,       setLoading]       = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [catalogFilter, setCatalogFilter] = useState<"all" | "book" | "thesis">("all");
@@ -183,18 +169,17 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   const activeFields = fields.filter((f) => !f.archived);
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
-  const setField     = (key: string, value: any) => setFormValues((p) => ({ ...p, [key]: value }));
+  const setField     = (key: string, value: CatalogFormValue) => setFormValues((p) => ({ ...p, [key]: value }));
   const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
 
-  useEffect(() => { axiosInstance.get<BookType[]>("api/admin/book-types").then((res) => setBookTypes(res.data)).catch(() => toast.error("Failed to load book types")); }, []);
+  useEffect(() => { fetchBookTypes().then(setBookTypes).catch(() => toast.error("Failed to load book types")); }, []);
 
   const lookupIsbn = async () => {
     const isbn = String(formValues.isbn ?? "").trim();
     if (!isbn) return toast.error("Enter an ISBN first");
     setIsbnLookup(true);
     try {
-      const response = await axiosInstance.get(`api/admin/books/isbn/${encodeURIComponent(isbn)}`);
-      const metadata = response.data;
+      const metadata = await lookupBookIsbn(isbn);
       // The lookup may return more than the active form supports. Keep the
       // payload aligned with the current form-builder schema so optional
       // metadata can never become an unknown-field save error.
@@ -214,7 +199,7 @@ const AdminCatalogData = ({ fields }: Props) => {
         return next;
       });
       toast.success("Available ISBN details added — review before saving");
-    } catch (error: any) { toast.error(error.response?.data?.message ?? "ISBN lookup failed"); }
+    } catch (error: unknown) { toast.error(getApiErrorMessage(error, "ISBN lookup failed")); }
     finally { setIsbnLookup(false); }
   };
 
@@ -232,10 +217,10 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!validateRequired()) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.post("api/admin/books", { ...formValues, material_type: materialType });
-      toast.success(res.data.message); resetForm(); setCatalogMode("edit"); await handleSearchBooks(false);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Failed to add book");
+      const result = await createCatalogBook({ ...formValues, material_type: materialType });
+      toast.success(result.message); resetForm(); setCatalogMode("edit"); await handleSearchBooks(false);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Failed to add book"));
     } finally { setLoading(false); }
   };
 
@@ -243,12 +228,10 @@ const AdminCatalogData = ({ fields }: Props) => {
     setLoading(true);
     const archived = archivedOverride ?? showArchived;
     try {
-      const res = await axiosInstance.get("api/admin/books", {
-        params: { query: searchQuery, materialType: materialOverride ?? catalogFilter, page: pageOverride, limit: 25, ...(archived && { archived: "true" }) },
-      });
-      const rows = res.data.rows ?? res.data;
+      const result = await searchCatalogBooks({ query: searchQuery, materialType: materialOverride ?? catalogFilter, page: pageOverride, archived });
+      const rows = result.rows;
       setSearchResults(rows);
-      setCatalogPagination(res.data.pagination ?? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 });
+      setCatalogPagination(result.pagination);
       if (!rows.length) {
         toast.info(
           searchQuery.trim()
@@ -256,8 +239,8 @@ const AdminCatalogData = ({ fields }: Props) => {
             : (archived ? "No archived books are available" : "No active books are available")
         );
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Search failed");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Search failed"));
     } finally { setLoading(false); }
   };
 
@@ -279,10 +262,10 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!selectedBook || !validateRequired()) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.put(`api/admin/books/${selectedBook.id}`, formValues);
-      toast.success(res.data.message); resetForm(); await handleSearchBooks();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Update failed");
+      const result = await updateCatalogBook(selectedBook.id, formValues);
+      toast.success(result.message); resetForm(); await handleSearchBooks();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Update failed"));
     } finally { setLoading(false); }
   };
 
@@ -297,10 +280,10 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!shouldDelete) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.delete(`api/admin/books/${selectedBook.id}`);
-      toast.success(res.data.message); resetForm(); await handleSearchBooks();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Delete failed");
+      const result = await archiveCatalogBook(selectedBook.id);
+      toast.success(result.message); resetForm(); await handleSearchBooks();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Delete failed"));
     } finally { setLoading(false); }
   };
 
@@ -314,18 +297,18 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!shouldRestore) return;
     setLoading(true);
     try {
-      const res = await axiosInstance.post(`api/admin/books/${book.id}/restore`);
-      toast.success(res.data.message);
+      const result = await restoreCatalogBook(book.id);
+      toast.success(result.message);
       await handleSearchBooks(true);
       if (selectedBook?.id === book.id) resetForm();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Restore failed");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Restore failed"));
     } finally { setLoading(false); }
   };
 
   const selectBookForEdit = (b: Book) => {
     setSelectedBook(b);
-    const vals: Record<string, any> = {};
+    const vals: CatalogFormValues = {};
     activeFields.forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
     setFormValues(vals);
     requestAnimationFrame(() => editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
