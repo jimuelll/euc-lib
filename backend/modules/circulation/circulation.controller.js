@@ -32,15 +32,14 @@ const lookupBook = async (req, res) => {
 
 const processBorrow = async (req, res) => {
   try {
-    const { userId, bookId, dueDate } = req.body;
-    if (!userId || !bookId || !dueDate) {
-      return res.status(400).json({ message: "userId, bookId, and dueDate are required" });
+    const { userId, bookId } = req.body;
+    if (!userId || !bookId) {
+      return res.status(400).json({ message: "userId and bookId are required" });
     }
 
     const result = await service.processBorrow({
       userId,
       bookId,
-      dueDate,
       issuedBy: req.user.id,
     });
     res.status(201).json(result);
@@ -67,12 +66,12 @@ const processReturn = async (req, res) => {
 
 const processRenew = async (req, res) => {
   try {
-    const { borrowingId, dueDate } = req.body;
-    if (!borrowingId || !dueDate) {
-      return res.status(400).json({ message: "borrowingId and dueDate are required" });
+    const { borrowingId } = req.body;
+    if (!borrowingId) {
+      return res.status(400).json({ message: "borrowingId is required" });
     }
 
-    const result = await service.processRenew({ borrowingId, dueDate });
+    const result = await service.processRenew({ borrowingId, renewedBy: req.user.id });
     res.json(result);
   } catch (err) {
     console.error("[circulation] processRenew:", err);

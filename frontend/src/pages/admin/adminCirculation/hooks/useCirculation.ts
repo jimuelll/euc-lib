@@ -7,7 +7,6 @@ import {
   processBorrow,
   processReturn,
 } from "../circulation.api";
-import { DEFAULT_LOAN_DAYS } from "../circulation.types";
 import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus } from "../circulation.types";
 
 interface ReservationCheckout {
@@ -23,7 +22,6 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   const [type, setType]                   = useState<TransactionType>("borrow");
   const [studentId, setStudentId]         = useState("");
   const [copyBarcode, setCopyBarcode]     = useState("");
-  const [daysAllowed, setDaysAllowed]     = useState(DEFAULT_LOAN_DAYS);
 
   const [lookingUpUser, setLookingUpUser] = useState(false);
   const [lookingUpCopy, setLookingUpCopy] = useState(false);
@@ -113,7 +111,6 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     setFoundCopy(null);
     setActiveBorrows([]);
     setMatchedBorrow(null);
-    setDaysAllowed(DEFAULT_LOAN_DAYS);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +135,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     try {
       if (type === "borrow") {
         // Backend expects a barcode OR student_employee_id as userBarcode
-        await processBorrow(studentId.trim(), copyBarcode.trim(), daysAllowed, reservationCheckout?.id);
+        await processBorrow(studentId.trim(), copyBarcode.trim(), reservationCheckout?.id);
         toast.success(
           reservationCheckout
             ? `Reservation fulfilled and "${foundCopy.title}" borrowed by ${foundUser.name}`
@@ -170,11 +167,11 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 
   return {
-    type, studentId, copyBarcode, daysAllowed,
+    type, studentId, copyBarcode,
     lookingUpUser, lookingUpCopy, submitting,
     foundUser, foundCopy, activeBorrows, matchedBorrow, clearance,
     canSubmit: canSubmit && clearanceAllowsBorrow,
-    setStudentId, setCopyBarcode, setDaysAllowed,
+    setStudentId, setCopyBarcode,
     handleTypeChange: setType,
     handleLookupUser,
     handleLookupCopy,

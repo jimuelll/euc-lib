@@ -171,7 +171,6 @@ const borrowBook = async (
   userId,
   bookIdOrCopyBarcode,
   issuedBy,
-  daysAllowed = null,
   { isCopyBarcode = false, ipAddress = null, reservationId = null } = {}
 ) => {
   await syncOverdueBorrowings();

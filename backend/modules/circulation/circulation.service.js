@@ -1,5 +1,5 @@
 const db = require("../../db");
-const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
+const { calculateDueDateWithHolidays, syncOverdueBorrowings } = require("../borrowing/overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
 const { getClearanceProfile, assertEligible } = require("../clearance/clearance.service");
 
@@ -68,7 +68,7 @@ const lookupBook = async (isbn) => {
   return book;
 };
 
-const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
+const processBorrow = async ({ userId, bookId, issuedBy }) => {
   await syncOverdueBorrowings();
   const conn = await db.getConnection();
   try {
@@ -77,7 +77,11 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
     await assertEligible(userId, conn);
 
     const [[book]] = await conn.query(
-      "SELECT id, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+      `SELECT bk.id, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
+       FROM books bk
+       JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
+       WHERE bk.id = ? AND bk.deleted_at IS NULL
+       FOR UPDATE`,
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
@@ -103,10 +107,13 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
     );
     if (!copy) throw Object.assign(new Error("No borrowable copies are available"), { status: 409 });
 
+    const policyDays = Math.max(1, Number.parseInt(book.default_borrow_days, 10) || 7);
+    const dueDate = await calculateDueDateWithHolidays(new Date(), policyDays, conn);
+
     const [result] = await conn.query(
-      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, status, issued_by)
-       VALUES (?, ?, ?, ?, 'borrowed', ?)`,
-      [userId, bookId, copy.id, dueDate, issuedBy]
+      `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, fine_per_hour, fine_interval, initial_fine, status, issued_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'borrowed', ?)`,
+      [userId, bookId, copy.id, dueDate, book.fine_per_hour, book.fine_interval, book.initial_fine, issuedBy]
     );
 
     await conn.commit();
@@ -130,7 +137,7 @@ const processBorrow = async ({ userId, bookId, dueDate, issuedBy }) => {
       });
     }
 
-    return { message: "Book borrowed successfully", borrowingId: result.insertId, barcode: copy.barcode, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
+    return { message: "Book borrowed successfully", borrowingId: result.insertId, barcode: copy.barcode, dueDate, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -168,15 +175,22 @@ const processReturn = async (borrowingId) => {
   }
 };
 
-const processRenew = async ({ borrowingId, dueDate }) => {
+const processRenew = async ({ borrowingId, renewedBy = null }) => {
   const [[row]] = await db.query(
-    "SELECT id, status FROM borrowings WHERE id = ?",
+    `SELECT b.id, b.status, bt.default_borrow_days
+     FROM borrowings b
+     JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
+     JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
+     WHERE b.id = ?`,
     [borrowingId]
   );
   if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
   if (row.status === "returned") {
     throw Object.assign(new Error("Cannot renew a returned book"), { status: 409 });
   }
+
+  const policyDays = Math.max(1, Number.parseInt(row.default_borrow_days, 10) || 7);
+  const dueDate = await calculateDueDateWithHolidays(new Date(), policyDays);
 
   await db.query(
     `UPDATE borrowings SET due_date = ?, status = 'borrowed' WHERE id = ?`,
@@ -198,7 +212,7 @@ const processRenew = async ({ borrowingId, dueDate }) => {
       href: "/my-library",
       audienceType: "user",
       audienceUserId: target.user_id,
-      createdBy: null,
+        createdBy: renewedBy,
     });
   }
 

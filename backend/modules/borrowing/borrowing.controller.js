@@ -43,8 +43,6 @@ const searchCatalogue = async (req, res) => {
 const borrowBook = async (req, res) => {
   try {
     const bookId      = parseInt(req.params.bookId, 10);
-    const daysAllowed = req.body?.daysAllowed ?? 7;
-
     if (isNaN(bookId) || bookId < 1) {
       return res.status(400).json({ message: "Invalid book ID" });
     }
@@ -53,7 +51,6 @@ const borrowBook = async (req, res) => {
       req.user.id,
       bookId,
       req.user.id,
-      daysAllowed,
       { isCopyBarcode: false, ipAddress: req.ip }
     );
     res.status(201).json({ message: "Book borrowed successfully", ...result });
@@ -81,12 +78,12 @@ const returnBook = async (req, res) => {
 
 /**
  * POST /borrowings/scan/borrow
- * Body: { userBarcode, copyBarcode, daysAllowed? }
+ * Body: { userBarcode, copyBarcode, reservationId? }
  * Used by staff/scanner — scan a user's ID card then the book copy.
  */
 const scanBorrow = async (req, res) => {
   try {
-    const { userBarcode, copyBarcode, daysAllowed = 7, reservationId } = req.body;
+    const { userBarcode, copyBarcode, reservationId } = req.body;
 
     if (!userBarcode?.trim() || !copyBarcode?.trim()) {
       return res.status(400).json({ message: "userBarcode and copyBarcode are required" });
@@ -108,7 +105,6 @@ const scanBorrow = async (req, res) => {
       patron.id,
       copyBarcode.trim(),
       req.user.id,
-      daysAllowed,
       { isCopyBarcode: true, ipAddress: req.ip, reservationId: parsedReservationId }
     );
 
