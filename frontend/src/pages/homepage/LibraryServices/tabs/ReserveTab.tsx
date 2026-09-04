@@ -197,7 +197,7 @@ const ReserveTab = ({
               />
             );
           })}
-        {!catalogLoading && pagination.totalPages > 1 ? <div className="flex items-center justify-between border-t border-border pt-3"><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Previous</button><span className="text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Next</button></div> : null}
+        {!catalogLoading && pagination.totalPages > 1 ? <div className="flex items-center justify-between gap-2 border-t border-border pt-3"><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Previous</button><span className="text-center text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Next</button></div> : null}
       </div>
 
       {/* ── My active reservations ────────────────────────────────────────── */}

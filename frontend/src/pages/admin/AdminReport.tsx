@@ -54,6 +54,39 @@ const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP
 const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 const downloadCsv = (filename: string, headers: string[], rows: unknown[][]) => { const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"); const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
 
+const ClearanceMobileRows = ({ rows }: { rows: ClearanceQueueEntry[] }) => (
+  <div className="space-y-3 sm:hidden">
+    {rows.map((row) => (
+      <article key={row.userId} className="border border-border/70 bg-background p-4">
+        <div className="min-w-0">
+          <h3 className="break-words font-medium text-foreground">{row.name}</h3>
+          <p className="mt-0.5 break-all text-xs text-muted-foreground">{row.studentEmployeeId}</p>
+        </div>
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/70 pt-3 text-sm">
+          <div>
+            <dt className="text-xs text-muted-foreground">Overdue returns</dt>
+            <dd className={row.overdueCount ? "mt-1 font-medium text-destructive" : "mt-1 text-muted-foreground"}>{row.overdueCount || "None"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Unpaid fines</dt>
+            <dd className="mt-1 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-xs text-muted-foreground">Fine records</dt>
+            <dd className="mt-1 text-foreground">{row.fineRecords || "—"}</dd>
+          </div>
+          {row.overdueTitles.length > 0 && (
+            <div className="col-span-2">
+              <dt className="text-xs text-muted-foreground">Overdue titles</dt>
+              <dd className="mt-1 break-words text-foreground">{row.overdueTitles.join(", ")}</dd>
+            </div>
+          )}
+        </dl>
+      </article>
+    ))}
+  </div>
+);
+
 const AdminReport = () => {
   const [circulationStatus, setCirculationStatus] = useState("all");
   const [circulationDateFrom, setCirculationDateFrom] = useState("");
@@ -387,7 +420,7 @@ const AdminReport = () => {
 
         <TabsContent value="clearance" className="space-y-6">
           <AdminPanel title="Clearance exceptions" description="Current patrons with overdue returns, unpaid fines, or both. Export this list for follow-up and reconciliation." actions={<div className="flex gap-2"><Button type="button" variant="outline" className="rounded-none" disabled={!clearanceRows.length} onClick={() => downloadCsv("clearance-exceptions-report.csv", ["Patron", "Student / employee ID", "Overdue returns", "Oldest due date", "Overdue titles", "Unpaid fines", "Fine records"], clearanceRows.map((row) => [row.name, row.studentEmployeeId, row.overdueCount, row.oldestDueDate, row.overdueTitles.join("; "), row.outstandingAmount, row.fineRecords]))}><Download className="mr-2 h-4 w-4" />Export current page</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => void loadClearanceReport(clearancePagination.page)} disabled={clearanceLoading}><RefreshCcw className={`mr-2 h-4 w-4 ${clearanceLoading ? "animate-spin" : ""}`} />Refresh</Button></div>}>
-            {clearanceRows.length ? <><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/20">{["Patron", "Overdue returns", "Unpaid fines", "Fine records"].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{heading}</th>)}</tr></thead><tbody>{clearanceRows.map((row) => <tr key={row.userId} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-3"><div className="font-medium text-foreground">{row.name}</div><div className="text-xs text-muted-foreground">{row.studentEmployeeId}</div></td><td className="px-4 py-3">{row.overdueCount ? <><div className="font-medium text-destructive">{row.overdueCount} item{row.overdueCount === 1 ? "" : "s"}</div><div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground" title={row.overdueTitles.join(", ")}>{row.overdueTitles.join(", ")}</div></> : <span className="text-muted-foreground">None</span>}</td><td className="px-4 py-3 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</td><td className="px-4 py-3 text-muted-foreground">{row.fineRecords || "-"}</td></tr>)}</tbody></table></div>{clearancePagination.totalPages > 1 ? <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-4"><Button type="button" variant="outline" className="rounded-none" disabled={clearanceLoading || clearancePagination.page <= 1} onClick={() => void loadClearanceReport(clearancePagination.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {clearancePagination.page} of {clearancePagination.totalPages} with {clearancePagination.total} patron(s)</p><Button type="button" variant="outline" className="rounded-none" disabled={clearanceLoading || clearancePagination.page >= clearancePagination.totalPages} onClick={() => void loadClearanceReport(clearancePagination.page + 1)}>Next</Button></div> : null}</> : <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center"><p className="text-sm text-muted-foreground">{clearanceLoading ? "Loading clearance exceptions..." : "No overdue returns or unpaid fines are waiting for review."}</p></div>}
+            {clearanceRows.length ? <><ClearanceMobileRows rows={clearanceRows} /><div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/20">{["Patron", "Overdue returns", "Unpaid fines", "Fine records"].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{heading}</th>)}</tr></thead><tbody>{clearanceRows.map((row) => <tr key={row.userId} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-3"><div className="font-medium text-foreground">{row.name}</div><div className="text-xs text-muted-foreground">{row.studentEmployeeId}</div></td><td className="px-4 py-3">{row.overdueCount ? <><div className="font-medium text-destructive">{row.overdueCount} item{row.overdueCount === 1 ? "" : "s"}</div><div className="mt-1 max-w-[30ch] truncate text-xs text-muted-foreground" title={row.overdueTitles.join(", ")}>{row.overdueTitles.join(", ")}</div></> : <span className="text-muted-foreground">None</span>}</td><td className="px-4 py-3 font-medium text-foreground">{row.outstandingAmount ? money.format(row.outstandingAmount) : "None"}</td><td className="px-4 py-3 text-muted-foreground">{row.fineRecords || "-"}</td></tr>)}</tbody></table></div>{clearancePagination.totalPages > 1 ? <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4"><Button type="button" variant="outline" className="min-h-11 rounded-none" disabled={clearanceLoading || clearancePagination.page <= 1} onClick={() => void loadClearanceReport(clearancePagination.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {clearancePagination.page} of {clearancePagination.totalPages} with {clearancePagination.total} patron(s)</p><Button type="button" variant="outline" className="min-h-11 rounded-none" disabled={clearanceLoading || clearancePagination.page >= clearancePagination.totalPages} onClick={() => void loadClearanceReport(clearancePagination.page + 1)}>Next</Button></div> : null}</> : <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center"><p className="text-sm text-muted-foreground">{clearanceLoading ? "Loading clearance exceptions..." : "No overdue returns or unpaid fines are waiting for review."}</p></div>}
           </AdminPanel>
         </TabsContent>
       </Tabs>

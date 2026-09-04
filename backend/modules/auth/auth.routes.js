@@ -1,6 +1,7 @@
 const express = require("express");
 const { signToken, verifyRefreshToken } = require("./jwt.util");
 const { loginUser, recordAuthAuditEvent } = require("./auth.service");
+const { getAuthAuditContext } = require("./authDevice");
 const { getUserByID } = require("../../users/users.service");
 const { loginLimiter } = require("../../middlewares/rateLimiter");
 const { authMiddleware } = require("./auth.middleware");
@@ -21,7 +22,7 @@ const router = express.Router();
 router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { student_employee_id, password, rememberMe = false } = req.body;
-    const result = await loginUser(student_employee_id, password, Boolean(rememberMe));
+    const result = await loginUser(student_employee_id, password, Boolean(rememberMe), getAuthAuditContext(req));
     setRefreshAuthCookies(res, result.refreshToken, Boolean(rememberMe));
     res.json({
       accessToken: result.token,
@@ -82,7 +83,7 @@ router.post("/logout", async (req, res) => {
       const payload = verifyRefreshToken(refreshToken);
       if (payload?.id && payload?.jti) {
         await revokeRefreshSession(payload.id, payload.jti);
-        await recordAuthAuditEvent(payload.id, "logout");
+        await recordAuthAuditEvent(payload.id, "logout", getAuthAuditContext(req));
       }
     }
   } catch {

@@ -41,7 +41,16 @@ function buildAuditFeedQuery() {
         CONVERT(ae.event_type USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS action,
         CONVERT(u.name USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_name,
         CONVERT(u.role USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS actor_role,
-        CONVERT(CONCAT(u.name, ' signed ', IF(ae.event_type = 'login', 'in', 'out')) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
+        CONVERT(CONCAT(
+          u.name,
+          CASE ae.event_type
+            WHEN 'login' THEN ' signed in'
+            WHEN 'logout' THEN ' signed out'
+            WHEN 'password_changed' THEN ' changed their password'
+            ELSE CONCAT(' performed ', ae.event_type)
+          END,
+          IF(ae.device_type IS NULL OR ae.device_type = 'unknown', '', CONCAT(' on ', ae.device_type))
+        ) USING utf8mb4) COLLATE ${AUDIT_COLLATION} AS description
       FROM auth_audit_events ae
       JOIN users u ON u.id = ae.user_id
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu, X, Bell, QrCode, LogOut, UserCog, LayoutDashboard, Baby, ChevronDown,
@@ -36,6 +36,8 @@ const UserAvatar = ({ initials }: { initials: string }) => (
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, loading } = useAuth();
@@ -51,6 +53,42 @@ const Navbar = () => {
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const menu = menuRef.current;
+    if (!menu) return;
+    const focusable = () => Array.from(menu.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ));
+    focusable()[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileOpen(false);
+        menuButtonRef.current?.focus();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const controls = focusable();
+      if (!controls.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen]);
 
   const isNavActive = (link: NavigationLink) => isNavigationLinkActive(location.pathname, link);
@@ -157,10 +195,12 @@ const Navbar = () => {
 
             {/* Burger — fixed dimensions, always last, can never be squeezed */}
             <button
-              className="md:hidden flex items-center justify-center h-9 w-9 shrink-0 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              ref={menuButtonRef}
+              className="md:hidden flex items-center justify-center h-11 w-11 shrink-0 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -178,6 +218,9 @@ const Navbar = () => {
           />
 
           <nav
+            ref={menuRef}
+            id="mobile-navigation"
+            aria-label="Mobile navigation"
             className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 overflow-y-auto border-b border-primary-foreground/10 bg-primary md:hidden"
             style={{ maxHeight: "calc(100dvh - 3px - 3.5rem)" }}
           >
@@ -254,7 +297,7 @@ const Navbar = () => {
               <div className="px-4 pt-2 pb-3">
                 <Link to="/login" onClick={closeMobile}>
                   <button
-                    className="w-full py-2.5 text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                    className="flex h-11 w-full items-center justify-center text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Login
@@ -325,7 +368,7 @@ const NotificationsDropdown = ({
 }) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <button className="relative p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+      <button aria-label="Open notifications" className="relative flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
           <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-primary">
@@ -489,13 +532,15 @@ const UserDropdown = ({
 const ScannerTools = ({ onNavigate }: { onNavigate: (path: string) => void }) => (
   <>
     <button
-      className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+      aria-label="Open QR scanner"
+      className="flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
       onClick={() => onNavigate("/scan-qr")}
     >
       <QrCode className="h-4 w-4" />
     </button>
     <button
-      className="p-2 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+      aria-label="Open child attendance scanner"
+      className="flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
       onClick={() => onNavigate("/scan-qr")}
     >
       <Baby className="h-4 w-4" />
@@ -517,7 +562,7 @@ const MobileNavLink = ({
   <Link
     to={to}
     onClick={onClick}
-    className={`flex items-center px-4 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
+    className={`flex min-h-11 items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
       active
         ? "border-warning text-primary-foreground bg-primary-foreground/[0.08]"
         : gold
@@ -540,7 +585,7 @@ const MobileActionButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`flex w-full items-center px-4 py-2.5 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 border-transparent hover:bg-primary-foreground/5 ${
+    className={`flex min-h-11 w-full items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 border-transparent hover:bg-primary-foreground/5 ${
       destructive
         ? "text-destructive-foreground/70 hover:border-destructive"
         : "text-primary-foreground/55 hover:text-primary-foreground/90"

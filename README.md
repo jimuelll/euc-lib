@@ -118,6 +118,7 @@ db/2026-08-30-enable-catalog-isbn-metadata-fields.sql
 db/2026-08-31-backup-snapshots.sql
 db/2026-08-31-book-types-and-copy-conditions.sql
 db/2026-08-31-book-type-fine-rules.sql
+backend/sql/2026-09-04-add-auth-audit-device.sql
 ```
 
 > The last two migrations build on the preceding catalogue changes. Do not reapply migrations already present in the selected baseline.

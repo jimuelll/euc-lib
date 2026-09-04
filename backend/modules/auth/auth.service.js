@@ -6,6 +6,7 @@ const {
 } = require("./authSession.service");
 const db = require("../../db");
 const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
+const { normalizeDeviceType } = require("./authDevice");
 
 const getTermStatus = async (user) => {
   if (user.role !== "student") return { term_status: "not_applicable", academic_term_name: null };
@@ -14,11 +15,14 @@ const getTermStatus = async (user) => {
   return { term_status: "current", academic_term_name: term.name };
 };
 
-const recordAuthAuditEvent = async (userId, eventType) => {
-  await db.query("INSERT INTO auth_audit_events (user_id, event_type) VALUES (?, ?)", [userId, eventType]);
+const recordAuthAuditEvent = async (userId, eventType, { deviceType = "unknown" } = {}) => {
+  await db.query(
+    "INSERT INTO auth_audit_events (user_id, event_type, device_type) VALUES (?, ?, ?)",
+    [userId, eventType, normalizeDeviceType(deviceType)]
+  );
 };
 
-async function loginUser(student_employee_id, password, rememberMe = false) {
+async function loginUser(student_employee_id, password, rememberMe = false, auditContext = {}) {
   const user = await getUserByEmployeeID(student_employee_id);
   if (!user || !user.is_active) {
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
@@ -46,7 +50,7 @@ async function loginUser(student_employee_id, password, rememberMe = false) {
   );
 
   await updateLastLogin(user.id);
-  await recordAuthAuditEvent(user.id, "login");
+  await recordAuthAuditEvent(user.id, "login", auditContext);
 
   if (user.must_change_password) {
     return { mustChangePassword: true, token, refreshToken };
@@ -55,7 +59,7 @@ async function loginUser(student_employee_id, password, rememberMe = false) {
   return { token, refreshToken, role: user.role, ...termStatus };
 }
 
-async function changePassword(userId, oldPassword, newPassword, rememberMe = false) {
+async function changePassword(userId, oldPassword, newPassword, rememberMe = false, auditContext = {}) {
   const user = await getUserByID(userId);
   if (!user) throw new Error("User not found");
 
@@ -79,6 +83,7 @@ async function changePassword(userId, oldPassword, newPassword, rememberMe = fal
   );
 
   await revokeAllRefreshSessionsForUser(userId);
+  await recordAuthAuditEvent(user.id, "password_changed", auditContext);
 
   // Issue both a new access token and a new refresh token
   // so the old refresh token can no longer be used

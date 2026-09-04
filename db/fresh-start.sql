@@ -132,7 +132,8 @@ CREATE TABLE `attendance_logs` (
 CREATE TABLE `auth_audit_events` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `user_id` bigint(20) UNSIGNED NOT NULL,
-  `event_type` enum('login','logout') NOT NULL,
+  `event_type` enum('login','logout','password_changed') NOT NULL,
+  `device_type` enum('desktop','mobile','tablet','unknown') NOT NULL DEFAULT 'unknown',
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

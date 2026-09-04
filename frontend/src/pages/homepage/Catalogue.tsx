@@ -284,7 +284,7 @@ const Catalogue = () => {
               })}
             </div>
           )}
-          {!loading && pagination.totalPages > 1 ? <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => void searchBooks(debouncedQuery, pagination.page - 1)}>Previous</button><span className="text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => void searchBooks(debouncedQuery, pagination.page + 1)}>Next</button></div> : null}
+          {!loading && pagination.totalPages > 1 ? <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4"><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => void searchBooks(debouncedQuery, pagination.page - 1)}>Previous</button><span className="text-center text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => void searchBooks(debouncedQuery, pagination.page + 1)}>Next</button></div> : null}
         </div>
       </main>
 

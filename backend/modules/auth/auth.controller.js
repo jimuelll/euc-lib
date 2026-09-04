@@ -1,4 +1,5 @@
 const { changePassword } = require("./auth.service");
+const { getAuthAuditContext } = require("./authDevice");
 const {
   getRememberMeFromCookies,
   setRefreshAuthCookies,
@@ -14,7 +15,7 @@ async function handleChangePassword(req, res) {
     }
 
     const rememberMe = getRememberMeFromCookies(req);
-    const result = await changePassword(userId, oldPassword, newPassword, rememberMe);
+    const result = await changePassword(userId, oldPassword, newPassword, rememberMe, getAuthAuditContext(req));
 
     setRefreshAuthCookies(res, result.refreshToken, rememberMe);
 
