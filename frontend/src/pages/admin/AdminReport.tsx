@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Download, ExternalLink, FileBarChart, RefreshCcw, ScrollText, UsersRound } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Download, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +27,6 @@ import { getAdminReservations } from "./adminReservations/reservations.api";
 import type { AdminReservation, ReservationsResult } from "./adminReservations/reservations.types";
 import { fetchClearanceQueue, type ClearanceQueueEntry } from "./adminReports.api";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { useAuth } from "@/context/AuthContext";
 
 const emptyCirculationSummary: CirculationLogSummary = {
   total_records: 0,
@@ -93,7 +91,6 @@ const ClearanceMobileRows = ({ rows }: { rows: ClearanceQueueEntry[] }) => (
 );
 
 const AdminReport = () => {
-  const { user } = useAuth();
   const [circulationStatus, setCirculationStatus] = useState("all");
   const [circulationSearch, setCirculationSearch] = useState("");
   const [circulationDateFrom, setCirculationDateFrom] = useState("");
@@ -235,17 +232,6 @@ const AdminReport = () => {
       contentWidth="wide"
     >
       {reportError ? <div role="alert" className="flex flex-col gap-3 border border-destructive/40 bg-destructive/5 px-4 py-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"><span>{reportError}</span><Button type="button" variant="outline" size="sm" className="w-fit rounded-none border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { setReportError(null); void Promise.all([loadCirculationReport(), loadReservationReport(), loadClearanceReport()]); }}>Try again</Button></div> : null}
-
-      <AdminPanel title="Report workspace" description="Choose a report based on the question you need answered. Exports include every record matching the active filters, not only the page on screen.">
-        <div className="space-y-4">
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Choose a report based on the question you need answered. Exports include every record matching the active filters, not only the page on screen.</p>
-          <div className="grid gap-px border border-border/70 bg-border/70 md:grid-cols-3">
-            <Link to="/admin/analytics" className="group bg-card p-4 transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><FileBarChart className="h-5 w-5 text-primary" /><p className="mt-5 font-semibold text-foreground">Analytics</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Collection health, trends, patron activity, and fine collections.</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">Open analytics <ExternalLink className="h-3.5 w-3.5" /></span></Link>
-            <Link to="/admin/attendance-logs" className="group bg-card p-4 transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><UsersRound className="h-5 w-5 text-primary" /><p className="mt-5 font-semibold text-foreground">Attendance logs</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Visitor and entry activity with its own date and purpose filters.</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">Open attendance logs <ExternalLink className="h-3.5 w-3.5" /></span></Link>
-            {user?.role === "super_admin" ? <Link to="/admin/audit-logs" className="group bg-card p-4 transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ScrollText className="h-5 w-5 text-primary" /><p className="mt-5 font-semibold text-foreground">Audit logs</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Accountability trail for sensitive administrative actions.</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">Open audit logs <ExternalLink className="h-3.5 w-3.5" /></span></Link> : <div className="bg-card p-4"><ScrollText className="h-5 w-5 text-muted-foreground" /><p className="mt-5 font-semibold text-foreground">Audit logs</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Sensitive administrative accountability records are available to super administrators.</p></div>}
-          </div>
-        </div>
-      </AdminPanel>
 
       <Tabs defaultValue="circulation" className="space-y-4">
         <TabsList className="h-auto flex-wrap justify-start rounded-none border border-border/70 bg-background p-1">

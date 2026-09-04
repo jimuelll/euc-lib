@@ -8,19 +8,16 @@ const services = [
   {
     icon: BookOpen,
     title: "Borrowing & Reservation",
-    description:
-      "Borrow up to 5 books at a time with a 14-day lending period. Reserve books online before visiting — held for 48 hours. Track active borrows, reservations, and your full return history. Returns accepted at the front desk or the 24-hour drop-off box.",
+    description: "Manage your book borrowing activity and reservations through your library account.",
     requiresLogin: true,
     link: "/services/borrowing",
   },
   {
     icon: GraduationCap,
     title: "Academic Subscriptions",
-    description:
-      "Full access to JSTOR, IEEE Xplore, ScienceDirect, and other academic databases for research and scholarly articles. Available 24/7 with your credentials.",
+    description: "Explore academic resources and research materials through your library account.",
     requiresLogin: true,
     link: "/services/subscriptions",
-    note: "Placeholder — Subscriptions will be configurable by admin.",
   },
 ];
 
