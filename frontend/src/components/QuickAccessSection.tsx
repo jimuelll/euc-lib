@@ -1,32 +1,30 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, CalendarCheck, GraduationCap, Library } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowRight, BookOpen, CalendarCheck, FileText, Library, Monitor } from "lucide-react";
 
 const quickLinks = [
-  { title: "Find Resources", description: "Explore books, journals, and digital materials.", to: "/catalogue", icon: BookOpen, index: "01", label: "Search" },
-  { title: "Plan Ahead", description: "Reserve library materials before you visit.", to: "/login", icon: CalendarCheck, index: "02", label: "Reserve" },
-  { title: "Learn Without Limits", description: "Access services and academic subscriptions.", to: "/services", icon: GraduationCap, index: "03", label: "Access" },
-  { title: "Library Services", description: "Get help with borrowing, research, and more.", to: "/services", icon: Library, index: "04", label: "Support" },
+  { title: "Search the Catalogue", description: "Explore books, journals, and more.", to: "/catalogue", icon: BookOpen },
+  { title: "Room Reservation", description: "Plan ahead for study and research.", to: "/login", icon: CalendarCheck },
+  { title: "Research Support", description: "Get help with your research needs.", to: "/services", icon: FileText },
+  { title: "Library Services", description: "Access borrowing, renewal, and more.", to: "/services", icon: Library },
+  { title: "Digital Resources", description: "Explore e-books and e-journals.", to: "/services/subscriptions", icon: Monitor },
 ];
 
 const QuickAccessSection = () => (
-  <section className="border-b border-border bg-background">
-    <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
-      <div className="grid border-l border-border md:grid-cols-[.86fr_1fr_1fr_1fr_1fr]">
-        <div className="border-r border-border px-5 py-8 sm:px-7 lg:py-10">
-          <p className="homepage-kicker flex items-center gap-3 text-primary"><span className="h-px w-7 bg-warning" />Our Services</p>
-          <h2 className="mt-4 text-2xl font-bold tracking-[-.05em] text-foreground">Designed for every<br />academic step.</h2>
-          <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">Search, reserve, access, and get support in one place.</p>
+  <section className="border-b border-border bg-background text-foreground">
+    <div className="container px-5 py-8 sm:px-8 lg:px-12 xl:px-16">
+      <div className="grid gap-4 lg:grid-cols-[9.5rem_repeat(5,minmax(0,1fr))] lg:items-stretch lg:gap-3">
+        <div className="pr-4 lg:py-2">
+          <span className="mb-3 block h-px w-7 bg-warning" />
+          <h2 className="text-2xl font-bold leading-none tracking-[-.045em]">Our Services</h2>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">Support for every step of your academic journey.</p>
         </div>
-        {quickLinks.map(({ title, description, to, icon: Icon, index, label }) => (
-          <motion.div key={title} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: .35 }} className="border-r border-border">
-            <Link to={to} className="group flex h-full min-h-[210px] flex-col px-5 py-8 transition-colors hover:bg-primary sm:px-7 lg:py-10">
-              <div className="flex items-center justify-between text-[10px] font-bold tracking-[.18em] uppercase text-muted-foreground group-hover:text-white/65"><span>{index} / {label}</span><Icon className="h-4 w-4 text-warning" /></div>
-              <h3 className="mt-auto text-lg font-bold leading-[1.03] tracking-[-.045em] text-foreground transition-colors group-hover:text-white">{title}</h3>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground transition-colors group-hover:text-white/75">{description}</p>
-              <ArrowRight className="mt-6 h-4 w-4 text-warning transition-transform group-hover:translate-x-1" />
-            </Link>
-          </motion.div>
+        {quickLinks.map(({ title, description, to, icon: Icon }) => (
+          <Link key={title} to={to} className="group flex min-h-[124px] flex-col border border-border bg-card px-4 py-4 transition-colors hover:border-primary hover:bg-primary">
+            <Icon className="h-5 w-5 text-warning" />
+            <h3 className="mt-3 text-[11px] font-bold leading-tight tracking-[-.02em] text-foreground transition-colors group-hover:text-primary-foreground">{title}</h3>
+            <p className="mt-2 text-[10px] leading-4 text-muted-foreground transition-colors group-hover:text-primary-foreground/75">{description}</p>
+            <ArrowRight className="mt-auto h-3.5 w-3.5 self-end text-warning transition-transform group-hover:translate-x-1" />
+          </Link>
         ))}
       </div>
     </div>

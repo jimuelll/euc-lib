@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen } from "lucide-react";
-import { motion } from "framer-motion";
 import { PostCard } from "./components/PostCard";
 import { PostModal } from "./components/PostModal";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
@@ -9,150 +8,39 @@ import type { BulletinPost } from "./types";
 import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 export function AnnouncementsSection() {
-  const { posts, loading, updatePost } = useBulletinPosts({ limit: 4, type: "announcement" });
+  const { posts, loading, updatePost } = useBulletinPosts({ limit: 3, type: "announcement" });
   const [selected, setSelected] = useState<BulletinPost | null>(null);
 
-  const handleLikeToggle = (postId: number, liked: boolean, total: number) => {
-    updatePost(postId, { liked_by_me: liked, likes: total });
-  };
-
-  const handleCommentAdded = (postId: number) => {
-    const post = posts.find((p) => p.id === postId);
-    if (post) updatePost(postId, { comment_count: post.comment_count + 1 });
-  };
-
   return (
-    <section className="border-b border-border bg-secondary/35 py-16 sm:py-20">
-      <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
-
-        {/* ── Section header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-9 flex items-end justify-between gap-4 sm:mb-11"
-        >
-          <div>
-            {/* Eyebrow — gold rule + label, like a cornerstone inscription */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-px w-8 bg-warning" />
-              <p
-              className="homepage-kicker text-primary"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Library Bulletin
-              </p>
-            </div>
-
-            <h2
-              className="text-3xl sm:text-4xl font-bold text-foreground leading-[.95] tracking-[-.055em]"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Latest Announcements
-            </h2>
-            <p className="mt-3 text-sm text-muted-foreground max-w-sm leading-relaxed">
-              Stay informed about library news, events, and updates.
-            </p>
-          </div>
-
-          {/* View all — restrained, directional */}
-          <Link
-            to="/bulletin"
-            className="hidden shrink-0 items-center gap-2 border border-primary px-5 py-2.5 text-[10px] font-bold tracking-[0.18em] uppercase text-primary transition-colors duration-200 hover:bg-primary hover:text-primary-foreground sm:flex"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            View All
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        </motion.div>
-
-        {/* ── Loading ── */}
-        {loading && (
-          <ContentCardsSkeleton cards={4} className="xl:grid-cols-4" />
-        )}
-
-        {/* ── Empty state ── */}
-        {!loading && posts.length === 0 && (
-          <div className="flex flex-col items-center py-20 border border-border">
-            <div className="flex h-12 w-12 items-center justify-center border border-border bg-muted/40 mb-5">
-              <BookOpen className="h-5 w-5 text-muted-foreground/30" />
-            </div>
-            <p
-              className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              No Announcements Yet
-            </p>
-            <p className="text-xs text-muted-foreground/55 mt-1.5">
-              Check back soon for library news.
-            </p>
-          </div>
-        )}
-
-        {/* ── Editorial post composition: the lead keeps visual priority while the
-            following posts retain their natural content height. */}
-        {!loading && posts.length > 0 && (
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-24px" }}
-            variants={{
-              hidden:  {},
-              visible: { transition: { staggerChildren: 0.07 } },
-            }}
-            className="grid border-l border-t border-border lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.85fr)]"
-          >
-            <motion.div
-              variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } } }}
-              className="border-r border-b border-border"
-            >
-              <PostCard post={posts[0]} variant="featured" onClick={() => setSelected(posts[0])} />
-            </motion.div>
-
-            {posts.length > 1 && (
-              <div className="grid content-start sm:grid-cols-2 lg:grid-cols-1">
-                {posts.slice(1).map((post) => (
-                  <motion.div
-                    key={post.id}
-                    variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } } }}
-                    className="border-r border-b border-border"
-                  >
-                    <PostCard post={post} variant="grid" onClick={() => setSelected(post)} />
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* ── Mobile see-all ── */}
-        {!loading && posts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3 }}
-            className="mt-6 sm:hidden"
-          >
-            <Link
-              to="/bulletin"
-              className="flex w-full items-center justify-center gap-2 border border-border py-3 text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              See All Posts
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </motion.div>
-        )}
-
+    <section className="border border-border bg-card px-6 py-7 sm:px-8">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <span className="mb-3 block h-px w-7 bg-warning" />
+          <h2 className="text-2xl font-bold leading-none tracking-[-.045em] text-foreground">Latest from the Bulletin</h2>
+        </div>
+        <Link to="/bulletin" className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary hover:text-warning">
+          View All <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
+
+      {loading && <ContentCardsSkeleton cards={3} className="mt-5 md:grid-cols-3" />}
+      {!loading && posts.length === 0 && (
+        <div className="mt-5 flex min-h-36 items-center justify-center border border-border text-center text-sm text-muted-foreground"><BookOpen className="mr-3 h-4 w-4 text-warning" />No announcements yet.</div>
+      )}
+      {!loading && posts.length > 0 && (
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {posts.map((post) => <PostCard key={post.id} post={post} variant="grid" onClick={() => setSelected(post)} />)}
+        </div>
+      )}
 
       <PostModal
         post={selected}
         onClose={() => setSelected(null)}
-        onLikeToggle={handleLikeToggle}
-        onCommentAdded={handleCommentAdded}
+        onLikeToggle={(postId, liked, likes) => updatePost(postId, { liked_by_me: liked, likes })}
+        onCommentAdded={(postId) => {
+          const post = posts.find((item) => item.id === postId);
+          if (post) updatePost(postId, { comment_count: post.comment_count + 1 });
+        }}
       />
     </section>
   );
