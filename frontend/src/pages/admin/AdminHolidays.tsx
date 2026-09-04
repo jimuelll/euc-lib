@@ -1,229 +1,24 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CalendarOff, Loader2, Pencil, Trash2 } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { useEffect, useState, type FormEvent } from "react";
+import { BookOpen, CalendarDays, CalendarOff } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
-import {
-  createLibraryHoliday,
-  deleteLibraryHoliday,
-  fetchLibrarySettings,
-  type LibraryHoliday,
-  updateLibraryHoliday,
-} from "./adminLibrarySettings/api";
+import { AdminPage, AdminPanel } from "./components/AdminPage";
+import { ContentRowsSkeleton } from "@/components/ui/content-skeletons";
+import { createAcademicProgram, createAcademicTerm, createLibraryHoliday, fetchAcademicPrograms, fetchAcademicTerms, fetchLibrarySettings, setCurrentAcademicTerm, type AcademicProgram, type AcademicTerm, type LibraryHoliday } from "./adminLibrarySettings/api";
 
-const emptyForm = {
-  name: "",
-  holiday_date: "",
-  description: "",
-};
-
-const formatDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
-};
-
-const AdminHolidays = () => {
-  const [holidays, setHolidays] = useState<LibraryHoliday[]>([]);
-  const [form, setForm] = useState(emptyForm);
-  const [editingHolidayId, setEditingHolidayId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const loadHolidays = async () => {
-    setLoading(true);
-    try {
-      const payload = await fetchLibrarySettings();
-      setHolidays(payload.holidays);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message ?? "Failed to load holidays");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadHolidays();
-  }, []);
-
-  const upcomingCount = useMemo(
-    () => holidays.filter((holiday) => new Date(holiday.holiday_date) >= new Date()).length,
-    [holidays]
-  );
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSaving(true);
-
-    try {
-      if (editingHolidayId) {
-        await updateLibraryHoliday(editingHolidayId, form);
-        toast.success("Holiday updated");
-      } else {
-        await createLibraryHoliday(form);
-        toast.success("Holiday added");
-      }
-
-      setForm(emptyForm);
-      setEditingHolidayId(null);
-      await loadHolidays();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message ?? "Failed to save holiday");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const startEditing = (holiday: LibraryHoliday) => {
-    setEditingHolidayId(holiday.id);
-    setForm({
-      name: holiday.name,
-      holiday_date: holiday.holiday_date.slice(0, 10),
-      description: holiday.description ?? "",
-    });
-  };
-
-  const handleDelete = async (holidayId: number) => {
-    try {
-      await deleteLibraryHoliday(holidayId);
-      toast.success("Holiday removed");
-      if (editingHolidayId === holidayId) {
-        setEditingHolidayId(null);
-        setForm(emptyForm);
-      }
-      await loadHolidays();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message ?? "Failed to remove holiday");
-    }
-  };
-
-  return (
-    <AdminPage
-      eyebrow="Administration"
-      title="Holiday Calendar"
-      contentWidth="wide"
-    >
-      <AdminStatGrid>
-        <AdminStatCard
-          label="Configured holidays"
-          value={String(holidays.length)}
-          icon={<CalendarOff className="h-4 w-4" />}
-          helperText="Every active holiday extends the due date by one day if it lands within the loan period."
-        />
-        <AdminStatCard
-          label="Upcoming holidays"
-          value={String(upcomingCount)}
-          helperText="Future holidays that can still affect new borrowings."
-        />
-      </AdminStatGrid>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-      <AdminPanel title={editingHolidayId ? "Edit holiday" : "Add holiday"}>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="holiday-name">Holiday name</Label>
-              <Input
-                id="holiday-name"
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Foundation Day"
-                disabled={saving}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="holiday-date">Holiday date</Label>
-              <Input
-                id="holiday-date"
-                type="date"
-                value={form.holiday_date}
-                onChange={(event) => setForm((current) => ({ ...current, holiday_date: event.target.value }))}
-                disabled={saving}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="holiday-description">Description</Label>
-            <Textarea
-              id="holiday-description"
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Optional note for staff"
-              disabled={saving}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-border/70 pt-4">
-            {editingHolidayId ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setEditingHolidayId(null);
-                  setForm(emptyForm);
-                }}
-              >
-                Cancel
-              </Button>
-            ) : null}
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {editingHolidayId ? "Save holiday" : "Add holiday"}
-            </Button>
-          </div>
-        </form>
-      </AdminPanel>
-
-      <AdminPanel title="Configured holidays" contentClassName="p-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading holidays...
-          </div>
-        ) : holidays.length ? (
-          <div className="divide-y divide-border">
-            {holidays.map((holiday, index) => (
-              <div
-                key={holiday.id}
-                className={`flex flex-col gap-3 px-5 py-4 md:flex-row md:items-start md:justify-between ${index % 2 === 0 ? "bg-card" : "bg-muted/35"}`}
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-foreground">{holiday.name}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{formatDate(holiday.holiday_date)}</div>
-                  {holiday.description ? (
-                    <div className="mt-2 text-sm text-muted-foreground">{holiday.description}</div>
-                  ) : null}
-                </div>
-
-                <div className="flex shrink-0 gap-2">
-                  <Button type="button" variant="outline" size="sm" className="rounded-none" onClick={() => startEditing(holiday)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className="rounded-none hover:border-destructive/40 hover:text-destructive" onClick={() => void handleDelete(holiday.id)}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            No holidays configured yet.
-          </div>
-        )}
-      </AdminPanel>
-      </div>
-    </AdminPage>
-  );
-};
-
-export default AdminHolidays;
+const fmt = (v: string) => new Date(v).toLocaleDateString();
+export default function AcademicSettings() {
+  const [tab, setTab] = useState("terms"), [loading, setLoading] = useState(true), [terms, setTerms] = useState<AcademicTerm[]>([]), [programs, setPrograms] = useState<AcademicProgram[]>([]), [holidays, setHolidays] = useState<LibraryHoliday[]>([]);
+  const [term, setTerm] = useState({ name: "", starts_on: "", ends_on: "", is_current: false }), [program, setProgram] = useState(""), [holiday, setHoliday] = useState({ name: "", holiday_date: "", description: "" });
+  const load = async () => { setLoading(true); const [s,p,t] = await Promise.all([fetchLibrarySettings(), fetchAcademicPrograms(), fetchAcademicTerms()]); setHolidays(s.holidays); setPrograms(p); setTerms(t); setLoading(false); };
+  useEffect(() => { void load(); }, []);
+  const form = (onSubmit: (e: FormEvent) => void, children: React.ReactNode) => <form className="space-y-4" onSubmit={onSubmit}>{children}</form>;
+  const list = (rows: { id: number; name: string }[], empty: string, extra?: (row: any) => React.ReactNode) => loading ? <div className="p-5"><ContentRowsSkeleton rows={4}/></div> : <div className="divide-y divide-border">{rows.map(row => <div key={row.id} className="flex items-center justify-between gap-3 px-5 py-4"><p className="font-medium">{row.name}</p>{extra?.(row)}</div>)}{!rows.length && <p className="p-5 text-sm text-muted-foreground">{empty}</p>}</div>;
+  const Header = ({ icon: Icon, title, detail }: any) => <div className="flex items-start gap-3 border-b border-border py-5"><div className="flex h-9 w-9 items-center justify-center border border-warning/30 bg-warning/10 text-warning"><Icon className="h-4 w-4" /></div><div><h2 className="text-lg font-semibold" style={{fontFamily:"var(--font-heading)"}}>{title}</h2><p className="mt-1 text-sm text-muted-foreground">{detail}</p></div></div>;
+  return <AdminPage title="Academic settings" contentWidth="wide"><Tabs value={tab} onValueChange={setTab}><div className="border-y border-border bg-muted/20 px-2 py-2 sm:px-3"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0"><TabsTrigger value="terms" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarDays className="h-4 w-4"/>Terms</TabsTrigger><TabsTrigger value="programs" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpen className="h-4 w-4"/>Programs / Courses</TabsTrigger><TabsTrigger value="holidays" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarOff className="h-4 w-4"/>Holidays</TabsTrigger></TabsList></div>
+  <TabsContent value="terms" className="mt-0"><Header icon={CalendarDays} title="Academic terms" detail="Expired terms require students to revalidate their library card, without preventing sign-in."/><div className="mt-5 grid gap-5 lg:grid-cols-2"><AdminPanel title="Add term">{form(e=>{e.preventDefault(); void createAcademicTerm(term).then(()=>{setTerm({name:"",starts_on:"",ends_on:"",is_current:false});return load();});},<><div><Label>Term name</Label><Input className="mt-2" value={term.name} onChange={e=>setTerm({...term,name:e.target.value})} required/></div><div className="grid gap-3 sm:grid-cols-2"><Input type="date" value={term.starts_on} onChange={e=>setTerm({...term,starts_on:e.target.value})} required/><Input type="date" value={term.ends_on} onChange={e=>setTerm({...term,ends_on:e.target.value})} required/></div><label className="flex gap-2 text-sm"><input type="checkbox" checked={term.is_current} onChange={e=>setTerm({...term,is_current:e.target.checked})}/>Make current term</label><Button>Add term</Button></>)}</AdminPanel><AdminPanel title="Configured terms" contentClassName="p-0">{list(terms,"No academic terms yet.",row=><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground">{fmt(row.starts_on)} – {fmt(row.ends_on)}</span>{row.is_current?<span className="text-sm text-success">Current</span>:<Button size="sm" variant="outline" onClick={()=>void setCurrentAcademicTerm(row.id).then(load)}>Set current</Button>}</div>)}</AdminPanel></div></TabsContent>
+  <TabsContent value="programs" className="mt-0"><Header icon={BookOpen} title="Programs / Courses" detail="These are the optional standardized choices available in User Management."/><div className="mt-5 grid gap-5 lg:grid-cols-2"><AdminPanel title="Add program / course">{form(e=>{e.preventDefault();void createAcademicProgram(program).then(()=>{setProgram("");return load();});},<><Input value={program} onChange={e=>setProgram(e.target.value)} placeholder="BS Information Technology" required/><Button>Add program / course</Button></>)}</AdminPanel><AdminPanel title="Configured programs / courses" contentClassName="p-0">{list(programs,"No programs / courses yet.")}</AdminPanel></div></TabsContent>
+  <TabsContent value="holidays" className="mt-0"><Header icon={CalendarOff} title="Holidays" detail="Active holidays extend affected circulation due dates."/><div className="mt-5 grid gap-5 lg:grid-cols-2"><AdminPanel title="Add holiday">{form(e=>{e.preventDefault();void createLibraryHoliday(holiday).then(()=>{setHoliday({name:"",holiday_date:"",description:""});return load();});},<><Input value={holiday.name} onChange={e=>setHoliday({...holiday,name:e.target.value})} placeholder="Holiday name" required/><Input type="date" value={holiday.holiday_date} onChange={e=>setHoliday({...holiday,holiday_date:e.target.value})} required/><Button>Add holiday</Button></>)}</AdminPanel><AdminPanel title="Configured holidays" contentClassName="p-0">{list(holidays,"No holidays yet.",row=><span className="text-sm text-muted-foreground">{fmt(row.holiday_date)}</span>)}</AdminPanel></div></TabsContent></Tabs></AdminPage>;
+}

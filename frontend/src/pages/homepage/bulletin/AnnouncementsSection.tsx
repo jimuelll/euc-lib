@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Loader2, BookOpen } from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { PostCard } from "./components/PostCard";
 import { PostModal } from "./components/PostModal";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
+import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 export function AnnouncementsSection() {
   const { posts, loading, updatePost } = useBulletinPosts({ limit: 4, type: "announcement" });
@@ -68,15 +69,7 @@ export function AnnouncementsSection() {
 
         {/* ── Loading ── */}
         {loading && (
-          <div className="flex items-center justify-center py-20 text-muted-foreground">
-            <Loader2 className="mr-2.5 h-4 w-4 animate-spin text-primary" />
-            <span
-              className="text-[11px] tracking-[0.15em] uppercase"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Loading…
-            </span>
-          </div>
+          <ContentCardsSkeleton cards={4} className="xl:grid-cols-4" />
         )}
 
         {/* ── Empty state ── */}

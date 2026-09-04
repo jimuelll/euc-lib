@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ChevronLeft, ChevronRight, Plus, Loader2, Lock, Search, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -20,6 +20,7 @@ import { CreatePostModal } from "./components/CreatePostModal";
 import { BulletinSidebar } from "./components/BulletinSidebar";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
+import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
@@ -187,15 +188,7 @@ export function BulletinPage() {
               </div>
 
               {loading && (
-                <div className="flex items-center justify-center gap-3 py-20 border border-border">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Loading posts...
-                  </span>
-                </div>
+                <div className="border border-border p-4"><ContentCardsSkeleton cards={6} className="md:grid-cols-2 xl:grid-cols-2" /></div>
               )}
 
               {error && !loading && (

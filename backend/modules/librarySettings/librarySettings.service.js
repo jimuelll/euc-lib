@@ -166,6 +166,83 @@ const deleteHoliday = async (holidayId, userId, conn = db) => {
   return { success: true };
 };
 
+const listAcademicPrograms = async ({ activeOnly = true } = {}, conn = db) => {
+  const [rows] = await conn.query(
+    `SELECT id, name, is_active, created_at, updated_at
+     FROM academic_programs
+     ${activeOnly ? "WHERE is_active = 1" : ""}
+     ORDER BY name ASC`
+  );
+  return rows;
+};
+
+const createAcademicProgram = async ({ name }, userId, conn = db) => {
+  const cleanedName = String(name || "").trim();
+  if (!cleanedName) throw Object.assign(new Error("Program / course name is required"), { status: 400 });
+  try {
+    const [result] = await conn.query(
+      "INSERT INTO academic_programs (name, created_by, updated_by) VALUES (?, ?, ?)",
+      [cleanedName, userId ?? null, userId ?? null]
+    );
+    const [[program]] = await conn.query("SELECT id, name, is_active, created_at, updated_at FROM academic_programs WHERE id = ?", [result.insertId]);
+    return program;
+  } catch (error) {
+    if (error?.code === "ER_DUP_ENTRY") throw Object.assign(new Error("This program / course already exists"), { status: 409 });
+    throw error;
+  }
+};
+
+const updateAcademicProgram = async (programId, { name }, userId, conn = db) => {
+  const cleanedName = String(name || "").trim();
+  if (!Number.isInteger(programId) || programId < 1) throw Object.assign(new Error("Invalid program / course"), { status: 400 });
+  if (!cleanedName) throw Object.assign(new Error("Program / course name is required"), { status: 400 });
+  try {
+    const [result] = await conn.query(
+      "UPDATE academic_programs SET name = ?, updated_by = ? WHERE id = ? AND is_active = 1",
+      [cleanedName, userId ?? null, programId]
+    );
+    if (!result.affectedRows) throw Object.assign(new Error("Program / course not found"), { status: 404 });
+    const [[program]] = await conn.query("SELECT id, name, is_active, created_at, updated_at FROM academic_programs WHERE id = ?", [programId]);
+    return program;
+  } catch (error) {
+    if (error?.code === "ER_DUP_ENTRY") throw Object.assign(new Error("This program / course already exists"), { status: 409 });
+    throw error;
+  }
+};
+
+const deleteAcademicProgram = async (programId, userId, conn = db) => {
+  if (!Number.isInteger(programId) || programId < 1) throw Object.assign(new Error("Invalid program / course"), { status: 400 });
+  const [result] = await conn.query(
+    "UPDATE academic_programs SET is_active = 0, updated_by = ? WHERE id = ? AND is_active = 1",
+    [userId ?? null, programId]
+  );
+  if (!result.affectedRows) throw Object.assign(new Error("Program / course not found"), { status: 404 });
+  return { success: true };
+};
+
+const listAcademicTerms = async (conn = db) => {
+  const [rows] = await conn.query("SELECT id, name, starts_on, ends_on, is_current, created_at, updated_at FROM academic_terms ORDER BY starts_on DESC, id DESC");
+  return rows;
+};
+
+const createAcademicTerm = async ({ name, startsOn, endsOn, isCurrent }, userId, conn = db) => {
+  if (!String(name || "").trim() || !startsOn || !endsOn) throw Object.assign(new Error("Term name and dates are required"), { status: 400 });
+  if (new Date(startsOn) > new Date(endsOn)) throw Object.assign(new Error("The end date must be after the start date"), { status: 400 });
+  if (isCurrent) await conn.query("UPDATE academic_terms SET is_current = 0, updated_by = ? WHERE is_current = 1", [userId ?? null]);
+  const [result] = await conn.query("INSERT INTO academic_terms (name, starts_on, ends_on, is_current, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)", [String(name).trim(), startsOn, endsOn, isCurrent ? 1 : 0, userId ?? null, userId ?? null]);
+  const [[term]] = await conn.query("SELECT id, name, starts_on, ends_on, is_current, created_at, updated_at FROM academic_terms WHERE id = ?", [result.insertId]);
+  return term;
+};
+
+const setCurrentAcademicTerm = async (termId, userId, conn = db) => {
+  if (!Number.isInteger(termId) || termId < 1) throw Object.assign(new Error("Invalid academic term"), { status: 400 });
+  const [[term]] = await conn.query("SELECT id FROM academic_terms WHERE id = ?", [termId]);
+  if (!term) throw Object.assign(new Error("Academic term not found"), { status: 404 });
+  await conn.query("UPDATE academic_terms SET is_current = 0, updated_by = ? WHERE is_current = 1", [userId ?? null]);
+  await conn.query("UPDATE academic_terms SET is_current = 1, updated_by = ? WHERE id = ?", [userId ?? null, termId]);
+  return { success: true };
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -174,4 +251,11 @@ module.exports = {
   createHoliday,
   updateHoliday,
   deleteHoliday,
+  listAcademicPrograms,
+  createAcademicProgram,
+  updateAcademicProgram,
+  deleteAcademicProgram,
+  listAcademicTerms,
+  createAcademicTerm,
+  setCurrentAcademicTerm,
 };

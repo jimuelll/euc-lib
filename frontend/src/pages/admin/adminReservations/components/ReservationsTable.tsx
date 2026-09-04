@@ -1,4 +1,5 @@
-import { Loader2, BookMarked } from "lucide-react";
+import { BookMarked } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import ReservationRow from "./ReservationRow";
 import type { AdminReservation } from "../reservations.types";
 
@@ -44,15 +45,8 @@ const ReservationsTable = ({
       <tbody>
         {loading && (
           <tr>
-            <td colSpan={5} className="px-4 py-14 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-warning" />
-                <span
-                  className="text-sm text-muted-foreground"
-                >
-                  Loading reservations…
-                </span>
-              </div>
+            <td colSpan={5} className="p-0" aria-label="Loading reservations">
+              {Array.from({ length: 4 }, (_, index) => <div className="grid grid-cols-[3px_minmax(10rem,1fr)_minmax(8rem,0.7fr)_minmax(8rem,0.7fr)_7rem] gap-4 border-b border-border px-4 py-4" key={index}><span /><div className="space-y-2"><Skeleton className="h-4 w-3/5" /><Skeleton className="h-3 w-2/5" /></div><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-8 w-full" /></div>)}
             </td>
           </tr>
         )}

@@ -6,6 +6,9 @@ import type { FunctionType, User, UserFormState, QrTarget } from "./AdminManage.
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 
+export type AcademicProgram = { id: number; name: string };
+export type AcademicTerm = { id: number; name: string; starts_on: string; ends_on: string; is_current: number };
+
 interface UseAdminManageReturn {
   // Mode
   functionType:    FunctionType;
@@ -19,8 +22,9 @@ interface UseAdminManageReturn {
   resetForm:       () => void;
 
   // Roles
-  currentUserRole: string;
   allowedRoles: string[];
+  programs: AcademicProgram[];
+  terms: AcademicTerm[];
 
   // Search
   searchQuery:          string;
@@ -45,7 +49,6 @@ interface UseAdminManageReturn {
   handleUpdateUser:  () => Promise<void>;
   handleArchiveUser: () => Promise<void>;
   handleRestoreUser: () => Promise<void>;
-  handleBulkDeactivateStudentLikeUsers: () => Promise<void>;
   confirmDialog: JSX.Element;
 
   // QR
@@ -61,6 +64,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [showPassword,  setShowPassword]  = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
+  const [programs,      setPrograms]      = useState<AcademicProgram[]>([]);
+  const [terms,         setTerms]         = useState<AcademicTerm[]>([]);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [roleFilter,    setRoleFilter]    = useState("all");
   const [statusFilter,  setStatusFilter]  = useState("all");
@@ -70,11 +75,19 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
-  const currentUserRole = user?.role ?? "";
 
   useEffect(() => {
     if (!user) return;
     setAllowedRoles(getAllowedRoles(user.role));
+  }, [user]);
+
+  useEffect(() => { if (!user) return; void axiosInstance.get("/api/admin/academic-terms").then(r => setTerms(r.data.terms ?? [])).catch(() => setTerms([])); }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void axiosInstance.get("/api/admin/academic-programs")
+      .then((response) => setPrograms(response.data.programs ?? []))
+      .catch(() => setPrograms([]));
   }, [user]);
 
   // ── Form helpers ───────────────────────────────────────────────────────────
@@ -105,7 +118,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
-    const { fullName, id, role, password, rePassword, address, contact } = form;
+    const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId } = form;
     if (!fullName || !id || !role || !password || !rePassword) {
       toast.error("All required fields must be filled");
       return;
@@ -123,6 +136,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
         password,
         address,
         contact,
+        program_id: programId || null,
+        academic_term_id: academicTermId || null,
       });
       toast.success(res.data.message);
       setQrTarget({ studentId: id, name: fullName });
@@ -185,6 +200,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
       id:         u.student_employee_id,
       address:    u.address  || "",
       contact:    u.contact  || "",
+      programId:  u.program_id ? String(u.program_id) : "",
+      academicTermId: "",
       role:       u.role,
       password:   "",
       rePassword: "",
@@ -194,8 +211,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // ── Update ─────────────────────────────────────────────────────────────────
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
-    const { fullName, role, address, contact, password, rePassword } = form;
-    const updates: any = { name: fullName, role, address, contact };
+    const { fullName, role, address, contact, programId, academicTermId, password, rePassword } = form;
+    const updates: any = { name: fullName, role, address, contact, program_id: programId || null, academic_term_id: academicTermId || null };
     if (password) {
       if (password !== rePassword) {
         toast.error("Passwords do not match");
@@ -270,7 +287,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
   };
 
-  const handleBulkDeactivateStudentLikeUsers = async () => {
+  /* const handleBulkDeactivateStudentLikeUsers = async () => {
     const shouldDeactivate = await confirm({
       title: "Deactivate all student-like accounts?",
       description: "This archives every active student, employee, and alumni account with no unreturned books so their library cards stop working for the new semester.",
@@ -306,7 +323,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     } finally {
       setLoading(false);
     }
-  };
+  }; */
 
   return {
     functionType,
@@ -316,8 +333,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
     showPassword,
     togglePassword,
     resetForm,
-    currentUserRole,
     allowedRoles,
+    programs,
+    terms,
     searchQuery,
     setSearchQuery,
     roleFilter,
@@ -336,7 +354,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
-    handleBulkDeactivateStudentLikeUsers,
     confirmDialog,
     qrTarget,
     setQrTarget,

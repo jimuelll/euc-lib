@@ -11,6 +11,7 @@ import {
   SelectItem,
 } from "@/components/ui";
 import type { User, UserFormState, QrTarget } from "../AdminManage.types";
+import type { AcademicProgram, AcademicTerm } from "../useAdminManage";
 import { formatRole } from "../AdminManage.data";
 import { printCodeLabel } from "@/utils/printCodeLabel";
 
@@ -249,6 +250,21 @@ export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) =
   </div>
 );
 
+const ProgramSelect = ({ value, programs, onChange, disabled = false }: { value: string; programs: AcademicProgram[]; onChange: (value: string) => void; disabled?: boolean }) => (
+  <div>
+    <FieldLabel>Program / Course <span className="normal-case tracking-normal">(optional)</span></FieldLabel>
+    <Select value={value || "__none"} onValueChange={(next) => onChange(next === "__none" ? "" : next)} disabled={disabled}>
+      <SelectTrigger className="rounded-none"><SelectValue placeholder="No program / course selected" /></SelectTrigger>
+      <SelectContent className="rounded-none">
+        <SelectItem value="__none" className="rounded-none">No program / course</SelectItem>
+        {programs.map((program) => <SelectItem key={program.id} value={String(program.id)} className="rounded-none">{program.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+    {!programs.length ? <p className="mt-1.5 text-xs text-muted-foreground">No choices configured yet. An administrator can add them in Academic Calendar.</p> : null}
+  </div>
+);
+const TermSelect = ({ value, terms, onChange, disabled = false }: { value: string; terms: AcademicTerm[]; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>Academic term <span className="normal-case tracking-normal">(students)</span></FieldLabel><Select value={value || "__current"} onValueChange={v => onChange(v === "__current" ? "" : v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Current term" /></SelectTrigger><SelectContent className="rounded-none"><SelectItem value="__current">Current term (automatic)</SelectItem>{terms.map(term => <SelectItem key={term.id} value={String(term.id)}>{term.name}{term.is_current ? " · Current" : ""}</SelectItem>)}</SelectContent></Select></div>;
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 export const StatusBadge = ({ isArchived }: { isArchived: boolean }) => (
@@ -271,6 +287,8 @@ interface CreateFormProps {
   form:             UserFormState;
   showPassword:     boolean;
   allowedRoles:     string[];
+  programs:         AcademicProgram[];
+  terms:            AcademicTerm[];
   loading:          boolean;
   onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
@@ -279,7 +297,7 @@ interface CreateFormProps {
 }
 
 export const CreateForm = ({
-  form, showPassword, allowedRoles, loading,
+  form, showPassword, allowedRoles, programs, terms, loading,
   onField, onTogglePassword, onSubmit, onReset,
 }: CreateFormProps) => (
   <form
@@ -311,6 +329,7 @@ export const CreateForm = ({
           <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} className="rounded-none" />
         </div>
       </div>
+      {form.role === "student" ? <><ProgramSelect value={form.programId} programs={programs} onChange={(value) => onField("programId", value)} /><TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} /></> : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <PasswordField
           label="Password"
@@ -343,7 +362,6 @@ export const CreateForm = ({
 // ─── Search Bar ───────────────────────────────────────────────────────────────
 
 interface SearchBarProps {
-  currentUserRole:  string;
   value:            string;
   loading:          boolean;
   showArchived:     boolean;
@@ -355,11 +373,10 @@ interface SearchBarProps {
   onStatusFilterChange: (v: string) => void;
   onSearch:         () => void;
   onToggleArchived: () => void;
-  onBulkDeactivateStudentLikeUsers: () => void;
 }
 
 export const SearchBar = ({
-  currentUserRole, value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange, onRoleFilterChange, onStatusFilterChange, onSearch, onToggleArchived, onBulkDeactivateStudentLikeUsers,
+  value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange, onRoleFilterChange, onStatusFilterChange, onSearch, onToggleArchived,
 }: SearchBarProps) => (
   <div className="mt-6 space-y-0">
     {/* Section header with toggle */}
@@ -374,17 +391,6 @@ export const SearchBar = ({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {["admin", "super_admin"].includes(currentUserRole) ? (
-          <ActionButton
-            type="button"
-            variant="danger"
-            onClick={onBulkDeactivateStudentLikeUsers}
-            disabled={loading}
-            className="px-3 py-1 text-[10px]"
-          >
-            {loading ? "Working..." : "Deactivate All Students + Employee"}
-          </ActionButton>
-        ) : null}
         <button
           onClick={onToggleArchived}
           className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
@@ -446,7 +452,7 @@ export const SearchResultsTable = ({ results, showArchived, onSelect }: SearchRe
     <table className="w-full text-left text-sm">
       <thead className="border-b border-border bg-secondary/40">
         <tr>
-          {["ID", "Name", "Role", "Status"].map((h) => (
+          {["ID", "Name", "Program / Course", "Role", "Status"].map((h) => (
             <th
               key={h}
               className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
@@ -468,6 +474,7 @@ export const SearchResultsTable = ({ results, showArchived, onSelect }: SearchRe
           >
             <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{u.student_employee_id}</td>
             <td className="px-4 py-3 text-xs font-medium text-foreground">{u.name}</td>
+            <td className="px-4 py-3 text-xs text-muted-foreground">{u.program_course ?? "—"}</td>
             <td
               className="px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
@@ -491,6 +498,8 @@ interface EditFormProps {
   form:             UserFormState;
   showPassword:     boolean;
   allowedRoles:     string[];
+  programs:         AcademicProgram[];
+  terms:            AcademicTerm[];
   loading:          boolean;
   showArchived:     boolean;
   onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
@@ -502,7 +511,7 @@ interface EditFormProps {
 }
 
 export const EditForm = ({
-  selectedUser, form, showPassword, allowedRoles, loading, showArchived,
+  selectedUser, form, showPassword, allowedRoles, programs, terms, loading, showArchived,
   onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore,
 }: EditFormProps) => (
   <form
@@ -567,6 +576,8 @@ export const EditForm = ({
           />
         </div>
       </div>
+
+      {form.role === "student" ? <><ProgramSelect value={form.programId} programs={programs} onChange={(value) => onField("programId", value)} disabled={showArchived} /><TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} disabled={showArchived} /></> : null}
 
       {/* Password + role only editable in active mode */}
       {!showArchived && (

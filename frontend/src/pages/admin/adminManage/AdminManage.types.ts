@@ -10,6 +10,8 @@ export interface User {
   role:                string;
   address?:            string;
   contact?:            string;
+  program_id?:         number | null;
+  program_course?:     string | null;
   is_active?:          number;
   deleted_at?:         string | null;   // ← new: present when user is archived
 }
@@ -21,6 +23,8 @@ export interface UserFormState {
   id:         string;
   address:    string;
   contact:    string;
+  programId:  string;
+  academicTermId: string;
   role:       string;
   password:   string;
   rePassword: string;

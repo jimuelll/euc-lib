@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminPage, AdminPanel } from "../components/AdminPage";
 import { useAboutData } from "./AdminAboutData";
+import { ContentRowsSkeleton } from "@/components/ui/content-skeletons";
 import {
   Divider,
   Field,
@@ -16,10 +17,7 @@ const AdminAboutBuilder = () => {
 
   if (loading) {
     return (
-      <div className="flex max-w-2xl items-center gap-2 py-10 text-sm text-muted-foreground">
-        <div className="h-3 w-3 animate-pulse rounded-full bg-warning/60" />
-        Loading about settings...
-      </div>
+      <div className="max-w-5xl py-3"><ContentRowsSkeleton rows={5} /></div>
     );
   }
 

@@ -1,5 +1,7 @@
 import { Clock, MapPin, Mail, Phone } from "lucide-react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { getSiteContent, type SiteContent } from "@/services/site-content.service";
 
 const hours = [
   { day: "Monday – Friday", time: "7:00 AM – 9:00 PM", open: true  },
@@ -14,6 +16,12 @@ const contactDetails = [
 ];
 
 const LibraryHoursSection = () => {
+  const [content, setContent] = useState<SiteContent | null>(null);
+  useEffect(() => { getSiteContent().then(setContent).catch(() => undefined); }, []);
+  const visibleHours = content?.hours || hours;
+  const visibleContact = content ? [
+    { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },
+  ] : contactDetails;
   return (
     <section className="border-t border-border py-14 sm:py-[4.5rem]">
       <div className="container px-4 sm:px-6">
@@ -58,7 +66,7 @@ const LibraryHoursSection = () => {
 
             {/* Hours rows */}
             <div className="flex-1 border-t border-primary/20 px-6 py-4 sm:px-8">
-              {hours.map((row, i) => (
+              {visibleHours.map((row, i) => (
                 <motion.div
                   key={row.day}
                   initial={{ opacity: 0 }}
@@ -66,7 +74,7 @@ const LibraryHoursSection = () => {
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: i * 0.08 }}
                   className={`flex items-center justify-between gap-4 py-3.5 ${
-                    i < hours.length - 1 ? "border-b border-border" : ""
+                    i < visibleHours.length - 1 ? "border-b border-border" : ""
                   }`}
                 >
                   <span className="text-sm text-muted-foreground">{row.day}</span>
@@ -113,7 +121,7 @@ const LibraryHoursSection = () => {
 
             {/* Contact rows */}
             <div className="flex-1 px-6 py-4 sm:px-8">
-              {contactDetails.map((item, i) => {
+              {visibleContact.map((item, i) => {
                 const Icon = item.icon;
                 return (
                   <motion.div
@@ -123,7 +131,7 @@ const LibraryHoursSection = () => {
                     viewport={{ once: true }}
                     transition={{ duration: 0.3, delay: i * 0.08 }}
                     className={`flex items-start gap-4 py-3.5 ${
-                      i < contactDetails.length - 1 ? "border-b border-border" : ""
+                      i < visibleContact.length - 1 ? "border-b border-border" : ""
                     }`}
                   >
                     {/* Icon badge — maroon tinted */}

@@ -24,6 +24,7 @@ const notificationsRoutes = require("./modules/notifications/notifications.route
 const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
 const backupRoutes = require("./modules/backup/backup.routes");
 const clearanceRoutes = require("./modules/clearance/clearance.routes");
+const siteContentRoutes = require("./modules/siteContent/siteContent.routes");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -59,6 +60,7 @@ app.use("/api/auth",     authRoutes);
 app.use("/api/bulletin", bulletinRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/about",    aboutRoutes);
+app.use("/api/site-content", siteContentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicCatalogRoutes);
 app.use("/api/admin/users", require("./modules/admin/barcode.routes"));

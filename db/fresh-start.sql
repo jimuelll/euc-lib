@@ -40,6 +40,24 @@ ALTER TABLE `library_events`
 ALTER TABLE `library_events`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+CREATE TABLE `site_content_settings` (
+  `id` tinyint NOT NULL,
+  `hero_kicker` varchar(255) NOT NULL,
+  `hero_title` varchar(255) NOT NULL,
+  `hero_highlight` varchar(255) NOT NULL,
+  `hero_description` text NOT NULL,
+  `hero_image_url` varchar(2048) DEFAULT NULL,
+  `hero_stats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`hero_stats`)),
+  `hours` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`hours`)),
+  `address` varchar(500) NOT NULL,
+  `contact_email` varchar(255) NOT NULL,
+  `contact_phone` varchar(100) NOT NULL,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- --------------------------------------------------------
 
 --
@@ -485,11 +503,39 @@ CREATE TABLE `users` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `address` varchar(100) NOT NULL DEFAULT '',
   `contact` varchar(11) NOT NULL DEFAULT '',
+  `program_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `academic_term_id` bigint(20) UNSIGNED DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL,
   `_unique_sid` varchar(80) GENERATED ALWAYS AS (if(`deleted_at` is null,`student_employee_id`,concat('__deleted__',`student_employee_id`,'_',`deleted_at`))) STORED,
   `_unique_email` varchar(280) GENERATED ALWAYS AS (if(`deleted_at` is null,`email`,concat('__deleted__',`email`,'_',`deleted_at`))) STORED,
   `_unique_barcode` varchar(90) GENERATED ALWAYS AS (if(`deleted_at` is null,`barcode`,concat('__deleted__',`barcode`,'_',`deleted_at`))) STORED
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `academic_programs`
+--
+
+CREATE TABLE `academic_programs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `academic_terms` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `starts_on` date NOT NULL,
+  `ends_on` date NOT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -706,7 +752,16 @@ ALTER TABLE `users`
   ADD UNIQUE KEY `uq_active_sid` (`_unique_sid`),
   ADD UNIQUE KEY `uq_active_email` (`_unique_email`),
   ADD UNIQUE KEY `uq_active_barcode` (`_unique_barcode`),
-  ADD KEY `idx_users_deleted` (`deleted_at`);
+  ADD KEY `idx_users_deleted` (`deleted_at`),
+  ADD KEY `idx_users_program` (`program_id`),
+  ADD KEY `idx_users_academic_term` (`academic_term_id`);
+
+ALTER TABLE `academic_programs`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_academic_program_name` (`name`);
+
+ALTER TABLE `academic_terms`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -844,6 +899,12 @@ ALTER TABLE `site_daily_visits`
 ALTER TABLE `users`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
+ALTER TABLE `academic_programs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `academic_terms`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
 --
 -- Constraints for dumped tables
 --
@@ -874,6 +935,12 @@ ALTER TABLE `attendance_logs`
 --
 ALTER TABLE `auth_audit_events`
   ADD CONSTRAINT `fk_auth_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_program` FOREIGN KEY (`program_id`) REFERENCES `academic_programs` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_academic_term` FOREIGN KEY (`academic_term_id`) REFERENCES `academic_terms` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Constraints for table `books`
@@ -1004,6 +1071,8 @@ INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `lo
 ('location', 'Location', 'text', NULL, 0, 0, 7, 0, 0);
 
 INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00);
+INSERT INTO `site_content_settings` (`id`, `hero_kicker`, `hero_title`, `hero_highlight`, `hero_description`, `hours`, `hero_stats`, `address`, `contact_email`, `contact_phone`) VALUES
+(1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567');
 INSERT INTO `auth_restore_state` (`id`) VALUES (1);
 COMMIT;
 

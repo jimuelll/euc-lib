@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
   FileBarChart, ClipboardCheck, PenSquare,
-  CalendarDays, FileText, GraduationCap, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2,
+  CalendarDays, FileText, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
 
@@ -23,7 +23,7 @@ export const sidebarSections: SidebarSection[] = [
     label: "Administration",
     items: [
       { title: "User Management", url: "/admin/manage",       icon: ShieldCheck    },
-      { title: "Holidays",        url: "/admin/holidays",     icon: CalendarOff, roles: ["admin", "super_admin"] },
+      { title: "Academic Settings", url: "/admin/holidays",   icon: CalendarOff, roles: ["admin", "super_admin"] },
       { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert    },
       { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: ["super_admin"] },
     ],
@@ -31,9 +31,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     label: "Content Management",
     items: [
-      { title: "Bulletin Posts",      url: "/admin/bulletin",      icon: FileText, roles: ["admin", "super_admin"] },
-      { title: "Edit About Section", url: "/admin/edit-about", icon: PenSquare, roles: [...ROLES_WITH_ABOUT_SECTION] },
-      { title: "Subscriptions",       url: "/admin/subscriptions", icon: GraduationCap, roles: ["admin", "super_admin"] },
+      { title: "Content Management", url: "/admin/content", icon: FileText, roles: [...ROLES_WITH_ABOUT_SECTION] },
       { title: "Notifications",       url: "/admin/notifications", icon: BellRing, roles: ["admin", "super_admin"] },
     ],
   },

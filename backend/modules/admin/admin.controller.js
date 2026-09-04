@@ -5,7 +5,6 @@ const {
   updateUser,
   searchUsers,
   queryToolsSearch,
-  bulkDeactivateStudentLikeUsers,
 } = require("./admin.service");
 const qr = require("qrcode");
 const db = require("../../db");
@@ -72,15 +71,6 @@ async function handleQueryToolsSearch(req, res) {
   }
 }
 
-async function handleBulkDeactivateStudentLikeUsers(req, res) {
-  try {
-    const result = await bulkDeactivateStudentLikeUsers(req.user.role, req.user.id);
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-}
-
 // GET /admin/users/:student_employee_id/barcode-png
 async function handleGetBarcodePng(req, res) {
   try {
@@ -115,6 +105,5 @@ module.exports = {
   handleUpdateUser,
   handleSearchUsers,
   handleQueryToolsSearch,
-  handleBulkDeactivateStudentLikeUsers,
   handleGetBarcodePng,
 };

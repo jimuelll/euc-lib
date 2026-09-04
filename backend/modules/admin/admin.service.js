@@ -6,9 +6,9 @@ const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
 
 // Role hierarchy map
 const roleHierarchy = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
-  admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
-  staff: ["staff", "scanner", "employee", "alumni", "student"],
+  super_admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
+  admin: ["staff", "scanner", "employee", "alumni", "student"],
+  staff: ["scanner", "employee", "alumni", "student"],
 };
 
 const searchRoleHierarchy = {
@@ -18,7 +18,17 @@ const searchRoleHierarchy = {
 };
 
 // CREATE USER
-async function createUser({ student_employee_id, name, role, password, address, contact }, creatorRole) {
+async function ensureProgramExists(programId) {
+  if (!programId) return null;
+  const [[program]] = await db.query(
+    "SELECT id FROM academic_programs WHERE id = ? AND is_active = 1 LIMIT 1",
+    [programId]
+  );
+  if (!program) throw new Error("Select a valid active program / course");
+  return program.id;
+}
+
+async function createUser({ student_employee_id, name, role, password, address, contact, program_id, academic_term_id }, creatorRole) {
   if (!roleHierarchy[creatorRole]?.includes(role)) {
     throw new Error("You are not allowed to create a user with this role");
   }
@@ -34,11 +44,23 @@ async function createUser({ student_employee_id, name, role, password, address, 
 
   const password_hash = await bcrypt.hash(password, 12);
 
+  const programId = await ensureProgramExists(program_id);
+  let academicTermId = null;
+  if (role === "student") {
+    if (academic_term_id) {
+      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1", [academic_term_id]);
+      if (!term) throw new Error("Select a valid academic term");
+      academicTermId = term.id;
+    } else {
+      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1");
+      academicTermId = term?.id ?? null;
+    }
+  }
   const [result] = await db.query(
     `INSERT INTO users 
-      (student_employee_id, name, password_hash, role, is_active, must_change_password, address, contact)
-      VALUES (?, ?, ?, ?, 1, 1, ?, ?)`,
-    [student_employee_id, name, password_hash, role, address || "", contact || ""]
+      (student_employee_id, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id)
+      VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?)`,
+    [student_employee_id, name, password_hash, role, address || "", contact || "", programId, academicTermId]
   );
 
   const userId = result.insertId;
@@ -155,6 +177,23 @@ async function updateUser(student_employee_id, updates, requesterRole) {
     values.push(updates.contact);
   }
 
+  if (updates.program_id !== undefined) {
+    const programId = await ensureProgramExists(updates.program_id);
+    fields.push("program_id = ?");
+    values.push(programId);
+  }
+
+  if (updates.academic_term_id !== undefined) {
+    let termId = null;
+    if (updates.academic_term_id) {
+      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1", [updates.academic_term_id]);
+      if (!term) throw new Error("Select a valid academic term");
+      termId = term.id;
+    }
+    fields.push("academic_term_id = ?");
+    values.push(termId);
+  }
+
   if (updates.is_active !== undefined) {
     fields.push("is_active = ?");
     values.push(updates.is_active ? 1 : 0);
@@ -180,22 +219,25 @@ async function searchUsers(query, requesterRole) {
   }
 
   const showArchived = query.archived === "true";
-  let sql = `SELECT student_employee_id, name, role, is_active, address, contact, deleted_at
-             FROM users WHERE deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`;
+  let sql = `SELECT u.student_employee_id, u.name, u.role, u.is_active, u.address, u.contact, u.program_id,
+                    p.name AS program_course, u.deleted_at
+             FROM users u
+             LEFT JOIN academic_programs p ON p.id = u.program_id
+             WHERE u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`;
   const values = [...allowedRoles];
 
-  sql += ` AND role IN (${allowedRoles.map(() => "?").join(", ")})`;
+  sql += ` AND u.role IN (${allowedRoles.map(() => "?").join(", ")})`;
 
   if (query.student_employee_id && query.name) {
-    sql += " AND (student_employee_id = ? OR name LIKE ?)";
+    sql += " AND (u.student_employee_id = ? OR u.name LIKE ?)";
     values.push(query.student_employee_id, `%${query.name}%`);
   } else {
     if (query.student_employee_id) {
-      sql += " AND student_employee_id = ?";
+      sql += " AND u.student_employee_id = ?";
       values.push(query.student_employee_id);
     }
     if (query.name) {
-      sql += " AND name LIKE ?";
+      sql += " AND u.name LIKE ?";
       values.push(`%${query.name}%`);
     }
   }
@@ -205,24 +247,24 @@ async function searchUsers(query, requesterRole) {
       if (query.page !== undefined) return { rows: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
       return [];
     }
-    sql += " AND role = ?";
+    sql += " AND u.role = ?";
     values.push(query.role);
   }
 
   if (query.status === "active") {
-    sql += " AND is_active = 1";
+    sql += " AND u.is_active = 1";
   } else if (query.status === "inactive") {
-    sql += " AND is_active = 0";
+    sql += " AND u.is_active = 0";
   }
 
   if (query.page !== undefined) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 25));
     const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM (${sql}) AS matching_users`, values);
-    const [results] = await db.query(`${sql} ORDER BY name ASC LIMIT ? OFFSET ?`, [...values, limit, (page - 1) * limit]);
+    const [results] = await db.query(`${sql} ORDER BY u.name ASC LIMIT ? OFFSET ?`, [...values, limit, (page - 1) * limit]);
     return { rows: results, pagination: { page, limit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / limit)) } };
   }
-  const [results] = await db.query(`${sql} ORDER BY name ASC`, values);
+  const [results] = await db.query(`${sql} ORDER BY u.name ASC`, values);
   return results;
 }
 

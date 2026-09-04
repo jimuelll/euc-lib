@@ -155,6 +155,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
+        hideClose
         className="w-[calc(100vw-2rem)] max-w-lg max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
         style={{ borderRadius: 0 }}
       >
@@ -191,6 +192,8 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               </DialogHeader>
             </div>
             <button
+              data-dialog-close
+              aria-label="Close new post form"
               onClick={handleClose}
               className="flex h-7 w-7 items-center justify-center text-primary-foreground/40 hover:text-primary-foreground transition-colors"
             >

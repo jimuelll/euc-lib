@@ -6,14 +6,10 @@ import MissionHistory from "./components/MissionHistory";
 import PoliciesFacilities from "./components/PoliciesFacilities";
 import StaffGrid from "./components/StaffGrid";
 import SpacesGrid from "./components/SpacesGrid";
+import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 const LoadingIndicator = () => (
-  <div className="container px-4 sm:px-6 py-16 flex items-center justify-center">
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <div className="h-3 w-3 rounded-full bg-warning/60 animate-pulse" />
-      Loading page content…
-    </div>
-  </div>
+  <div className="container px-4 py-16 sm:px-6"><ContentCardsSkeleton cards={3} /></div>
 );
 
 const About = () => {

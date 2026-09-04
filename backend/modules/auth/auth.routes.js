@@ -56,11 +56,15 @@ router.post("/refresh", async (req, res) => {
     );
     setRefreshAuthCookies(res, nextRefreshToken, Boolean(payload.remember_me));
 
+    let term = null;
+    if (user.role === "student") [[term]] = await require("../../db").query("SELECT name, ends_on FROM academic_terms WHERE id = ? LIMIT 1", [user.academic_term_id ?? null]);
+    const termStatus = user.role !== "student" ? { term_status: "not_applicable", academic_term_name: null } : (!term || new Date(term.ends_on) < new Date(new Date().toDateString()) ? { term_status: "expired", academic_term_name: term?.name ?? null } : { term_status: "current", academic_term_name: term.name });
     const accessToken = signToken({
       id: user.id,
       role: user.role,
       name: user.name,
       must_change_password: user.must_change_password,
+      ...termStatus,
     });
 
     res.json({ accessToken });

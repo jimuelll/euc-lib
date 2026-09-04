@@ -209,7 +209,7 @@ const deletePost = async (postId, requestingUser) => {
   if (!post) throw Object.assign(new Error("Post not found"), { status: 404 });
 
   const isOwner = post.author_id === requestingUser.id;
-  const isAdmin = ["staff", "admin", "super_admin"].includes(requestingUser.role);
+  const isAdmin = ["admin", "super_admin"].includes(requestingUser.role);
 
   if (!isOwner && !isAdmin) {
     throw Object.assign(new Error("Forbidden"), { status: 403 });
@@ -236,7 +236,7 @@ const restorePost = async (postId, requestingUser) => {
   if (!post) throw Object.assign(new Error("Archived post not found"), { status: 404 });
 
   const isOwner = post.author_id === requestingUser.id;
-  const isAdmin = ["staff", "admin", "super_admin"].includes(requestingUser.role);
+  const isAdmin = ["admin", "super_admin"].includes(requestingUser.role);
 
   if (!isOwner && !isAdmin) {
     throw Object.assign(new Error("Forbidden"), { status: 403 });

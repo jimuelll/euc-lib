@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "./components/AdminPage";
 
 type FineRow = { id: number; book_title: string; status: "borrowed" | "overdue" | "returned"; fine_amount: number; settled_amount: number; unsettled_amount: number };
-type Profile = { user: { name: string; student_employee_id: string }; status: "blocked" | "eligible"; reasons: string[]; overdueItems: { id: number; title: string }[]; fineRows: FineRow[]; outstandingAmount: number; reservations: { id: number; status: string; book_title: string }[]; transactions: { id: number; receipt_number: string | null; transaction_type: string; amount: number; reason: string | null; created_at: string; corrected: number }[] };
+type Profile = { user: { name: string; student_employee_id: string; program_course?: string | null }; status: "blocked" | "eligible"; reasons: string[]; overdueItems: { id: number; title: string }[]; fineRows: FineRow[]; outstandingAmount: number; reservations: { id: number; status: string; book_title: string }[]; transactions: { id: number; receipt_number: string | null; transaction_type: string; amount: number; reason: string | null; created_at: string; corrected: number }[] };
 type UserSuggestion = { student_employee_id: string; name: string; role: string };
 type QueueEntry = { userId: number; name: string; studentEmployeeId: string; overdueCount: number; oldestDueDate: string | null; overdueTitles: string[]; outstandingAmount: number; fineRecords: number };
 type QueueResponse = { rows: QueueEntry[]; pagination: { page: number; limit: number; total: number; totalPages: number } };

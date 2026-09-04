@@ -1,17 +1,10 @@
-import { AlertTriangle, BookOpen, Loader2 } from "lucide-react";
+import { AlertTriangle, BookOpen } from "lucide-react";
+import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 // ─── Loading ──────────────────────────────────────────────────────────────────
 
 export const LoadingState = () => (
-  <div className="border border-border border-t-0 flex items-center justify-center gap-3 py-20 text-muted-foreground bg-background">
-    <Loader2 className="h-5 w-5 animate-spin" />
-    <span
-      className="text-[10px] font-bold uppercase tracking-[0.18em]"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      Loading…
-    </span>
-  </div>
+  <div className="border border-border border-t-0 bg-background p-5"><ContentCardsSkeleton cards={3} /></div>
 );
 
 // ─── Error ────────────────────────────────────────────────────────────────────

@@ -7,6 +7,13 @@ const {
 const db = require("../../db");
 const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
 
+const getTermStatus = async (user) => {
+  if (user.role !== "student") return { term_status: "not_applicable", academic_term_name: null };
+  const [[term]] = await db.query("SELECT name, ends_on FROM academic_terms WHERE id = ? LIMIT 1", [user.academic_term_id ?? null]);
+  if (!term || new Date(term.ends_on) < new Date(new Date().toDateString())) return { term_status: "expired", academic_term_name: term?.name ?? null };
+  return { term_status: "current", academic_term_name: term.name };
+};
+
 const recordAuthAuditEvent = async (userId, eventType) => {
   await db.query("INSERT INTO auth_audit_events (user_id, event_type) VALUES (?, ?)", [userId, eventType]);
 };
@@ -22,11 +29,13 @@ async function loginUser(student_employee_id, password, rememberMe = false) {
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
   }
 
+  const termStatus = await getTermStatus(user);
   const payload = {
     id: user.id,
     role: user.role,
     name: user.name,
     must_change_password: user.must_change_password,
+    ...termStatus,
   };
 
   const token = signToken(payload);
@@ -43,7 +52,7 @@ async function loginUser(student_employee_id, password, rememberMe = false) {
     return { mustChangePassword: true, token, refreshToken };
   }
 
-  return { token, refreshToken, role: user.role };
+  return { token, refreshToken, role: user.role, ...termStatus };
 }
 
 async function changePassword(userId, oldPassword, newPassword, rememberMe = false) {
@@ -78,6 +87,7 @@ async function changePassword(userId, oldPassword, newPassword, rememberMe = fal
     role: user.role,
     name: user.name,
     must_change_password: false,
+    ...(await getTermStatus(user)),
   });
 
   const refreshToken = await issueRefreshSession(

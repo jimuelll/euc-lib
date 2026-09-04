@@ -21,8 +21,9 @@ const buildStatus = async (userId, conn = db) => {
 const getClearanceProfile = async (studentEmployeeId) => {
   await syncOverdueBorrowings();
   const [[user]] = await db.query(
-    `SELECT id, name, role, student_employee_id, is_active FROM users
-     WHERE student_employee_id = ? AND deleted_at IS NULL LIMIT 1`, [String(studentEmployeeId).trim()]
+    `SELECT u.id, u.name, u.role, u.student_employee_id, u.is_active, p.name AS program_course
+     FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id
+     WHERE u.student_employee_id = ? AND u.deleted_at IS NULL LIMIT 1`, [String(studentEmployeeId).trim()]
   );
   if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
   const clearance = await buildStatus(user.id);
@@ -176,8 +177,8 @@ const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
 };
 
 const getReceipt = async (receiptNumber) => {
-  const [[transaction]] = await db.query(`SELECT ct.*, u.name AS user_name, u.student_employee_id, staff.name AS recorded_by_name
-    FROM clearance_transactions ct JOIN users u ON u.id = ct.user_id LEFT JOIN users staff ON staff.id = ct.created_by
+  const [[transaction]] = await db.query(`SELECT ct.*, u.name AS user_name, u.student_employee_id, p.name AS program_course, staff.name AS recorded_by_name
+    FROM clearance_transactions ct JOIN users u ON u.id = ct.user_id LEFT JOIN academic_programs p ON p.id = u.program_id LEFT JOIN users staff ON staff.id = ct.created_by
     WHERE ct.receipt_number = ? LIMIT 1`, [receiptNumber]);
   if (!transaction) throw Object.assign(new Error("Receipt not found"), { status: 404 });
   const [items] = await db.query(`SELECT cti.amount, bk.title AS book_title FROM clearance_transaction_items cti

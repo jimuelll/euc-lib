@@ -1,9 +1,10 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Search, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
 import { useTheme } from "@/hooks/use-theme"
 import { useAuth } from "@/context/AuthContext"
+import { getSiteContent, type SiteContent } from "@/services/site-content.service"
 
 const HeroSection = () => {
   const [searchActive, setSearchActive] = useState(false)
@@ -12,6 +13,8 @@ const HeroSection = () => {
   const navigate = useNavigate()
   const { theme } = useTheme()
   const { isLoggedIn, loading } = useAuth()
+  const [content, setContent] = useState<SiteContent | null>(null)
+  useEffect(() => { getSiteContent().then(setContent).catch(() => undefined); }, [])
 
   const isDark = theme === "dark"
 
@@ -40,7 +43,7 @@ const HeroSection = () => {
       {/* Background photo — let it breathe */}
       <div className="absolute inset-0">
         <img
-          src="/hero.jpg"
+          src={content?.hero_image_url || "/hero.jpg"}
           alt="Library interior"
           className="h-full w-full object-cover"
         />
@@ -86,7 +89,7 @@ const HeroSection = () => {
             className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/50"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            Manuel S. Enverga University Foundation — Candelaria Inc.
+            {content?.hero_kicker || "Manuel S. Enverga University Foundation — Candelaria Inc."}
           </span>
         </motion.div>
 
@@ -98,9 +101,9 @@ const HeroSection = () => {
           className="font-heading text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl 2xl:text-7xl"
           style={{ fontFamily: "var(--font-heading)" }}
         >
-          Enverga-Candelaria
+          {content?.hero_title || "Enverga-Candelaria"}
           <br />
-          <span className="text-warning">Library</span>
+          <span className="text-warning">{content?.hero_highlight || "Library"}</span>
         </motion.h1>
 
         {/* Subordinate descriptor */}
@@ -110,8 +113,7 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.15 }}
           className="mt-5 max-w-xl text-[15px] leading-7 text-white/75 2xl:max-w-2xl 2xl:text-base 2xl:leading-8"
         >
-          Digitalized inventory tracking, book reservations, and seamless access
-          to library services — built for academic excellence.
+          {content?.hero_description || "Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence."}
         </motion.p>
 
         {/* Search */}
@@ -197,11 +199,11 @@ const HeroSection = () => {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="mt-12 flex flex-wrap items-center gap-0 border-t border-white/15 pt-6 2xl:mt-16 2xl:pt-8"
         >
-          {[
+          {(content?.hero_stats || [
             { value: "12,000+", label: "Volumes" },
             { value: "400+",    label: "Journals" },
             { value: "24/7",    label: "Digital Access" },
-          ].map((stat, i) => (
+          ]).map((stat, i) => (
             <div
               key={stat.label}
               className={`flex flex-col pr-8 ${i > 0 ? "pl-8 border-l border-white/12" : ""}`}

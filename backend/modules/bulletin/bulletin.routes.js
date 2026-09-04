@@ -13,7 +13,7 @@ router.get("/:postId", optionalAuthMiddleware(), controller.getPostById);
 // ─── Protected — must be logged in ───────────────────────────────────────────
 router.post  ("/",                            authMiddleware(CAN_POST),   controller.createPost);
 router.delete("/:postId",                     authMiddleware(),            controller.deletePost);
-router.patch ("/:postId/restore",             authMiddleware(ADMIN_ONLY), controller.restorePost);
+router.patch ("/:postId/restore",             authMiddleware(CAN_POST),   controller.restorePost);
 router.patch ("/:postId/pin",                 authMiddleware(ADMIN_ONLY), controller.pinPost);
 
 router.post  ("/:postId/like",                authMiddleware(), controller.toggleLike);

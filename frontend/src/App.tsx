@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,9 +7,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PasswordChangeGate from "@/components/auth/PasswordChangeGate";
+import TermRevalidationNotice from "@/components/auth/TermRevalidationNotice";
 import SiteVisitTracker from "@/components/analytics/SiteVisitTracker";
 import ScrollToTop from "@/components/ScrollToTop";
 import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
 import { NotificationsProvider } from "./context/NotificationsContext";
 
 import Index from "./pages/homepage/Index";
@@ -21,17 +23,25 @@ import Login from "./pages/homepage/Login";
 import ChangePassword from "./pages/homepage/ChangePassword";
 import NotFound from "./pages/homepage/NotFound";
 
-const LibraryServices = lazy(() => import("./pages/homepage/LibraryServices"));
-const AcademicSubscriptions = lazy(() => import("./pages/homepage/academicSubscriptions/AcademicSubscriptions"));
-const StudentDashboard = lazy(() => import("./pages/homepage/myLibrary"));
+const loadLibraryServices = () => import("./pages/homepage/LibraryServices");
+const loadAcademicSubscriptions = () => import("./pages/homepage/academicSubscriptions/AcademicSubscriptions");
+const loadStudentDashboard = () => import("./pages/homepage/myLibrary");
+const LibraryServices = lazy(loadLibraryServices);
+const AcademicSubscriptions = lazy(loadAcademicSubscriptions);
+const StudentDashboard = lazy(loadStudentDashboard);
 const EditProfile = lazy(() => import("./pages/homepage/EditProfile"));
 const ScanQR = lazy(() => import("./pages/homepage/scanqr/index"));
 
-const AdminLayout = lazy(() => import("./pages/admin/adminLayout/Index"));
-const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
+const loadAdminLayout = () => import("./pages/admin/adminLayout/Index");
+const loadAdminHome = () => import("./pages/admin/AdminHome");
+const loadAdminManage = () => import("./pages/admin/adminManage/Index");
+const loadAdminCatalog = () => import("./pages/admin/adminCatalog/Index");
+const loadAdminContentManagement = () => import("./pages/admin/AdminContentManagement");
+const AdminLayout = lazy(loadAdminLayout);
+const AdminHome = lazy(loadAdminHome);
 const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
-const AdminManage = lazy(() => import("./pages/admin/adminManage/Index"));
-const AdminCatalog = lazy(() => import("./pages/admin/adminCatalog/Index"));
+const AdminManage = lazy(loadAdminManage);
+const AdminCatalog = lazy(loadAdminCatalog);
 const AdminCirculation = lazy(() => import("./pages/admin/adminCirculation/Index"));
 const AdminReservations = lazy(() => import("./pages/admin/adminReservations/AdminReservations"));
 const AdminPayment = lazy(() => import("./pages/admin/AdminPayment"));
@@ -47,14 +57,33 @@ const AdminHolidays = lazy(() => import("./pages/admin/AdminHolidays"));
 const AdminAuditLogs = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminBulletin = lazy(() => import("./pages/admin/AdminBulletin"));
 const AdminBookTypes = lazy(() => import("./pages/admin/AdminBookTypes"));
+const AdminContentManagement = lazy(loadAdminContentManagement);
 
 const queryClient = new QueryClient();
 
-const RouteFallback = () => (
-  <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-    Loading...
-  </div>
-);
+const RouteFallback = () => {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setVisible(true), 220); return () => window.clearTimeout(timer); }, []);
+  if (!visible) return null;
+  return <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" aria-label="Loading page" aria-busy="true"><div className="h-full w-1/3 bg-warning animate-[route-progress_1.15s_ease-in-out_infinite]" /></div>;
+};
+
+const RoutePrefetcher = () => {
+  const { user, loading } = useAuth();
+  useEffect(() => {
+    if (loading || !user) return;
+    const preload = () => {
+      if (["admin", "super_admin", "staff"].includes(user.role)) {
+        void Promise.all([loadAdminLayout(), loadAdminHome(), loadAdminManage(), loadAdminCatalog(), loadAdminContentManagement()]);
+      } else {
+        void Promise.all([loadLibraryServices(), loadAcademicSubscriptions(), loadStudentDashboard()]);
+      }
+    };
+    const timer = window.setTimeout(preload, 1200);
+    return () => window.clearTimeout(timer);
+  }, [loading, user]);
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -66,7 +95,9 @@ const App = () => (
           <ScrollToTop />
           <AuthProvider>
             <NotificationsProvider>
+              <RoutePrefetcher />
               <PasswordChangeGate />
+              <TermRevalidationNotice />
               <SiteVisitTracker />
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
@@ -149,22 +180,9 @@ const App = () => (
                     <Route path="reservations" element={<AdminReservations />} />
                     <Route path="holidays" element={<AdminHolidays />} />
                     <Route path="restrictions" element={<AdminManage />} />
-                    <Route
-                      path="bulletin"
-                      element={
-                        <ProtectedRoute roles={["admin", "super_admin"]}>
-                          <AdminBulletin />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="subscriptions"
-                      element={
-                        <ProtectedRoute roles={["admin", "super_admin"]}>
-                          <AdminSubscriptions />
-                        </ProtectedRoute>
-                      }
-                    />
+                    <Route path="content" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminContentManagement /></ProtectedRoute>} />
+                    <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />
+                    <Route path="subscriptions" element={<Navigate to="/admin/content?tab=subscriptions" replace />} />
                     <Route
                       path="notifications"
                       element={
@@ -181,14 +199,7 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
-                    <Route
-                      path="edit-about"
-                      element={
-                        <ProtectedRoute roles={["admin", "super_admin"]}>
-                          <AdminEditAbout />
-                        </ProtectedRoute>
-                      }
-                    />
+                    <Route path="edit-about" element={<Navigate to="/admin/content?tab=about" replace />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />
