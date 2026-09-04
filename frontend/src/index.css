@@ -9,33 +9,33 @@
 
 @layer base {
   :root {
-    --font-heading: "Manrope", system-ui, sans-serif;
-    --font-body: "Inter", system-ui, sans-serif;
+    --font-heading: "DM Sans", system-ui, sans-serif;
+    --font-body: "DM Sans", system-ui, sans-serif;
 
-    /* Parchment white — breathing room, not decoration */
-    --background: 36 20% 97%;
-    --foreground: 10 30% 10%;
+    /* Clean paper white: light mode stays crisp around the MSEUF maroon. */
+    --background: 0 0% 100%;
+    --foreground: 12 15% 10%;
 
-    --card: 36 15% 99%;
-    --card-foreground: 10 30% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 12 15% 10%;
 
-    --popover: 36 15% 99%;
-    --popover-foreground: 10 30% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 12 15% 10%;
 
     /* MSEUF maroon (#800000) — the dominant structural field */
     --primary: 0 100% 25.1%;
     --primary-foreground: 36 30% 97%;
 
     /* Warm muted clay — secondary surfaces */
-    --secondary: 18 15% 91%;
-    --secondary-foreground: 10 20% 18%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 12 15% 14%;
 
-    --muted: 24 10% 90%;
-    --muted-foreground: 10 10% 42%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 12 7% 42%;
 
     /* Subtle warm tone for accents */
-    --accent: 30 12% 88%;
-    --accent-foreground: 10 25% 12%;
+    --accent: 42 40% 94%;
+    --accent-foreground: 12 15% 12%;
 
     --destructive: 4 70% 45%;
     --destructive-foreground: 0 0% 100%;
@@ -50,8 +50,8 @@
     --info: 214 52% 32%;
     --info-foreground: 0 0% 100%;
 
-    --border: 24 12% 84%;
-    --input: 24 12% 84%;
+    --border: 12 10% 86%;
+    --input: 12 10% 86%;
     --ring: 0 100% 25.1%;
 
     /* Slightly tighter radius — rectilinear authority */
@@ -131,9 +131,7 @@
     @apply bg-background text-foreground font-body antialiased;
     min-width: 0;
     overflow-x: hidden;
-    background-image:
-      linear-gradient(180deg, hsl(var(--primary) / 0.06), transparent 18rem),
-      linear-gradient(90deg, hsl(var(--warning) / 0.04), transparent 24rem);
+    background-image: none;
     background-attachment: scroll;
   }
 
@@ -207,5 +205,18 @@
     box-shadow:
       inset 0 1px 0 hsl(var(--background) / 0.7),
       0 12px 32px hsl(var(--primary) / 0.08);
+  }
+
+  .homepage-shell {
+    background: hsl(var(--background));
+  }
+
+  .homepage-kicker {
+    font-family: var(--font-heading);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.26em;
+    line-height: 1.25;
+    text-transform: uppercase;
   }
 }

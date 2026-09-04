@@ -8,7 +8,7 @@ import { AnnouncementsSection } from "@/pages/homepage/bulletin/AnnouncementsSec
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="homepage-shell min-h-screen bg-background">
       <Navbar />
       <main>
         <HeroSection />

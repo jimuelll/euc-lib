@@ -116,26 +116,18 @@ export function BulletinPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="bg-primary relative overflow-hidden">
+      <div className="bg-primary relative overflow-hidden border-b border-warning/70">
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        <div
-          className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-          }}
-        />
-        <div className="relative z-10 h-[3px] w-full bg-warning" />
-        <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
+        <div className="relative z-10 h-[2px] w-full bg-warning" />
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
+        <div className="container relative z-20 px-5 py-11 sm:px-8 sm:py-14 lg:px-12 xl:px-16">
           <SectionLabel light>Enverga-Candelaria Library</SectionLabel>
 
           <div className="mt-5 flex items-start justify-between gap-6 flex-wrap">
             <div>
               <h1
-                className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight text-primary-foreground"
+                className="text-4xl sm:text-5xl font-bold tracking-[-.055em] leading-[.92] text-primary-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Bulletin Board
@@ -160,7 +152,7 @@ export function BulletinPage() {
       </div>
 
       <main className="bg-background">
-        <div className="container px-4 py-8 sm:px-6 sm:py-9">
+        <div className="container px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-16">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
             <div className="flex-1 min-w-0">
               <div className="mb-5 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">

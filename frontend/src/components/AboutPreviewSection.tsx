@@ -2,100 +2,33 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
-const AboutPreviewSection = () => {
-  return (
-    <section className="relative overflow-hidden border-t border-border bg-background py-16 sm:py-20">
-
-      {/* Faint maroon wash — tints without dominating */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: "linear-gradient(105deg, hsl(var(--primary) / 0.04) 0%, transparent 60%)",
-        }}
-      />
-
-      {/* Gold left spine — carries the language without the maroon field */}
-      <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
-
-      <div className="container relative z-10 px-4 sm:px-6">
-        <div className="max-w-2xl">
-
-          {/* Eyebrow */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4 }}
-            className="flex items-center gap-3 mb-7"
-          >
-            <div className="h-px w-6 bg-warning" />
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              About the Library
-            </p>
-          </motion.div>
-
-          {/* Heading */}
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-3xl sm:text-4xl font-bold text-foreground leading-tight tracking-tight"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Committed to Academic
-            <br />
-            <span className="text-primary">Excellence</span>
-          </motion.h2>
-
-          {/* Body */}
-          <motion.p
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.12 }}
-            className="mt-5 max-w-xl text-sm leading-7 text-muted-foreground"
-          >
-            Our college library fosters scholarly growth through comprehensive resources,
-            modern facilities, and digital services. With a growing collection and access
-            to leading research databases, we support every student and faculty member
-            in their pursuit of knowledge.
-          </motion.p>
-
-          {/* Divider rule */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-            className="mt-8 h-px w-16 bg-border origin-left"
-          />
-
-          {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.28 }}
-            className="mt-7"
-          >
-            <Link
-              to="/about"
-              className="inline-flex items-center gap-2 border border-border px-6 py-3 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground transition-colors duration-200 hover:border-primary hover:text-primary"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Learn More
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </motion.div>
-
+const AboutPreviewSection = () => (
+  <section className="border-b border-border bg-background py-16 sm:py-20">
+    <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
+      <div className="grid overflow-hidden border border-border lg:grid-cols-[.82fr_1.18fr]">
+        <div className="relative min-h-[280px] overflow-hidden border-b border-border lg:min-h-[430px] lg:border-b-0 lg:border-r">
+          <img src="/hero.jpg" alt="Books and study tables at the library" className="absolute inset-0 h-full w-full object-cover object-[35%_center]" loading="lazy" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgb(50_0_0_/_0.74),transparent_65%)]" />
+          <div className="absolute bottom-0 left-0 border-l-[3px] border-warning px-6 py-6 text-white sm:px-8">
+            <p className="homepage-kicker text-warning">MSEUF-CI Library</p>
+            <p className="mt-2 max-w-[12rem] text-xl font-bold leading-tight tracking-[-.04em]">A place for bigger ideas.</p>
+          </div>
         </div>
+        <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: .45 }} className="flex flex-col px-6 py-10 sm:px-10 sm:py-12 lg:px-14 lg:py-16">
+          <p className="homepage-kicker flex items-center gap-3 text-primary"><span className="h-px w-8 bg-warning" />About the Library</p>
+          <h2 className="mt-5 max-w-xl text-4xl font-bold leading-[.92] tracking-[-.06em] text-foreground sm:text-5xl">Academic support, made more accessible.</h2>
+          <p className="mt-6 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
+            The Enverga-Candelaria Library supports scholarly growth through a rich and diverse collection, modern resources, and responsive services for every student and faculty member.
+          </p>
+          <div className="mt-auto pt-9">
+            <Link to="/about" className="inline-flex items-center gap-3 border border-primary px-5 py-3 text-[10px] font-bold tracking-[.18em] uppercase text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+              Learn More <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </motion.div>
       </div>
-    </section>
-  );
-};
+    </div>
+  </section>
+);
 
 export default AboutPreviewSection;

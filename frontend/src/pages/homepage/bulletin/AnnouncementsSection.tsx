@@ -22,8 +22,8 @@ export function AnnouncementsSection() {
   };
 
   return (
-    <section className="py-14 sm:py-[4.5rem]">
-      <div className="container px-4 sm:px-6">
+    <section className="border-b border-border bg-secondary/35 py-16 sm:py-20">
+      <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Section header ── */}
         <motion.div
@@ -31,14 +31,14 @@ export function AnnouncementsSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-8 flex items-end justify-between gap-4 sm:mb-10"
+          className="mb-9 flex items-end justify-between gap-4 sm:mb-11"
         >
           <div>
             {/* Eyebrow — gold rule + label, like a cornerstone inscription */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-px w-6 bg-warning" />
+              <div className="h-px w-8 bg-warning" />
               <p
-                className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+              className="homepage-kicker text-primary"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Library Bulletin
@@ -46,12 +46,12 @@ export function AnnouncementsSection() {
             </div>
 
             <h2
-              className="text-2xl sm:text-3xl font-bold text-foreground leading-tight tracking-tight"
+              className="text-3xl sm:text-4xl font-bold text-foreground leading-[.95] tracking-[-.055em]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Latest Announcements
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground max-w-sm leading-relaxed">
+            <p className="mt-3 text-sm text-muted-foreground max-w-sm leading-relaxed">
               Stay informed about library news, events, and updates.
             </p>
           </div>
@@ -59,7 +59,7 @@ export function AnnouncementsSection() {
           {/* View all — restrained, directional */}
           <Link
             to="/bulletin"
-            className="hidden shrink-0 items-center gap-2 border border-border px-4 py-2 text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground transition-colors duration-200 hover:border-primary hover:text-primary sm:flex"
+            className="hidden shrink-0 items-center gap-2 border border-primary px-5 py-2.5 text-[10px] font-bold tracking-[0.18em] uppercase text-primary transition-colors duration-200 hover:bg-primary hover:text-primary-foreground sm:flex"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             View All

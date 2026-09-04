@@ -97,7 +97,7 @@ const Navbar = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-primary border-b border-primary-foreground/10">
+      <header className="sticky top-0 z-50 border-b border-primary-foreground/15 bg-primary">
         {/* Gold rule */}
         <div className="h-[3px] w-full bg-warning" />
 
@@ -117,7 +117,7 @@ const Navbar = () => {
               >
                 EUC Library
               </span>
-              <span className="text-primary-foreground/50 text-[9px] tracking-[0.2em] uppercase hidden sm:block">
+              <span className="text-primary-foreground/60 text-[9px] tracking-[0.2em] uppercase hidden sm:block">
                 Enverga-Candelaria Library
               </span>
             </div>
@@ -331,7 +331,7 @@ const DesktopNav = ({
           className={`relative flex h-14 items-center border-b-2 px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors duration-200 focus-visible:ring-inset ${
             active
               ? "text-primary-foreground border-warning"
-              : "text-primary-foreground/55 hover:text-primary-foreground/90 border-transparent hover:border-primary-foreground/20"
+              : "text-primary-foreground/60 hover:text-primary-foreground border-transparent hover:border-primary-foreground/20"
           }`}
           style={{ fontFamily: "var(--font-heading)" }}
         >

@@ -1,131 +1,36 @@
 import { Link } from "react-router-dom";
-import { BookOpen, CalendarCheck, GraduationCap, Library, ArrowRight } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarCheck, GraduationCap, Library } from "lucide-react";
 import { motion } from "framer-motion";
 
 const quickLinks = [
-  {
-    title: "Book Catalogue",
-    description: "Browse and search the full library collection.",
-    to: "/catalogue",
-    icon: BookOpen,
-    index: "01",
-  },
-  {
-    title: "Digital Reservation",
-    description: "Reserve books online. Login required.",
-    to: "/login",
-    icon: CalendarCheck,
-    index: "02",
-  },
-  {
-    title: "Academic Subscriptions",
-    description: "Access digital resources and online databases.",
-    to: "/services",
-    icon: GraduationCap,
-    index: "03",
-  },
-  {
-    title: "Library Services",
-    description: "Borrowing, returning, and more.",
-    to: "/services",
-    icon: Library,
-    index: "04",
-  },
+  { title: "Find Resources", description: "Explore books, journals, and digital materials.", to: "/catalogue", icon: BookOpen, index: "01", label: "Search" },
+  { title: "Plan Ahead", description: "Reserve library materials before you visit.", to: "/login", icon: CalendarCheck, index: "02", label: "Reserve" },
+  { title: "Learn Without Limits", description: "Access services and academic subscriptions.", to: "/services", icon: GraduationCap, index: "03", label: "Access" },
+  { title: "Library Services", description: "Get help with borrowing, research, and more.", to: "/services", icon: Library, index: "04", label: "Support" },
 ];
 
-const containerVariants = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.08 },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: "easeOut" as const },
-  },
-};
-
-const QuickAccessSection = () => {
-  return (
-    /* bg-background gives it its own floor, border-t draws the line between hero and cards */
-    <section className="border-t border-border bg-background py-9 sm:py-10">
-      <div className="container">
-
-        {/* Section label — orients the reader, marks the transition */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4 }}
-          className="mb-7 flex items-center gap-3"
-        >
-          <div className="h-px w-6 bg-warning" />
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Quick Access
-          </p>
-        </motion.div>
-
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-40px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-l border-t border-border"
-        >
-          {quickLinks.map((link) => {
-            const Icon = link.icon;
-            return (
-              <motion.div key={link.title} variants={cardVariants}>
-                <Link
-                  to={link.to}
-                  className="group relative flex h-full min-h-[220px] flex-col border-r border-b border-border bg-card p-5 transition-colors duration-200 hover:bg-primary hover:border-primary focus-visible:z-10 focus-visible:ring-inset"
-                >
-                  {/* Index number */}
-                  <span
-                    className="mb-5 block text-[10px] font-bold tracking-[0.25em] text-muted-foreground/70 transition-colors group-hover:text-primary-foreground/55"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {link.index}
-                  </span>
-
-                  {/* Icon */}
-                  <div className="mb-4">
-                    <Icon className="h-5 w-5 text-primary group-hover:text-warning transition-colors duration-200" />
-                  </div>
-
-                  {/* Title */}
-                  <h3
-                    className="text-[13px] font-bold tracking-[0.06em] uppercase text-foreground group-hover:text-primary-foreground transition-colors duration-200 leading-snug"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {link.title}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="mt-2 flex-1 text-xs leading-5 text-muted-foreground transition-colors duration-200 group-hover:text-primary-foreground/75">
-                    {link.description}
-                  </p>
-
-                  {/* Arrow */}
-                  <div className="mt-5 flex items-center gap-1.5">
-                    <div className="h-px w-4 bg-border group-hover:bg-warning/60 transition-colors duration-200" />
-                    <ArrowRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-warning transition-colors duration-200" />
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+const QuickAccessSection = () => (
+  <section className="border-b border-border bg-background">
+    <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
+      <div className="grid border-l border-border md:grid-cols-[.86fr_1fr_1fr_1fr_1fr]">
+        <div className="border-r border-border px-5 py-8 sm:px-7 lg:py-10">
+          <p className="homepage-kicker flex items-center gap-3 text-primary"><span className="h-px w-7 bg-warning" />Our Services</p>
+          <h2 className="mt-4 text-2xl font-bold tracking-[-.05em] text-foreground">Designed for every<br />academic step.</h2>
+          <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">Search, reserve, access, and get support in one place.</p>
+        </div>
+        {quickLinks.map(({ title, description, to, icon: Icon, index, label }) => (
+          <motion.div key={title} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: .35 }} className="border-r border-border">
+            <Link to={to} className="group flex h-full min-h-[210px] flex-col px-5 py-8 transition-colors hover:bg-primary sm:px-7 lg:py-10">
+              <div className="flex items-center justify-between text-[10px] font-bold tracking-[.18em] uppercase text-muted-foreground group-hover:text-white/65"><span>{index} / {label}</span><Icon className="h-4 w-4 text-warning" /></div>
+              <h3 className="mt-auto text-lg font-bold leading-[1.03] tracking-[-.045em] text-foreground transition-colors group-hover:text-white">{title}</h3>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground transition-colors group-hover:text-white/75">{description}</p>
+              <ArrowRight className="mt-6 h-4 w-4 text-warning transition-transform group-hover:translate-x-1" />
+            </Link>
+          </motion.div>
+        ))}
       </div>
-    </section>
-  );
-};
+    </div>
+  </section>
+);
 
 export default QuickAccessSection;

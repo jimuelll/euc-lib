@@ -2,27 +2,17 @@ import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
-    <footer className="relative bg-primary border-t border-primary-foreground/10 overflow-hidden">
+    <footer className="relative overflow-hidden border-t border-primary-foreground/15 bg-primary">
 
-      {/* Gold top rule — sealing the page like a document's closing line */}
-      <div className="h-[3px] w-full bg-warning" />
+      <div className="h-[2px] w-full bg-warning" />
 
-      {/* Louvered texture — same grammar as hero and about section */}
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-        }}
-      />
-
-      <div className="container relative z-10 px-4 py-11 sm:px-6">
+      <div className="container relative z-10 px-5 py-12 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Main grid ── */}
-        <div className="grid gap-0 border-l border-t border-primary-foreground/10 md:grid-cols-4">
+        <div className="grid gap-0 border-l border-t border-primary-foreground/15 md:grid-cols-[1.45fr_.8fr_.8fr_1.1fr]">
 
           {/* Brand column */}
-          <div className="border-r border-b border-primary-foreground/10 p-6 md:col-span-1 md:p-7">
+          <div className="border-r border-b border-primary-foreground/15 p-7 md:col-span-1 md:p-8">
             {/* Wordmark */}
             <div className="mb-4">
               <div className="flex items-center gap-2.5 mb-1">
@@ -41,15 +31,15 @@ const Footer = () => {
                 </span>
               </div>
               <p
-                className="text-[9px] tracking-[0.2em] uppercase text-primary-foreground/40 ml-9"
+                className="text-[9px] tracking-[0.2em] uppercase text-primary-foreground/60 ml-9"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Enverga-Candelaria Library
               </p>
             </div>
 
-            <p className="text-xs text-primary-foreground/50 leading-relaxed mt-5">
-              Modernizing library operations through digital solutions for students and staff.
+            <p className="max-w-xs text-sm leading-6 text-primary-foreground/75 mt-6">
+              Supporting learning, research, and discovery at every step of the academic journey.
             </p>
           </div>
 
@@ -80,15 +70,15 @@ const Footer = () => {
         </div>
 
         {/* ── Bottom bar ── */}
-        <div className="flex flex-col items-center justify-between gap-2 border-x border-b border-primary-foreground/10 px-6 py-4 sm:flex-row sm:px-7">
+        <div className="flex flex-col items-center justify-between gap-3 border-x border-b border-primary-foreground/15 px-7 py-4 sm:flex-row sm:px-8">
           <p
-            className="text-[10px] tracking-[0.15em] uppercase text-primary-foreground/30"
+            className="text-[10px] tracking-[0.15em] uppercase text-primary-foreground/55"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             © {new Date().getFullYear()} EUC Library Management System
           </p>
           <p
-            className="text-[10px] tracking-[0.15em] uppercase text-primary-foreground/20"
+            className="text-[10px] tracking-[0.15em] uppercase text-warning/85"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             All rights reserved
@@ -109,10 +99,10 @@ const FooterColumn = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <div className="flex flex-col gap-0 border-r border-b border-primary-foreground/10 p-6 md:p-7">
+  <div className="flex flex-col gap-0 border-r border-b border-primary-foreground/15 p-7 md:p-8">
     {/* Column header — like a brass nameplate */}
     <h4
-      className="text-[10px] font-bold uppercase tracking-[0.25em] text-warning/80 mb-5"
+      className="text-[10px] font-bold uppercase tracking-[0.25em] text-warning mb-5"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {title}
@@ -132,14 +122,14 @@ const FooterLink = ({
 }) => (
   <Link
     to={to}
-    className="text-xs tracking-wide text-primary-foreground/65 transition-colors duration-200 hover:text-primary-foreground"
+    className="text-xs tracking-wide text-primary-foreground/75 transition-colors duration-200 hover:text-warning"
   >
     {children}
   </Link>
 );
 
 const FooterSpan = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-xs tracking-wide text-primary-foreground/55">
+  <span className="text-xs tracking-wide text-primary-foreground/70">
     {children}
   </span>
 );

@@ -27,9 +27,9 @@ const AcademicSubscriptions = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="py-16">
-        <div className="container max-w-4xl px-4 sm:px-6">
-          <PageHeader />
+      <PageHeader />
+      <main className="py-12 sm:py-16">
+        <div className="container max-w-4xl px-5 sm:px-8 lg:px-12">
 
           {!isLoggedIn ? (
             <div className="border border-border bg-background overflow-hidden">

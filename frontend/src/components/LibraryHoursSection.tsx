@@ -23,8 +23,8 @@ const LibraryHoursSection = () => {
     { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },
   ] : contactDetails;
   return (
-    <section className="border-t border-border py-14 sm:py-[4.5rem]">
-      <div className="container px-4 sm:px-6">
+    <section className="border-b border-border bg-background py-16 sm:py-20">
+      <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Section label ── */}
         <motion.div
@@ -32,18 +32,18 @@ const LibraryHoursSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="mb-8 flex items-center gap-3 sm:mb-10"
+          className="mb-9 flex items-center gap-3 sm:mb-11"
         >
-          <div className="h-px w-6 bg-warning" />
+          <div className="h-px w-8 bg-warning" />
           <p
-            className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+            className="homepage-kicker text-primary"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Hours & Location
           </p>
         </motion.div>
 
-        <div className="grid gap-0 md:grid-cols-2 border-l border-t border-border">
+        <div className="grid gap-0 border-l border-t border-border md:grid-cols-2">
 
           {/* ── Operating Hours — left column, maroon header band ── */}
           <motion.div

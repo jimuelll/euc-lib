@@ -119,25 +119,15 @@ const Catalogue = () => {
       {/* ── Page header band ──
           bg-primary matches the navbar, then a black/20 overlay steps it
           visibly darker in both light and dark mode without hardcoding HSL. */}
-      <div className="bg-primary relative overflow-hidden">
+      <div className="bg-primary relative overflow-hidden border-b border-warning/70">
         {/* Depth overlay */}
         <div className="absolute inset-0 bg-black/20 pointer-events-none" />
         {/* Gold top rule */}
-        <div className="relative z-10 h-[3px] w-full bg-warning" />
-        {/* Louvered texture */}
-        <div
-          className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-          }}
-        />
-        {/* Gold left spine */}
-        <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
+        <div className="relative z-10 h-[2px] w-full bg-warning" />
         {/* Bottom border */}
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 px-4 py-12 sm:px-6 md:py-14">
+        <div className="container relative z-20 px-5 py-11 sm:px-8 sm:py-14 lg:px-12 xl:px-16">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-px w-6 bg-warning shrink-0" />
             <span
@@ -148,7 +138,7 @@ const Catalogue = () => {
             </span>
           </div>
           <h1
-            className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight text-primary-foreground"
+            className="text-4xl sm:text-5xl font-bold tracking-[-.055em] leading-[.92] text-primary-foreground"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Book Catalogue
@@ -184,7 +174,7 @@ const Catalogue = () => {
 
       {/* ── Results — parchment ground ── */}
       <main className="bg-background">
-        <div className="container px-4 py-8 sm:px-6 md:py-10">
+        <div className="container px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-16">
 
           {error && (
             <div className="mb-6 border-l-2 border-destructive bg-destructive/5 px-5 py-3.5">
