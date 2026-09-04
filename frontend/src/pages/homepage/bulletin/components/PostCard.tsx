@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, FileText, Pin, Archive, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, FileText, Pin, Archive, Loader2, CalendarDays, MapPin } from "lucide-react";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -140,6 +140,13 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           >
             {post.title}
           </p>
+
+          {post.post_type === "event" ? (
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.1em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+              <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{post.event_starts_at ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(post.event_starts_at)) : "Date to be announced"}</span>
+              {post.event_location ? <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3 w-3" />{post.event_location}</span> : null}
+            </div>
+          ) : null}
 
           {(isList || !hasImage || isFeatured) && (
             <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-3 sm:text-sm" : "line-clamp-2"}`}>

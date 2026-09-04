@@ -260,7 +260,7 @@ export function PostModal({
     <>
       <Dialog open={!!post} onOpenChange={onClose}>
         <DialogContent
-          className="[&>button]:hidden w-[calc(100vw-1rem)] max-w-2xl max-h-[92dvh] overflow-x-hidden overflow-y-auto p-0 gap-0 border-border shadow-2xl sm:w-[calc(100vw-2rem)]"
+          className="[&>button:last-child]:hidden w-[calc(100vw-1rem)] max-w-2xl max-h-[92dvh] overflow-x-hidden overflow-y-auto p-0 gap-0 border-border shadow-2xl sm:w-[calc(100vw-2rem)]"
           style={{ borderRadius: 0 }}
         >
           <div className="bg-primary relative overflow-hidden shrink-0">

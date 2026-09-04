@@ -1,3 +1,7 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import axiosInstance from "@/utils/AxiosInstance";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { UpcomingEvent } from "../types";
 
 const upcomingEvents: UpcomingEvent[] = [
@@ -21,6 +25,31 @@ const SidebarHeading = ({ children }: { children: React.ReactNode }) => (
 );
 
 export function BulletinSidebar() {
+  const { user } = useAuth();
+  const canManage = ["admin", "super_admin"].includes(user?.role ?? "");
+  const [events, setEvents] = useState<UpcomingEvent[]>(upcomingEvents);
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const load = async () => {
+    try {
+      const { data } = await axiosInstance.get("/api/events");
+      setEvents(data.map((event: { id: number; title: string; starts_at: string; ends_at?: string }) => {
+        const start = new Date(event.starts_at);
+        const end = event.ends_at ? new Date(event.ends_at) : null;
+        return {
+          id: event.id,
+          title: event.title,
+          date: start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+          time: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${end ? ` – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`,
+        };
+      }));
+    } catch {
+      // Keep the supplied fallback events when the endpoint is unavailable.
+    }
+  };
+  useEffect(() => { void load(); }, []);
+  const save = async () => { if (!title.trim() || !startsAt) return; await axiosInstance.post("/api/events", { title, starts_at: startsAt }); setTitle(""); setStartsAt(""); setOpen(false); await load(); };
   return (
     <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
 
@@ -36,11 +65,12 @@ export function BulletinSidebar() {
           >
             Upcoming Events
           </span>
+          {canManage ? <button onClick={() => setOpen(true)} className="ml-auto text-[9px] font-bold uppercase tracking-[0.14em] text-primary-foreground/70 hover:text-warning">Update</button> : null}
         </div>
 
         {/* Event list — flush rows separated by ruled lines */}
         <div className="divide-y divide-border">
-          {upcomingEvents.map((event, i) => (
+          {events.map((event, i) => (
             <div
               key={event.title}
               className="group flex gap-0 transition-colors duration-200 hover:bg-secondary/50"
@@ -77,6 +107,8 @@ export function BulletinSidebar() {
         {/* Footer rule */}
         <div className="h-[3px] w-full bg-warning" />
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader><div className="space-y-3"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={startsAt} onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" className="h-10 w-full border border-border bg-background px-3 text-sm" /><button onClick={() => void save()} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground">Add event</button></div></DialogContent></Dialog>
 
     </aside>
   );

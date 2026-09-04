@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, HelpCircle } from "lucide-react";
+import { Bell, BookOpen, CalendarDays, Eye, EyeOff, HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +45,42 @@ const Login = () => {
       <Navbar />
 
       <main className="bg-background">
-        <div className="container px-4 sm:px-6 py-16 md:py-24 flex items-start justify-center">
+        <div className="container grid min-h-[calc(100svh-3.75rem)] items-center gap-12 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16 lg:py-20 xl:gap-28">
+          <section className="hidden max-w-xl lg:block" aria-labelledby="login-support-heading">
+            <div className="h-px w-8 bg-warning" />
+            <h1
+              id="login-support-heading"
+              className="mt-6 text-4xl font-bold leading-[1.08] tracking-[-0.03em] text-foreground xl:text-5xl"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Your library, ready when you are.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground">
+              Access your borrowing activity, reservations, notices, and academic resources from one place.
+            </p>
+
+            <div className="mt-10 divide-y divide-border border-y border-border">
+              {[
+                { icon: BookOpen, title: "Track your borrowing", detail: "See current loans and due dates at a glance." },
+                { icon: CalendarDays, title: "Manage reservations", detail: "Keep up with requests that are ready for pickup." },
+                { icon: Bell, title: "Stay informed", detail: "Review library updates and account notifications." },
+              ].map(({ icon: Icon, title, detail }) => (
+                <div key={title} className="flex gap-4 py-4">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                  <div>
+                    <h2
+                      className="text-sm font-bold tracking-[-0.01em] text-foreground"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {title}
+                    </h2>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <div className="w-full max-w-sm">
             <div className="bg-primary relative overflow-hidden">
               <div className="h-[3px] w-full bg-warning" />

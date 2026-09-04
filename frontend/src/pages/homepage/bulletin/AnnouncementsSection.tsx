@@ -8,7 +8,7 @@ import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
 
 export function AnnouncementsSection() {
-  const { posts, loading, updatePost } = useBulletinPosts({ limit: 4 });
+  const { posts, loading, updatePost } = useBulletinPosts({ limit: 4, type: "announcement" });
   const [selected, setSelected] = useState<BulletinPost | null>(null);
 
   const handleLikeToggle = (postId: number, liked: boolean, total: number) => {

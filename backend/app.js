@@ -13,6 +13,7 @@ const reservationRoutes = require("./modules/reservation/reservation.routes");
 const adminReservationRoutes = require("./modules/reservation/adminReservation.routes");
 const circulationRoutes = require("./modules/circulation/circulation.routes");
 const bulletinRoutes    = require("./modules/bulletin/bulletin.routes");
+const eventRoutes       = require("./modules/events/events.routes");
 const aboutRoutes       = require("./modules/about/about.routes");
 const attendanceRoutes  = require("./modules/attendance/attendance.routes");
 const subscriptionsRoutes = require("./modules/subscriptions/subscriptions.routes");
@@ -56,6 +57,7 @@ app.use(express.urlencoded({ extended: true }));
 // --- Public Routes ---
 app.use("/api/auth",     authRoutes);
 app.use("/api/bulletin", bulletinRoutes);
+app.use("/api/events", eventRoutes);
 app.use("/api/about",    aboutRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicCatalogRoutes);

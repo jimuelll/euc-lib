@@ -14,6 +14,11 @@ export interface BulletinPost {
   author_name: string;
   author_role: string;
   is_pinned: boolean;
+  post_type: "announcement" | "event";
+  event_starts_at?: string | null;
+  event_ends_at?: string | null;
+  event_location?: string | null;
+  event_registration_url?: string | null;
   comments: BulletinComment[];
 }
 
@@ -41,6 +46,11 @@ export interface ApiPost {
   likes: number;
   liked_by_me: number; // 0 | 1
   comment_count: number;
+  post_type: "announcement" | "event";
+  event_starts_at?: string | null;
+  event_ends_at?: string | null;
+  event_location?: string | null;
+  event_registration_url?: string | null;
 }
 
 export interface ApiComment {
@@ -54,6 +64,7 @@ export interface ApiComment {
 // ── Misc ──────────────────────────────────────────────────────────────────────
 
 export interface UpcomingEvent {
+  id?: number;
   title: string;
   date: string;
   time: string;

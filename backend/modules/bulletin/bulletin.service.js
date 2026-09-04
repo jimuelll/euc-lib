@@ -22,7 +22,7 @@ const destroyCloudinaryImage = async (publicId) => {
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", search = "", month = "") => {
+const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", search = "", month = "", postType = "all", upcomingOnly = false) => {
   const offset = (page - 1) * limit;
   const deletedFilter = archiveScope === "archived"
     ? "bp.deleted_at IS NOT NULL"
@@ -39,13 +39,16 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
     : [];
   const normalizedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : "";
   const monthFilter = normalizedMonth ? "AND DATE_FORMAT(bp.created_at, '%Y-%m') = ?" : "";
-  const filterParams = [...searchParams, ...(normalizedMonth ? [normalizedMonth] : [])];
+  const normalizedType = ["announcement", "event"].includes(postType) ? postType : "all";
+  const typeFilter = normalizedType === "all" ? "" : "AND bp.post_type = ?";
+  const upcomingFilter = upcomingOnly ? "AND bp.post_type = 'event' AND bp.event_starts_at >= NOW()" : "";
+  const filterParams = [...searchParams, ...(normalizedMonth ? [normalizedMonth] : []), ...(normalizedType === "all" ? [] : [normalizedType])];
 
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE ${deletedFilter} ${searchFilter} ${monthFilter}`,
+     WHERE ${deletedFilter} ${searchFilter} ${monthFilter} ${typeFilter} ${upcomingFilter}`,
     filterParams
   );
 
@@ -53,9 +56,9 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
     `SELECT DISTINCT DATE_FORMAT(bp.created_at, '%Y-%m') AS value
      FROM bulletin_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE ${deletedFilter} ${searchFilter}
+     WHERE ${deletedFilter} ${searchFilter} ${typeFilter} ${upcomingFilter}
      ORDER BY value DESC`,
-    searchParams
+    [...searchParams, ...(normalizedType === "all" ? [] : [normalizedType])]
   );
 
   const queryParams = [];
@@ -71,6 +74,11 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
        bp.excerpt,
        bp.content,
        bp.image_url,
+       bp.post_type,
+       bp.event_starts_at,
+       bp.event_ends_at,
+       bp.event_location,
+       bp.event_registration_url,
        bp.is_pinned,
        bp.created_at,
        bp.deleted_at,
@@ -88,7 +96,9 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
      WHERE ${deletedFilter}
      ${searchFilter}
      ${monthFilter}
-     ORDER BY bp.is_pinned DESC, bp.created_at DESC
+     ${typeFilter}
+     ${upcomingFilter}
+     ORDER BY bp.is_pinned DESC, CASE WHEN bp.post_type = 'event' THEN bp.event_starts_at END ASC, bp.created_at DESC
      LIMIT ? OFFSET ?`,
     queryParams
   );
@@ -110,6 +120,11 @@ const getPostById = async (postId, userId) => {
        bp.excerpt,
        bp.content,
        bp.image_url,
+       bp.post_type,
+       bp.event_starts_at,
+       bp.event_ends_at,
+       bp.event_location,
+       bp.event_registration_url,
        bp.is_pinned,
        bp.created_at,
        u.id   AS author_id,
@@ -145,13 +160,17 @@ const getPostById = async (postId, userId) => {
   return { ...post, comments };
 };
 
-const createPost = async (authorId, { title, excerpt, content, image_url, image_public_id, is_pinned }) => {
+const createPost = async (authorId, { title, excerpt, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url }) => {
   if (!title?.trim() || !excerpt?.trim() || !content?.trim()) {
     throw Object.assign(
       new Error("title, excerpt, and content are required"),
       { status: 400 }
     );
   }
+  const postType = post_type === "event" ? "event" : "announcement";
+  if (postType === "event" && !event_starts_at) throw Object.assign(new Error("An event start date and time is required"), { status: 400 });
+  if (event_ends_at && event_starts_at && new Date(event_ends_at) < new Date(event_starts_at)) throw Object.assign(new Error("The event end time must be after its start time"), { status: 400 });
+  const sqlDate = (value) => value ? String(value).replace("T", " ") : null;
 
   // Enforce single pin — unpin any currently pinned post first
   if (is_pinned) {
@@ -160,8 +179,8 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
 
   const [result] = await db.query(
     `INSERT INTO bulletin_posts
-       (title, excerpt, content, image_url, image_public_id, author_id, is_pinned)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (title, excerpt, content, image_url, image_public_id, author_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title.trim(),
       excerpt.trim(),
@@ -170,6 +189,11 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
       image_public_id?.trim() ?? null,
       authorId,
       is_pinned ? 1 : 0,
+      postType,
+      postType === "event" ? sqlDate(event_starts_at) : null,
+      postType === "event" ? sqlDate(event_ends_at) : null,
+      postType === "event" ? (event_location?.trim() || null) : null,
+      postType === "event" ? (event_registration_url?.trim() || null) : null,
     ]
   );
 

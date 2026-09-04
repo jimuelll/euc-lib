@@ -12,6 +12,11 @@ interface BulletinPostRecord {
   excerpt: string;
   content: string;
   image_url?: string | null;
+  post_type: "announcement" | "event";
+  event_starts_at?: string | null;
+  event_ends_at?: string | null;
+  event_location?: string | null;
+  event_registration_url?: string | null;
   is_pinned: boolean | number;
   created_at: string;
   deleted_at?: string | null;
@@ -294,6 +299,11 @@ const AdminBulletin = () => {
                                       <FileText className="h-3 w-3" /> Text-only
                                     </span>
                                   ) : null}
+                                  {post.post_type === "event" ? (
+                                    <span className="inline-flex items-center gap-1 border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-warning">
+                                      <CalendarRange className="h-3 w-3" /> Event
+                                    </span>
+                                  ) : null}
                                   <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
                                     isArchived
                                       ? "border-border bg-muted/20 text-muted-foreground"
@@ -312,6 +322,13 @@ const AdminBulletin = () => {
                                 </div>
                                 <p className="text-base font-semibold text-foreground">{post.title}</p>
                                 <p className="text-sm leading-6 text-muted-foreground">{post.excerpt}</p>
+                                {post.post_type === "event" ? (
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                    <span>{post.event_starts_at ? `Starts ${DATE_TIME_FORMATTER.format(new Date(post.event_starts_at))}` : "Start time not set"}</span>
+                                    {post.event_location ? <span>{post.event_location}</span> : null}
+                                    {post.event_registration_url ? <a className="text-primary hover:underline" href={post.event_registration_url} target="_blank" rel="noreferrer">Registration link</a> : null}
+                                  </div>
+                                ) : null}
                               </div>
 
                               <div className="flex flex-wrap gap-2">

@@ -298,7 +298,7 @@ const MyLibrary = () => {
         <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
         <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
 
-        <div className="container relative z-20 max-w-5xl px-4 py-14 sm:px-6 md:py-16">
+        <div className="container relative z-20 max-w-5xl px-4 py-8 sm:px-6 sm:py-10 md:py-11">
           <motion.div initial="hidden" animate="visible" variants={fadeUp(0)}>
             <div className="flex items-center gap-3">
               <div className="h-px w-6 bg-warning shrink-0" />
@@ -310,7 +310,7 @@ const MyLibrary = () => {
               </span>
             </div>
 
-            <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl">
                 <h1
                   className="text-3xl font-bold tracking-tight leading-tight text-primary-foreground sm:text-4xl"
@@ -318,9 +318,12 @@ const MyLibrary = () => {
                 >
                   My Library
                 </h1>
+                <p className="mt-2 text-sm leading-6 text-primary-foreground/70">
+                  Track your borrowing, reservations, and library activity.
+                </p>
               </div>
 
-              <div className="min-w-[240px] border border-warning/25 bg-black/10 px-4 py-4 backdrop-blur-sm">
+              <div className="min-w-[240px] border border-warning/25 bg-black/10 px-4 py-3.5 backdrop-blur-sm">
                 <div className="flex items-center gap-2 text-primary-foreground">
                   <UserRound className="h-4 w-4 text-warning" />
                   <span className="font-medium">{profile?.name ?? user?.name ?? "Library account"}</span>
@@ -337,7 +340,7 @@ const MyLibrary = () => {
         </div>
       </div>
 
-      <main className="py-10 sm:py-12">
+      <main className="py-8 sm:py-10">
         <div className="container max-w-5xl px-4 sm:px-6">
           {error ? (
             <div className="mt-6 border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -349,7 +352,7 @@ const MyLibrary = () => {
             initial="hidden"
             animate="visible"
             variants={fadeUp(0.1)}
-            className="mt-8 grid gap-4 md:grid-cols-3"
+            className="mt-6 grid gap-4 md:grid-cols-3"
           >
             <MetricCard
               label="Borrowing"

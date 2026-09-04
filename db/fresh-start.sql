@@ -23,6 +23,25 @@ SET time_zone = "+00:00";
 
 -- --------------------------------------------------------
 
+CREATE TABLE `library_events` (
+  `id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `starts_at` datetime NOT NULL,
+  `ends_at` datetime DEFAULT NULL,
+  `created_by` bigint(20) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `library_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_library_events_starts_at` (`starts_at`),
+  ADD KEY `fk_library_events_creator` (`created_by`);
+
+ALTER TABLE `library_events`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+-- --------------------------------------------------------
+
 --
 -- Table structure for table `about_settings`
 --
@@ -270,6 +289,11 @@ CREATE TABLE `bulletin_posts` (
   `content` text NOT NULL,
   `image_url` varchar(512) DEFAULT NULL,
   `image_public_id` varchar(512) DEFAULT NULL,
+  `post_type` enum('announcement','event') NOT NULL DEFAULT 'announcement',
+  `event_starts_at` datetime DEFAULT NULL,
+  `event_ends_at` datetime DEFAULT NULL,
+  `event_location` varchar(255) DEFAULT NULL,
+  `event_registration_url` varchar(512) DEFAULT NULL,
   `author_id` bigint(20) UNSIGNED NOT NULL,
   `is_pinned` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -591,7 +615,8 @@ ALTER TABLE `bulletin_posts`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_created_at` (`created_at`),
   ADD KEY `fk_bp_author` (`author_id`),
-  ADD KEY `idx_bulletin_posts_deleted` (`deleted_at`);
+  ADD KEY `idx_bulletin_posts_deleted` (`deleted_at`),
+  ADD KEY `idx_bulletin_events_upcoming` (`post_type`, `event_starts_at`);
 
 --
 -- Indexes for table `catalog_schema`
@@ -960,7 +985,7 @@ CREATE TABLE `restore_audit_events` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `users` (`student_employee_id`, `name`, `password_hash`, `role`, `is_active`, `must_change_password`, `address`, `contact`)
-VALUES ('SA0001', 'Development Super Admin', '$2b$12$buA8cKPLUl3yVNMs01sibeSWY4/0AFzv/FNPNUa61RLI3CryzEHpG', 'super_admin', 1, 1, '', '');
+VALUES ('SA0001', 'Development Super Admin', '$2b$12$buA8cKPLUl3yVNMs01sibeSWY4/0AFzv/FNPNUa61RLI3CryzEHpG', 'super_admin', 1, 0, '', '');
 
 INSERT INTO `about_settings` (`id`, `library_name`, `mission_title`, `mission_text`, `history_title`, `history_text`, `policies`, `facilities`, `staff`, `spaces`)
 VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '', '[]', '[]', '[]', '[]');

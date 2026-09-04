@@ -13,11 +13,20 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { cn } from "@/lib/utils";
 import { sidebarSections, getInitials, resolveCurrentItem, resolveCurrentSection } from "../AdminLayoutData";
 
@@ -240,9 +249,11 @@ export function AdminSidebar() {
 export function AdminTopbar({ pathname }: { pathname: string }) {
   const current = resolveCurrentItem(pathname);
   const currentSection = current ? resolveCurrentSection(current.url) : undefined;
+  const navigate = useNavigate();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/92 backdrop-blur-md">
+    <header className="sticky top-0 z-50 shrink-0 border-b border-border/80 bg-background/92 backdrop-blur-md">
       <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--warning)),transparent_70%)]" />
       <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -284,16 +295,67 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
 
           <div className="mx-0.5 h-4 w-px bg-border" />
 
-          <button
-            className="relative flex h-9 w-9 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border/70 hover:bg-card hover:text-foreground"
-            aria-label="Notifications"
-          >
-            <Bell className="h-3.5 w-3.5" />
-            <span
-              className="absolute right-2 top-2 h-1.5 w-1.5 ring-2 ring-background"
-              style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
-            />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="relative flex h-9 w-9 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border/70 hover:bg-card hover:text-foreground"
+                aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {unreadCount > 0 ? (
+                  <span
+                    className="absolute right-2 top-2 h-1.5 w-1.5 ring-2 ring-background"
+                    style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
+                  />
+                ) : null}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] rounded-none border-border p-0">
+              <DropdownMenuLabel className="flex items-center justify-between gap-3 border-b border-border bg-primary px-4 py-3 text-primary-foreground">
+                <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-heading)" }}>
+                  Notifications
+                </span>
+                {unreadCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void markAllAsRead()}
+                    className="text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:text-warning/75"
+                    style={{ fontFamily: "var(--font-heading)" }}
+                  >
+                    Mark all read
+                  </button>
+                ) : null}
+              </DropdownMenuLabel>
+              <div className="max-h-[22rem] overflow-y-auto">
+                {notifications.length ? notifications.slice(0, 8).map((notification) => (
+                  <DropdownMenuItem
+                    key={notification.id}
+                    onSelect={() => {
+                      if (!notification.is_read) void markAsRead(notification.id);
+                      navigate(notification.href || "/admin/notifications");
+                    }}
+                    className="flex cursor-pointer flex-col items-start gap-1.5 rounded-none border-b border-border/70 px-4 py-3 focus:bg-muted"
+                  >
+                    <span className="w-full truncate text-[11px] font-bold uppercase tracking-[0.1em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+                      {notification.title}
+                    </span>
+                    <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">{notification.body}</span>
+                    {!notification.is_read ? <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-warning">Unread</span> : null}
+                  </DropdownMenuItem>
+                )) : (
+                  <p className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications yet.</p>
+                )}
+              </div>
+              <DropdownMenuSeparator className="m-0" />
+              <DropdownMenuItem
+                onSelect={() => navigate("/admin/notifications")}
+                className="cursor-pointer rounded-none px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-primary focus:bg-muted focus:text-primary"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                Manage notifications
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <ThemeToggle />
         </div>

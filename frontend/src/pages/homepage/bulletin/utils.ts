@@ -33,5 +33,10 @@ export function toPost(raw: ApiPost): BulletinPost {
     author_role:   raw.author_role,
     comments:      [],
     is_pinned:     Boolean(raw.is_pinned),
+    post_type: raw.post_type ?? "announcement",
+    event_starts_at: raw.event_starts_at,
+    event_ends_at: raw.event_ends_at,
+    event_location: raw.event_location,
+    event_registration_url: raw.event_registration_url,
   };
 }

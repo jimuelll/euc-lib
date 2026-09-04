@@ -15,7 +15,9 @@ const getPosts = async (req, res) => {
         ? "archived"
         : "active";
     const month = typeof req.query.month === "string" ? req.query.month.trim() : "";
-    const result = await service.getPosts(userId, page, limit, archiveScope, search, month);
+    const postType = typeof req.query.type === "string" ? req.query.type : "all";
+    const upcomingOnly = req.query.upcoming === "true";
+    const result = await service.getPosts(userId, page, limit, archiveScope, search, month, postType, upcomingOnly);
     res.json(result);
   } catch (err) {
     console.error("[bulletin] getPosts:", err);
@@ -40,7 +42,7 @@ const getPostById = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { title, excerpt, content, image_url, image_public_id, is_pinned } = req.body;
+    const { title, excerpt, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url } = req.body;
     const result = await service.createPost(req.user.id, {
       title,
       excerpt,
@@ -48,6 +50,7 @@ const createPost = async (req, res) => {
       image_url,
       image_public_id,
       is_pinned: Boolean(is_pinned),
+      post_type, event_starts_at, event_ends_at, event_location, event_registration_url,
     });
     res.status(201).json({ message: "Post created successfully", ...result });
   } catch (err) {

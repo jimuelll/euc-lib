@@ -7,6 +7,8 @@ import type { BulletinPost } from "../types";
 interface UseBulletinPostsOptions {
   limit?: number;
   autoFetch?: boolean;
+  type?: "announcement" | "event";
+  upcoming?: boolean;
 }
 
 interface UseBulletinPostsReturn {
@@ -26,6 +28,8 @@ interface UseBulletinPostsReturn {
 export function useBulletinPosts({
   limit = 4,
   autoFetch = true,
+  type,
+  upcoming = false,
 }: UseBulletinPostsOptions = {}): UseBulletinPostsReturn {
   const { loading: authLoading } = useAuth();
   const [posts, setPosts] = useState<BulletinPost[]>([]);
@@ -45,6 +49,8 @@ export function useBulletinPosts({
           page,
           limit,
           ...(query.trim() ? { search: query.trim() } : {}),
+          ...(type ? { type } : {}),
+          ...(upcoming ? { upcoming: true } : {}),
         },
       });
       setPosts(data.data.map(toPost));
@@ -54,7 +60,7 @@ export function useBulletinPosts({
     } finally {
       setLoading(false);
     }
-  }, [limit, search]);
+  }, [limit, search, type, upcoming]);
 
   useEffect(() => {
     if (!autoFetch || authLoading) return;
