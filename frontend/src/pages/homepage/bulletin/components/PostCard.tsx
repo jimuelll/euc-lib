@@ -9,7 +9,7 @@ import type { BulletinPost } from "../types";
 interface PostCardProps {
   post: BulletinPost;
   onClick: () => void;
-  variant?: "featured" | "grid" | "list";
+  variant?: "featured" | "grid" | "list" | "homepage";
   /** Called after the post is successfully archived */
   onArchived?: (postId: number) => void;
 }
@@ -28,6 +28,7 @@ const ADMIN_ROLES = ["admin", "super_admin"];
 export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCardProps) {
   const isList = variant === "list";
   const isFeatured = variant === "featured";
+  const isHomepage = variant === "homepage";
   const hasImage = Boolean(post.image_url);
   const { user } = useAuth();
 
@@ -60,14 +61,14 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
     <motion.div
       variants={cardVariants}
       className={`group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
-        isList ? "flex-row" : "flex-col"
-      } ${post.is_pinned ? "border-l-[3px] border-l-warning" : ""}`}
+        isList ? "flex-row" : isHomepage ? "flex-row md:flex-col" : "flex-col"
+      } ${post.is_pinned ? "border-t-2 border-t-warning" : ""}`}
     >
       {/* Clickable area — everything except the archive button */}
       <button
         onClick={onClick}
         className={`flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning ${
-          isList ? "flex-row" : "flex-col"
+          isList ? "flex-row" : isHomepage ? "flex-row md:flex-col" : "flex-col"
         }`}
       >
         {/* Image posts keep their media panel; text-only posts use the full card for the announcement. */}
@@ -75,7 +76,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div
             style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
+              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-28 w-28 sm:w-40 md:h-auto md:w-full md:aspect-[16/9]" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
             }`}
           >
             <img
@@ -97,15 +98,15 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             )}
           </div>
         ) : (
-          <div className={`relative shrink-0 overflow-hidden border-b border-border bg-primary/[0.035] ${isList ? "w-2 sm:w-3 border-b-0 border-r" : "h-2 w-full"}`}>
-            <div className={isList ? "absolute inset-y-0 left-0 w-px bg-warning" : "absolute inset-x-0 top-0 h-px bg-warning"} />
+          <div className={`relative shrink-0 overflow-hidden border-b border-border bg-primary/[0.035] ${isList ? "w-2 sm:w-3 border-b-0 border-r" : isHomepage ? "h-full w-1.5 border-b-0 border-r md:h-2 md:w-full md:border-b md:border-r-0" : "h-2 w-full"}`}>
+            <div className={isList || isHomepage ? "absolute inset-y-0 left-0 w-px bg-warning md:inset-x-0 md:top-0 md:h-px md:w-auto" : "absolute inset-x-0 top-0 h-px bg-warning"} />
           </div>
         )}
 
         {/* Content panel */}
-        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6" : "p-4 sm:p-5"}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-3 sm:p-4 md:p-4" : isFeatured ? "p-5 sm:p-6" : "p-4 sm:p-5"}`}>
           {/* Author row */}
-          <div className="flex items-center gap-2.5 mb-3">
+          <div className={`flex items-center gap-2.5 ${isHomepage ? "mb-2" : "mb-3"}`}>
             <div
               className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary text-primary-foreground text-[9px] font-bold"
               style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.04em" }}
@@ -132,7 +133,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           {/* Title */}
           <p
             className={`font-bold leading-snug text-foreground group-hover:text-primary transition-colors ${
-              isList ? "text-sm sm:text-base" : isFeatured ? "text-lg sm:text-xl" : "text-sm"
+              isList ? "text-sm sm:text-base" : isHomepage ? "text-sm md:text-base" : isFeatured ? "text-lg sm:text-xl" : "text-sm"
             }`}
             style={{ fontFamily: "var(--font-heading)" }}
           >
@@ -153,7 +154,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           )}
 
           {/* Footer — stats */}
-          <div className="mt-auto flex items-center gap-4 border-t border-border/70 pt-3">
+          <div className={`mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
             <span
               className={`flex items-center gap-1.5 text-[11px] font-bold transition-colors ${
                 post.liked_by_me ? "text-primary" : "text-muted-foreground"
@@ -190,10 +191,10 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           title={archiveConfirm ? "Click again to confirm" : "Archive post"}
           className={`
             absolute top-2 right-2
-            flex items-center gap-1.5 h-7 px-2
+            flex min-h-11 min-w-11 items-center gap-1.5 px-2
             text-[9px] font-bold uppercase tracking-[0.12em]
             border transition-all duration-150
-            opacity-0 group-hover:opacity-100
+            opacity-0 group-hover:opacity-100 group-focus-within:opacity-100
             disabled:cursor-not-allowed
             ${archiveConfirm
               ? "border-destructive/60 bg-destructive/10 text-destructive opacity-100"

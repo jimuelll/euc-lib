@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen } from "lucide-react";
+import { ArrowRight, BookOpen, Newspaper } from "lucide-react";
 import { PostCard } from "./components/PostCard";
 import { PostModal } from "./components/PostModal";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
@@ -12,26 +12,28 @@ export function AnnouncementsSection() {
   const [selected, setSelected] = useState<BulletinPost | null>(null);
 
   return (
-    <section className="min-w-0 overflow-hidden border border-border bg-card px-6 py-7 sm:px-8">
-      <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-end md:justify-between md:text-left">
-        <div>
-          <span className="mx-auto mb-3 block h-px w-7 bg-warning md:mx-0" />
-          <h2 className="text-2xl font-bold leading-none tracking-[-.045em] text-foreground">Latest from the Bulletin</h2>
+    <section aria-labelledby="bulletin-heading" className="min-w-0 overflow-hidden border-y border-border bg-card">
+      <div className="flex items-end justify-between gap-4 border-b border-border px-5 py-5 sm:px-7 sm:py-6">
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+            <Newspaper className="h-3.5 w-3.5" aria-hidden="true" /> Bulletin board
+          </div>
+          <h2 id="bulletin-heading" className="text-[1.65rem] font-bold leading-[1.05] tracking-[-.04em] text-foreground sm:text-3xl">Latest from the Bulletin</h2>
         </div>
-        <Link to="/bulletin" className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary hover:text-warning">
-          View All <ArrowRight className="h-3.5 w-3.5" />
+        <Link to="/bulletin" className="inline-flex min-h-11 shrink-0 items-center gap-2 border-b border-primary px-1 text-xs font-bold uppercase tracking-[.12em] text-primary transition-colors hover:border-warning hover:text-warning focus-visible:ring-2 focus-visible:ring-warning">
+          <span className="hidden sm:inline">View all posts</span><span className="sm:hidden">All</span><ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>
 
-      {loading && <ContentCardsSkeleton cards={3} className="mt-5 md:grid-cols-3" />}
+      {loading && <ContentCardsSkeleton cards={3} className="px-5 py-5 sm:px-7 md:grid-cols-3" />}
       {!loading && posts.length === 0 && (
-        <div className="mt-5 flex min-h-36 items-center justify-center gap-3 border border-border text-center text-sm text-muted-foreground"><BookOpen className="h-4 w-4 shrink-0 text-warning" />No announcements yet.</div>
+        <div className="flex min-h-44 flex-col items-center justify-center gap-3 px-5 py-8 text-center sm:px-7"><BookOpen className="h-5 w-5 text-warning" aria-hidden="true" /><p className="font-medium text-foreground">No announcements yet.</p><p className="max-w-xs text-sm leading-relaxed text-muted-foreground">New library updates will appear here as they are published.</p></div>
       )}
       {!loading && posts.length > 0 && (
-        <div className="mt-5 grid w-full min-w-0 gap-3 md:grid-cols-3">
+        <div className="grid w-full min-w-0 divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
           {posts.map((post) => (
-            <div key={post.id} className="w-full max-w-md justify-self-center md:max-w-none md:justify-self-stretch">
-              <PostCard post={post} variant="grid" onClick={() => setSelected(post)} />
+            <div key={post.id} className="min-w-0">
+              <PostCard post={post} variant="homepage" onClick={() => setSelected(post)} />
             </div>
           ))}
         </div>
