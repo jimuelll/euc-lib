@@ -22,6 +22,7 @@ interface UseBulletinPostsReturn {
   fetchPosts: (page: number, nextSearch?: string) => Promise<void>;
   setCurrentPage: (page: number) => void;
   updatePost: (id: number, patch: Partial<BulletinPost>) => void;
+  setPinnedPost: (id: number, pinned: boolean) => void;
   removePost: (id: number) => void;
 }
 
@@ -71,6 +72,17 @@ export function useBulletinPosts({
     setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }, []);
 
+  const setPinnedPost = useCallback((id: number, pinned: boolean) => {
+    setPosts((prev) => {
+      const next = prev.map((post) => ({
+        ...post,
+        is_pinned: pinned ? post.id === id : post.id === id ? false : post.is_pinned,
+      }));
+
+      return pinned ? [...next].sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned)) : next;
+    });
+  }, []);
+
   const removePost = useCallback((id: number) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }, []);
@@ -86,6 +98,7 @@ export function useBulletinPosts({
     fetchPosts,
     setCurrentPage,
     updatePost,
+    setPinnedPost,
     removePost,
   };
 }

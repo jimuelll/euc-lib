@@ -65,6 +65,7 @@ export function BulletinPage() {
     fetchPosts,
     setCurrentPage,
     updatePost,
+    setPinnedPost,
     removePost,
   } = useBulletinPosts({ limit: POSTS_PER_PAGE });
 
@@ -92,16 +93,11 @@ export function BulletinPage() {
   }, [updatePost, posts]);
 
   const handlePinToggle = useCallback((postId: number, pinned: boolean) => {
-    posts.forEach((p) => {
-      if (p.id !== postId && p.is_pinned) {
-        updatePost(p.id, { is_pinned: false });
-      }
-    });
-    updatePost(postId, { is_pinned: pinned });
+    setPinnedPost(postId, pinned);
     setSelectedPost((prev) =>
       prev?.id === postId ? { ...prev, is_pinned: pinned } : prev
     );
-  }, [updatePost, posts]);
+  }, [setPinnedPost]);
 
   const handleArchived = useCallback((postId: number) => {
     removePost(postId);

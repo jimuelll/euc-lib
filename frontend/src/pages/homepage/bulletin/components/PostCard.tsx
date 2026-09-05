@@ -62,7 +62,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
       variants={cardVariants}
       className={`group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
         isList || isHomepage ? "flex-row" : "flex-col"
-      } ${post.is_pinned ? "border-t-2 border-t-warning" : ""}`}
+      } ${post.is_pinned ? isFeatured ? "border-l-2 border-l-warning" : "border-t-2 border-t-warning" : ""}`}
     >
       {/* Clickable area — everything except the archive button */}
       <button
@@ -76,7 +76,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div
             style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-24 sm:w-32" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
+              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
             }`}
           >
             <img
@@ -87,10 +87,10 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             />
             {post.is_pinned && (
             <div
-              className="absolute top-0 left-0 flex items-center gap-1 bg-warning px-2 py-1"
+              className="absolute top-0 left-0 flex items-center gap-1 border-b border-r border-warning/50 bg-background/90 px-2 py-1"
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <Pin className="h-2.5 w-2.5 text-foreground/80" />
+              <Pin className="h-2.5 w-2.5 text-warning" />
               <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80">
                 Pinned
               </span>
@@ -113,9 +113,9 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             >
               {getInitials(post.author_name)}
             </div>
-            <div className="flex items-baseline gap-2 min-w-0">
+            <div className={`min-w-0 ${isHomepage ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
               <span
-                className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 truncate"
+                className={`text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage ? "break-words" : "truncate"}`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {post.author_name}

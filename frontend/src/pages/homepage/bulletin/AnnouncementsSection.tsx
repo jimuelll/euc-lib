@@ -29,7 +29,7 @@ export function AnnouncementsSection() {
         <div className="flex min-h-44 flex-col items-center justify-center gap-3 px-5 py-8 text-center sm:px-7"><BookOpen className="h-5 w-5 text-warning" aria-hidden="true" /><p className="font-medium text-foreground">No announcements yet.</p><p className="max-w-xs text-sm leading-relaxed text-muted-foreground">New library updates will appear here as they are published.</p></div>
       )}
       {!loading && featuredPost && (
-        <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.45fr)_minmax(12rem,.9fr)]">
+        <div className="grid min-w-0 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
           <div className="min-w-0">
             <PostCard post={featuredPost} variant="featured" onClick={() => setSelected(featuredPost)} />
           </div>
