@@ -28,7 +28,7 @@ export function AnnouncementsSection() {
         <div className="mt-5 flex min-h-36 items-center justify-center gap-3 border border-border text-center text-sm text-muted-foreground"><BookOpen className="h-4 w-4 shrink-0 text-warning" />No announcements yet.</div>
       )}
       {!loading && posts.length > 0 && (
-        <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
+        <div className="mx-auto mt-5 grid w-full max-w-sm min-w-0 gap-3 md:max-w-none md:grid-cols-3">
           {posts.map((post) => <PostCard key={post.id} post={post} variant="grid" onClick={() => setSelected(post)} />)}
         </div>
       )}
