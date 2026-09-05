@@ -61,14 +61,14 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
     <motion.div
       variants={cardVariants}
       className={`group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
-        isList ? "flex-row" : isHomepage ? "flex-row md:flex-col" : "flex-col"
+        isList || isHomepage ? "flex-row" : "flex-col"
       } ${post.is_pinned ? "border-t-2 border-t-warning" : ""}`}
     >
       {/* Clickable area — everything except the archive button */}
       <button
         onClick={onClick}
         className={`flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning ${
-          isList ? "flex-row" : isHomepage ? "flex-row md:flex-col" : "flex-col"
+          isList || isHomepage ? "flex-row" : "flex-col"
         }`}
       >
         {/* Image posts keep their media panel; text-only posts use the full card for the announcement. */}
@@ -76,7 +76,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div
             style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-28 w-28 sm:w-40 md:h-auto md:w-full md:aspect-[16/9]" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
+              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-24 sm:w-32" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
             }`}
           >
             <img
@@ -98,8 +98,8 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             )}
           </div>
         ) : (
-          <div className={`relative shrink-0 overflow-hidden border-b border-border bg-primary/[0.035] ${isList ? "w-2 sm:w-3 border-b-0 border-r" : isHomepage ? "h-full w-1.5 border-b-0 border-r md:h-2 md:w-full md:border-b md:border-r-0" : "h-2 w-full"}`}>
-            <div className={isList || isHomepage ? "absolute inset-y-0 left-0 w-px bg-warning md:inset-x-0 md:top-0 md:h-px md:w-auto" : "absolute inset-x-0 top-0 h-px bg-warning"} />
+          <div className={`relative shrink-0 overflow-hidden border-b border-border bg-primary/[0.035] ${isList || isHomepage ? "h-full w-1.5 border-b-0 border-r" : "h-2 w-full"}`}>
+            <div className={isList || isHomepage ? "absolute inset-y-0 left-0 w-px bg-warning" : "absolute inset-x-0 top-0 h-px bg-warning"} />
           </div>
         )}
 
