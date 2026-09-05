@@ -20,7 +20,7 @@ import { CreatePostModal } from "./components/CreatePostModal";
 import { BulletinSidebar } from "./components/BulletinSidebar";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
-import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
+import { BulletinListSkeleton } from "@/components/ui/content-skeletons";
 
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
 const POSTS_PER_PAGE = 6;
@@ -176,7 +176,7 @@ export function BulletinPage() {
               </div>
 
               {loading && (
-                <div className="border border-border p-4"><ContentCardsSkeleton cards={6} className="md:grid-cols-2 xl:grid-cols-2" /></div>
+                <BulletinListSkeleton rows={POSTS_PER_PAGE} />
               )}
 
               {error && !loading && (
