@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, FileText, Pin, Archive, Loader2, CalendarDays, MapPin } from "lucide-react";
+import { Heart, MessageCircle, Pin, Archive, Loader2, CalendarDays, MapPin } from "lucide-react";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -123,13 +123,11 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             </div>
           </div>
 
-          {!hasImage && (
-            <div className="mb-3 flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-primary" style={{ fontFamily: "var(--font-heading)" }}>
-              <FileText className="h-3.5 w-3.5" />
-              Text announcement
-              {post.is_pinned ? <span className="ml-auto flex items-center gap-1 text-warning"><Pin className="h-3 w-3" /> Pinned</span> : null}
+          {!hasImage && post.is_pinned ? (
+            <div className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+              <Pin className="h-3 w-3" /> Pinned
             </div>
-          )}
+          ) : null}
 
           {/* Title */}
           <p

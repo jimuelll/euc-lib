@@ -30,7 +30,7 @@ export function AnnouncementsSection() {
       {!loading && posts.length > 0 && (
         <div className="mx-auto mt-5 grid w-full min-w-0 justify-items-center gap-3 md:grid-cols-3 md:justify-items-stretch">
           {posts.map((post) => (
-            <div key={post.id} className="w-full max-w-sm md:max-w-none">
+            <div key={post.id} className="w-full max-w-[calc(100%-2rem)] md:max-w-none">
               <PostCard post={post} variant="grid" onClick={() => setSelected(post)} />
             </div>
           ))}
