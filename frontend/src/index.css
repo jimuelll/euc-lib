@@ -50,8 +50,9 @@
     --info: 214 52% 32%;
     --info-foreground: 0 0% 100%;
 
-    --border: 12 10% 86%;
-    --input: 12 10% 86%;
+    /* Clear enough for structural rules on white surfaces without competing with maroon. */
+    --border: 12 12% 76%;
+    --input: 12 12% 76%;
     --ring: 0 100% 25.1%;
 
     /* Slightly tighter radius — rectilinear authority */
