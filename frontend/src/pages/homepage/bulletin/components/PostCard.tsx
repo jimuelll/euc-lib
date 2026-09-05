@@ -76,7 +76,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div
             style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/9] w-full lg:aspect-auto lg:min-h-[220px] lg:w-[55%]" : "aspect-[16/9] w-full"
+              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "m-4 mr-0 h-20 w-24 border border-border sm:m-5 sm:mr-0 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/9] w-full lg:aspect-auto lg:min-h-[220px] lg:w-[55%]" : "aspect-[16/9] w-full"
             }`}
           >
             <img
