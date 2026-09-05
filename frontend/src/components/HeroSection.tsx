@@ -41,8 +41,8 @@ const HeroSection = () => {
       </div>
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,transparent_49.9%,rgb(255_255_255_/_0.09)_50%,transparent_50.1%)]" />
 
-      <div className="container relative z-10 grid min-h-[calc(100svh-59px)] items-end px-5 pb-10 pt-16 sm:px-8 sm:pb-14 lg:min-h-[min(770px,calc(100svh-59px))] lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,.95fr)] lg:px-12 lg:pb-12 lg:pt-20 xl:px-16">
-        <div className="relative max-w-3xl lg:pb-8">
+      <div className="container relative z-10 flex min-h-[calc(100svh-59px)] flex-col justify-end px-5 pb-10 pt-16 sm:px-8 sm:pb-14 lg:min-h-[clamp(42rem,calc(100svh-59px),50rem)] lg:px-12 lg:pb-12 lg:pt-20 xl:px-16">
+        <div className="relative max-w-3xl">
           <motion.p
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45 }}
             className="homepage-kicker flex items-center gap-3 text-white/75"
@@ -87,7 +87,7 @@ const HeroSection = () => {
           </motion.div>
         </div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .6, delay: .45 }} className="mt-12 grid grid-cols-3 border-t border-white/25 pt-5 lg:mt-0 lg:self-end lg:justify-self-end lg:w-full lg:max-w-md">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .6, delay: .45 }} className="mt-9 grid w-full max-w-xl grid-cols-3 border-t border-white/25 pt-5 lg:mt-10">
           {(content?.hero_stats || [{ value: "12,000+", label: "Volumes" }, { value: "400+", label: "Journals" }, { value: "24/7", label: "Digital Access" }]).map((stat, index) => (
             <div key={stat.label} className={`px-3 first:pl-0 ${index ? "border-l border-white/25" : ""}`}>
               <p className="text-2xl font-bold tracking-[-.05em] sm:text-3xl">{stat.value}</p>

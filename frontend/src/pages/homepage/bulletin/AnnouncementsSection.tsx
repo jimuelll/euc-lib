@@ -12,7 +12,7 @@ export function AnnouncementsSection() {
   const [selected, setSelected] = useState<BulletinPost | null>(null);
 
   return (
-    <section className="border border-border bg-card px-6 py-7 sm:px-8">
+    <section className="min-w-0 overflow-hidden border border-border bg-card px-6 py-7 sm:px-8">
       <div className="flex items-center justify-between gap-4">
         <div>
           <span className="mb-3 block h-px w-7 bg-warning" />
@@ -28,7 +28,7 @@ export function AnnouncementsSection() {
         <div className="mt-5 flex min-h-36 items-center justify-center border border-border text-center text-sm text-muted-foreground"><BookOpen className="mr-3 h-4 w-4 text-warning" />No announcements yet.</div>
       )}
       {!loading && posts.length > 0 && (
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
           {posts.map((post) => <PostCard key={post.id} post={post} variant="grid" onClick={() => setSelected(post)} />)}
         </div>
       )}

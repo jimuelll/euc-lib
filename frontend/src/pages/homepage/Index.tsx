@@ -13,8 +13,8 @@ const Index = () => {
       <main>
         <HeroSection />
         <QuickAccessSection />
-        <div className="border-b border-border bg-secondary/35">
-          <div className="container grid gap-0 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,.95fr)_minmax(0,1.25fr)] lg:px-12 xl:px-16">
+        <div className="overflow-hidden border-b border-border bg-secondary/35">
+          <div className="container grid min-w-0 gap-0 px-5 py-8 sm:px-8 lg:grid-cols-[minmax(0,.95fr)_minmax(0,1.25fr)] lg:px-12 xl:px-16">
             <AboutPreviewSection />
             <AnnouncementsSection />
           </div>
