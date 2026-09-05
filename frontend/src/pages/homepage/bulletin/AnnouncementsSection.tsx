@@ -13,9 +13,9 @@ export function AnnouncementsSection() {
 
   return (
     <section className="min-w-0 overflow-hidden border border-border bg-card px-6 py-7 sm:px-8">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-end md:justify-between md:text-left">
         <div>
-          <span className="mb-3 block h-px w-7 bg-warning" />
+          <span className="mx-auto mb-3 block h-px w-7 bg-warning md:mx-0" />
           <h2 className="text-2xl font-bold leading-none tracking-[-.045em] text-foreground">Latest from the Bulletin</h2>
         </div>
         <Link to="/bulletin" className="inline-flex shrink-0 items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary hover:text-warning">
@@ -25,7 +25,7 @@ export function AnnouncementsSection() {
 
       {loading && <ContentCardsSkeleton cards={3} className="mt-5 md:grid-cols-3" />}
       {!loading && posts.length === 0 && (
-        <div className="mt-5 flex min-h-36 items-center justify-center border border-border text-center text-sm text-muted-foreground"><BookOpen className="mr-3 h-4 w-4 text-warning" />No announcements yet.</div>
+        <div className="mt-5 flex min-h-36 items-center justify-center gap-3 border border-border text-center text-sm text-muted-foreground"><BookOpen className="h-4 w-4 shrink-0 text-warning" />No announcements yet.</div>
       )}
       {!loading && posts.length > 0 && (
         <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
