@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { BookMarked, RotateCcw, Search, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PublicPageMasthead from "@/components/PublicPageMasthead";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -90,8 +91,9 @@ const LibraryServices = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <PublicPageMasthead title="Book Reservations" description="Search the collection and reserve books for pickup at the library front desk." />
       <main className="border-t border-border py-10 sm:py-12">
-        <div className="container max-w-5xl space-y-5 px-4 sm:px-6">
+        <div className="container max-w-5xl space-y-5 px-5 sm:px-8 lg:px-12">
 
           <Link
             to="/services"
@@ -122,23 +124,6 @@ const LibraryServices = () => {
               {error}
             </div>
           )}
-
-          <div className="flex items-center gap-4 border-b border-border pb-5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center border border-primary/20 bg-primary text-primary-foreground">
-              <BookMarked className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.24em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
-                Library Services
-              </p>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Book Reservations
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Reserve a book — pick it up at the front desk
-              </p>
-            </div>
-          </div>
 
           <div className="relative border border-border bg-card">
             <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PublicPageMasthead from "@/components/PublicPageMasthead";
 import { useDebounce } from "@/hooks/use-debounce";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -116,39 +117,11 @@ const Catalogue = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* ── Page header band ──
-          bg-primary matches the navbar, then a black/20 overlay steps it
-          visibly darker in both light and dark mode without hardcoding HSL. */}
-      <div className="bg-primary relative overflow-hidden border-b border-warning/70">
-        {/* Depth overlay */}
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        {/* Gold top rule */}
-        <div className="relative z-10 h-[2px] w-full bg-warning" />
-        {/* Bottom border */}
-        <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
-
-        <div className="container relative z-20 px-5 py-11 sm:px-8 sm:py-14 lg:px-12 xl:px-16">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="h-px w-6 bg-warning shrink-0" />
-            <span
-              className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Enverga-Candelaria Library
-            </span>
-          </div>
-          <h1
-            className="text-4xl sm:text-5xl font-bold tracking-[-.055em] leading-[.92] text-primary-foreground"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Book Catalogue
-          </h1>
-          <p className="mt-3 text-sm text-primary-foreground/50 max-w-lg leading-relaxed">
-            Search and browse the library's collection.
-          </p>
-
-          {/* Search input */}
-          <div className="mt-8 relative max-w-xl">
+      <PublicPageMasthead
+        title="Book Catalogue"
+        description="Search and browse the library's collection."
+      >
+          <div className="relative max-w-xl">
             <div className="absolute inset-y-0 left-0 w-[3px] bg-warning z-10" />
             <Search className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-warning/50 pointer-events-none z-10" />
             {loading && (
@@ -169,8 +142,7 @@ const Catalogue = () => {
               onBlur={(e)  => { e.currentTarget.style.backgroundColor = "hsl(var(--primary) / 0.5)"; }}
             />
           </div>
-        </div>
-      </div>
+      </PublicPageMasthead>
 
       {/* ── Results — parchment ground ── */}
       <main className="bg-background">

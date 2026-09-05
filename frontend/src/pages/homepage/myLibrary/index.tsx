@@ -12,6 +12,7 @@ import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
 import { type ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PublicPageMasthead from "@/components/PublicPageMasthead";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
@@ -285,45 +286,8 @@ const MyLibrary = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="bg-primary relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        <div
-          className="absolute inset-0 z-10 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-          }}
-        />
-        <div className="relative z-10 h-[3px] w-full bg-warning" />
-        <div className="absolute inset-y-0 left-0 z-10 w-[3px] bg-warning" />
-        <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
-
-        <div className="container relative z-20 max-w-5xl px-4 py-8 sm:px-6 sm:py-10 md:py-11">
-          <motion.div initial="hidden" animate="visible" variants={fadeUp(0)}>
-            <div className="flex items-center gap-3">
-              <div className="h-px w-6 bg-warning shrink-0" />
-              <span
-                className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Enverga-Candelaria Library
-              </span>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <h1
-                  className="text-3xl font-bold tracking-tight leading-tight text-primary-foreground sm:text-4xl"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  My Library
-                </h1>
-                <p className="mt-2 text-sm leading-6 text-primary-foreground/70">
-                  Track your borrowing, reservations, and library activity.
-                </p>
-              </div>
-
-              <div className="min-w-[240px] border border-warning/25 bg-black/10 px-4 py-3.5 backdrop-blur-sm">
+      <PublicPageMasthead title="My Library" description="Track your borrowing, reservations, and library activity.">
+        <motion.div initial="hidden" animate="visible" variants={fadeUp(0)} className="max-w-sm border border-warning/25 bg-black/10 px-4 py-3.5">
                 <div className="flex items-center gap-2 text-primary-foreground">
                   <UserRound className="h-4 w-4 text-warning" />
                   <span className="font-medium">{profile?.name ?? user?.name ?? "Library account"}</span>
@@ -334,14 +298,11 @@ const MyLibrary = () => {
                 <p className="mt-3 text-xs leading-5 text-primary-foreground/45">
                   {summary?.active_borrows ?? 0} active borrows, {summary?.active_reservations ?? 0} active reservations
                 </p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
+        </motion.div>
+      </PublicPageMasthead>
 
       <main className="py-8 sm:py-10">
-        <div className="container max-w-5xl px-4 sm:px-6">
+        <div className="container max-w-5xl px-5 sm:px-8 lg:px-12">
           {error ? (
             <div className="mt-6 border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {error}

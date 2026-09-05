@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PublicPageMasthead from "@/components/PublicPageMasthead";
 import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
@@ -37,18 +38,6 @@ const getPageItems = (currentPage: number, totalPages: number): Array<number | "
   });
   return items;
 };
-
-const SectionLabel = ({ children, light = false }: { children: React.ReactNode; light?: boolean }) => (
-  <div className="flex items-center gap-3">
-    <div className={`h-px w-6 shrink-0 ${light ? "bg-warning" : "bg-warning"}`} />
-    <span
-      className={`text-[10px] font-bold uppercase tracking-[0.28em] ${light ? "text-warning" : "text-warning"}`}
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {children}
-    </span>
-  </div>
-);
 
 export function BulletinPage() {
   const { user } = useAuth();
@@ -112,27 +101,11 @@ export function BulletinPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="bg-primary relative overflow-hidden border-b border-warning/70">
-        <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-        <div className="relative z-10 h-[2px] w-full bg-warning" />
-        <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-black/30" />
-
-        <div className="container relative z-20 px-5 py-11 sm:px-8 sm:py-14 lg:px-12 xl:px-16">
-          <SectionLabel light>Enverga-Candelaria Library</SectionLabel>
-
-          <div className="mt-5 flex items-start justify-between gap-6 flex-wrap">
-            <div>
-              <h1
-                className="text-4xl sm:text-5xl font-bold tracking-[-.055em] leading-[.92] text-primary-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Bulletin Board
-              </h1>
-              <p className="mt-3 text-sm text-primary-foreground/50 max-w-lg leading-relaxed">
-                Library announcements, notices, and upcoming events.
-              </p>
-            </div>
-
+      <PublicPageMasthead
+        title="Bulletin Board"
+        description="Library announcements, notices, and upcoming events."
+      >
+          <div className="flex flex-wrap items-center gap-4">
             {canPost && (
               <button
                 onClick={() => setShowCreate(true)}
@@ -144,8 +117,7 @@ export function BulletinPage() {
               </button>
             )}
           </div>
-        </div>
-      </div>
+      </PublicPageMasthead>
 
       <main className="bg-background">
         <div className="container px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-16">
