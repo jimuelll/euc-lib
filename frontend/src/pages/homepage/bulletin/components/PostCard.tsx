@@ -61,14 +61,14 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
     <motion.div
       variants={cardVariants}
       className={`group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
-        isList || isHomepage ? "flex-row" : "flex-col"
+        isList || isHomepage ? "flex-row" : isFeatured ? "flex-col lg:flex-row" : "flex-col"
       } ${post.is_pinned ? isFeatured ? "border-l-2 border-l-warning" : "border-t-2 border-t-warning" : ""}`}
     >
       {/* Clickable area — everything except the archive button */}
       <button
         onClick={onClick}
         className={`flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning ${
-          isList || isHomepage ? "flex-row" : "flex-col"
+          isList || isHomepage ? "flex-row" : isFeatured ? "flex-col lg:flex-row" : "flex-col"
         }`}
       >
         {/* Image posts keep their media panel; text-only posts use the full card for the announcement. */}
@@ -76,7 +76,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div
             style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/8] w-full sm:aspect-[16/7]" : "aspect-[16/9] w-full"
+              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "h-20 w-24 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/9] w-full lg:aspect-auto lg:min-h-[220px] lg:w-[55%]" : "aspect-[16/9] w-full"
             }`}
           >
             <img
@@ -97,14 +97,20 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             </div>
             )}
           </div>
-        ) : (
+        ) : isHomepage ? null : (
           <div className={`relative shrink-0 overflow-hidden border-b border-border bg-primary/[0.035] ${isList || isHomepage ? "h-full w-1.5 border-b-0 border-r" : "h-2 w-full"}`}>
             <div className={isList || isHomepage ? "absolute inset-y-0 left-0 w-px bg-warning" : "absolute inset-x-0 top-0 h-px bg-warning"} />
           </div>
         )}
 
         {/* Content panel */}
-        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-3 sm:p-4 md:p-4" : isFeatured ? "p-5 sm:p-6" : "p-4 sm:p-5"}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6 lg:w-[45%] lg:justify-center" : "p-4 sm:p-5"}`}>
+          {!hasImage && post.is_pinned ? (
+            <div className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+              <Pin className="h-3 w-3" /> Pinned
+            </div>
+          ) : null}
+
           {/* Author row */}
           <div className={`flex items-center gap-2.5 ${isHomepage ? "mb-2" : "mb-3"}`}>
             <div
@@ -113,9 +119,9 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             >
               {getInitials(post.author_name)}
             </div>
-            <div className={`min-w-0 ${isHomepage ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
+            <div className={`min-w-0 ${isHomepage || isFeatured ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
               <span
-                className={`text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage ? "break-words" : "truncate"}`}
+                className={`text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage || isFeatured ? "break-words" : "truncate"}`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {post.author_name}
@@ -124,16 +130,10 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             </div>
           </div>
 
-          {!hasImage && post.is_pinned ? (
-            <div className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
-              <Pin className="h-3 w-3" /> Pinned
-            </div>
-          ) : null}
-
           {/* Title */}
           <p
             className={`font-bold leading-snug text-foreground group-hover:text-primary transition-colors ${
-              isList ? "text-sm sm:text-base" : isHomepage ? "text-sm md:text-base" : isFeatured ? "text-lg sm:text-xl" : "text-sm"
+              isList ? "text-sm sm:text-base" : isHomepage ? "text-base" : isFeatured ? "text-xl sm:text-2xl" : "text-sm"
             }`}
             style={{ fontFamily: "var(--font-heading)" }}
           >
@@ -148,7 +148,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           ) : null}
 
           {(isList || !hasImage || isFeatured) && (
-            <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-3 sm:text-sm" : "line-clamp-2"}`}>
+            <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-2 sm:text-sm" : "line-clamp-2"}`}>
               {post.excerpt}
             </p>
           )}
