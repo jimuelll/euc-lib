@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Heart, MessageCircle, Send, Loader2,
-  Trash2, Download, X, ZoomIn, Pin, PinOff, Archive,
+  Trash2, Download, X, ZoomIn, ZoomOut, Pin, PinOff, Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -72,6 +72,7 @@ export function PostModal({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export function PostModal({
     setPinned(post.is_pinned);
     setCommentText("");
     setCommentError(null);
+    setDownloadError(null);
     setLightboxOpen(false);
     setArchiveConfirm(false);
     loadComments(post.id);
@@ -216,23 +218,26 @@ export function PostModal({
 
   const handleDownload = async () => {
     if (!post?.image_url) return;
+    setDownloadError(null);
     try {
-      const rawUrl = post.image_url.replace(/\/upload\/[^/]+\//, "/upload/");
-      const res = await fetch(rawUrl);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const ext = blob.type.split("/")[1] || "jpg";
+      // Ask Cloudinary to attach the original asset instead of fetching it
+      // through the browser, which is unreliable for cross-origin downloads.
+      const [baseUrl, assetPath] = post.image_url.split("/upload/");
+      if (!baseUrl || !assetPath) throw new Error("Invalid Cloudinary URL");
       const a = Object.assign(document.createElement("a"), {
-        href: url,
-        download: `${post.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.${ext}`,
+        href: `${baseUrl}/upload/fl_attachment/${assetPath}`,
       });
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch {
-      window.open(post.image_url, "_blank");
+      setDownloadError("Could not start the download. Open the image in a new tab and try again.");
     }
+  };
+
+  const toggleZoom = () => {
+    setZoom((current) => current > 1 ? 1 : 2.5);
+    setOrigin({ x: 50, y: 50 });
   };
 
   const handleLightboxImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
@@ -369,7 +374,7 @@ export function PostModal({
               onClick={() => setLightboxOpen(true)}
             >
               <img
-                src={post.image_url.replace("/upload/", "/upload/q_auto,f_auto/")}
+                src={post.image_url}
                 alt={post.title}
                 className="w-full object-contain"
                 style={{ maxHeight: "48vh" }}
@@ -581,7 +586,7 @@ export function PostModal({
         >
           <img
             ref={imgRef}
-            src={post.image_url.replace("/upload/", "/upload/q_auto,f_auto/")}
+            src={post.image_url}
             alt={post.title}
             onClick={handleLightboxImageClick}
             className="max-h-[90dvh] max-w-[92vw] object-contain select-none"
@@ -593,25 +598,51 @@ export function PostModal({
             }}
             draggable={false}
           />
-          <div
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 px-4 py-2 text-[10px] text-white/60 pointer-events-none transition-opacity duration-300"
-            style={{ opacity: zoom > 1 ? 0 : 1, fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
-          >
-            CLICK IMAGE TO ZOOM - CLICK BACKDROP TO CLOSE
+          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleZoom();
+              }}
+              className="flex min-h-10 items-center gap-2 bg-white/10 px-4 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+              aria-label={zoom > 1 ? "Zoom out" : "Zoom in"}
+            >
+              {zoom > 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+              {zoom > 1 ? "Zoom out" : "Zoom in"}
+            </button>
+            <span
+              className="hidden bg-black/45 px-3 py-2 text-[10px] text-white/75 sm:block"
+              style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
+            >
+              Click image to {zoom > 1 ? "reset" : "zoom"}
+            </span>
           </div>
           <button
-            onClick={() => setLightboxOpen(false)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setLightboxOpen(false);
+            }}
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
           >
             <X className="h-4 w-4" />
           </button>
           <button
-            onClick={handleDownload}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDownload();
+            }}
             className="absolute right-4 top-14 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
-            title="Download full resolution"
+            title="Download original image"
+            aria-label="Download original image"
           >
             <Download className="h-4 w-4" />
           </button>
+          {downloadError && (
+            <p className="absolute inset-x-4 bottom-20 z-10 mx-auto max-w-md bg-destructive px-4 py-3 text-center text-sm text-destructive-foreground" role="alert">
+              {downloadError}
+            </p>
+          )}
         </div>
       )}
     </>
