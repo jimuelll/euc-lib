@@ -34,6 +34,7 @@ frontend/.env
 .agents/
 .claude/
 .codex/
+.codex-remote-attachments/
 .gemini/
 .impeccable/
 PRODUCT.md
