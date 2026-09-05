@@ -578,12 +578,12 @@ export function PostModal({
       </Dialog>
 
       {lightboxOpen && post.image_url && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95"
-          onClick={() => {
-            if (zoom === 1) setLightboxOpen(false);
-          }}
-        >
+        <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+          <DialogContent
+            hideClose
+            className="fixed inset-0 left-0 top-0 z-[200] flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 items-center justify-center border-0 bg-black/95 p-0 shadow-none sm:rounded-none"
+          >
+            <DialogTitle className="sr-only">{post.title} image viewer</DialogTitle>
           <img
             ref={imgRef}
             src={post.image_url}
@@ -643,7 +643,8 @@ export function PostModal({
               {downloadError}
             </p>
           )}
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
