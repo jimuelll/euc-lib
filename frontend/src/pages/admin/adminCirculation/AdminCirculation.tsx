@@ -1,5 +1,6 @@
 import { AdminPage, AdminPanel } from "../components/AdminPage";
 import { useLocation } from "react-router-dom";
+import { useState } from "react";
 import { useCirculation } from "./hooks/useCirculation";
 import { TRANSACTION_CONFIG } from "./circulation.types";
 import BookLookup from "./components/BookLookup";
@@ -9,6 +10,7 @@ import UserLookup from "./components/UserLookup";
 
 const AdminCirculation = () => {
   const location = useLocation();
+  const [logRevision, setLogRevision] = useState(0);
   const checkoutReservation = (location.state as { checkoutReservation?: Parameters<typeof useCirculation>[0] } | null)?.checkoutReservation ?? null;
   const {
     type,
@@ -30,7 +32,7 @@ const AdminCirculation = () => {
     handleLookupCopy,
     handleSubmit,
     reservationCheckout,
-  } = useCirculation(checkoutReservation);
+  } = useCirculation(checkoutReservation, () => setLogRevision((revision) => revision + 1));
 
   const cfg = TRANSACTION_CONFIG[type];
   const Icon = cfg.icon;
@@ -105,7 +107,7 @@ const AdminCirculation = () => {
         </div>
       </AdminPanel>
 
-      <CirculationLog />
+      <CirculationLog refreshKey={logRevision} />
     </AdminPage>
   );
 };

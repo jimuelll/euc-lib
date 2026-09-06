@@ -234,6 +234,32 @@ const createAcademicTerm = async ({ name, startsOn, endsOn, isCurrent }, userId,
   return term;
 };
 
+const updateAcademicTerm = async (termId, { name, startsOn, endsOn, isCurrent }, userId, conn = db) => {
+  if (!Number.isInteger(termId) || termId < 1) throw Object.assign(new Error("Invalid academic term"), { status: 400 });
+  if (!String(name || "").trim() || !startsOn || !endsOn) throw Object.assign(new Error("Term name and dates are required"), { status: 400 });
+  if (new Date(startsOn) > new Date(endsOn)) throw Object.assign(new Error("The end date must be after the start date"), { status: 400 });
+  const connToUse = conn;
+  if (isCurrent) await connToUse.query("UPDATE academic_terms SET is_current = 0, updated_by = ? WHERE is_current = 1 AND id <> ?", [userId ?? null, termId]);
+  const [result] = await connToUse.query(
+    "UPDATE academic_terms SET name = ?, starts_on = ?, ends_on = ?, is_current = ?, updated_by = ? WHERE id = ?",
+    [String(name).trim(), startsOn, endsOn, isCurrent ? 1 : 0, userId ?? null, termId]
+  );
+  if (!result.affectedRows) throw Object.assign(new Error("Academic term not found"), { status: 404 });
+  const [[term]] = await connToUse.query("SELECT id, name, starts_on, ends_on, is_current, created_at, updated_at FROM academic_terms WHERE id = ?", [termId]);
+  return term;
+};
+
+const deleteAcademicTerm = async (termId, conn = db) => {
+  if (!Number.isInteger(termId) || termId < 1) throw Object.assign(new Error("Invalid academic term"), { status: 400 });
+  const [[term]] = await conn.query("SELECT id, is_current FROM academic_terms WHERE id = ?", [termId]);
+  if (!term) throw Object.assign(new Error("Academic term not found"), { status: 404 });
+  if (term.is_current) throw Object.assign(new Error("Set another term as current before deleting this term"), { status: 409 });
+  const [[usage]] = await conn.query("SELECT COUNT(*) AS total FROM users WHERE academic_term_id = ?", [termId]);
+  if (usage.total) throw Object.assign(new Error("This term is assigned to user records and cannot be deleted"), { status: 409 });
+  await conn.query("DELETE FROM academic_terms WHERE id = ?", [termId]);
+  return { success: true };
+};
+
 const setCurrentAcademicTerm = async (termId, userId, conn = db) => {
   if (!Number.isInteger(termId) || termId < 1) throw Object.assign(new Error("Invalid academic term"), { status: 400 });
   const [[term]] = await conn.query("SELECT id FROM academic_terms WHERE id = ?", [termId]);
@@ -257,5 +283,7 @@ module.exports = {
   deleteAcademicProgram,
   listAcademicTerms,
   createAcademicTerm,
+  updateAcademicTerm,
+  deleteAcademicTerm,
   setCurrentAcademicTerm,
 };

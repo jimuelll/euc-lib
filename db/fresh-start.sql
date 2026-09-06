@@ -48,6 +48,7 @@ DROP TABLE IF EXISTS
   `catalog_schema`,
   `auth_refresh_sessions`,
   `auth_audit_events`,
+  `audit_events`,
   `bulletin_comments`,
   `bulletin_likes`,
   `bulletin_posts`,
@@ -177,6 +178,24 @@ CREATE TABLE `auth_audit_events` (
   `event_type` enum('login','logout','password_changed') NOT NULL,
   `device_type` enum('desktop','mobile','tablet','unknown') NOT NULL DEFAULT 'unknown',
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+--
+-- Table structure for table `audit_events`
+--
+
+CREATE TABLE `audit_events` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `actor_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `actor_name` varchar(255) DEFAULT NULL,
+  `actor_role` varchar(64) DEFAULT NULL,
+  `category` varchar(64) NOT NULL,
+  `action` varchar(64) NOT NULL,
+  `description` varchar(500) NOT NULL,
+  `route` varchar(255) DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `occurred_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -621,6 +640,15 @@ ALTER TABLE `auth_audit_events`
   ADD KEY `idx_auth_audit_user_time` (`user_id`,`created_at`);
 
 --
+-- Indexes for table `audit_events`
+--
+ALTER TABLE `audit_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_audit_events_time` (`occurred_at`),
+  ADD KEY `idx_audit_events_category_time` (`category`,`occurred_at`),
+  ADD KEY `idx_audit_events_actor_time` (`actor_id`,`occurred_at`);
+
+--
 -- Indexes for table `auth_refresh_sessions`
 --
 ALTER TABLE `auth_refresh_sessions`
@@ -834,6 +862,12 @@ ALTER TABLE `attendance_logs`
 -- AUTO_INCREMENT for table `auth_audit_events`
 --
 ALTER TABLE `auth_audit_events`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `audit_events`
+--
+ALTER TABLE `audit_events`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --

@@ -119,6 +119,8 @@ const deleteAcademicProgram = async (req, res) => {
 
 const listAcademicTerms = async (_req, res) => { try { res.json({ terms: await service.listAcademicTerms() }); } catch (error) { res.status(500).json({ message: "Failed to fetch academic terms" }); } };
 const createAcademicTerm = async (req, res) => { try { const term = await service.createAcademicTerm({ name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.status(201).json({ message: "Academic term added", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add academic term" }); } };
+const updateAcademicTerm = async (req, res) => { try { const term = await service.updateAcademicTerm(Number.parseInt(req.params.termId, 10), { name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.json({ message: "Academic term updated", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
+const deleteAcademicTerm = async (req, res) => { try { await service.deleteAcademicTerm(Number.parseInt(req.params.termId, 10)); res.json({ message: "Academic term deleted" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to delete academic term" }); } };
 const setCurrentAcademicTerm = async (req, res) => { try { await service.setCurrentAcademicTerm(Number.parseInt(req.params.termId, 10), req.user?.id); res.json({ message: "Current academic term updated" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
 
 module.exports = {
@@ -133,5 +135,7 @@ module.exports = {
   deleteAcademicProgram,
   listAcademicTerms,
   createAcademicTerm,
+  updateAcademicTerm,
+  deleteAcademicTerm,
   setCurrentAcademicTerm,
 };

@@ -17,7 +17,7 @@ interface ReservationCheckout {
   user_name: string;
 }
 
-export const useCirculation = (reservationCheckout: ReservationCheckout | null = null) => {
+export const useCirculation = (reservationCheckout: ReservationCheckout | null = null, onTransactionCompleted?: () => void) => {
   const navigate = useNavigate();
   const [type, setType]                   = useState<TransactionType>("borrow");
   const [studentId, setStudentId]         = useState("");
@@ -169,6 +169,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
         toast.success(`"${foundCopy.title}" returned by ${foundUser.name}`);
       }
       resetForm();
+      onTransactionCompleted?.();
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "Transaction failed");
     } finally {

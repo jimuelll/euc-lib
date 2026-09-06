@@ -45,7 +45,7 @@ const formatDateTime = (value?: string | null) => {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 };
 
-const CirculationLog = () => {
+const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
   const [rows,         setRows]         = useState<CirculationLogEntry[]>([]);
   const [total,        setTotal]        = useState(0);
   const [totalPages,   setTotalPages]   = useState(1);
@@ -79,7 +79,7 @@ const CirculationLog = () => {
     }
   }, [status, debouncedSearch, page, showArchived]);
 
-  useEffect(() => { fetchLog(); }, [fetchLog]);
+  useEffect(() => { void fetchLog(); }, [fetchLog, refreshKey]);
   useEffect(() => { setPage(1); }, [status, debouncedSearch, showArchived]);
 
   // ── Toggle archived — resets page & clears selection ─────────────────────

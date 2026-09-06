@@ -1,7 +1,7 @@
 const { createHash } = require("crypto");
 const { APPLICATION_TABLES } = require("./snapshot.registry");
 
-const SNAPSHOT_VERSION = 6;
+const SNAPSHOT_VERSION = 7;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -103,7 +103,7 @@ function upgradeV4ToV5(backup) {
     backup.tables.library_circulation_settings.push({ id: 1, overdue_fine_per_hour: 1 });
   }
   backup.tableManifest = Object.keys(backup.tables).sort();
-  backup.version = SNAPSHOT_VERSION;
+  backup.version = 5;
   delete backup.schema;
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   return backup;
@@ -120,13 +120,23 @@ function upgradeV5ToV6(backup) {
       reservation.reserved_copy_id = null;
     }
   }
-  backup.version = SNAPSHOT_VERSION;
+  backup.version = 6;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
+function upgradeV6ToV7(backup) {
+  assertSnapshotIntegrity(backup);
+  // v7 introduced the durable actor-aware audit stream. Older snapshots have
+  // no equivalent records, but must still restore safely into the new schema.
+  for (const table of APPLICATION_TABLES) backup.tables[table] ??= [];
+  backup.version = 7;
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   return backup;
 }
 
 // Each supported snapshot version advances through one reviewed transformer.
-const SNAPSHOT_TRANSFORMERS = new Map([[3, upgradeV3ToV4], [4, upgradeV4ToV5], [5, upgradeV5ToV6]]);
+const SNAPSHOT_TRANSFORMERS = new Map([[3, upgradeV3ToV4], [4, upgradeV4ToV5], [5, upgradeV5ToV6], [6, upgradeV6ToV7]]);
 
 function upgradeBackup(backup) {
   if (backup.version > SNAPSHOT_VERSION) {

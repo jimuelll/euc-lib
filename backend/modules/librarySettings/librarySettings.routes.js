@@ -16,6 +16,8 @@ router.put("/academic-programs/:programId", adminOnly, controller.updateAcademic
 router.delete("/academic-programs/:programId", adminOnly, controller.deleteAcademicProgram);
 router.get("/academic-terms", authMiddleware(["staff", "admin", "super_admin"]), controller.listAcademicTerms);
 router.post("/academic-terms", adminOnly, controller.createAcademicTerm);
+router.put("/academic-terms/:termId", adminOnly, controller.updateAcademicTerm);
+router.delete("/academic-terms/:termId", adminOnly, controller.deleteAcademicTerm);
 router.post("/academic-terms/:termId/current", adminOnly, controller.setCurrentAcademicTerm);
 
 module.exports = router;

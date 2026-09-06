@@ -32,7 +32,7 @@ async function logSiteVisit({ visitorId, userId = null, path = "/", ipAddress = 
   );
 }
 
-function buildAuditFeedQuery() {
+function buildLegacyAuditFeedQuery() {
   return `SELECT *
     FROM (
       SELECT
@@ -235,6 +235,11 @@ function buildAuditFeedQuery() {
     ) audit_feed`;
 }
 
+function buildAuditFeedQuery() {
+  return `SELECT occurred_at, category, action, actor_name, actor_role, description
+    FROM audit_events`;
+}
+
 function buildAuditFilters({ category = "all", action = "", dateFrom = "", dateTo = "" } = {}) {
   const filters = ["occurred_at IS NOT NULL"];
   const params = [];
@@ -330,7 +335,7 @@ async function getAuditLogMeta() {
   }
 
   return {
-    categories: ["all", "auth", "users", "attendance", "borrowing", "reservation", "bulletin", "subscriptions", "notifications", "clearance"],
+    categories: ["all", "auth", "users", "catalog", "academic_settings", "attendance", "borrowing", "reservation", "bulletin", "events", "content", "subscriptions", "notifications", "backup", "clearance", "system"],
     actions: [...new Set(actionRows.map((row) => row.action))],
     actionsByCategory,
   };

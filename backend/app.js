@@ -24,6 +24,7 @@ const notificationsRoutes = require("./modules/notifications/notifications.route
 const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
 const backupRoutes = require("./modules/backup/backup.routes");
 const maintenanceMode = require("./middlewares/maintenanceMode");
+const auditLogger = require("./middlewares/auditLogger");
 const clearanceRoutes = require("./modules/clearance/clearance.routes");
 const siteContentRoutes = require("./modules/siteContent/siteContent.routes");
 
@@ -59,6 +60,7 @@ app.use(express.urlencoded({ extended: true }));
 // route (including public routes) so a public visit, like, or comment cannot
 // be written into the state that is being replaced.
 app.use(maintenanceMode);
+app.use(auditLogger);
 
 // --- Public Routes ---
 // --- Public Routes ---

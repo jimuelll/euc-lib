@@ -82,4 +82,6 @@ export async function deleteAcademicProgram(programId: number) {
 }
 export async function fetchAcademicTerms(): Promise<AcademicTerm[]> { const res = await axiosInstance.get("/api/admin/academic-terms"); return res.data.terms ?? []; }
 export async function createAcademicTerm(payload: { name: string; starts_on: string; ends_on: string; is_current: boolean }) { const res = await axiosInstance.post("/api/admin/academic-terms", payload); return res.data; }
+export async function updateAcademicTerm(termId: number, payload: { name: string; starts_on: string; ends_on: string; is_current: boolean }) { const res = await axiosInstance.put(`/api/admin/academic-terms/${termId}`, payload); return res.data; }
+export async function deleteAcademicTerm(termId: number) { const res = await axiosInstance.delete(`/api/admin/academic-terms/${termId}`); return res.data; }
 export async function setCurrentAcademicTerm(termId: number) { const res = await axiosInstance.post(`/api/admin/academic-terms/${termId}/current`); return res.data; }

@@ -50,10 +50,14 @@ const categoryOptions = [
   { value: "all", label: "All categories" },
   { value: "auth", label: "Auth" },
   { value: "users", label: "Users" },
+  { value: "catalog", label: "Catalog & policies" },
+  { value: "academic_settings", label: "Academic settings" },
   { value: "attendance", label: "Attendance" },
   { value: "borrowing", label: "Borrowing" },
   { value: "reservation", label: "Reservation" },
   { value: "bulletin", label: "Bulletin" },
+  { value: "events", label: "Events" },
+  { value: "content", label: "Content" },
   { value: "subscriptions", label: "Subscriptions" },
   { value: "notifications", label: "Notifications" },
 ];
@@ -67,6 +71,10 @@ const categoryTone: Record<string, string> = {
   bulletin: "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-700",
   subscriptions: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700",
   notifications: "border-rose-500/20 bg-rose-500/10 text-rose-700",
+  catalog: "border-violet-500/20 bg-violet-500/10 text-violet-700",
+  academic_settings: "border-orange-500/20 bg-orange-500/10 text-orange-700",
+  events: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700",
+  content: "border-indigo-500/20 bg-indigo-500/10 text-indigo-700",
 };
 
 const formatDateTime = (value: string) =>
@@ -177,7 +185,7 @@ const AdminAuditLogs = () => {
     <AdminPage
       eyebrow="Reports"
       title="Audit Log"
-      description="A dedicated trail of notable activity reconstructed from timestamps and actor fields already stored across the current schema."
+      description="A durable, actor-aware record of every successful change made through the system."
       actions={
         <Button
           type="button"
@@ -262,7 +270,7 @@ const AdminAuditLogs = () => {
 
       <AdminPanel
         title="Audit Feed"
-        description="Each item represents an event that can be inferred directly from existing database timestamps and actor relationships."
+        description="Each item records the completed action, its category, time, and responsible account when one is available."
       >
         {loading ? <div className="space-y-3" aria-label="Loading audit records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-20 w-full rounded-none" />)}</div> : null}
         {error ? (
@@ -313,7 +321,7 @@ const AdminAuditLogs = () => {
 
                       <p className="text-sm font-medium leading-6 text-foreground">{item.description}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: Not captured by current schema"}
+                        {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}
                       </p>
                     </div>
 

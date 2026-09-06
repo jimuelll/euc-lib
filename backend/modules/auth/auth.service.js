@@ -7,6 +7,7 @@ const {
 const db = require("../../db");
 const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
 const { normalizeDeviceType } = require("./authDevice");
+const { recordAuditEvent } = require("../analytics/audit.service");
 
 const getTermStatus = async (user) => {
   if (user.role !== "student") return { term_status: "not_applicable", academic_term_name: null };
@@ -20,6 +21,19 @@ const recordAuthAuditEvent = async (userId, eventType, { deviceType = "unknown" 
     "INSERT INTO auth_audit_events (user_id, event_type, device_type) VALUES (?, ?, ?)",
     [userId, eventType, normalizeDeviceType(deviceType)]
   );
+  const descriptions = {
+    login: "Signed in",
+    logout: "Signed out",
+    password_changed: "Changed their password",
+  };
+  await recordAuditEvent({
+    actorId: userId,
+    category: "auth",
+    action: eventType,
+    description: descriptions[eventType] ?? `Completed ${eventType}`,
+    route: "/api/auth",
+    metadata: { device_type: normalizeDeviceType(deviceType) },
+  });
 };
 
 async function loginUser(student_employee_id, password, rememberMe = false, auditContext = {}) {
