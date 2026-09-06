@@ -19,7 +19,14 @@ type TermDraft = { name: string; starts_on: string; ends_on: string; is_current:
 type HolidayDraft = { name: string; holiday_date: string; description: string };
 const blankTerm: TermDraft = { name: "", starts_on: "", ends_on: "", is_current: false };
 const blankHoliday: HolidayDraft = { name: "", holiday_date: "", description: "" };
-const fmt = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString();
+// MySQL DATE values can arrive as either YYYY-MM-DD or an ISO timestamp.
+// Normalize to the calendar part before parsing so we never append a second
+// time component (which turns valid ISO values into Invalid Date).
+const fmt = (value: string) => {
+  const datePart = String(value ?? "").slice(0, 10);
+  const date = new Date(`${datePart}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
+};
 const messageOf = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again.";
 
 function BusyButton({ pending, children, ...props }: React.ComponentProps<typeof Button> & { pending?: boolean }) {

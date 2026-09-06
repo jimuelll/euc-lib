@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onClick, ...props }, ref) => {
     const isDateLike = type === "date" || type === "datetime-local";
 
     return (
@@ -15,6 +15,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        onClick={(event) => {
+          onClick?.(event);
+          if (event.defaultPrevented || !isDateLike || props.disabled || props.readOnly) return;
+          // Browsers that support showPicker() open the native calendar for a
+          // click anywhere in the input, not only on its small icon. Browsers
+          // without it retain their ordinary focus/native-picker behavior.
+          try { event.currentTarget.showPicker?.(); } catch { /* native picker unavailable */ }
+        }}
         {...props}
       />
     );
