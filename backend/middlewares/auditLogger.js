@@ -41,6 +41,45 @@ function describeTarget(body = {}, path = "") {
   return "";
 }
 
+const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const valueFor = (value) => {
+  if (value === null || value === "") return "Cleared";
+  if (value === true || value === 1 || value === "1") return "Yes";
+  if (value === false || value === 0 || value === "0") return "No";
+  return String(value).slice(0, 180);
+};
+
+function getAuditMetadata(path, body = {}) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const fieldSets = path.includes("catalog-schema")
+    ? [["key", "Field key"], ["label", "Label"], ["type", "Field type"], ["required", "Required"], ["public", "Public"], ["scope", "Applies to"]]
+    : path.includes("book-types")
+      ? [["name", "Policy name"], ["default_borrow_days", "Borrow days"], ["fine_per_hour", "Recurring fine (PHP)"], ["fine_interval", "Fine interval"], ["initial_fine", "Initial fine (PHP)"]]
+      : path.includes("/books")
+        ? [["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["material_type", "Material"], ["book_type_id", "Book type"], ["copies", "Copies"]]
+        : path.includes("academic-terms")
+          ? [["name", "Term"], ["starts_on", "Starts"], ["ends_on", "Ends"], ["is_current", "Current term"]]
+          : path.includes("academic-programs")
+            ? [["name", "Program / course"]]
+            : path.includes("library-holidays")
+              ? [["name", "Holiday"], ["holiday_date", "Date"], ["description", "Note"]]
+              : path.includes("library-settings")
+                ? [["overdue_fine_per_hour", "Overdue fine per hour (PHP)"]]
+                : path.includes("/users")
+                  ? [["name", "Name"], ["student_employee_id", "Student / employee ID"], ["role", "Role"], ["is_active", "Active"], ["program_id", "Program / course"], ["academic_term_id", "Academic term"]]
+                  : path.includes("/events")
+                    ? [["title", "Event"], ["starts_at", "Starts"], ["ends_at", "Ends"]]
+                    : path.includes("/notifications")
+                      ? [["title", "Title"], ["type", "Type"], ["audience_type", "Audience"]]
+                      : path.includes("/circulation") || path.includes("/borrowing")
+                        ? [["userBarcode", "Borrower"], ["bookBarcode", "Copy barcode"], ["reservationId", "Reservation"]]
+                        : [];
+  const changes = fieldSets
+    .filter(([key]) => has(body, key))
+    .map(([key, label]) => ({ field: label, value: valueFor(body[key]) }));
+  return changes.length ? { changes } : null;
+}
+
 function getDescription(method, path, body) {
   if (path.includes("/backup/snapshots") && method === "POST") return "Saved a manual snapshot";
   if (path.includes("/circulation") && method === "POST") return `Processed circulation${describeTarget(body, path)}`;
@@ -66,7 +105,8 @@ function getDescription(method, path, body) {
 // credentials, tokens, or other sensitive input. The response is never held up
 // by a best-effort audit write.
 function auditLogger(req, res, next) {
-  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method) || ignoredPaths.has(req.path) || req.path.includes("/backup/restore")) return next();
+  const isSnapshotRestore = req.path.includes("/backup/") && req.path.includes("/restore");
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method) || ignoredPaths.has(req.path) || isSnapshotRestore) return next();
 
   res.on("finish", () => {
     if (res.statusCode < 200 || res.statusCode >= 300) return;
@@ -77,6 +117,7 @@ function auditLogger(req, res, next) {
       action: getAction(req.method, path),
       description: getDescription(req.method, path, req.body),
       route: path.slice(0, 255),
+      metadata: getAuditMetadata(path, req.body),
     }).catch((error) => console.error("[audit] Failed to record event:", error.message));
   });
   next();

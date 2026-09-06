@@ -38,10 +38,17 @@ function encodeValue(value) {
 function decodeValue(value, columnType) {
   if (value && typeof value === "object" && value.__backupType === "buffer") return Buffer.from(value.data, "base64");
   if (value && typeof value === "object" && value.__backupType === "date") return formatDateForMySql(value.data, columnType);
+  const normalizedColumnType = String(columnType).toLowerCase();
+  // Uploaded JSON can contain an ISO date string even when it was not tagged
+  // as a Date instance. MySQL DATE/DATETIME/TIMESTAMP columns reject the
+  // ISO `T`/`Z` form, so convert it to their canonical SQL representation.
+  if (typeof value === "string" && /^(date|datetime|timestamp|time|year)/.test(normalizedColumnType) && /T|Z$/.test(value)) {
+    return formatDateForMySql(value, normalizedColumnType);
+  }
   // JSON values arrive as objects after an uploaded snapshot is parsed by
   // Express. mysql2 must receive JSON text for a JSON column, not an object
   // coerced to "[object Object]".
-  if (String(columnType).toLowerCase() === "json" && value !== null && value !== undefined) {
+  if (normalizedColumnType === "json" && value !== null && value !== undefined) {
     if (typeof value === "string") {
       try { JSON.parse(value); return value; }
       catch { throw Object.assign(new Error("The backup contains invalid JSON data."), { status: 400 }); }

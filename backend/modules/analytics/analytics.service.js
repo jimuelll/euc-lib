@@ -236,7 +236,7 @@ function buildLegacyAuditFeedQuery() {
 }
 
 function buildAuditFeedQuery() {
-  return `SELECT occurred_at, category, action, actor_name, actor_role, description,
+  return `SELECT occurred_at, category, action, actor_name, actor_role, description, metadata,
       restore_status, reversed_at, reversed_by_restore_id
     FROM audit_events`;
 }

@@ -15,6 +15,7 @@ interface AuditItem {
   actor_name: string | null;
   actor_role: string | null;
   description: string;
+  metadata: unknown;
   restore_status: "retained" | "reversed";
   reversed_at: string | null;
 }
@@ -83,6 +84,17 @@ const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 const formatRole = (role: string | null) => (role ? role.replace(/_/g, " ") : "System");
+const auditChanges = (metadata: unknown): Array<{ field: string; value: string }> => {
+  if (!metadata) return [];
+  try {
+    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+    return Array.isArray((parsed as { changes?: unknown }).changes)
+      ? (parsed as { changes: Array<{ field?: unknown; value?: unknown }> }).changes
+        .filter((change) => typeof change.field === "string" && typeof change.value === "string")
+        .map((change) => ({ field: change.field as string, value: change.value as string }))
+      : [];
+  } catch { return []; }
+};
 
 const AdminAuditLogs = () => {
   const [rows, setRows] = useState<AuditItem[]>([]);
@@ -322,6 +334,7 @@ const AdminAuditLogs = () => {
                       </div>
 
                       <p className="text-sm font-medium leading-6 text-foreground">{item.description}</p>
+                      {auditChanges(item.metadata).length ? <dl className="grid gap-x-5 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata).map((change) => <div key={change.field} className="flex min-w-0 gap-1"><dt className="shrink-0 font-medium text-foreground">{change.field}:</dt><dd className="truncate">{change.value}</dd></div>)}</dl> : null}
                       {item.restore_status === "reversed" ? <p className="inline-flex w-fit border border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive">Reversed by snapshot restore{item.reversed_at ? ` · ${formatDateTime(item.reversed_at)}` : ""}</p> : null}
                       <p className="text-xs text-muted-foreground">
                         {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}
