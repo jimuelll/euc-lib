@@ -23,6 +23,7 @@ const myLibraryRoutes = require("./modules/myLibrary/myLibrary.routes");
 const notificationsRoutes = require("./modules/notifications/notifications.routes");
 const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
 const backupRoutes = require("./modules/backup/backup.routes");
+const maintenanceMode = require("./middlewares/maintenanceMode");
 const clearanceRoutes = require("./modules/clearance/clearance.routes");
 const siteContentRoutes = require("./modules/siteContent/siteContent.routes");
 
@@ -30,6 +31,7 @@ const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
 
 const app = express();
+const backupBodyLimit = Number(process.env.BACKUP_MAX_BYTES || 50 * 1024 * 1024);
 app.set("trust proxy", 1);
 app.use(cors({
   origin: (origin, callback) => {
@@ -50,9 +52,13 @@ app.use(cors({
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(cookieParser());
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: `${backupBodyLimit}b` }));
 app.use(express.urlencoded({ extended: true }));
 
+// A restore replaces application data atomically.  This must run before every
+// route (including public routes) so a public visit, like, or comment cannot
+// be written into the state that is being replaced.
+app.use(maintenanceMode);
 
 // --- Public Routes ---
 // --- Public Routes ---

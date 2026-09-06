@@ -7,31 +7,9 @@ let ensuredNotificationSourceColumns = false;
 
 const ensureNotificationSourceColumns = async (conn = db) => {
   if (ensuredNotificationSourceColumns) return;
-
-  const [columns] = await conn.query(
-    `SELECT COLUMN_NAME
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'notifications'
-       AND COLUMN_NAME IN ('source_type', 'source_id')`
-  );
-
-  const existingColumns = new Set(columns.map((column) => column.COLUMN_NAME));
-
-  if (!existingColumns.has("source_type")) {
-    await conn.query(
-      `ALTER TABLE notifications
-       ADD COLUMN source_type VARCHAR(50) DEFAULT NULL AFTER created_by`
-    );
-  }
-
-  if (!existingColumns.has("source_id")) {
-    await conn.query(
-      `ALTER TABLE notifications
-       ADD COLUMN source_id BIGINT DEFAULT NULL AFTER source_type`
-    );
-  }
-
+  // These columns are owned by the fresh-start database baseline. Never alter
+  // a live table during a user request: that makes first-use behavior and
+  // snapshot compatibility depend on request timing.
   ensuredNotificationSourceColumns = true;
 };
 

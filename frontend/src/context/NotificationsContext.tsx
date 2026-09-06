@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchNotifications,
@@ -37,8 +37,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const reconnectAttemptsRef = useRef(0);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
-  const refresh = async () => {
-    if (!user) {
+  const refresh = useCallback(async () => {
+    if (!user?.id) {
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
@@ -56,7 +56,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   refreshRef.current = refresh;
 
@@ -64,10 +64,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     if (authLoading) return;
 
     void refresh();
-  }, [authLoading, user?.id]);
+  }, [authLoading, refresh]);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !user?.id) return;
 
     let cancelled = false;
 
@@ -151,7 +151,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [authLoading, user?.id, getToken]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
     const syncNotifications = () => {
       void refreshRef.current();
@@ -207,7 +207,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       markAllAsRead,
       refresh,
     }),
-    [notifications, unreadCount, loading]
+    [notifications, unreadCount, loading, refresh]
   );
 
   return (

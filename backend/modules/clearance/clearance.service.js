@@ -102,6 +102,12 @@ const getClearanceQueue = async ({ page, limit } = {}) => {
 };
 
 const assertEligible = async (userId, conn = db) => {
+  const [[user]] = await conn.query(
+    "SELECT id, is_active FROM users WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+    [userId]
+  );
+  if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
+  if (!user.is_active) throw Object.assign(new Error("User account is inactive"), { status: 403 });
   const profile = await buildStatus(userId, conn);
   if (profile.status === "blocked") {
     throw Object.assign(new Error(`Clearance required: ${profile.reasons.join("; ")}`), { status: 409, clearance: profile });

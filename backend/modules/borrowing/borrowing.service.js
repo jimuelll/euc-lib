@@ -8,6 +8,7 @@ const {
 const notificationsService = require("../notifications/notifications.service");
 const { assertEligible, getClearanceProfile } = require("../clearance/clearance.service");
 const { getPagination, roundCurrency } = require("./borrowing.helpers");
+const { catalogDisplayColumns } = require("../catalog/catalog.projection");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,22 +72,27 @@ const searchCatalogueWithAvailability = async (query) => {
        bk.id,
        bk.title,
        bk.author,
-       bk.category,
+       ${catalogDisplayColumns("bk", ["category", "location"])},
        bk.isbn,
        bk.copies,
-       bk.location,
+       bk.material_type,
+       TRUE AS canBorrow,
+       TRUE AS canReserve,
        COUNT(DISTINCT bc.id)                                      AS total_copies,
        GREATEST(0,
          COUNT(DISTINCT bc.id) -
          COUNT(DISTINCT CASE
-           WHEN br.status IN ('borrowed','overdue') THEN br.id
+           WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id
          END)
        )                                                           AS available
      FROM books bk
      LEFT JOIN book_copies  bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings   br ON br.copy_id  = bc.id
                                AND br.status IN ('borrowed','overdue')
+     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id
+                              AND rr.status = 'ready' AND rr.deleted_at IS NULL
      WHERE bk.deleted_at IS NULL
+       AND bk.material_type = 'book'
        AND (bk.title  LIKE ?
         OR bk.author LIKE ?
         OR bk.isbn   LIKE ?)
@@ -119,7 +125,11 @@ const resolveUserByBarcode = async (scannedValue) => {
 const resolveCopyByBarcode = async (barcode) => {
   const [[copy]] = await db.query(
     `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active,
-            bk.title, bk.author, bk.copies
+            bk.title, bk.author, bk.copies,
+            EXISTS(
+              SELECT 1 FROM reservations r
+              WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL
+            ) AS is_reserved
      FROM book_copies bc
      JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
      WHERE bc.barcode = ? AND bc.deleted_at IS NULL`,
@@ -198,11 +208,12 @@ const borrowBook = async (
       copy = c;
     } else {
       const [[book]] = await conn.query(
-        "SELECT bk.id, bk.copies, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine FROM books bk JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1 WHERE bk.id = ? AND bk.deleted_at IS NULL FOR UPDATE",
+        "SELECT bk.id, bk.copies, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine FROM books bk LEFT JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1 WHERE bk.id = ? AND bk.deleted_at IS NULL FOR UPDATE",
         [bookIdOrCopyBarcode]
       );
       if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
       if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
+      if (!book.default_borrow_days) throw Object.assign(new Error("This book has no active loan policy"), { status: 409 });
 
       const [copies] = await conn.query(
         `SELECT bc.id, bc.barcode, bc.condition FROM book_copies bc
@@ -211,7 +222,12 @@ const borrowBook = async (
              SELECT copy_id FROM borrowings
              WHERE status IN ('borrowed','overdue') AND copy_id IS NOT NULL
            )
-         LIMIT 1`,
+           AND NOT EXISTS (
+             SELECT 1 FROM reservations r
+             WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL
+           )
+         ORDER BY bc.condition = 'good' DESC, bc.id ASC
+         LIMIT 1 FOR UPDATE`,
         [bookIdOrCopyBarcode]
       );
       if (!copies.length) {
@@ -220,9 +236,20 @@ const borrowBook = async (
       copy = { ...copies[0], book_id: bookIdOrCopyBarcode, default_borrow_days: book.default_borrow_days, fine_per_hour: book.fine_per_hour, fine_interval: book.fine_interval, initial_fine: book.initial_fine };
     }
 
+    const [[readyHold]] = await conn.query(
+      `SELECT id FROM reservations
+       WHERE reserved_copy_id = ? AND status = 'ready' AND deleted_at IS NULL
+       FOR UPDATE`,
+      [copy.id]
+    );
+    if (readyHold && reservationId !== readyHold.id) {
+      throw Object.assign(new Error("This copy is reserved for a patron awaiting pickup"), { status: 409 });
+    }
+
     const [[activeLoan]] = await conn.query(
       `SELECT id FROM borrowings
-       WHERE copy_id = ? AND status IN ('borrowed','overdue')`,
+       WHERE copy_id = ? AND status IN ('borrowed','overdue')
+       FOR UPDATE`,
       [copy.id]
     );
     if (activeLoan) {
@@ -231,7 +258,8 @@ const borrowBook = async (
 
     const [[existing]] = await conn.query(
       `SELECT id FROM borrowings
-       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed','overdue')`,
+       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed','overdue')
+       FOR UPDATE`,
       [userId, copy.book_id]
     );
     if (existing) {
@@ -240,7 +268,7 @@ const borrowBook = async (
 
     if (reservationId !== null) {
       const [[reservation]] = await conn.query(
-        `SELECT id FROM reservations
+        `SELECT id, reserved_copy_id FROM reservations
          WHERE id = ? AND user_id = ? AND book_id = ?
            AND status = 'ready' AND deleted_at IS NULL
          FOR UPDATE`,
@@ -248,6 +276,9 @@ const borrowBook = async (
       );
       if (!reservation) {
         throw Object.assign(new Error("This ready reservation does not match the patron and selected copy"), { status: 409 });
+      }
+      if (reservation.reserved_copy_id !== copy.id) {
+        throw Object.assign(new Error("The selected copy is not the copy prepared for this reservation"), { status: 409 });
       }
     }
 
@@ -299,6 +330,9 @@ const borrowBook = async (
     };
   } catch (err) {
     await conn.rollback();
+    if (err?.code === "ER_DUP_ENTRY" && /uq_borrowings_active_(copy|user_book)/.test(String(err.message))) {
+      throw Object.assign(new Error("This copy is no longer available for checkout"), { status: 409 });
+    }
     throw err;
   } finally {
     conn.release();

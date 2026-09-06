@@ -9,14 +9,18 @@ import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 import { FormField, Book, type BookType, type CatalogFormValue, type CatalogFormValues } from "./AdminCatalog.types";
 import { archiveCatalogBook, createCatalogBook, fetchBookTypes, fetchCatalogBarcode, fetchCatalogBookCopies, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook, updateCatalogCopyCondition, type CatalogCopy } from "./catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
-import FieldInput from "./components/FieldInput";
+import CatalogCreateForm from "./components/CatalogCreateForm";
+import CatalogEditForm from "./components/CatalogEditForm";
 import BookCopiesModal from "./components/BookCopiesModal";
-import { Library, Loader2, Search, Trash2, RefreshCw, ArchiveRestore, Archive, FileText, Printer } from "lucide-react";
+import { Library, Loader2, Search, ArchiveRestore, Archive, Printer } from "lucide-react";
 import { printCodeLabel } from "@/utils/printCodeLabel";
 import { SegmentedNavigation } from "../components/SegmentedNavigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Props = { fields: FormField[] };
+type ApiFieldError = { response?: { data?: { fields?: Record<string, string> } } };
+const getServerFieldErrors = (error: unknown): Record<string, string> =>
+  (error as ApiFieldError)?.response?.data?.fields ?? {};
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -33,17 +37,6 @@ const PanelLabel = ({ children, action }: { children: React.ReactNode; action?: 
     </div>
     {action}
   </div>
-);
-
-const FieldLabel = ({ children, required, htmlFor }: { children: React.ReactNode; required?: boolean; htmlFor?: string }) => (
-  <label
-    htmlFor={htmlFor}
-    className="mb-2 block text-sm font-medium text-muted-foreground"
-    style={{ fontFamily: "var(--font-heading)" }}
-  >
-    {children}
-    {required && <span className="ml-1 text-destructive">*</span>}
-  </label>
 );
 
 // ─── Barcode strip ────────────────────────────────────────────────────────────
@@ -129,6 +122,8 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
               className={`text-[10px] font-bold uppercase tracking-[0.12em] border px-2 py-0.5 ${
                 copy.status === "borrowed"
                   ? "border-destructive/30 text-destructive bg-destructive/5"
+                  : copy.status === "reserved"
+                    ? "border-warning/30 text-warning bg-warning/5"
                   : "border-success/30 text-success bg-success/5"
               }`}
               style={{ fontFamily: "var(--font-heading)" }}
@@ -137,7 +132,7 @@ const BookBarcodeStrip = ({ bookId }: { bookId: number }) => {
             </span>
             <label className="w-full text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
               Condition
-              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status === "borrowed" || updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as CatalogCopy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
+              <select aria-label={`Condition for ${copy.barcode}`} value={copy.condition} disabled={!copy.is_active || copy.status !== "available" || updatingCopyId === copy.id} onChange={(event) => void updateCondition(copy, event.target.value as CatalogCopy["condition"])} className="mt-1 h-8 w-full border border-border bg-background px-1 text-xs font-semibold normal-case tracking-normal text-foreground disabled:opacity-50">
                 <option value="good">Good</option><option value="damaged">Damaged</option><option value="lost">Lost</option>
               </select>
             </label>
@@ -161,6 +156,7 @@ const AdminCatalogData = ({ fields }: Props) => {
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [catalogPagination, setCatalogPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [copiesBook,    setCopiesBook]    = useState<Book | null>(null);
   const [showArchived,  setShowArchived]  = useState(false);  // ← NEW
   const [bookTypes, setBookTypes] = useState<BookType[]>([]);
@@ -169,8 +165,9 @@ const AdminCatalogData = ({ fields }: Props) => {
 
   const activeFields = fields.filter((f) => !f.archived);
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
-  const setField     = (key: string, value: CatalogFormValue) => setFormValues((p) => ({ ...p, [key]: value }));
-  const resetForm    = () => { setFormValues({}); setSelectedBook(null); };
+  const fieldsForMaterial = (type: "book" | "thesis") => sortedFields.filter((field) => (field.scope ?? "shared") === "shared" || field.scope === type);
+  const setField     = (key: string, value: CatalogFormValue) => { setFormValues((p) => ({ ...p, [key]: value })); setFieldErrors((errors) => { const next = { ...errors }; delete next[key]; return next; }); };
+  const resetForm    = () => { setFormValues({}); setSelectedBook(null); setFieldErrors({}); };
 
   useEffect(() => { fetchBookTypes().then(setBookTypes).catch(() => toast.error("Failed to load book types")); }, []);
 
@@ -190,6 +187,7 @@ const AdminCatalogData = ({ fields }: Props) => {
           isbn: metadata.isbn,
           title: metadata.title,
           author: metadata.author,
+          publisher: metadata.publisher,
           edition: metadata.edition,
           publication_year: metadata.publication_year,
         };
@@ -199,18 +197,25 @@ const AdminCatalogData = ({ fields }: Props) => {
         return next;
       });
       toast.success("Available ISBN details added — review before saving");
-    } catch (error: unknown) { toast.error(getApiErrorMessage(error, "ISBN lookup failed")); }
+    } catch (error: unknown) {
+      const message = getApiErrorMessage(error, "ISBN lookup failed");
+      setFieldErrors((current) => ({ ...current, isbn: message }));
+    }
     finally { setIsbnLookup(false); }
   };
 
-  const validateRequired = () => {
-    for (const key of ["title", "author"]) {
-      if (!String(formValues[key] ?? "").trim()) {
-        toast.error(`${key === "title" ? "Book title" : "Author"} is required`);
-        return false;
+  const validateRequired = (type = materialType) => {
+    const errors: Record<string, string> = {};
+    if (type === "book" && !String(formValues.book_type_id ?? "").trim()) errors.book_type_id = "Select a loan policy.";
+    for (const field of fieldsForMaterial(type)) {
+      if (field.required && !String(formValues[field.key] ?? "").trim()) {
+        errors[field.key] = `${field.label} is required.`;
       }
     }
-    return true;
+    setFieldErrors(errors);
+    const first = Object.values(errors)[0];
+    if (first) toast.error("Review the highlighted fields.");
+    return !first;
   };
 
   const handleCreateBook = async () => {
@@ -220,6 +225,7 @@ const AdminCatalogData = ({ fields }: Props) => {
       const result = await createCatalogBook({ ...formValues, material_type: materialType });
       toast.success(result.message); resetForm(); setCatalogMode("edit"); await handleSearchBooks(false);
     } catch (error: unknown) {
+      setFieldErrors(getServerFieldErrors(error));
       toast.error(getApiErrorMessage(error, "Failed to add book"));
     } finally { setLoading(false); }
   };
@@ -235,8 +241,8 @@ const AdminCatalogData = ({ fields }: Props) => {
       if (!rows.length) {
         toast.info(
           searchQuery.trim()
-            ? (archived ? "No archived books found" : "No books found")
-            : (archived ? "No archived books are available" : "No active books are available")
+            ? (archived ? "No archived catalog records found" : "No catalog records found")
+            : (archived ? "No archived catalog records are available" : "No active catalog records are available")
         );
       }
     } catch (error: unknown) {
@@ -259,12 +265,14 @@ const AdminCatalogData = ({ fields }: Props) => {
   };
 
   const handleUpdateBook = async () => {
-    if (!selectedBook || !validateRequired()) return;
+    const selectedMaterial = selectedBook?.material_type === "thesis" ? "thesis" : "book";
+    if (!selectedBook || !validateRequired(selectedMaterial)) return;
     setLoading(true);
     try {
-      const result = await updateCatalogBook(selectedBook.id, formValues);
+      const result = await updateCatalogBook(selectedBook.id, { ...formValues, material_type: selectedMaterial });
       toast.success(result.message); resetForm(); await handleSearchBooks();
     } catch (error: unknown) {
+      setFieldErrors(getServerFieldErrors(error));
       toast.error(getApiErrorMessage(error, "Update failed"));
     } finally { setLoading(false); }
   };
@@ -273,8 +281,8 @@ const AdminCatalogData = ({ fields }: Props) => {
     if (!selectedBook) return;
     const shouldDelete = await confirm({
       title: `Archive "${selectedBook.title}"?`,
-      description: "The book will be hidden from active catalog management until it is restored.",
-      actionLabel: "Archive Book",
+      description: `The ${selectedBook.material_type === "thesis" ? "thesis" : "book"} will be hidden from active catalog management until it is restored.`,
+      actionLabel: `Archive ${selectedBook.material_type === "thesis" ? "Thesis" : "Book"}`,
       tone: "danger",
     });
     if (!shouldDelete) return;
@@ -291,8 +299,8 @@ const AdminCatalogData = ({ fields }: Props) => {
   const handleRestoreBook = async (book: Book) => {
     const shouldRestore = await confirm({
       title: `Restore "${book.title}"?`,
-      description: "This book will return to the active catalog list and can be edited again.",
-      actionLabel: "Restore Book",
+      description: `This ${book.material_type === "thesis" ? "thesis" : "book"} will return to the active catalog list and can be edited again.`,
+      actionLabel: `Restore ${book.material_type === "thesis" ? "Thesis" : "Book"}`,
     });
     if (!shouldRestore) return;
     setLoading(true);
@@ -309,7 +317,8 @@ const AdminCatalogData = ({ fields }: Props) => {
   const selectBookForEdit = (b: Book) => {
     setSelectedBook(b);
     const vals: CatalogFormValues = {};
-    activeFields.forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
+    fieldsForMaterial(b.material_type === "thesis" ? "thesis" : "book").forEach((f) => { vals[f.key] = b[f.key] ?? ""; });
+    vals.book_type_id = b.book_type_id ?? "";
     setFormValues(vals);
     requestAnimationFrame(() => editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
@@ -338,7 +347,7 @@ const AdminCatalogData = ({ fields }: Props) => {
           onChange={(mode) => { setCatalogMode(mode); resetForm(); setShowArchived(false); }}
           segments={[
             { value: "edit", label: "Catalog Records", icon: Search },
-            { value: "create", label: "Add Book", icon: Library },
+            { value: "create", label: "Add Record", icon: Library },
           ]}
           />
         </div>
@@ -346,45 +355,24 @@ const AdminCatalogData = ({ fields }: Props) => {
 
       {/* ── Create ────────────────────────────────────────────────────── */}
       {catalogMode === "create" && (
-        <div className="admin-panel-surface admin-etched-border mt-5 border border-border bg-card">
-          <PanelLabel>{materialType === "book" ? "New Book Entry" : "New Thesis Entry"}</PanelLabel>
-          <div className="p-5">
-            <div className="mb-5"><SegmentedNavigation ariaLabel="Material type" value={materialType} onChange={(value) => { setMaterialType(value); setFormValues({ material_type: value, copies: "1" }); }} segments={[{ value: "book", label: "Book", icon: Library }, { value: "thesis", label: "Thesis", icon: FileText }]} /></div>
-            {materialType === "book" ? <div className="mb-5 border border-warning/30 bg-warning/5 p-4"><FieldLabel>ISBN</FieldLabel><div className="flex gap-2"><input value={formValues.isbn ?? ""} onChange={(event) => setField("isbn", event.target.value)} placeholder="ISBN-10 or ISBN-13" className="h-9 min-w-0 flex-1 border border-border bg-background px-3 text-sm" /><button type="button" onClick={lookupIsbn} disabled={isbnLookup} className="flex h-9 shrink-0 items-center gap-2 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">{isbnLookup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}Look up</button></div></div> : <div className="mb-5 border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-foreground">Theses are reference-only. They will appear in the catalog but cannot be borrowed or reserved.</div>}
-            {materialType === "thesis" ? <div className="mb-5 grid gap-5 sm:grid-cols-2">{[{ key: "thesis_program", label: "Program" }, { key: "thesis_adviser", label: "Adviser" }, { key: "academic_year", label: "Academic Year" }, { key: "accession_number", label: "Accession Number" }, { key: "thesis_keywords", label: "Keywords", wide: true }].map((field) => <div key={field.key} className={field.wide ? "sm:col-span-2" : ""}><FieldLabel>{field.label}</FieldLabel><input value={formValues[field.key] ?? ""} onChange={(event) => setField(field.key, event.target.value)} className="h-9 w-full border border-border bg-background px-3 text-sm" /></div>)}<div className="sm:col-span-2"><FieldLabel>Abstract</FieldLabel><textarea value={formValues.thesis_abstract ?? ""} onChange={(event) => setField("thesis_abstract", event.target.value)} className="min-h-28 w-full border border-border bg-background p-3 text-sm" /></div></div> : null}
-            <div className="mb-5"><FieldLabel required>Book type</FieldLabel><Select value={String(formValues.book_type_id ?? "")} onValueChange={(value) => setField("book_type_id", value)}><SelectTrigger><SelectValue placeholder="Select the loan and fine policy" /></SelectTrigger><SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent></Select></div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              {sortedFields.filter((field) => field.key !== "isbn").map((f) => (
-                <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                  <FieldLabel required={f.required} htmlFor={`create-field-${f.key}`}>{f.label}</FieldLabel>
-                  <FieldInput id={`create-field-${f.key}`} field={f} value={formValues[f.key]} onChange={setField} />
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 flex gap-2.5 border-t border-border pt-5">
-              <button
-                onClick={() => void handleCreateBook()}
-                disabled={loading}
-                className="flex items-center gap-2 bg-primary h-9 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {loading
-                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Adding…</>
-                  : <>{materialType === "book" ? <Library className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" /> }Add {materialType === "book" ? "Book" : "Thesis"}</>
-                }
-              </button>
-              <button
-                onClick={resetForm}
-                disabled={loading}
-                className="flex items-center gap-2 border border-border h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                <RefreshCw className="h-3.5 w-3.5" /> Clear
-              </button>
-            </div>
-          </div>
-        </div>
+        <CatalogCreateForm
+          fields={fields}
+          materialType={materialType}
+          values={formValues}
+          errors={fieldErrors}
+          bookTypes={bookTypes}
+          loading={loading}
+          isbnLookup={isbnLookup}
+          onMaterialChange={(value) => {
+            setMaterialType(value);
+            setFieldErrors({});
+            setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value });
+          }}
+          onFieldChange={setField}
+          onLookupIsbn={() => void lookupIsbn()}
+          onSubmit={() => void handleCreateBook()}
+          onClear={resetForm}
+        />
       )}
 
       {/* ── Edit / Search / Delete ─────────────────────────────────── */}
@@ -396,7 +384,8 @@ const AdminCatalogData = ({ fields }: Props) => {
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 pointer-events-none" />
               <input
-                className="h-10 w-full border-r border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-r-primary"
+                aria-label="Search catalog records"
+                className="min-h-11 w-full border-r border-border bg-background pl-10 pr-4 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-r-primary sm:text-sm"
                 placeholder="Search by title, author, or ISBN…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -408,7 +397,7 @@ const AdminCatalogData = ({ fields }: Props) => {
             <button
               onClick={handleToggleArchived}
               title={showArchived ? "Showing archived — click for active" : "Show archived books"}
-              className={`flex h-10 shrink-0 items-center gap-2 border-r border-border px-4 text-sm font-semibold transition-colors ${
+              className={`flex min-h-11 shrink-0 items-center gap-2 border-r border-border px-4 text-sm font-semibold transition-colors ${
                 showArchived
                   ? "bg-warning/10 text-foreground border-warning/30 hover:bg-warning/20"
                   : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
@@ -420,14 +409,14 @@ const AdminCatalogData = ({ fields }: Props) => {
             </button>
 
             <Select value={catalogFilter} onValueChange={(value: "all" | "book" | "thesis") => { setCatalogFilter(value); void handleSearchBooks(undefined, value); }}>
-              <SelectTrigger className="h-10 w-32 rounded-none border-y-0 border-l-0"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="min-h-11 w-32 rounded-none border-y-0 border-l-0"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="book">Books</SelectItem><SelectItem value="thesis">Theses</SelectItem></SelectContent>
             </Select>
 
             <button
               onClick={() => handleSearchBooks()}
               disabled={loading}
-              className="flex h-10 shrink-0 items-center gap-2 bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              className="flex min-h-11 shrink-0 items-center gap-2 bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {loading
@@ -442,7 +431,7 @@ const AdminCatalogData = ({ fields }: Props) => {
             <div className="flex items-center gap-2.5 px-4 py-2.5 bg-warning/5 border border-t-0 border-warning/20">
               <Archive className="h-4 w-4 shrink-0 text-foreground" />
               <p className="text-sm font-medium text-foreground">
-                Showing archived books — restore to make them active again
+                Showing archived catalog records — restore to make them active again
               </p>
             </div>
           )}
@@ -486,7 +475,7 @@ const AdminCatalogData = ({ fields }: Props) => {
                           <button
                             onClick={() => handleRestoreBook(b)}
                             disabled={loading}
-                            className="flex min-h-10 items-center gap-2 border border-warning/40 px-3 text-sm font-semibold text-warning transition-colors hover:bg-warning hover:text-warning-foreground disabled:opacity-50"
+                            className="flex min-h-11 items-center gap-2 border border-warning/40 px-3 text-sm font-semibold text-warning transition-colors hover:bg-warning hover:text-warning-foreground disabled:opacity-50"
                           >
                             <ArchiveRestore className="h-4 w-4" /> Restore record
                           </button>
@@ -494,16 +483,16 @@ const AdminCatalogData = ({ fields }: Props) => {
                           <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => selectBookForEdit(b)}
-                              className="min-h-10 border border-warning bg-warning px-3 text-sm font-semibold text-warning-foreground transition-colors hover:bg-warning/90"
+                              className="min-h-11 border border-warning bg-warning px-3 text-sm font-semibold text-warning-foreground transition-colors hover:bg-warning/90"
                             >
                               Edit record
                             </button>
-                            <button
+                            {b.material_type !== "thesis" && <button
                               onClick={() => setCopiesBook(b)}
-                              className="min-h-10 border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-warning hover:text-warning"
+                              className="min-h-11 border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-warning hover:text-warning"
                             >
                               Copies
-                            </button>
+                            </button>}
                           </div>
                         )}
                       </td>
@@ -524,61 +513,20 @@ const AdminCatalogData = ({ fields }: Props) => {
 
           {/* Edit form — only shown in active mode */}
           {selectedBook && !showArchived && (
-            <div ref={editFormRef} className="admin-panel-surface admin-etched-border mt-5 scroll-mt-6 border border-border bg-card">
-              <PanelLabel
-                action={
-                  <span className="text-[10px] text-muted-foreground/50 truncate max-w-[220px]">
-                    {selectedBook.title}
-                  </span>
-                }
-              >
-                Editing
-              </PanelLabel>
-
-              <div className="p-5">
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div><FieldLabel required>Book type</FieldLabel><Select value={String(formValues.book_type_id ?? "")} onValueChange={(value) => setField("book_type_id", value)}><SelectTrigger><SelectValue placeholder="Select the loan and fine policy" /></SelectTrigger><SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent></Select></div>
-                  {sortedFields.map((f) => (
-                    <div key={f.key} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-                      <FieldLabel required={f.required} htmlFor={`edit-field-${f.key}`}>{f.label}</FieldLabel>
-                      <FieldInput id={`edit-field-${f.key}`} field={f} value={formValues[f.key]} onChange={setField} />
-                    </div>
-                  ))}
-                </div>
-
-                <BookBarcodeStrip bookId={selectedBook.id} />
-
-                <div className="mt-6 flex gap-2.5 border-t border-border pt-5">
-                  <button
-                    onClick={handleUpdateBook}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-primary h-9 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {loading
-                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating…</>
-                      : "Update Book"
-                    }
-                  </button>
-                  <button
-                    onClick={handleDeleteBook}
-                    disabled={loading}
-                    className="flex items-center gap-2 border border-destructive/40 h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 transition-colors"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {loading ? "Archiving…" : "Archive Book"}
-                  </button>
-                  <button
-                    onClick={resetForm}
-                    disabled={loading}
-                    className="flex items-center gap-2 border border-border h-9 px-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors ml-auto"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" /> Deselect
-                  </button>
-                </div>
-              </div>
+            <div ref={editFormRef} className="scroll-mt-6">
+              <CatalogEditForm
+                book={selectedBook}
+                fields={fields}
+                values={formValues}
+                errors={fieldErrors}
+                bookTypes={bookTypes}
+                loading={loading}
+                barcodeStrip={selectedBook.material_type !== "thesis" ? <BookBarcodeStrip bookId={selectedBook.id} /> : undefined}
+                onFieldChange={setField}
+                onUpdate={() => void handleUpdateBook()}
+                onArchive={() => void handleDeleteBook()}
+                onDeselect={resetForm}
+              />
             </div>
           )}
         </>

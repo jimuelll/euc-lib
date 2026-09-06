@@ -3,6 +3,7 @@ const { mapBorrowingsWithFineDetails, syncOverdueBorrowings } = require("../borr
 const { syncExpired } = require("../reservation/reservation.service");
 const { getActiveSubscriptions } = require("../subscriptions/subscriptions.service");
 const notificationsService = require("../notifications/notifications.service");
+const { metadataValue } = require("../catalog/catalog.projection");
 
 const getUserProfile = async (userId) => {
   const [[user]] = await db.query(
@@ -22,8 +23,8 @@ const getActiveBorrows = async (userId) => {
        b.id,
        bk.title,
        bk.author,
-       bk.category,
-       bk.location,
+       ${metadataValue("bk", "category")},
+       ${metadataValue("bk", "location")},
        b.borrowed_at,
        b.due_date,
        b.status,
@@ -73,7 +74,7 @@ const getActiveReservations = async (userId) => {
        r.id,
        bk.title,
        bk.author,
-       bk.location,
+       ${metadataValue("bk", "location")},
        r.status,
        r.reserved_at,
        r.expires_at,

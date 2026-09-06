@@ -21,6 +21,48 @@ SET time_zone = "+00:00";
 -- Database: `library`
 --
 
+--
+-- Fresh-start reset
+--
+-- WARNING: this file is intentionally destructive. It removes only tables
+-- owned by this application in the database currently selected by your SQL
+-- client, then recreates the current baseline. This makes a retry after a
+-- partial import safe; do not use it for an installation whose data you need
+-- to retain.
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS
+  `restore_audit_events`,
+  `system_maintenance_state`,
+  `auth_restore_state`,
+  `notification_reads`,
+  `notifications`,
+  `site_daily_visits`,
+  `reservations`,
+  `clearance_transaction_items`,
+  `clearance_transactions`,
+  `attendance_logs`,
+  `borrowings`,
+  `book_copies`,
+  `books`,
+  `book_types`,
+  `catalog_schema`,
+  `auth_refresh_sessions`,
+  `auth_audit_events`,
+  `bulletin_comments`,
+  `bulletin_likes`,
+  `bulletin_posts`,
+  `library_events`,
+  `academic_subscriptions`,
+  `library_holidays`,
+  `library_circulation_settings`,
+  `site_content_settings`,
+  `about_settings`,
+  `academic_terms`,
+  `academic_programs`,
+  `backup_snapshots`,
+  `users`;
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- --------------------------------------------------------
 
 CREATE TABLE `library_events` (
@@ -178,23 +220,14 @@ CREATE TABLE `books` (
   `id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
   `material_type` enum('book','thesis') NOT NULL DEFAULT 'book',
-  `book_type_id` bigint(20) UNSIGNED NOT NULL,
+  `metadata` json DEFAULT NULL,
+  `book_type_id` bigint(20) UNSIGNED DEFAULT NULL,
   `author` varchar(255) DEFAULT NULL,
-  `thesis_program` varchar(255) DEFAULT NULL,
-  `thesis_adviser` varchar(255) DEFAULT NULL,
-  `academic_year` varchar(32) DEFAULT NULL,
-  `thesis_abstract` text DEFAULT NULL,
-  `thesis_keywords` text DEFAULT NULL,
-  `category` varchar(100) DEFAULT NULL,
   `isbn` varchar(20) DEFAULT NULL,
-  `accession_number` varchar(100) DEFAULT NULL,
-  `edition` varchar(50) DEFAULT NULL,
-  `publication_year` year(4) DEFAULT NULL,
   `copies` int(11) DEFAULT 1,
   `created_by` varchar(50) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `location` text DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -263,7 +296,9 @@ CREATE TABLE `borrowings` (
   `settled_at` datetime DEFAULT NULL,
   `settled_by` bigint(20) UNSIGNED DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
+  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `active_copy_id` int(11) GENERATED ALWAYS AS (CASE WHEN `status` IN ('borrowed','overdue') AND `deleted_at` IS NULL THEN `copy_id` ELSE NULL END) STORED,
+  `active_user_book_key` varchar(64) GENERATED ALWAYS AS (CASE WHEN `status` IN ('borrowed','overdue') AND `deleted_at` IS NULL THEN concat(`user_id`, ':', `book_id`) ELSE NULL END) STORED
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -338,6 +373,7 @@ CREATE TABLE `catalog_schema` (
   `order` int(11) NOT NULL DEFAULT 0,
   `public` tinyint(1) NOT NULL DEFAULT 0,
   `archived` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = field removed from active schema but data retained in books table'
+  ,`scope` enum('shared','book','thesis') NOT NULL DEFAULT 'shared'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -450,6 +486,7 @@ CREATE TABLE `reservations` (
   `id` int(11) NOT NULL,
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `book_id` int(11) NOT NULL,
+  `reserved_copy_id` int(11) DEFAULT NULL,
   `status` enum('pending','ready','cancelled','expired','fulfilled') NOT NULL DEFAULT 'pending',
   `reserved_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `expires_at` timestamp NULL DEFAULT NULL,
@@ -457,7 +494,9 @@ CREATE TABLE `reservations` (
   `cancelled_at` timestamp NULL DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
-  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
+  `deleted_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `active_user_book_key` varchar(64) GENERATED ALWAYS AS (CASE WHEN `status` IN ('pending','ready') AND `deleted_at` IS NULL THEN concat(`user_id`, ':', `book_id`) ELSE NULL END) STORED,
+  `ready_copy_id` int(11) GENERATED ALWAYS AS (CASE WHEN `status` = 'ready' AND `deleted_at` IS NULL THEN `reserved_copy_id` ELSE NULL END) STORED
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -604,7 +643,7 @@ ALTER TABLE `backup_snapshots`
 --
 ALTER TABLE `books`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_books_accession_number` (`accession_number`),
+  ADD UNIQUE KEY `uq_books_isbn` (`isbn`),
   ADD KEY `idx_books_deleted` (`deleted_at`),
   ADD KEY `idx_books_material_type` (`material_type`),
   ADD KEY `fk_books_book_type` (`book_type_id`);
@@ -636,7 +675,9 @@ ALTER TABLE `borrowings`
   ADD KEY `idx_user_status` (`user_id`,`status`),
   ADD KEY `idx_book_id` (`book_id`),
   ADD KEY `fk_borrowings_copy` (`copy_id`),
-  ADD KEY `idx_borrowings_deleted` (`deleted_at`);
+  ADD KEY `idx_borrowings_deleted` (`deleted_at`),
+  ADD UNIQUE KEY `uq_borrowings_active_copy` (`active_copy_id`),
+  ADD UNIQUE KEY `uq_borrowings_active_user_book` (`active_user_book_key`);
 
 --
 -- Indexes for table `bulletin_comments`
@@ -734,7 +775,10 @@ ALTER TABLE `reservations`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_user_status` (`user_id`,`status`),
   ADD KEY `idx_book_status` (`book_id`,`status`),
-  ADD KEY `idx_reservations_deleted` (`deleted_at`);
+  ADD KEY `idx_reservations_deleted` (`deleted_at`),
+  ADD KEY `fk_reservation_copy` (`reserved_copy_id`),
+  ADD UNIQUE KEY `uq_reservations_active_user_book` (`active_user_book_key`),
+  ADD UNIQUE KEY `uq_reservations_ready_copy` (`ready_copy_id`);
 
 --
 -- Indexes for table `site_daily_visits`
@@ -959,10 +1003,10 @@ ALTER TABLE `book_copies`
 -- Constraints for table `borrowings`
 --
 ALTER TABLE `borrowings`
-  ADD CONSTRAINT `fk_borrowings_book` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_borrowings_copy` FOREIGN KEY (`copy_id`) REFERENCES `book_copies` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_borrowings_issued_by` FOREIGN KEY (`issued_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_borrowings_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_borrowings_book` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`),
+  ADD CONSTRAINT `fk_borrowings_copy` FOREIGN KEY (`copy_id`) REFERENCES `book_copies` (`id`),
+  ADD CONSTRAINT `fk_borrowings_issued_by` FOREIGN KEY (`issued_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_borrowings_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
 --
 -- Constraints for table `bulletin_comments`
@@ -1030,13 +1074,22 @@ ALTER TABLE `notification_reads`
 -- Constraints for table `reservations`
 --
 ALTER TABLE `reservations`
-  ADD CONSTRAINT `fk_res_book` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_res_book` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`),
+  ADD CONSTRAINT `fk_reservation_copy` FOREIGN KEY (`reserved_copy_id`) REFERENCES `book_copies` (`id`),
+  ADD CONSTRAINT `fk_res_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 
--- Development bootstrap configuration. Change the starter password on first login.
 CREATE TABLE `auth_restore_state` (
   `id` tinyint NOT NULL,
   `invalid_before` datetime NOT NULL DEFAULT '1970-01-01 00:00:00',
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `system_maintenance_state` (
+  `id` tinyint NOT NULL,
+  `mode` enum('normal','restoring') NOT NULL DEFAULT 'normal',
+  `started_at` datetime DEFAULT NULL,
+  `started_by` bigint unsigned DEFAULT NULL,
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1061,20 +1114,27 @@ VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '
 INSERT INTO `book_types` (`name`, `default_borrow_days`, `fine_per_hour`, `fine_interval`, `initial_fine`, `is_active`)
 VALUES ('General collection', 7, 1.00, 'hour', 0.00, 1);
 
-INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`) VALUES
-('title', 'Book Title', 'text', NULL, 1, 1, 0, 1, 0),
-('author', 'Author', 'text', NULL, 1, 1, 1, 1, 0),
-('isbn', 'ISBN', 'text', NULL, 0, 0, 2, 1, 0),
-('category', 'Category', 'select', '["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"]', 0, 0, 3, 1, 0),
-('copies', 'Copies', 'number', NULL, 0, 0, 4, 1, 0),
-('edition', 'Edition', 'text', NULL, 0, 0, 5, 1, 0),
-('publication_year', 'Publication Year', 'number', NULL, 0, 0, 6, 1, 0),
-('location', 'Location', 'text', NULL, 0, 0, 7, 0, 0);
+INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`, `scope`) VALUES
+('title', 'Title', 'text', NULL, 1, 1, 0, 1, 0, 'shared'),
+('author', 'Author', 'text', NULL, 1, 1, 1, 1, 0, 'shared'),
+('isbn', 'ISBN', 'text', NULL, 0, 1, 2, 1, 0, 'book'),
+('category', 'Category', 'select', '["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"]', 0, 0, 3, 1, 0, 'shared'),
+('copies', 'Copies', 'number', NULL, 0, 1, 4, 1, 0, 'book'),
+('edition', 'Edition', 'text', NULL, 0, 0, 5, 1, 0, 'book'),
+('publication_year', 'Publication Year', 'number', NULL, 0, 0, 6, 1, 0, 'book'),
+('location', 'Location', 'text', NULL, 0, 0, 7, 0, 0, 'shared'),
+('thesis_program', 'Program', 'text', NULL, 1, 1, 20, 1, 0, 'thesis'),
+('thesis_adviser', 'Adviser', 'text', NULL, 0, 1, 21, 1, 0, 'thesis'),
+('academic_year', 'Academic Year', 'text', NULL, 1, 1, 22, 1, 0, 'thesis'),
+('accession_number', 'Accession Number', 'text', NULL, 1, 1, 23, 1, 0, 'thesis'),
+('thesis_keywords', 'Keywords', 'textarea', NULL, 0, 1, 24, 1, 0, 'thesis'),
+('thesis_abstract', 'Abstract', 'textarea', NULL, 0, 1, 25, 0, 0, 'thesis');
 
 INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00);
 INSERT INTO `site_content_settings` (`id`, `hero_kicker`, `hero_title`, `hero_highlight`, `hero_description`, `hours`, `hero_stats`, `address`, `contact_email`, `contact_phone`) VALUES
 (1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567');
 INSERT INTO `auth_restore_state` (`id`) VALUES (1);
+INSERT INTO `system_maintenance_state` (`id`, `mode`) VALUES (1, 'normal');
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

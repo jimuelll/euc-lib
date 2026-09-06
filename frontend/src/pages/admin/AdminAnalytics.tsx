@@ -356,7 +356,7 @@ const AdminAnalytics = () => {
       {groupViews.collection === "text" ? <AnalyticsTextView group="collection" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} /> : <AnalyticsGroup title="Collection health" summary="Inventory mix, condition, and collection use by role." actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} />}>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="Catalog by Category" description="Title and copy concentration across the catalog categories currently stored in the books table.">
+          <AdminPanel title="Catalog by Category" description="Title and copy concentration across the catalog's configured category metadata.">
             <ChartContainer
               className="h-[280px] w-full sm:h-[320px]"
               config={{

@@ -13,7 +13,7 @@ import {
   Trash2, Plus, Pencil, X, Check,
   Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp, Lock, LockOpen,
 } from "lucide-react";
-import { FormField, FieldType, FIELD_TYPES, MAX_CUSTOM_FIELDS } from "./AdminCatalog.types";
+import { FormField, FieldType, FieldScope, FIELD_TYPES, MAX_CUSTOM_FIELDS } from "./AdminCatalog.types";
 import { saveCatalogSchema } from "./catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
 
@@ -70,6 +70,8 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const [newFieldOptions,   setNewFieldOptions]   = useState("");
   const [newFieldRequired,  setNewFieldRequired]  = useState(false);
   const [newFieldPublic,    setNewFieldPublic]    = useState(true);
+  const [newFieldScope,     setNewFieldScope]     = useState<FieldScope>("shared");
+  const [scopeTab,          setScopeTab]          = useState<"all" | FieldScope>("all");
   const [editingFieldKey,   setEditingFieldKey]   = useState<string | null>(null);
   const [editingLabel,      setEditingLabel]      = useState("");
   const [editingOptionsKey, setEditingOptionsKey] = useState<string | null>(null);
@@ -83,7 +85,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const customFieldCount   = activeCustomFields.length;
   const atCap              = customFieldCount >= MAX_CUSTOM_FIELDS;
 
-  const sortedFields   = [...fields].filter((f) => !f.archived).sort((a, b) => a.order - b.order);
+  const sortedFields   = [...fields].filter((f) => !f.archived && (scopeTab === "all" || (f.scope ?? "shared") === scopeTab)).sort((a, b) => a.order - b.order);
   const archivedFields = fields.filter((f) => f.archived);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,6 +125,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
         public:   newFieldPublic,
         order:    fields.length,
         archived: false,
+        scope: newFieldScope,
         options:
           newFieldType === "select"
             ? newFieldOptions.split(",").map((o) => o.trim()).filter(Boolean)
@@ -135,12 +138,13 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
     setNewFieldOptions("");
     setNewFieldRequired(false);
     setNewFieldPublic(true);
+    setNewFieldScope("shared");
   };
 
   const handleDeleteField = async (key: string) => {
     const shouldDelete = await confirm({
       title: "Archive this field?",
-      description: "Existing data in book records will be kept, and you can restore the field later.",
+      description: "Existing catalog-record data will be kept, and you can restore the field later.",
       actionLabel: "Archive Field",
       tone: "danger",
     });
@@ -199,14 +203,19 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
   const handleTogglePublic = (key: string, current: boolean) =>
     saveSchema(fields.map((f) => (f.key === key ? { ...f, public: !current } : f)));
 
+  // Scope controls where an existing field renders; changing it never changes
+  // the JSON key or discards values already saved on catalog records.
+  const handleScopeChange = (key: string, scope: FieldScope) =>
+    saveSchema(fields.map((f) => (f.key === key ? { ...f, scope } : f)));
+
   const handleMove = (key: string, dir: "up" | "down") => {
-    const sorted = [...fields].filter((f) => !f.archived).sort((a, b) => a.order - b.order);
+    const sorted = fields.filter((f) => !f.archived && (scopeTab === "all" || (f.scope ?? "shared") === scopeTab)).map((f) => ({ ...f })).sort((a, b) => a.order - b.order);
     const idx    = sorted.findIndex((f) => f.key === key);
     const swap   = dir === "up" ? idx - 1 : idx + 1;
     if (swap < 0 || swap >= sorted.length) return;
     [sorted[idx].order, sorted[swap].order] = [sorted[swap].order, sorted[idx].order];
-    const archived = fields.filter((f) => f.archived);
-    saveSchema([...sorted, ...archived]);
+    const orders = new Map(sorted.map((field) => [field.key, field.order]));
+    saveSchema(fields.map((field) => orders.has(field.key) ? { ...field, order: orders.get(field.key)! } : field));
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -235,6 +244,9 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
           </div>
 
           <div className="divide-y divide-border">
+            <div className="flex flex-wrap gap-2 border-b border-border bg-muted/10 px-5 py-3" role="tablist" aria-label="Field scope">
+              {(["all", "shared", "book", "thesis"] as const).map((scope) => <button key={scope} type="button" role="tab" aria-selected={scopeTab === scope} onClick={() => setScopeTab(scope)} className={`min-h-9 px-3 text-[10px] font-bold uppercase tracking-[0.12em] ${scopeTab === scope ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"}`}>{scope === "all" ? "All fields" : scope === "book" ? "Books" : scope === "thesis" ? "Theses" : "Shared"}</button>)}
+            </div>
             {sortedFields.length === 0 ? (
               <div className="px-5 py-10 text-center">
                 <p
@@ -298,6 +310,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                     <Badge className="border-border/60 text-muted-foreground/50 bg-muted/30">{f.type}</Badge>
                     {f.required && <Badge className="border-destructive/25 text-destructive/70 bg-destructive/5">Req</Badge>}
                     {f.locked   && <Badge className="border-border text-muted-foreground/30">Locked</Badge>}
+                    <Badge className="border-border/60 text-muted-foreground/50 bg-muted/20">{f.scope ?? "shared"}</Badge>
                   </div>
 
                   <button
@@ -343,6 +356,16 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        <Select value={f.scope ?? "shared"} onValueChange={(value) => handleScopeChange(f.key, value as FieldScope)} disabled={saving}>
+                          <SelectTrigger aria-label={`Where ${f.label} appears`} className="h-7 w-[108px] rounded-none border-border px-2 text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground focus:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-none border-border">
+                            <SelectItem value="shared" className="text-sm">Shared</SelectItem>
+                            <SelectItem value="book" className="text-sm">Books only</SelectItem>
+                            <SelectItem value="thesis" className="text-sm">Theses only</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <button
                           type="button"
                           onClick={() => { setEditingFieldKey(f.key); setEditingLabel(f.label); }}
@@ -510,6 +533,18 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
               </Select>
             </div>
 
+            <div>
+              <FieldLabel>Appears on</FieldLabel>
+              <Select value={newFieldScope} onValueChange={(v) => setNewFieldScope(v as FieldScope)} disabled={atCap}>
+                <SelectTrigger className={inputClass}><SelectValue /></SelectTrigger>
+                <SelectContent className="rounded-none border-border">
+                  <SelectItem value="shared">Shared fields</SelectItem>
+                  <SelectItem value="book">Books only</SelectItem>
+                  <SelectItem value="thesis">Theses only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Options — select type only */}
             {newFieldType === "select" && (
               <div>
@@ -661,7 +696,7 @@ const AdminCatalogBuilder = ({ fields, onFieldsChange }: Props) => {
               {/* Footer note */}
               <div className="px-5 py-2.5 bg-muted/10">
                 <p className="text-[10px] text-muted-foreground/40 tracking-wide">
-                  Restoring a field re-adds it to the form. All previously saved data in book records is still intact.
+                  Restoring a field re-adds it to the form. All previously saved catalog-record data is still intact.
                 </p>
               </div>
             </div>

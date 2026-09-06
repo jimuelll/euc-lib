@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const db = require("../../db");
 const qr = require("qrcode");
+const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service");
 
 const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
 
@@ -73,37 +74,48 @@ async function createUser({ student_employee_id, name, role, password, address, 
 
 // DELETE USER (soft delete — sets deleted_at + is_active = 0, preserves borrowing history)
 async function deleteUser(student_employee_id, requesterRole, requesterId) {
-  const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
-    [student_employee_id]
-  );
-  if (!existing.length) throw new Error("User not found");
-
-  const user = existing[0];
-
-  if (!roleHierarchy[requesterRole]?.includes(user.role)) {
-    throw new Error("You are not allowed to deactivate this user");
-  }
-
-  if (!user.is_active) {
-    throw new Error("User is already deactivated");
-  }
-
-  const [[{ active_count }]] = await db.query(
-    `SELECT COUNT(*) AS active_count FROM borrowings
-     WHERE user_id = ? AND status IN ('borrowed', 'overdue')`,
-    [user.id]
-  );
-  if (active_count > 0) {
-    throw new Error(
-      `User has ${active_count} unreturned book${active_count > 1 ? "s" : ""} — resolve before deactivating`
+  const conn = await db.getConnection();
+  let user;
+  try {
+    await conn.beginTransaction();
+    const [[lockedUser]] = await conn.query(
+      "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL FOR UPDATE",
+      [student_employee_id]
     );
-  }
+    if (!lockedUser) throw new Error("User not found");
+    user = lockedUser;
 
-  await db.query(
-    "UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ? WHERE student_employee_id = ?",
-    [requesterId, student_employee_id]
-  );
+    if (!roleHierarchy[requesterRole]?.includes(user.role)) throw new Error("You are not allowed to deactivate this user");
+    if (!user.is_active) throw new Error("User is already deactivated");
+
+    const [activeBorrows] = await conn.query(
+      `SELECT id FROM borrowings WHERE user_id = ? AND status IN ('borrowed', 'overdue') FOR UPDATE`,
+      [user.id]
+    );
+    if (activeBorrows.length > 0) {
+      throw new Error(`User has ${activeBorrows.length} unreturned book${activeBorrows.length > 1 ? "s" : ""} — resolve before deactivating`);
+    }
+
+    const [activeReservations] = await conn.query(
+      `SELECT id FROM reservations WHERE user_id = ? AND status IN ('pending', 'ready') AND deleted_at IS NULL FOR UPDATE`,
+      [user.id]
+    );
+    if (activeReservations.length > 0) {
+      throw new Error(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before deactivating`);
+    }
+
+    await conn.query(
+      "UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ? WHERE id = ?",
+      [requesterId, user.id]
+    );
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+  await revokeAllRefreshSessionsForUser(user.id);
   return { message: "User deactivated successfully" };
 }
 
@@ -296,7 +308,9 @@ async function queryToolsSearch(term, requesterRole) {
       [...allowedRoles, like, like, like]
     ),
     db.query(
-      `SELECT id, title, author, isbn, category, copies, location
+      `SELECT id, title, author, isbn, copies,
+              JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) AS category,
+              JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.location')) AS location
        FROM books
        WHERE deleted_at IS NULL
          AND (

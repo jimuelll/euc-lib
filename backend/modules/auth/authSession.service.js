@@ -72,6 +72,14 @@ async function isAccessTokenCurrent(payload) {
   return Number(payload?.iat || 0) > invalidBeforeSeconds;
 }
 
+async function isUserAccessActive(userId) {
+  const [[user]] = await db.query(
+    "SELECT is_active FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+    [userId]
+  );
+  return Boolean(user?.is_active);
+}
+
 module.exports = {
   issueRefreshSession,
   getActiveRefreshSession,
@@ -80,4 +88,5 @@ module.exports = {
   revokeAllRefreshSessionsForUser,
   invalidateAllSessionsAfterRestore,
   isAccessTokenCurrent,
+  isUserAccessActive,
 };

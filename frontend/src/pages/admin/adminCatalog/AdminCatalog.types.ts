@@ -1,4 +1,5 @@
 export type FieldType = "text" | "number" | "date" | "select" | "textarea";
+export type FieldScope = "shared" | "book" | "thesis";
 
 export type FormField = {
   key: string;
@@ -10,6 +11,8 @@ export type FormField = {
   public?: boolean;
   order: number;
   archived?: boolean; // soft-removed fields returned by getSchema({ includeArchived: true })
+  /** Which material form renders this definition. Shared fields render on both. */
+  scope?: FieldScope;
 };
 
 export type Book = {
@@ -23,6 +26,9 @@ export type Book = {
   copies?: number;
   material_type?: "book" | "thesis";
   book_type_id?: number | string;
+  metadata?: Record<string, CatalogFormValue>;
+  canBorrow?: boolean;
+  canReserve?: boolean;
   [key: string]: unknown;
 };
 
@@ -41,8 +47,8 @@ export type BookType = {
 export type CatalogPagination = { page: number; limit: number; total: number; totalPages: number };
 
 export const DEFAULT_FIELDS: FormField[] = [
-  { key: "title",            label: "Book Title",       type: "text",   required: true, locked: true, public: true, order: 0 },
-  { key: "author",           label: "Author",           type: "text",   required: true, locked: true, public: true, order: 1 },
+  { key: "title",            label: "Title",            type: "text",   required: true, locked: true, public: true, order: 0, scope: "shared" },
+  { key: "author",           label: "Author",           type: "text",   required: true, locked: true, public: true, order: 1, scope: "shared" },
   { key: "isbn",             label: "ISBN",             type: "text",   public: true,   order: 2 },
   { key: "category",         label: "Category",         type: "select", public: true,   order: 3,
     options: ["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"] },

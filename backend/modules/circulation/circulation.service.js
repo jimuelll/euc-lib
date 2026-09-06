@@ -51,20 +51,26 @@ const lookupUser = async (studentEmployeeId) => {
 const lookupBook = async (isbn) => {
   const [[book]] = await db.query(
     `SELECT
-       bk.id, bk.title, bk.author, bk.isbn, bk.copies,
-       COUNT(DISTINCT bc.id) - COUNT(DISTINCT br.id) AS available
+       bk.id, bk.title, bk.author, bk.isbn, bk.copies, bk.material_type,
+       CASE WHEN bk.material_type = 'book' THEN TRUE ELSE FALSE END AS canBorrow,
+       CASE WHEN bk.material_type = 'book' THEN TRUE ELSE FALSE END AS canReserve,
+       COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.id IS NOT NULL OR rr.id IS NOT NULL THEN bc.id END) AS available
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
+     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      WHERE bk.isbn = ? AND bk.deleted_at IS NULL
      GROUP BY bk.id`,
-    [isbn.trim()]
+    [String(isbn).replace(/[\s-]/g, "").toUpperCase()]
   );
 
   if (!book) {
     throw Object.assign(new Error("Book not found"), { status: 404 });
   }
 
+  if (book.material_type !== "book") {
+    throw Object.assign(new Error("This thesis is reference-only and cannot be circulated"), { status: 409, materialType: book.material_type });
+  }
   return book;
 };
 
@@ -79,17 +85,19 @@ const processBorrow = async ({ userId, bookId, issuedBy }) => {
     const [[book]] = await conn.query(
       `SELECT bk.id, bk.material_type, bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
        FROM books bk
-       JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
+       LEFT JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
        WHERE bk.id = ? AND bk.deleted_at IS NULL
        FOR UPDATE`,
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
     if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
+    if (!book.default_borrow_days) throw Object.assign(new Error("This book has no active loan policy"), { status: 409 });
 
     const [[existing]] = await conn.query(
       `SELECT id FROM borrowings
-       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed', 'overdue')`,
+       WHERE user_id = ? AND book_id = ? AND status IN ('borrowed', 'overdue')
+       FOR UPDATE`,
       [userId, bookId]
     );
     if (existing) {
@@ -101,6 +109,7 @@ const processBorrow = async ({ userId, bookId, issuedBy }) => {
        FROM book_copies bc
        WHERE bc.book_id = ? AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM borrowings b WHERE b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue'))
+         AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL)
        ORDER BY bc.condition = 'good' DESC, bc.id ASC
        LIMIT 1 FOR UPDATE`,
       [bookId]
@@ -140,6 +149,9 @@ const processBorrow = async ({ userId, bookId, issuedBy }) => {
     return { message: "Book borrowed successfully", borrowingId: result.insertId, barcode: copy.barcode, dueDate, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
   } catch (err) {
     await conn.rollback();
+    if (err?.code === "ER_DUP_ENTRY" && /uq_borrowings_active_(copy|user_book)/.test(String(err.message))) {
+      throw Object.assign(new Error("This copy is no longer available for checkout"), { status: 409 });
+    }
     throw err;
   } finally {
     conn.release();

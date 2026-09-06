@@ -2,7 +2,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 import type { Book, BookType, CatalogFormValues, CatalogPagination, FormField } from "./AdminCatalog.types";
 
 type MessageResponse = { message: string };
-export type IsbnMetadata = { isbn?: string; title?: string; author?: string; edition?: string; publication_year?: string | number };
+export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; publication_year?: string | number };
 export type CatalogSearchResponse = { rows: Book[]; pagination: CatalogPagination };
 
 export async function fetchCatalogSchema(): Promise<FormField[]> {
@@ -16,7 +16,7 @@ function toFormField(value: unknown): FormField {
     key: String(source.key ?? ""), label: String(source.label ?? ""), type: source.type ?? "text",
     options: typeof source.options === "string" ? JSON.parse(source.options) : source.options,
     required: Boolean(source.required), locked: Boolean(source.locked), public: Boolean(source.public),
-    archived: Boolean(source.archived), order: Number(source.order ?? 0),
+    archived: Boolean(source.archived), order: Number(source.order ?? 0), scope: source.scope ?? "shared",
   };
 }
 
@@ -35,7 +35,7 @@ export async function searchCatalogBooks(params: { query: string; materialType: 
   const rows = Array.isArray(payload) ? payload : payload.rows;
   return { rows, pagination: Array.isArray(payload) ? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } : payload.pagination };
 }
-export type CatalogCopy = { id: number; barcode: string; condition: "good" | "damaged" | "lost"; is_active: number; status: "available" | "borrowed" };
+export type CatalogCopy = { id: number; barcode: string; condition: "good" | "damaged" | "lost"; is_active: number; status: "available" | "borrowed" | "reserved" };
 export async function fetchCatalogBookCopies(bookId: number): Promise<CatalogCopy[]> { return (await axiosInstance.get<CatalogCopy[]>(`api/admin/books/${bookId}/copies`)).data; }
 export async function fetchCatalogBarcode(barcode: string): Promise<string> { const response = await axiosInstance.get(`api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`, { responseType: "blob" }); return URL.createObjectURL(response.data); }
 export async function updateCatalogCopyCondition(copyId: number, condition: CatalogCopy["condition"]): Promise<void> { await axiosInstance.patch(`api/admin/copies/${copyId}`, { condition }); }

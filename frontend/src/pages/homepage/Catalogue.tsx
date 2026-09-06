@@ -18,6 +18,9 @@ interface Book {
   publication_year?: number;
   copies?: number;
   available?: number;
+  material_type?: "book" | "thesis";
+  canBorrow?: boolean;
+  canReserve?: boolean;
   [key: string]: unknown;
 }
 
@@ -118,8 +121,8 @@ const Catalogue = () => {
       <Navbar />
 
       <PublicPageMasthead
-        title="Book Catalogue"
-        description="Search and browse the library's collection."
+        title="Library Catalogue"
+        description="Search books and reference theses in the library's collection."
       >
           <div className="relative max-w-xl">
             <div className="absolute inset-y-0 left-0 w-[3px] bg-warning z-10" />
@@ -165,7 +168,7 @@ const Catalogue = () => {
           {!loading && !error && hasSearched && books.length === 0 && (
             <div className="py-16 text-center">
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
-                No books found matching your search
+                No catalogue records found matching your search
               </p>
             </div>
           )}
@@ -181,7 +184,8 @@ const Catalogue = () => {
           {!loading && books.length > 0 && (
             <div className="border-l border-border">
               {books.map((book, index) => {
-                const availability = getAvailabilityLabel(book.available);
+                const isReferenceOnly = book.material_type === "thesis" || book.canBorrow === false;
+                const availability = isReferenceOnly ? null : getAvailabilityLabel(book.available);
                 return (
                   <div
                     key={book.id}
@@ -207,6 +211,11 @@ const Catalogue = () => {
                       {book.isbn && (
                         <p className="mt-1.5 break-all text-[10px] tracking-[0.08em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
                           ISBN {book.isbn}
+                        </p>
+                      )}
+                      {isReferenceOnly && (
+                        <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+                          Thesis · Reference only
                         </p>
                       )}
                       {extraFields.length > 0 && (

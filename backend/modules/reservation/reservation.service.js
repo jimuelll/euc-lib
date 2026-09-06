@@ -2,6 +2,7 @@ const db = require("../../db");
 const notificationsService = require("../notifications/notifications.service");
 const { assertEligible } = require("../clearance/clearance.service");
 const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
+const { metadataValue } = require("../catalog/catalog.projection");
 
 const getReservationNotificationTarget = async (reservationId, conn = db) => {
   const [[row]] = await conn.query(
@@ -37,7 +38,7 @@ const syncExpired = async () => {
 
   await db.query(
     `UPDATE reservations
-     SET status = 'expired'
+     SET status = 'expired', reserved_copy_id = NULL
      WHERE status IN ('pending', 'ready')
        AND expires_at IS NOT NULL
        AND expires_at < NOW()
@@ -59,7 +60,7 @@ const syncExpired = async () => {
 const getActiveReservations = async (userId) => {
   await syncExpired();
   const [rows] = await db.query(
-    `SELECT r.id, bk.title, bk.author, bk.location,
+    `SELECT r.id, bk.title, bk.author, ${metadataValue("bk", "location")},
             r.status, r.reserved_at, r.expires_at, r.notes
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
@@ -102,7 +103,8 @@ const searchCatalogue = async (query, { page, limit } = {}) => {
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
   const [[{ total }]] = paged ? await db.query(
     `SELECT COUNT(*) AS total FROM books bk
-     WHERE bk.deleted_at IS NULL AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
+     WHERE bk.deleted_at IS NULL AND bk.material_type = 'book'
+       AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
     [like, like, like]
   ) : [[{ total: 0 }]];
   const [rows] = await db.query(
@@ -110,20 +112,26 @@ const searchCatalogue = async (query, { page, limit } = {}) => {
        bk.id,
        bk.title,
        bk.author,
-       bk.category,
+       ${metadataValue("bk", "category")},
        bk.isbn,
        bk.copies,
-       bk.location,
+       ${metadataValue("bk", "location")},
+       bk.material_type,
+       TRUE AS canBorrow,
+       TRUE AS canReserve,
        GREATEST(0,
          COUNT(DISTINCT bc.id) -
-         COUNT(DISTINCT CASE WHEN br.status IN ('borrowed', 'overdue') THEN br.id END)
+         COUNT(DISTINCT CASE WHEN br.status IN ('borrowed', 'overdue') OR rr.id IS NOT NULL THEN bc.id END)
        ) AS available
      FROM books bk
      LEFT JOIN book_copies bc
        ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings br
        ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
+     LEFT JOIN reservations rr
+       ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      WHERE bk.deleted_at IS NULL
+       AND bk.material_type = 'book'
        AND (bk.title  LIKE ?
         OR bk.author LIKE ?
         OR bk.isbn   LIKE ?)
@@ -143,7 +151,7 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
     await assertEligible(userId, conn);
 
     const [[book]] = await conn.query(
-      "SELECT id, title, material_type FROM books WHERE id = ? AND deleted_at IS NULL",
+      "SELECT id, title, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
       [bookId]
     );
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
@@ -189,6 +197,9 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
     return { reservationId: result.insertId, expiresAt: expiresAtStr };
   } catch (err) {
     await conn.rollback();
+    if (err?.code === "ER_DUP_ENTRY" && /uq_reservations_active_user_book/.test(String(err.message))) {
+      throw Object.assign(new Error("You already have an active reservation for this book"), { status: 409 });
+    }
     throw err;
   } finally {
     conn.release();
@@ -304,7 +315,7 @@ const getAdminReservations = async ({
        r.notes,
        bk.title    AS book_title,
        bk.author   AS book_author,
-       bk.location AS book_location,
+       ${metadataValue("bk", "location", "book_location")},
        u.name                AS user_name,
        u.student_employee_id
      ${baseFromClause}
@@ -352,19 +363,23 @@ const markReservationReady = async (reservationId) => {
        WHERE bc.book_id = ? AND bc.is_active = 1
          AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM borrowings b WHERE b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue'))
+         AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL)
        LIMIT 1 FOR UPDATE`,
       [row.book_id]
     );
     if (!copy) throw Object.assign(new Error("No borrowable copy is available to prepare for pickup"), { status: 409 });
 
     await conn.query(
-      "UPDATE reservations SET status = 'ready' WHERE id = ?",
-      [reservationId]
+      "UPDATE reservations SET status = 'ready', reserved_copy_id = ? WHERE id = ?",
+      [copy.id, reservationId]
     );
 
     await conn.commit();
   } catch (err) {
     await conn.rollback();
+    if (err?.code === "ER_DUP_ENTRY" && /uq_reservations_ready_copy/.test(String(err.message))) {
+      throw Object.assign(new Error("That copy is already prepared for another reservation"), { status: 409 });
+    }
     throw err;
   } finally {
     conn.release();

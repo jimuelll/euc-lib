@@ -12,6 +12,7 @@ const comparableSchema = (fields) => fields
     public: Boolean(field.public),
     order: Number(field.order),
     archived: Boolean(field.archived),
+    scope: field.scope || "shared",
   }))
   .sort((a, b) => a.key.localeCompare(b.key));
 
@@ -48,17 +49,8 @@ const updateSchema = async (req, res) => {
       }
     }
 
-    for (const f of fields) {
-      await service.addColumnIfMissing(f.key, f.type);
-    }
-
-    const newKeys       = new Set(fields.map((f) => f.key));
-    const removedFields = oldFields.filter((f) => !f.archived && !f.locked && !newKeys.has(f.key));
-
-    for (const f of removedFields) {
-      await service.dropColumnIfExists(f.key);
-    }
-
+    // Builder definitions are stored in catalog_schema and values in JSON metadata.
+    // Never mutate the books table as a side effect of a form edit.
     await service.upsertSchema(fields);
     res.json({ message: "Schema updated successfully" });
   } catch (err) {
@@ -115,7 +107,10 @@ const createBook = async (req, res) => {
     res.status(201).json({ message: "Book added successfully", id });
   } catch (err) {
     console.error("[catalog] createBook:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book" });
+    const duplicateIsbn = err?.code === "ER_DUP_ENTRY" && String(err.message).includes("uq_books_isbn");
+    const isbnError = duplicateIsbn || (err?.status === 400 && /isbn/i.test(String(err.message)));
+    const message = duplicateIsbn ? "This ISBN is already assigned to another book" : (err.message ?? "Failed to create book");
+    res.status(duplicateIsbn ? 409 : (err.status ?? 500)).json({ message, ...(isbnError ? { fields: { isbn: message } } : {}) });
   }
 };
 
@@ -125,7 +120,10 @@ const updateBook = async (req, res) => {
     res.json({ message: "Book updated successfully" });
   } catch (err) {
     console.error("[catalog] updateBook:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book" });
+    const duplicateIsbn = err?.code === "ER_DUP_ENTRY" && String(err.message).includes("uq_books_isbn");
+    const isbnError = duplicateIsbn || (err?.status === 400 && /isbn/i.test(String(err.message)));
+    const message = duplicateIsbn ? "This ISBN is already assigned to another book" : (err.message ?? "Failed to update book");
+    res.status(duplicateIsbn ? 409 : (err.status ?? 500)).json({ message, ...(isbnError ? { fields: { isbn: message } } : {}) });
   }
 };
 

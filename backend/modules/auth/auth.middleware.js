@@ -1,5 +1,5 @@
 const { verifyAccessToken } = require("./jwt.util");
-const { isAccessTokenCurrent } = require("./authSession.service");
+const { isAccessTokenCurrent, isUserAccessActive } = require("./authSession.service");
 
 function authMiddleware(roles = []) {
   return async (req, res, next) => {
@@ -13,6 +13,9 @@ function authMiddleware(roles = []) {
       const payload = verifyAccessToken(token);
       if (!(await isAccessTokenCurrent(payload))) {
         return res.status(401).json({ message: "Your session ended because the system was restored. Please log in again." });
+      }
+      if (!(await isUserAccessActive(payload.id))) {
+        return res.status(401).json({ message: "Your account is inactive. Please contact the library." });
       }
 
       if (roles.length && !roles.includes(payload.role)) {
@@ -37,7 +40,7 @@ function optionalAuthMiddleware() {
       if (!token) return next();
 
       const payload = verifyAccessToken(token);
-      req.user = (await isAccessTokenCurrent(payload)) ? payload : undefined;
+      req.user = (await isAccessTokenCurrent(payload)) && (await isUserAccessActive(payload.id)) ? payload : undefined;
     } catch {
       req.user = undefined;
     }

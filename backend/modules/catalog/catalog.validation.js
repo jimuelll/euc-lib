@@ -8,7 +8,9 @@ function normalizeIsbn(value) {
 
 function validateIsbn(value) {
   const isbn = normalizeIsbn(value);
-  if (!/^\d{9}[\dX]$/.test(isbn) && !/^\d{13}$/.test(isbn)) {
+  const isbn10 = /^\d{9}[\dX]$/.test(isbn) && [...isbn].reduce((sum, digit, index) => sum + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0) % 11 === 0;
+  const isbn13 = /^\d{13}$/.test(isbn) && [...isbn].reduce((sum, digit, index) => sum + Number(digit) * (index % 2 ? 3 : 1), 0) % 10 === 0;
+  if (!isbn10 && !isbn13) {
     throw httpError("Enter a valid ISBN-10 or ISBN-13", 400);
   }
   return isbn;

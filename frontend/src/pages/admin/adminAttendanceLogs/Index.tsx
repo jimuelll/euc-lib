@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
@@ -109,10 +109,10 @@ const AdminAttendanceLogs = () => {
   const [historyError, setHistoryError] = useState("");
   const [historySessions, setHistorySessions] = useState<AttendanceHistoryResponse["sessions"]>([]);
 
-  const loadHistoryLogs = async (
-    loadMode: "initial" | "refresh" = "initial",
-    nextPage = historyPagination.page,
-    nextFilters = historyFilters,
+  const loadHistoryLogs = useCallback(async (
+    loadMode: "initial" | "refresh",
+    nextPage: number,
+    nextFilters: typeof emptyHistoryFilters,
   ) => {
     if (loadMode === "initial") setHistoryLoading(true);
     if (loadMode === "refresh") setHistoryRefreshing(true);
@@ -141,11 +141,11 @@ const AdminAttendanceLogs = () => {
       if (loadMode === "initial") setHistoryLoading(false);
       if (loadMode === "refresh") setHistoryRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    void loadHistoryLogs();
-  }, []);
+    void loadHistoryLogs("initial", 1, emptyHistoryFilters);
+  }, [loadHistoryLogs]);
 
   const isFiltered = Boolean(search || filter !== "all");
   const showLoadMore = !fetchState.loading && !fetchState.error && fetchState.hasMore && visible.length > 0 && !search && filter === "all";

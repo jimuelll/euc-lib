@@ -1,11 +1,15 @@
 const db = require("../../db");
 const { httpError, validateBookTypeInput, validateIsbn } = require("./catalog.validation");
-const MATERIAL_KEYS = ["material_type", "thesis_program", "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number"];
-const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies"];
+const { parseMetadata, hydrateCatalogRecord } = require("./catalog.projection");
+const MATERIAL_KEYS = ["material_type"];
+const OPERATIONAL_BOOK_KEYS = new Set(["title", "author", "isbn", "copies", "book_type_id", "material_type"]);
+const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "copies", "material_type", "metadata"];
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const MAX_CUSTOM_FIELDS = 15;
+
+const fieldsForMaterial = (schema, materialType) => schema.filter((field) => field.scope === "shared" || field.scope === materialType);
 
 const getSchema = async ({ includeArchived = false } = {}) => {
   const [rows] = await db.query(
@@ -46,7 +50,7 @@ const upsertSchema = async (fields) => {
     if (fields.length) {
       await conn.query(
         `INSERT INTO catalog_schema
-           (\`key\`, label, type, options, required, locked, \`public\`, \`order\`, archived)
+           (\`key\`, label, type, options, required, locked, \`public\`, \`order\`, archived, scope)
          VALUES ?
          ON DUPLICATE KEY UPDATE
            label    = VALUES(label),
@@ -56,7 +60,8 @@ const upsertSchema = async (fields) => {
            locked   = VALUES(locked),
            \`public\` = VALUES(\`public\`),
            \`order\` = VALUES(\`order\`),
-           archived = VALUES(archived)`,
+           archived = VALUES(archived),
+           scope = VALUES(scope)`,
         [
           fields.map((f) => [
             f.key,
@@ -68,6 +73,7 @@ const upsertSchema = async (fields) => {
             f.public   ? 1 : 0,
             f.order,
             f.archived ? 1 : 0,
+            f.scope || "shared",
           ]),
         ]
       );
@@ -82,54 +88,6 @@ const upsertSchema = async (fields) => {
   }
 };
 
-// ─── Dynamic column helpers ───────────────────────────────────────────────────
-
-const RESERVED_KEYS = new Set([
-  "id", "title", "author", "category", "isbn",
-  "edition", "publication_year", "copies", "created_by",
-  "created_at", "updated_at", "deleted_at", "deleted_by",
-]);
-
-const columnExists = async (key) => {
-  const [rows] = await db.query(
-    `SELECT COUNT(*) AS cnt
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME   = 'books'
-       AND COLUMN_NAME  = ?`,
-    [key]
-  );
-  return rows[0].cnt > 0;
-};
-
-const SQL_TYPE_MAP = {
-  text:     "TEXT",
-  textarea: "TEXT",
-  number:   "DECIMAL(15,4)",
-  date:     "DATE",
-  select:   "VARCHAR(255)",
-};
-
-const addColumnIfMissing = async (key, type) => {
-  if (RESERVED_KEYS.has(key)) return;
-  if (await columnExists(key)) return;
-  const sqlType = SQL_TYPE_MAP[type] ?? "TEXT";
-  await db.query(`ALTER TABLE books ADD COLUMN \`${key}\` ${sqlType} DEFAULT NULL`);
-};
-
-/**
- * FIX #1: Never physically drop a column.
- * Data stays in the DB; the column is simply hidden from the schema.
- * A DBA can physically drop it later after verifying the data is no longer needed.
- */
-const dropColumnIfExists = async (key) => {
-  // Intentionally a no-op — column archival is handled by upsertSchema.
-  // The physical column remains in `books` with its data intact.
-  if (RESERVED_KEYS.has(key)) return;
-  // Log for visibility
-  console.info(`[catalog] Field "${key}" removed from schema (column retained in books table)`);
-};
-
 // ─── book_copies helpers ──────────────────────────────────────────────────────
 
 const generateBarcode = (bookId, copyNumber) =>
@@ -137,7 +95,7 @@ const generateBarcode = (bookId, copyNumber) =>
 
 const syncBookCopies = async (bookId, targetCount, conn = db) => {
   const [existing] = await conn.query(
-    "SELECT id, barcode FROM book_copies WHERE book_id = ? AND deleted_at IS NULL ORDER BY id ASC",
+    "SELECT id, barcode FROM book_copies WHERE book_id = ? AND deleted_at IS NULL ORDER BY id ASC FOR UPDATE",
     [bookId]
   );
 
@@ -175,18 +133,25 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
        WHERE b.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
       [bookId]
     );
+    const [[{ prepared }]] = await conn.query(
+      `SELECT COUNT(*) AS prepared
+       FROM reservations r
+       WHERE r.book_id = ? AND r.status = 'ready' AND r.deleted_at IS NULL`,
+      [bookId]
+    );
 
-    if (borrowed > targetCount) {
+    const committedCopies = Number(borrowed) + Number(prepared);
+    if (committedCopies > targetCount) {
       throw Object.assign(
         new Error(
-          `Cannot reduce copies to ${targetCount}: ${borrowed} cop${borrowed === 1 ? "y is" : "ies are"} currently borrowed`
+          `Cannot reduce copies to ${targetCount}: ${committedCopies} cop${committedCopies === 1 ? "y is" : "ies are"} borrowed or prepared for pickup`
         ),
         { status: 409 }
       );
     }
 
     const [activeCopies] = await conn.query(
-      "SELECT id FROM book_copies WHERE book_id = ? AND deleted_at IS NULL AND is_active = 1 ORDER BY id DESC",
+      "SELECT id FROM book_copies WHERE book_id = ? AND deleted_at IS NULL AND is_active = 1 ORDER BY id DESC FOR UPDATE",
       [bookId]
     );
     const toDeactivate = activeCopies.slice(0, currentCount - targetCount).map((c) => c.id);
@@ -197,6 +162,9 @@ const syncBookCopies = async (bookId, targetCount, conn = db) => {
          WHERE id IN (?) AND id NOT IN (
            SELECT copy_id FROM borrowings
            WHERE status IN ('borrowed', 'overdue') AND copy_id IS NOT NULL
+         ) AND id NOT IN (
+           SELECT reserved_copy_id FROM reservations
+           WHERE status = 'ready' AND deleted_at IS NULL AND reserved_copy_id IS NOT NULL
          )`,
         [toDeactivate]
       );
@@ -214,6 +182,7 @@ const getBookCopies = async (bookId) => {
        bc.notes,
        CASE
          WHEN b.id IS NOT NULL THEN 'borrowed'
+         WHEN r.id IS NOT NULL THEN 'reserved'
          ELSE 'available'
        END AS status,
        b.due_date,
@@ -221,6 +190,8 @@ const getBookCopies = async (bookId) => {
      FROM book_copies bc
      LEFT JOIN borrowings b
        ON b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue')
+     LEFT JOIN reservations r
+       ON r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL
      LEFT JOIN users u ON u.id = b.user_id
      WHERE bc.book_id = ? AND bc.deleted_at IS NULL
      ORDER BY bc.id ASC`,
@@ -240,14 +211,11 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const schema = await getSchema();
-    const publicKeys = schema
-      .filter((f) => f.public)
-      .map((f) => f.key);
+    const publicFields = schema.filter((field) => field.public);
 
-    const columns = [...new Set([
-      ...PUBLIC_CATALOGUE_CORE_KEYS,
-      ...publicKeys,
-    ])];
+    // Configurable fields live in metadata. Selecting them as SQL columns would
+    // make a newly created public custom field crash this query.
+    const columns = PUBLIC_CATALOGUE_CORE_KEYS;
     const columnList = columns.map((c) => `bk.\`${c}\``).join(", ");
 
     const [[{ total }]] = paged ? await db.query(
@@ -260,11 +228,12 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
               COUNT(DISTINCT bc.id) AS total_copies,
               GREATEST(0,
                 COUNT(DISTINCT bc.id) -
-                COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
+                COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id END)
               ) AS available
        FROM books bk
        LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
        LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
+       LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
        WHERE bk.deleted_at ${deletedFilter}
          AND (bk.title  LIKE ?
           OR bk.author LIKE ?
@@ -273,7 +242,8 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
        ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
       paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
     );
-    return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
+    const hydrated = rows.map((row) => hydrateCatalogRecord(row, { publicFields }));
+    return paged ? { rows: hydrated, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : hydrated;
   }
 
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
@@ -283,11 +253,12 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
             COUNT(DISTINCT bc.id) AS total_copies,
             GREATEST(0,
               COUNT(DISTINCT bc.id) -
-              COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)
+              COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id END)
             ) AS available
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings  br ON br.copy_id  = bc.id AND br.status IN ('borrowed','overdue')
+     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      WHERE bk.deleted_at ${deletedFilter}
        AND (bk.title  LIKE ?
         OR bk.author LIKE ?
@@ -298,7 +269,7 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
      LIMIT 50`,
     params
   );
-  return rows;
+  return rows.map(hydrateCatalogRecord);
 };
 
 const createBook = async (data, createdBy) => {
@@ -306,14 +277,15 @@ const createBook = async (data, createdBy) => {
   try {
     await conn.beginTransaction();
 
-    const schema = await getSchema();
-
-    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS, "book_type_id"])]
-      .filter((k) => data[k] !== undefined && data[k] !== "");
-
-    if (!allowedKeys.includes("material_type")) allowedKeys.push("material_type");
-    const columns      = ["created_by", ...allowedKeys];
-    const values       = [createdBy, ...allowedKeys.map((k) => k === "material_type" ? (data[k] || "book") : (data[k] ?? null))];
+    const materialType = data.material_type || "book";
+    const schema = fieldsForMaterial(await getSchema(), materialType);
+    const metadata = Object.fromEntries(schema
+      .filter((field) => !OPERATIONAL_BOOK_KEYS.has(field.key) && data[field.key] !== undefined && data[field.key] !== "")
+      .map((field) => [field.key, data[field.key]]));
+    const columns = ["created_by", "material_type", "title", "author", "isbn", "copies", "book_type_id", "metadata"];
+    const values = [createdBy, materialType, data.title, data.author, data.isbn ? validateIsbn(data.isbn) : null,
+      materialType === "thesis" ? 0 : Number(data.copies ?? 1), materialType === "thesis" ? null : data.book_type_id,
+      JSON.stringify(metadata)];
     const placeholders = columns.map(() => "?").join(", ");
     const columnNames  = columns.map((c) => `\`${c}\``).join(", ");
 
@@ -323,7 +295,7 @@ const createBook = async (data, createdBy) => {
     );
 
     const bookId = result.insertId;
-    const copies = parseInt(data.copies ?? 1, 10);
+    const copies = materialType === "thesis" ? 0 : parseInt(data.copies ?? 1, 10);
 
     await syncBookCopies(bookId, copies, conn);
 
@@ -342,14 +314,17 @@ const updateBook = async (id, data) => {
   try {
     await conn.beginTransaction();
 
-    const schema = await getSchema();
-
-    const allowedKeys = [...new Set([...schema.map((f) => f.key), ...MATERIAL_KEYS, "book_type_id"])]
-      .filter((k) => data[k] !== undefined && data[k] !== "");
-
+    const [[existing]] = await conn.query("SELECT material_type, metadata FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [id]);
+    if (!existing) throw httpError("Catalog record not found", 404);
+    const materialType = existing.material_type;
+    const schema = fieldsForMaterial(await getSchema(), materialType);
+    const metadata = { ...parseMetadata(existing.metadata) };
+    for (const field of schema) if (!OPERATIONAL_BOOK_KEYS.has(field.key) && Object.prototype.hasOwnProperty.call(data, field.key)) metadata[field.key] = data[field.key] === "" ? null : data[field.key];
+    const directKeys = ["title", "author", "isbn", "copies", "book_type_id"].filter((key) => Object.prototype.hasOwnProperty.call(data, key));
+    const allowedKeys = [...directKeys, "metadata"];
     if (allowedKeys.length) {
       const setClause = allowedKeys.map((k) => `\`${k}\` = ?`).join(", ");
-      const values    = [...allowedKeys.map((k) => data[k] ?? null), id];
+      const values = [...directKeys.map((key) => key === "isbn" && data[key] ? validateIsbn(data[key]) : (data[key] === "" ? null : data[key])), JSON.stringify(metadata), id];
       await conn.query(
         `UPDATE books SET ${setClause} WHERE id = ? AND deleted_at IS NULL`,
         values
@@ -373,28 +348,53 @@ const updateBook = async (id, data) => {
 };
 
 const deleteBook = async (id, deletedBy) => {
-  const [[{ borrowed }]] = await db.query(
-    `SELECT COUNT(*) AS borrowed
-     FROM borrowings b
-     WHERE b.book_id = ? AND b.status IN ('borrowed', 'overdue')`,
-    [id]
-  );
-
-  if (borrowed > 0) {
-    throw Object.assign(
-      new Error(`Cannot delete: ${borrowed} cop${borrowed === 1 ? "y is" : "ies are"} currently borrowed`),
-      { status: 409 }
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[book]] = await conn.query(
+      "SELECT id FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+      [id]
     );
-  }
+    if (!book) throw Object.assign(new Error("Catalog record not found"), { status: 404 });
 
-  await db.query(
-    "UPDATE book_copies SET deleted_at = NOW(), deleted_by = ? WHERE book_id = ? AND deleted_at IS NULL",
-    [deletedBy ?? null, id]
-  );
-  await db.query(
-    "UPDATE books SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
-    [deletedBy ?? null, id]
-  );
+    const [borrowedRows] = await conn.query(
+      `SELECT id FROM borrowings b
+       WHERE b.book_id = ? AND b.status IN ('borrowed', 'overdue') FOR UPDATE`,
+      [id]
+    );
+    const borrowed = borrowedRows.length;
+    if (borrowed > 0) {
+      throw Object.assign(
+        new Error(`Cannot delete: ${borrowed} cop${borrowed === 1 ? "y is" : "ies are"} currently borrowed`),
+        { status: 409 }
+      );
+    }
+
+    const [reservationRows] = await conn.query(
+      `SELECT id FROM reservations
+       WHERE book_id = ? AND status IN ('pending', 'ready') AND deleted_at IS NULL FOR UPDATE`,
+      [id]
+    );
+    const reservations = reservationRows.length;
+    if (reservations > 0) {
+      throw Object.assign(new Error("Cannot archive a catalog record with active reservations"), { status: 409 });
+    }
+
+    await conn.query(
+      "UPDATE book_copies SET deleted_at = NOW(), deleted_by = ? WHERE book_id = ? AND deleted_at IS NULL",
+      [deletedBy ?? null, id]
+    );
+    await conn.query(
+      "UPDATE books SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+      [deletedBy ?? null, id]
+    );
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 const restoreBook = async (id) => {
@@ -435,6 +435,7 @@ const getCopyByBarcode = async (barcode) => {
        b.material_type,
        CASE
          WHEN br.id IS NOT NULL THEN 'borrowed'
+         WHEN rr.id IS NOT NULL THEN 'reserved'
          ELSE 'available'
        END AS status,
        br.due_date,
@@ -442,6 +443,7 @@ const getCopyByBarcode = async (barcode) => {
      FROM book_copies bc
      JOIN  books     b  ON b.id  = bc.book_id AND b.deleted_at IS NULL
      LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
+     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      LEFT JOIN users      u  ON u.id = br.user_id
      WHERE bc.barcode = ? AND bc.deleted_at IS NULL`,
     [barcode]
@@ -461,15 +463,16 @@ const searchBooksPage = async ({ query = "", showArchived = false, materialType 
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
   const [rows] = await db.query(
     `SELECT bk.*, COUNT(DISTINCT bc.id) AS total_copies,
-      GREATEST(0, COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') THEN br.id END)) AS available
+      GREATEST(0, COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id END)) AS available
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bc.deleted_at IS NULL
      LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue')
+     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      ${where}
      GROUP BY bk.id ORDER BY bk.title ASC LIMIT ? OFFSET ?`,
     [...params, safeLimit, (safePage - 1) * safeLimit]
   );
-  return { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
+  return { rows: rows.map(hydrateCatalogRecord), pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
 };
 
 const getBookTypes = async () => {
@@ -513,16 +516,21 @@ const updateCopyCondition = async (copyId, condition, notes = null) => {
 
 const lookupIsbn = async (value) => {
   const isbn = validateIsbn(value);
-  const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
+  let response;
+  try {
+    response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
+  } catch {
+    throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
+  }
   if (!response.ok) throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
   const record = (await response.json())[`ISBN:${isbn}`];
   if (!record) throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
-  return { isbn, title: record.title || "", author: (record.authors || []).map((item) => item.name).filter(Boolean).join(", "), publication_year: record.publish_date?.match(/\d{4}/)?.[0] || "", edition: record.publishers?.[0]?.name || "" };
+  return { isbn, title: record.title || "", author: (record.authors || []).map((item) => item.name).filter(Boolean).join(", "), publication_year: record.publish_date?.match(/\d{4}/)?.[0] || "", publisher: record.publishers?.[0]?.name || "" };
 };
 
 module.exports = {
   MAX_CUSTOM_FIELDS,
-  getSchema, upsertSchema, addColumnIfMissing, dropColumnIfExists,
+  getSchema, upsertSchema,
   searchBooks, searchBooksPage, createBook, updateBook, deleteBook, restoreBook,
   getBookCopies, syncBookCopies, getCopyByBarcode, lookupIsbn, getBookTypes, createBookType, updateBookType, updateCopyCondition,
 };

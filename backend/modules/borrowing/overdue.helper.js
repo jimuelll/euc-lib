@@ -10,38 +10,8 @@ const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
 const ensureBorrowingPaymentColumns = async (conn = db) => {
   if (ensuredBorrowingPaymentColumns) return;
-
-  const [columns] = await conn.query(
-    `SELECT COLUMN_NAME
-     FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'borrowings'
-       AND COLUMN_NAME IN ('settled_amount', 'settled_at', 'settled_by')`
-  );
-
-  const existingColumns = new Set(columns.map((column) => column.COLUMN_NAME));
-
-  if (!existingColumns.has("settled_amount")) {
-    await conn.query(
-      `ALTER TABLE borrowings
-       ADD COLUMN settled_amount DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER last_overdue_notification_at`
-    );
-  }
-
-  if (!existingColumns.has("settled_at")) {
-    await conn.query(
-      `ALTER TABLE borrowings
-       ADD COLUMN settled_at DATETIME DEFAULT NULL AFTER settled_amount`
-    );
-  }
-
-  if (!existingColumns.has("settled_by")) {
-    await conn.query(
-      `ALTER TABLE borrowings
-       ADD COLUMN settled_by BIGINT UNSIGNED DEFAULT NULL AFTER settled_at`
-    );
-  }
-
+  // Settlement columns are guaranteed by the migration baseline.  Request
+  // handlers must never change database structure.
   ensuredBorrowingPaymentColumns = true;
 };
 

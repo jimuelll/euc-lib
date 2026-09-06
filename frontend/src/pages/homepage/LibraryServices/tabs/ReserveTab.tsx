@@ -169,7 +169,9 @@ const ReserveTab = ({
                   </div>
                 }
                 action={
-                  alreadyReserved ? (
+                   book.canReserve === false ? (
+                     <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60" style={{ fontFamily: "var(--font-heading)" }}>Reference only</span>
+                   ) : alreadyReserved ? (
                     <span
                       className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50"
                       style={{ fontFamily: "var(--font-heading)" }}

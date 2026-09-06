@@ -17,7 +17,7 @@ import {
 import { AdminPage, AdminPanel } from "./components/AdminPage";
 import { useAuth } from "@/context/AuthContext";
 
-const MAX_BACKUP_SIZE = 25 * 1024 * 1024;
+const MAX_BACKUP_SIZE = 40 * 1024 * 1024;
 
 type Snapshot = {
   id: number;
@@ -27,9 +27,34 @@ type Snapshot = {
   createdAt: string;
   createdBy: string | null;
 };
+type Compatibility = { compatible: boolean; version?: number; message: string };
+type BackupStatus = { mode: "normal" | "restoring"; maxImportBytes?: number };
 
 function filenameFromHeader(header?: string) {
-  return header?.match(/filename=\"?([^\";]+)\"?/)?.[1] ?? `euc-library-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  return header?.match(/filename="?([^";]+)"?/)?.[1] ?? `euc-library-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+}
+
+async function readBackupText(file: File, maxBytes: number) {
+  const source = file.name.toLowerCase().endsWith(".gz")
+    ? file.stream().pipeThrough(new DecompressionStream("gzip"))
+    : file.stream();
+  const reader = source.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`The expanded backup exceeds the server import limit of ${(maxBytes / 1024 / 1024).toFixed(0)} MB.`);
+    }
+    chunks.push(value);
+  }
+  const data = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(data);
 }
 
 const AdminBackup = () => {
@@ -41,6 +66,10 @@ const AdminBackup = () => {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(true);
   const [snapshotToRestore, setSnapshotToRestore] = useState<Snapshot | null>(null);
+  const [snapshotCompatibility, setSnapshotCompatibility] = useState<Compatibility | null>(null);
+  const [checkingCompatibility, setCheckingCompatibility] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState<"normal" | "restoring">("normal");
+  const [maxImportBytes, setMaxImportBytes] = useState(50 * 1024 * 1024);
   const [lastBackup, setLastBackup] = useState<{ name: string; size: number; createdAt: string } | null>(null);
 
   const loadSnapshots = async () => {
@@ -56,6 +85,11 @@ const AdminBackup = () => {
   };
 
   useEffect(() => { void loadSnapshots(); }, []);
+  useEffect(() => {
+    axiosInstance.get<BackupStatus>("/api/admin/backup/status")
+      .then(({ data }) => { setMaintenanceMode(data.mode); if (data.maxImportBytes) setMaxImportBytes(data.maxImportBytes); })
+      .catch(() => undefined);
+  }, []);
 
   const handleExport = async () => {
     setExporting(true);
@@ -109,7 +143,7 @@ const AdminBackup = () => {
   };
 
   const handleRestoreSnapshot = async () => {
-    if (!snapshotToRestore) return;
+    if (!snapshotToRestore || !snapshotCompatibility?.compatible) return;
     setRestoring(true);
     try {
       await axiosInstance.post(`/api/admin/backup/snapshots/${snapshotToRestore.id}/restore`, {}, { headers: { "x-restore-confirmation": "global-sign-out" } });
@@ -127,16 +161,17 @@ const AdminBackup = () => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (file.size > MAX_BACKUP_SIZE) {
-      toast.error("The backup file must be 25 MB or smaller.");
+    if (file.size > Math.min(MAX_BACKUP_SIZE, maxImportBytes)) {
+      toast.error("The compressed backup file must be 40 MB or smaller.");
       return;
     }
-    if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
-
-    setRestoring(true);
     try {
-      const contents = await file.text();
+      const contents = await readBackupText(file, maxImportBytes);
       const backup = JSON.parse(contents);
+      const { data: compatibility } = await axiosInstance.post<Compatibility>("/api/admin/backup/compatibility", backup);
+      if (!compatibility.compatible) { toast.error(compatibility.message); return; }
+      if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
+      setRestoring(true);
       await axiosInstance.post("/api/admin/backup/restore", backup, { headers: { "x-restore-confirmation": "global-sign-out" } });
       toast.success("Database restored. All sessions, including yours, are ending now.");
       await logout();
@@ -148,6 +183,18 @@ const AdminBackup = () => {
     } finally {
       setRestoring(false);
     }
+  };
+
+  const inspectSnapshot = async (snapshot: Snapshot) => {
+    setCheckingCompatibility(true);
+    setSnapshotCompatibility(null);
+    try {
+      const { data } = await axiosInstance.get<Compatibility>(`/api/admin/backup/snapshots/${snapshot.id}/compatibility`);
+      setSnapshotToRestore(snapshot);
+      setSnapshotCompatibility(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not verify snapshot compatibility.");
+    } finally { setCheckingCompatibility(false); }
   };
 
   return (
@@ -174,7 +221,7 @@ const AdminBackup = () => {
               <label htmlFor="restore-input" className="cursor-pointer">
                 {restoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 {restoring ? "Restoring..." : "Restore"}
-                <input ref={inputRef} id="restore-input" type="file" className="hidden" accept="application/json,.json" onChange={handleRestore} />
+                <input ref={inputRef} id="restore-input" type="file" className="hidden" accept="application/json,application/gzip,.json,.gz" onChange={handleRestore} />
               </label>
             </Button>
           </>
@@ -182,7 +229,10 @@ const AdminBackup = () => {
       >
         <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
         <p className="text-sm leading-6 text-muted-foreground">
-          Every snapshot includes all database records and the catalog's custom-field layout. A restore reconciles snapshot custom fields but blocks incompatible core-schema changes. It is an emergency action: a successful restore signs out every user, including you.
+          Snapshot data uses the current metadata catalog model. Compatibility is verified before restoration; restoring never changes database structure and signs out every user.
+        </p>
+        <p className={`mt-3 text-xs font-medium ${maintenanceMode === "restoring" ? "text-warning" : "text-muted-foreground"}`}>
+          Maintenance status: {maintenanceMode === "restoring" ? "restore in progress" : "normal"}.
         </p>
       </AdminPanel>
 
@@ -208,7 +258,7 @@ const AdminBackup = () => {
                   <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadSnapshot(snapshot)} disabled={restoring}>
                     <FileDown className="mr-2 h-3.5 w-3.5" /> Download
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => setSnapshotToRestore(snapshot)} disabled={restoring}>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void inspectSnapshot(snapshot)} disabled={restoring || checkingCompatibility}>
                     <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> Restore
                   </Button>
                 </div>
@@ -246,12 +296,12 @@ const AdminBackup = () => {
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
             <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
-              This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first. After a successful restore, every user—including you—will be signed out and must log in again. Snapshot custom fields can be reconciled; incompatible core-schema changes still block the restore.
+              {snapshotCompatibility?.compatible ? "Compatible: " : "Incompatible: "}{snapshotCompatibility?.message ?? "Checking compatibility…"} This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first, then every user—including you—will sign in again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={restoring} onClick={(event) => { event.preventDefault(); void handleRestoreSnapshot(); }}>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={restoring || !snapshotCompatibility?.compatible} onClick={(event) => { event.preventDefault(); void handleRestoreSnapshot(); }}>
               {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Restore snapshot
             </AlertDialogAction>
           </AlertDialogFooter>

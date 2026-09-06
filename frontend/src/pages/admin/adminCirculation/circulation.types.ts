@@ -12,6 +12,7 @@ export interface BookInfo {
   barcode: string;
   condition: string;
   is_active: boolean;
+  is_reserved?: boolean | number;
 }
 
 export interface UserInfo {

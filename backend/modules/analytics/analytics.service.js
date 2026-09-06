@@ -376,6 +376,13 @@ async function getDashboardOverview({ range } = {}) {
                WHERE b.copy_id = bc.id
                  AND b.deleted_at IS NULL
                  AND b.status IN ('borrowed', 'overdue')
+             )
+             AND NOT EXISTS (
+               SELECT 1
+               FROM reservations r
+               WHERE r.reserved_copy_id = bc.id
+                 AND r.deleted_at IS NULL
+                 AND r.status = 'ready'
              )) AS available_book_copies,
          (SELECT COUNT(*)
             FROM borrowings
@@ -530,12 +537,12 @@ async function getDashboardOverview({ range } = {}) {
     ),
     db.query(
       `SELECT
-         COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized') AS name,
+         COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category'))), ''), 'Uncategorized') AS name,
          COUNT(*) AS titles,
          COALESCE(SUM(CASE WHEN copies IS NULL OR copies < 0 THEN 0 ELSE copies END), 0) AS copies
        FROM books
        WHERE deleted_at IS NULL
-       GROUP BY COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized')
+       GROUP BY COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category'))), ''), 'Uncategorized')
        ORDER BY titles DESC, name ASC
        LIMIT 8`
     ),

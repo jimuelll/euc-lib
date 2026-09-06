@@ -76,8 +76,7 @@ All protected API routes use JWT authentication. Access tokens are short-lived; 
 | `backend/` | Express server, middleware, MySQL pool, WebSocket server, and feature modules |
 | `backend/modules/` | API modules for auth, users, catalogue, borrowing, circulation, reservations, attendance, content, analytics, notifications, settings, backup, and clearance |
 | `backend/realtime/` | Authenticated WebSocket notification hub at `/ws` |
-| `db/` | Full database dumps and current incremental migrations |
-| `backend/sql/` | Earlier incremental migrations for analytics, notifications, roles, and catalogue alignment |
+| `db/fresh-start.sql` | Complete fresh-install database baseline |
 
 The backend exposes REST endpoints below `/api`. Public routes are limited to authentication, public content, and anonymous visit tracking; the remaining application routes are protected after the global authentication middleware. The server also recalculates overdue borrowings at startup and every five minutes.
 
@@ -99,29 +98,14 @@ There is no root workspace runner. Run the API and client in separate terminals.
 
 ### 1. Prepare the database
 
-Create a MySQL database, then import one baseline dump from `db/` that matches your deployment target:
+Select the application's MySQL database, then import `db/fresh-start.sql`.
+The file first deletes this application's known tables and recreates them, so it
+is safe to retry after a partial import. It is destructive: do not import it
+into an installation whose application data you need to retain.
 
-- `library-portable.sql` — general local/portable baseline
-- `library-aiven.sql` — Aiven-oriented baseline
-- `library-clevercloud.sql` — Clever Cloud-oriented baseline
-
-Apply these additive migrations after the baseline as needed, in date order:
-
-```text
-backend/sql/2026-03-30-dashboard-analytics.sql
-backend/sql/2026-03-30-notifications-websocket.sql
-backend/sql/2026-04-01-add-employees-role.sql
-backend/sql/2026-04-02-align-catalog-schema.sql
-db/2026-08-30-catalog-materials.sql
-db/2026-08-30-clearance-workflow.sql
-db/2026-08-30-enable-catalog-isbn-metadata-fields.sql
-db/2026-08-31-backup-snapshots.sql
-db/2026-08-31-book-types-and-copy-conditions.sql
-db/2026-08-31-book-type-fine-rules.sql
-backend/sql/2026-09-04-add-auth-audit-device.sql
-```
-
-> The last two migrations build on the preceding catalogue changes. Do not reapply migrations already present in the selected baseline.
+This release intentionally starts from a clean database. The baseline includes
+the complete current schema, starter configuration, catalog material model, and
+snapshot control tables; there is no migration runner or additional SQL to run.
 
 ### 2. Start the backend
 
@@ -205,7 +189,7 @@ npm run preview   # preview the production build
 
 The frontend includes a Vercel configuration in `frontend/vercel.json` that rewrites `/api/*` to the deployed Render backend and rewrites client routes to `index.html`.
 
-Before deploying, update the backend CORS allowlist in `backend/app.js` for the intended frontend origin, configure all backend environment variables, and apply the database migrations. Cloudinary credentials are required for bulletin/media handling and for saved snapshot operations. Snapshot files are uploaded as authenticated raw Cloudinary assets; metadata remains in MySQL.
+Before deploying, update the backend CORS allowlist in `backend/app.js` for the intended frontend origin, configure all backend environment variables, and import `db/fresh-start.sql` into the deployment database. Cloudinary credentials are required for bulletin/media handling and for saved snapshot operations. Snapshot files are uploaded as authenticated raw Cloudinary assets; metadata remains in MySQL.
 
 ## Security and operational notes
 

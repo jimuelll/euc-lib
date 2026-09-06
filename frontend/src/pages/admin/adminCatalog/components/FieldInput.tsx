@@ -14,28 +14,32 @@ type Props = {
   value: any;
   onChange: (key: string, value: any) => void;
   id?: string;
+  error?: string;
 };
 
 // Slightly taller inputs for admin readability — h-9 instead of h-8
 const inputClass =
   "rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors h-9";
 
-const FieldInput = ({ field, value, onChange, id }: Props) => {
+const FieldInput = ({ field, value, onChange, id, error }: Props) => {
+  const accessibility = { "aria-invalid": Boolean(error), "aria-describedby": error && `${id}-error` };
+  const classes = `${inputClass} ${error ? "border-destructive focus-visible:border-destructive" : ""}`;
   switch (field.type) {
     case "textarea":
       return (
         <Textarea
           id={id}
+          {...accessibility}
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
           rows={4}
-          className="rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors resize-none leading-relaxed"
+          className={`rounded-none border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:border-primary transition-colors resize-none leading-relaxed ${error ? "border-destructive focus-visible:border-destructive" : ""}`}
         />
       );
     case "select":
       return (
         <Select value={value ?? ""} onValueChange={(v) => onChange(field.key, v)}>
-          <SelectTrigger id={id} className={inputClass}>
+          <SelectTrigger id={id} {...accessibility} className={classes}>
             <SelectValue placeholder={`Select ${field.label}`} />
           </SelectTrigger>
           <SelectContent className="rounded-none border-border">
@@ -55,7 +59,8 @@ const FieldInput = ({ field, value, onChange, id }: Props) => {
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
           min={field.key === "copies" ? 0 : undefined}
-          className={inputClass}
+          {...accessibility}
+          className={classes}
         />
       );
     case "date":
@@ -65,7 +70,8 @@ const FieldInput = ({ field, value, onChange, id }: Props) => {
           type="date"
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
-          className={inputClass}
+          {...accessibility}
+          className={classes}
         />
       );
     default:
@@ -74,7 +80,8 @@ const FieldInput = ({ field, value, onChange, id }: Props) => {
           id={id}
           value={value ?? ""}
           onChange={(e) => onChange(field.key, e.target.value)}
-          className={inputClass}
+          {...accessibility}
+          className={classes}
         />
       );
   }

@@ -74,11 +74,26 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   };
 
   useEffect(() => {
-    if (!reservationCheckout) return;
+    const lookupId = reservationCheckout?.student_employee_id;
+    if (!reservationCheckout?.id || !lookupId) return;
     setType("borrow");
-    setStudentId(reservationCheckout.student_employee_id);
-    void handleLookupUser(reservationCheckout.student_employee_id);
-  }, [reservationCheckout?.id]);
+    setStudentId(lookupId);
+    setLookingUpUser(true);
+    void apiLookupUser(lookupId)
+      .then(({ user, activeBorrows, clearance }) => {
+        setFoundUser(user);
+        setActiveBorrows(activeBorrows);
+        setClearance(clearance);
+        setMatchedBorrow(null);
+      })
+      .catch((err: any) => {
+        toast.error(err.response?.data?.message ?? "User not found");
+        setFoundUser(null);
+        setActiveBorrows([]);
+        setClearance(null);
+      })
+      .finally(() => setLookingUpUser(false));
+  }, [reservationCheckout?.id, reservationCheckout?.student_employee_id]);
 
 const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
@@ -88,6 +103,10 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     const copy = await apiLookupCopy(lookupBarcode);
     setCopyBarcode(lookupBarcode);
     setFoundCopy(copy);
+
+    if (type === "borrow" && copy.is_reserved && !reservationCheckout) {
+      toast.info("This copy is prepared for a reservation and cannot be checked out to another patron");
+    }
 
     if (type === "return" && foundUser) {
       const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
@@ -163,6 +182,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     !!foundCopy &&
     foundCopy.is_active &&
     foundCopy.condition !== "lost" &&
+    (!foundCopy.is_reserved || Boolean(reservationCheckout)) &&
     !(type === "return" && !matchedBorrow);
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 

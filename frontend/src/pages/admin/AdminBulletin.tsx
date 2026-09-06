@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, FileText } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
@@ -68,23 +68,22 @@ const AdminBulletin = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const loadPosts = async (requestedPage = 1) => {
+  const loadPosts = useCallback(async (requestedPage = 1) => {
     setLoading(true);
     setError("");
     try {
-      const response = await axiosInstance.get<BulletinResponse>("/api/bulletin", {
+      const fetchPage = (page: number) => axiosInstance.get<BulletinResponse>("/api/bulletin", {
         params: {
-          page: requestedPage,
+          page,
           limit: 20,
           scope: statusFilter === "all" ? "all" : undefined,
           archived: statusFilter === "archived" ? true : undefined,
           month: selectedMonth === "all" ? undefined : selectedMonth,
         },
       });
-      const result = response.data;
+      let result = (await fetchPage(requestedPage)).data;
       if (requestedPage > 1 && result.totalPages > 0 && requestedPage > result.totalPages) {
-        await loadPosts(result.totalPages);
-        return;
+        result = (await fetchPage(result.totalPages)).data;
       }
       setPosts(result.data ?? []);
       setTotalPosts(result.total ?? 0);
@@ -96,11 +95,11 @@ const AdminBulletin = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth, statusFilter]);
 
   useEffect(() => {
     void loadPosts(1);
-  }, [statusFilter, selectedMonth]);
+  }, [loadPosts]);
 
   const monthOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -337,10 +336,10 @@ const AdminBulletin = () => {
                                     type="button"
                                     variant="outline"
                                     disabled={isBusy}
-                                    onClick={() => handlePinToggle(post.id, !Boolean(post.is_pinned))}
+                                    onClick={() => handlePinToggle(post.id, !post.is_pinned)}
                                   >
                                     <Pin className="mr-2 h-4 w-4" />
-                                    {Boolean(post.is_pinned) ? "Unpin" : "Pin"}
+                                    {post.is_pinned ? "Unpin" : "Pin"}
                                   </Button>
                                 ) : null}
 

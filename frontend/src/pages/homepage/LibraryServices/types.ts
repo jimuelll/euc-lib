@@ -9,6 +9,8 @@ export interface CatalogBook {
   location?: string;
   copies: number;
   available: number;
+  material_type?: "book" | "thesis";
+  canReserve?: boolean;
 }
 
 export interface ActiveReservation {

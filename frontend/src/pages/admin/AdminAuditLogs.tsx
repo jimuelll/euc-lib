@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { Activity, RefreshCcw } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Button } from "@/components/ui/button";
@@ -90,10 +90,10 @@ const AdminAuditLogs = () => {
   const [actionOptions, setActionOptions] = useState<string[]>([]);
   const [actionsByCategory, setActionsByCategory] = useState<Record<string, string[]>>({});
 
-  const loadAuditLogs = async (
-    mode: "initial" | "refresh" = "initial",
-    nextPage = page,
-    nextFilters = filters
+  const loadAuditLogs = useCallback(async (
+    mode: "initial" | "refresh",
+    nextPage: number,
+    nextFilters: typeof emptyFilters,
   ) => {
     if (mode === "initial") setLoading(true);
     if (mode === "refresh") setRefreshing(true);
@@ -119,11 +119,11 @@ const AdminAuditLogs = () => {
       if (mode === "initial") setLoading(false);
       if (mode === "refresh") setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    void loadAuditLogs();
-  }, []);
+    void loadAuditLogs("initial", 1, emptyFilters);
+  }, [loadAuditLogs]);
 
   useEffect(() => {
     const loadMeta = async () => {
@@ -183,7 +183,7 @@ const AdminAuditLogs = () => {
           type="button"
           variant="outline"
           className="rounded-none"
-          onClick={() => void loadAuditLogs("refresh")}
+          onClick={() => void loadAuditLogs("refresh", page, filters)}
           disabled={loading || refreshing}
         >
           <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
