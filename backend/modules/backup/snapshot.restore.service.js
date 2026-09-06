@@ -83,13 +83,18 @@ async function replaceApplicationData(backup, { restoredBy = null, restoredByNam
     const restoreAuditId = restoreAudit.insertId;
     // Do not erase the ledger. Events after the snapshot cutoff describe data
     // that is no longer present after this restore, so mark them transparently.
+    // `createdAt` is deliberately ISO-8601 in the JSON payload, while MySQL
+    // DATETIME comparisons require SQL datetime text. Normalize it here too;
+    // this is a query parameter rather than a restored row, so it does not go
+    // through the row-level decoder above.
+    const snapshotCutoff = decodeValue(backup.createdAt, "datetime");
     const [reversed] = await connection.query(
       `UPDATE audit_events
        SET restore_status = 'reversed', reversed_at = UTC_TIMESTAMP(), reversed_by_restore_id = ?
        WHERE occurred_at > ?
          AND restore_status = 'retained'
          AND category NOT IN ('auth', 'backup', 'system')`,
-      [restoreAuditId, backup.createdAt]
+      [restoreAuditId, snapshotCutoff]
     );
     // audit_events is restored with the snapshot, then this event is appended
     // inside the same transaction so the restore itself is never invisible.
