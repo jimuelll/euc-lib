@@ -195,6 +195,9 @@ CREATE TABLE `audit_events` (
   `description` varchar(500) NOT NULL,
   `route` varchar(255) DEFAULT NULL,
   `metadata` json DEFAULT NULL,
+  `restore_status` enum('retained','reversed') NOT NULL DEFAULT 'retained',
+  `reversed_at` datetime DEFAULT NULL,
+  `reversed_by_restore_id` bigint(20) UNSIGNED DEFAULT NULL,
   `occurred_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -646,7 +649,9 @@ ALTER TABLE `audit_events`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_audit_events_time` (`occurred_at`),
   ADD KEY `idx_audit_events_category_time` (`category`,`occurred_at`),
-  ADD KEY `idx_audit_events_actor_time` (`actor_id`,`occurred_at`);
+  ADD KEY `idx_audit_events_actor_time` (`actor_id`,`occurred_at`),
+  ADD KEY `idx_audit_events_restore_status_time` (`restore_status`,`occurred_at`),
+  ADD KEY `idx_audit_events_restore_id` (`reversed_by_restore_id`);
 
 --
 -- Indexes for table `auth_refresh_sessions`

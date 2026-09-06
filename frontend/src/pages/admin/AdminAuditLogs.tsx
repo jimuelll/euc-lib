@@ -15,6 +15,8 @@ interface AuditItem {
   actor_name: string | null;
   actor_role: string | null;
   description: string;
+  restore_status: "retained" | "reversed";
+  reversed_at: string | null;
 }
 
 interface AuditResponse {
@@ -320,6 +322,7 @@ const AdminAuditLogs = () => {
                       </div>
 
                       <p className="text-sm font-medium leading-6 text-foreground">{item.description}</p>
+                      {item.restore_status === "reversed" ? <p className="inline-flex w-fit border border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive">Reversed by snapshot restore{item.reversed_at ? ` · ${formatDateTime(item.reversed_at)}` : ""}</p> : null}
                       <p className="text-xs text-muted-foreground">
                         {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}
                       </p>

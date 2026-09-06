@@ -1,13 +1,11 @@
 const db = require("../../db");
 
-async function recordAuditEvent({ actorId = null, category, action, description, route = null, metadata = null }) {
-  let actorName = null;
-  let actorRole = null;
+async function recordAuditEvent({ actorId = null, actorName = null, actorRole = null, category, action, description, route = null, metadata = null }) {
 
   if (actorId) {
     const [[actor]] = await db.query("SELECT name, role FROM users WHERE id = ? LIMIT 1", [actorId]);
-    actorName = actor?.name ?? null;
-    actorRole = actor?.role ?? null;
+    actorName ||= actor?.name ?? null;
+    actorRole ||= actor?.role ?? null;
   }
 
   await db.query(

@@ -103,7 +103,14 @@ router.post("/backup/snapshots/:id/restore", superAdminOnly, async (req, res) =>
     const snapshot = await findSnapshot(req.params.id);
     const backup = await getSnapshotPayload(snapshot);
     if (!validateBackup(backup)) throw Object.assign(new Error("The saved snapshot is invalid."), { status: 400 });
-    const preRestoreSnapshot = await performRestore(backup, { restoredBy: req.user.id, snapshotId: snapshot.id, snapshotKind: snapshot.kind });
+    const preRestoreSnapshot = await performRestore(backup, {
+      restoredBy: req.user.id,
+      restoredByName: req.user.name,
+      restoredByRole: req.user.role,
+      snapshotId: snapshot.id,
+      snapshotKind: snapshot.kind,
+      snapshotLabel: `saved snapshot “${snapshot.filename}”`,
+    });
     res.json({ message: "Database restored successfully.", preRestoreSnapshot });
   } catch (error) {
     sendError(res, error, "Restore failed before any database records were changed.");
@@ -114,7 +121,12 @@ router.post("/backup/restore", superAdminOnly, async (req, res) => {
   try {
     requireRestoreSignOutAcknowledgement(req);
     if (!validateBackup(req.body)) throw Object.assign(new Error("This file is not a valid EUC Library backup."), { status: 400 });
-    const preRestoreSnapshot = await performRestore(req.body, { restoredBy: req.user.id });
+    const preRestoreSnapshot = await performRestore(req.body, {
+      restoredBy: req.user.id,
+      restoredByName: req.user.name,
+      restoredByRole: req.user.role,
+      snapshotLabel: "uploaded snapshot",
+    });
     res.json({ message: "Database restored successfully.", restoredAt: new Date().toISOString(), preRestoreSnapshot });
   } catch (error) {
     sendError(res, error, "Restore failed before any database records were changed.");

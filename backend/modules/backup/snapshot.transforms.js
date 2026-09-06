@@ -1,7 +1,7 @@
 const { createHash } = require("crypto");
 const { APPLICATION_TABLES } = require("./snapshot.registry");
 
-const SNAPSHOT_VERSION = 7;
+const SNAPSHOT_VERSION = 8;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -38,6 +38,16 @@ function encodeValue(value) {
 function decodeValue(value, columnType) {
   if (value && typeof value === "object" && value.__backupType === "buffer") return Buffer.from(value.data, "base64");
   if (value && typeof value === "object" && value.__backupType === "date") return formatDateForMySql(value.data, columnType);
+  // JSON values arrive as objects after an uploaded snapshot is parsed by
+  // Express. mysql2 must receive JSON text for a JSON column, not an object
+  // coerced to "[object Object]".
+  if (String(columnType).toLowerCase() === "json" && value !== null && value !== undefined) {
+    if (typeof value === "string") {
+      try { JSON.parse(value); return value; }
+      catch { throw Object.assign(new Error("The backup contains invalid JSON data."), { status: 400 }); }
+    }
+    return JSON.stringify(value);
+  }
   return value;
 }
 
@@ -135,8 +145,20 @@ function upgradeV6ToV7(backup) {
   return backup;
 }
 
+function upgradeV7ToV8(backup) {
+  assertSnapshotIntegrity(backup);
+  // Audit history became an append-only system ledger in v8. Existing v7
+  // audit rows are intentionally retained in the live database on restore,
+  // never replaced by an older snapshot.
+  delete backup.tables.audit_events;
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 8;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
 // Each supported snapshot version advances through one reviewed transformer.
-const SNAPSHOT_TRANSFORMERS = new Map([[3, upgradeV3ToV4], [4, upgradeV4ToV5], [5, upgradeV5ToV6], [6, upgradeV6ToV7]]);
+const SNAPSHOT_TRANSFORMERS = new Map([[3, upgradeV3ToV4], [4, upgradeV4ToV5], [5, upgradeV5ToV6], [6, upgradeV6ToV7], [7, upgradeV7ToV8]]);
 
 function upgradeBackup(backup) {
   if (backup.version > SNAPSHOT_VERSION) {
