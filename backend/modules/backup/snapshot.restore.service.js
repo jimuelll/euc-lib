@@ -52,7 +52,7 @@ async function replaceApplicationData(backup, { restoredBy = null, restoredByNam
     for (const table of backupTables) await connection.query(`DELETE FROM \`${table}\``);
     for (const table of backupTables) {
       const definitions = new Map((schemaTables[table]?.columns ?? []).map((column) => [column.name, column]));
-      for (const row of backup.tables[table]) {
+      for (const [rowIndex, row] of backup.tables[table].entries()) {
         const columns = Object.keys(row);
         if (columns.some((column) => !definitions.has(column))) {
           throw Object.assign(new Error(`The backup contains unsupported columns for ${table}.`), { status: 400 });
@@ -60,7 +60,16 @@ async function replaceApplicationData(backup, { restoredBy = null, restoredByNam
         const insertColumns = columns.filter((column) => !/generated/i.test(String(definitions.get(column)?.extra ?? "")));
         if (!insertColumns.length) continue;
         const names = insertColumns.map((column) => `\`${column}\``).join(", ");
-        const values = insertColumns.map((column) => decodeValue(row[column], definitions.get(column)?.columnType));
+        const values = insertColumns.map((column) => {
+          try {
+            return decodeValue(row[column], definitions.get(column)?.columnType);
+          } catch (error) {
+            throw Object.assign(
+              new Error(`Snapshot value for ${table}.${column} (row ${rowIndex + 1}) is invalid: ${error.message}`),
+              { status: error.status || 400 }
+            );
+          }
+        });
         await connection.query(`INSERT INTO \`${table}\` (${names}) VALUES (${insertColumns.map(() => "?").join(", ")})`, values);
       }
     }

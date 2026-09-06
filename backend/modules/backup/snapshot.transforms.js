@@ -9,10 +9,60 @@ const LEGACY_METADATA_KEYS = Object.freeze([
 
 const pad = (value, length = 2) => String(value).padStart(length, "0");
 
+function isValidCalendarDate(year, month, day) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function invalidDateValue() {
+  return Object.assign(new Error("The backup contains an invalid date value."), { status: 400 });
+}
+
+function normalizeSqlTemporalValue(value, columnType) {
+  const type = String(columnType).toLowerCase();
+  const text = String(value).trim();
+
+  // Preserve canonical SQL values as wall-clock values. Parsing a value such
+  // as `2026-07-17 00:00:00` with new Date() depends on the server timezone
+  // and can both shift it and let malformed values reach MySQL.
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(\.\d{1,6})?)?)?$/);
+  if (match) {
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction = ""] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const hasTime = hourText !== undefined;
+    const hour = Number(hourText ?? 0);
+    const minute = Number(minuteText ?? 0);
+    const second = Number(secondText ?? 0);
+    if (!isValidCalendarDate(year, month, day) || hour > 23 || minute > 59 || second > 59) throw invalidDateValue();
+    const datePart = `${yearText}-${monthText}-${dayText}`;
+    if (type === "date") return datePart;
+    if (/^year(?:\(|$)/.test(type)) return yearText;
+    if (/^(datetime|timestamp)/.test(type)) {
+      const timePart = hasTime ? `${pad(hour)}:${pad(minute)}:${pad(second)}${fraction}` : "00:00:00";
+      return `${datePart} ${timePart}`;
+    }
+  }
+
+  if (/^time(?:\(|$)/.test(type)) {
+    // MySQL TIME can contain a sign and values beyond 24 hours. Keep only its
+    // documented SQL form; ISO timestamps are handled below.
+    if (/^-?\d{1,3}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/.test(text)) return text;
+    throw invalidDateValue();
+  }
+  if (/^year(?:\(|$)/.test(type) && /^\d{4}$/.test(text)) return text;
+
+  // Tagged Date objects and uploaded ISO values represent instants, so UTC is
+  // the only unambiguous conversion to MySQL's canonical text form.
+  if (/T|Z$|[+-]\d{2}:?\d{2}$/.test(text)) return formatDateForMySql(text, type);
+  throw invalidDateValue();
+}
+
 function formatDateForMySql(isoValue, columnType = "") {
   const date = new Date(isoValue);
   if (Number.isNaN(date.getTime())) {
-    throw Object.assign(new Error("The backup contains an invalid date value."), { status: 400 });
+    throw invalidDateValue();
   }
 
   const type = String(columnType).toLowerCase();
@@ -39,11 +89,11 @@ function decodeValue(value, columnType) {
   if (value && typeof value === "object" && value.__backupType === "buffer") return Buffer.from(value.data, "base64");
   if (value && typeof value === "object" && value.__backupType === "date") return formatDateForMySql(value.data, columnType);
   const normalizedColumnType = String(columnType).toLowerCase();
-  // Uploaded JSON can contain an ISO date string even when it was not tagged
-  // as a Date instance. MySQL DATE/DATETIME/TIMESTAMP columns reject the
-  // ISO `T`/`Z` form, so convert it to their canonical SQL representation.
-  if (typeof value === "string" && /^(date|datetime|timestamp|time|year)/.test(normalizedColumnType) && /T|Z$/.test(value)) {
-    return formatDateForMySql(value, normalizedColumnType);
+  // Every temporal value is normalized and validated before MySQL sees it.
+  // This covers both Date objects serialized by mysql2 and plain SQL strings
+  // carried in an uploaded snapshot.
+  if (typeof value === "string" && /^(date|datetime|timestamp|time|year)/.test(normalizedColumnType)) {
+    return normalizeSqlTemporalValue(value, normalizedColumnType);
   }
   // JSON values arrive as objects after an uploaded snapshot is parsed by
   // Express. mysql2 must receive JSON text for a JSON column, not an object
