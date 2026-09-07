@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Heart, MessageCircle, Send, Loader2, Users,
+  Heart, MessageCircle, Send, Loader2,
   Trash2, Download, X, ZoomIn, ZoomOut, Pin, PinOff, Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -442,11 +442,24 @@ export function PostModal({
               </p>
             </div>
 
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-2.5 text-xs sm:px-6">
+              <button
+                type="button"
+                onClick={() => void openLikersDialog()}
+                className="flex items-center gap-1.5 font-medium text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={`View ${likeCount} likes`}
+              >
+                <Heart className={`h-3.5 w-3.5 ${liked ? "fill-current text-primary" : ""}`} />
+                <span>{likeCount} {likeCount === 1 ? "like" : "likes"}</span>
+              </button>
+              <span className="text-muted-foreground">{comments.length} {comments.length === 1 ? "comment" : "comments"}</span>
+            </div>
+
             <div className="flex items-stretch border-b border-border">
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
-                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 py-3 border-r border-border px-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 border-r border-border px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
                   liked
                     ? "bg-primary/[0.04] text-primary"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -454,19 +467,7 @@ export function PostModal({
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 <Heart className={`h-3.5 w-3.5 transition-all duration-150 ${liked ? "fill-current" : ""}`} />
-                <span>{likeCount}</span>
                 <span className="opacity-70">{liked ? "Liked" : "Like"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void openLikersDialog()}
-                className="flex w-12 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-                aria-label={`View ${likeCount} likes`}
-                title="View likes"
-              >
-                <Users className="h-3.5 w-3.5" />
               </button>
 
               <div

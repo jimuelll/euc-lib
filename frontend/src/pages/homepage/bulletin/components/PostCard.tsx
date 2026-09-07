@@ -111,7 +111,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         )}
 
         {/* Content panel */}
-        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6 lg:w-[45%] lg:justify-center" : "p-4 sm:p-5"}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6 lg:w-[45%] lg:justify-center" : "p-4 sm:p-5"} ${canArchive ? "pr-16 sm:pr-[4.5rem]" : ""}`}>
           {!hasImage && post.is_pinned ? (
             <div className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
               <Pin className="h-3 w-3" /> Pinned
@@ -190,7 +190,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         </div>
       </button>
 
-      {/* Archive is a sibling action so it never covers the post title or metadata. */}
+      {/* A familiar post-header action: kept out of the reading area with reserved padding. */}
       {canArchive && (
         <button
           onClick={handleArchiveClick}
@@ -198,7 +198,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           title={archiveConfirm ? "Click again to confirm" : "Archive post"}
           aria-label={archiveConfirm ? "Confirm archive" : "Archive post"}
           className={`
-            relative m-2 shrink-0 self-start
+            absolute right-2 top-2
             flex h-11 w-11 items-center justify-center
             border transition-all duration-150 opacity-0
             group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
