@@ -65,7 +65,7 @@ export function PostModal({
   const [likeBusy, setLikeBusy] = useState(false);
   const [likers, setLikers] = useState<PostLiker[]>([]);
   const [likersLoading, setLikersLoading] = useState(false);
-  const [likersVisible, setLikersVisible] = useState(false);
+  const [likersDialogOpen, setLikersDialogOpen] = useState(false);
 
   const [pinned, setPinned] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
@@ -97,7 +97,7 @@ export function PostModal({
     setLightboxOpen(false);
     setArchiveConfirm(false);
     setLikers([]);
-    setLikersVisible(false);
+    setLikersDialogOpen(false);
     loadComments(post.id);
   }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -248,13 +248,9 @@ export function PostModal({
     }
   };
 
-  const toggleLikers = async () => {
+  const openLikersDialog = async () => {
     if (!post) return;
-    if (likersVisible) {
-      setLikersVisible(false);
-      return;
-    }
-    setLikersVisible(true);
+    setLikersDialogOpen(true);
     setLikersLoading(true);
     try {
       const { data } = await axiosInstance.get(`/api/bulletin/${post.id}/likes`);
@@ -464,14 +460,13 @@ export function PostModal({
 
               <button
                 type="button"
-                onClick={() => void toggleLikers()}
-                aria-expanded={likersVisible}
-                className="flex min-w-0 flex-1 items-center justify-center gap-2.5 border-r border-border px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                onClick={() => void openLikersDialog()}
+                className="flex w-12 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
+                aria-label={`View ${likeCount} likes`}
+                title="View likes"
               >
                 <Users className="h-3.5 w-3.5" />
-                <span>{likeCount}</span>
-                <span className="opacity-70">Liked by</span>
               </button>
 
               <div
@@ -483,17 +478,6 @@ export function PostModal({
                 <span className="opacity-70">Comments</span>
               </div>
             </div>
-
-            {likersVisible && (
-              <div className="px-5 py-4 sm:px-6" aria-live="polite">
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>People who liked this post</p>
-                {likersLoading ? <p className="text-sm text-muted-foreground">Loading likes…</p> : likers.length ? (
-                  <div className="divide-y divide-border border border-border">
-                    {likers.map((liker) => <div key={liker.id} className="flex items-center justify-between gap-3 px-3 py-2.5"><span className="text-sm font-medium text-foreground">{liker.name}</span><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{liker.role.replace("_", " ")}</span></div>)}
-                  </div>
-                ) : <p className="text-sm text-muted-foreground">No likes yet.</p>}
-              </div>
-            )}
 
             <div className="px-5 sm:px-6 pt-5 pb-3">
               <div className="flex items-center gap-3 mb-4">
@@ -634,6 +618,19 @@ export function PostModal({
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={likersDialogOpen} onOpenChange={setLikersDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Liked by</DialogTitle>
+          </DialogHeader>
+          {likersLoading ? <p className="text-sm text-muted-foreground">Loading likes…</p> : likers.length ? (
+            <div className="max-h-[55dvh] divide-y divide-border overflow-y-auto border-y border-border">
+              {likers.map((liker) => <div key={liker.id} className="flex items-center justify-between gap-3 px-1 py-3"><span className="text-sm font-medium text-foreground">{liker.name}</span><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{liker.role.replace("_", " ")}</span></div>)}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">No likes yet.</p>}
         </DialogContent>
       </Dialog>
 

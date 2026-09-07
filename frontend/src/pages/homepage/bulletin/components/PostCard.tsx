@@ -196,11 +196,12 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           onClick={handleArchiveClick}
           disabled={archiveBusy}
           title={archiveConfirm ? "Click again to confirm" : "Archive post"}
+          aria-label={archiveConfirm ? "Confirm archive" : "Archive post"}
           className={`
             relative m-2 shrink-0 self-start
-            flex min-h-11 min-w-11 items-center gap-1.5 px-2
-            text-[9px] font-bold uppercase tracking-[0.12em]
-            border transition-all duration-150
+            flex h-11 w-11 items-center justify-center
+            border transition-all duration-150 opacity-0
+            group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
             disabled:cursor-not-allowed
             ${archiveConfirm
               ? "border-destructive/60 bg-destructive/10 text-destructive opacity-100"
@@ -213,7 +214,6 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             ? <Loader2 className="h-3 w-3 animate-spin" />
             : <Archive className="h-3 w-3" />
           }
-          {archiveConfirm ? "Confirm?" : "Archive"}
         </button>
       )}
     </motion.div>
