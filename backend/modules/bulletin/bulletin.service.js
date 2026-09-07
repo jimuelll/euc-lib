@@ -32,10 +32,10 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
   const normalizedSearch = search.trim();
   const hasSearch = normalizedSearch.length > 0;
   const searchFilter = hasSearch
-    ? "AND (bp.title LIKE ? OR bp.excerpt LIKE ? OR bp.content LIKE ? OR u.name LIKE ?)"
+    ? "AND (bp.title LIKE ? OR bp.content LIKE ? OR u.name LIKE ?)"
     : "";
   const searchParams = hasSearch
-    ? Array(4).fill(`%${normalizedSearch}%`)
+    ? Array(3).fill(`%${normalizedSearch}%`)
     : [];
   const normalizedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : "";
   const monthFilter = normalizedMonth ? "AND DATE_FORMAT(bp.created_at, '%Y-%m') = ?" : "";
@@ -71,7 +71,6 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
     `SELECT
        bp.id,
        bp.title,
-       bp.excerpt,
        bp.content,
        bp.image_url,
        bp.post_type,
@@ -117,7 +116,6 @@ const getPostById = async (postId, userId) => {
     `SELECT
        bp.id,
        bp.title,
-       bp.excerpt,
        bp.content,
        bp.image_url,
        bp.post_type,
@@ -160,14 +158,15 @@ const getPostById = async (postId, userId) => {
   return { ...post, comments };
 };
 
-const createPost = async (authorId, { title, excerpt, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url }) => {
-  if (!title?.trim() || !excerpt?.trim() || !content?.trim()) {
+const createPost = async (authorId, { title, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url }) => {
+  if (!title?.trim() || !content?.trim()) {
     throw Object.assign(
-      new Error("title, excerpt, and content are required"),
+      new Error("title and content are required"),
       { status: 400 }
     );
   }
   const postType = "announcement";
+  const generatedPreview = content.trim().replace(/\s+/g, " ").slice(0, 500);
   const sqlDate = (value) => value ? String(value).replace("T", " ") : null;
 
   // Enforce single pin — unpin any currently pinned post first
@@ -181,7 +180,7 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title.trim(),
-      excerpt.trim(),
+      generatedPreview,
       content.trim(),
       image_url?.trim()       ?? null,
       image_public_id?.trim() ?? null,

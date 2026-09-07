@@ -9,7 +9,6 @@ import { CreatePostModal } from "../homepage/bulletin";
 interface BulletinPostRecord {
   id: number;
   title: string;
-  excerpt: string;
   content: string;
   image_url?: string | null;
   post_type: "announcement" | "event";
@@ -320,7 +319,7 @@ const AdminBulletin = () => {
                                   </span>
                                 </div>
                                 <p className="text-base font-semibold text-foreground">{post.title}</p>
-                                <p className="text-sm leading-6 text-muted-foreground">{post.excerpt}</p>
+                                <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{post.content}</p>
                                 {post.post_type === "event" ? (
                                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                     <span>{post.event_starts_at ? `Starts ${DATE_TIME_FORMATTER.format(new Date(post.event_starts_at))}` : "Start time not set"}</span>

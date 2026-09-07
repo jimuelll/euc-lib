@@ -4,7 +4,6 @@ export interface BulletinPost {
   id: number;
   title: string;
   date: string;
-  excerpt: string;
   content: string;
   image_url?: string;
   likes: number;
@@ -35,7 +34,6 @@ export interface BulletinComment {
 export interface ApiPost {
   id: number;
   title: string;
-  excerpt: string;
   content: string;
   image_url?: string;
   is_pinned: number;

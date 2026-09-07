@@ -18,12 +18,10 @@ interface CreatePostModalProps {
 
 interface FormState {
   title: string;
-  excerpt: string;
   content: string;
   is_pinned: boolean;
 }
 
-const MAX_EXCERPT    = 200;
 const MAX_TITLE      = 120;
 const MAX_BYTES      = 5 * 1024 * 1024;
 const ACCEPTED       = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -54,7 +52,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const { user } = useAuth();
   const canPin   = CAN_PIN_ROLES.includes(user?.role ?? "");
 
-  const [form, setForm]               = useState<FormState>({ title: "", excerpt: "", content: "", is_pinned: false });
+  const [form, setForm]               = useState<FormState>({ title: "", content: "", is_pinned: false });
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +103,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   }, [resetUpload]);
 
   const handleClose = useCallback(() => {
-    setForm({ title: "", excerpt: "", content: "", is_pinned: false });
+    setForm({ title: "", content: "", is_pinned: false });
     clearImage();
     setSubmitError(null);
     onClose();
@@ -118,8 +116,8 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
 
   const handleSubmit = async () => {
     setSubmitError(null);
-    if (!form.title.trim() || !form.excerpt.trim() || !form.content.trim()) {
-      setSubmitError("Title, excerpt, and content are all required.");
+    if (!form.title.trim() || !form.content.trim()) {
+      setSubmitError("Title and content are required.");
       return;
     }
     setSubmitting(true);
@@ -219,24 +217,6 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
             <p className="mt-1.5 text-right text-[10px] text-muted-foreground/50 tabular-nums"
               style={{ fontFamily: "var(--font-heading)" }}>
               {form.title.length}/{MAX_TITLE}
-            </p>
-          </div>
-
-          {/* Excerpt */}
-          <div className="px-5 py-4">
-            <FieldLabel required>Excerpt</FieldLabel>
-            <textarea
-              name="excerpt"
-              value={form.excerpt}
-              onChange={handleChange}
-              maxLength={MAX_EXCERPT}
-              rows={2}
-              placeholder="Short summary shown on post cards…"
-              className={`${inputBase} py-2.5 resize-none`}
-            />
-            <p className="mt-1.5 text-right text-[10px] text-muted-foreground/50 tabular-nums"
-              style={{ fontFamily: "var(--font-heading)" }}>
-              {form.excerpt.length}/{MAX_EXCERPT}
             </p>
           </div>
 

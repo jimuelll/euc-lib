@@ -55,10 +55,9 @@ const getLikes = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { title, excerpt, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url } = req.body;
+    const { title, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url } = req.body;
     const result = await service.createPost(req.user.id, {
       title,
-      excerpt,
       content,
       image_url,
       image_public_id,

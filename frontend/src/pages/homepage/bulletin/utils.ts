@@ -22,7 +22,6 @@ export function toPost(raw: ApiPost): BulletinPost {
     id:            raw.id,
     title:         raw.title,
     date:          formatDate(raw.created_at),
-    excerpt:       raw.excerpt,
     content:       raw.content,
     image_url:     raw.image_url,
     likes:         raw.likes,

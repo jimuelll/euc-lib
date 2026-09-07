@@ -132,7 +132,7 @@ export function BulletinPage() {
                     Search Posts
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Search by title, excerpt, post content, or author name.
+                    Search by title, post content, or author name.
                   </p>
                 </div>
 

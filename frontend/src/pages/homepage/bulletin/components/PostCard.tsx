@@ -74,15 +74,14 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         {/* Image posts keep their media panel; text-only posts use the full card for the announcement. */}
         {hasImage ? (
           <div
-            style={isList ? { minHeight: "152px" } : undefined}
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
-              isList ? "w-36 sm:w-48 md:w-56" : isHomepage ? "m-4 mr-0 h-20 w-24 border border-border sm:m-5 sm:mr-0 sm:h-[90px] sm:w-[120px]" : isFeatured ? "aspect-[16/9] w-full lg:aspect-auto lg:min-h-[220px] lg:w-[55%]" : "aspect-[16/9] w-full"
+              isList ? "h-40 w-36 sm:w-48 md:w-56" : isHomepage ? "m-4 mr-0 h-28 w-32 border border-border sm:m-5 sm:mr-0 sm:h-32 sm:w-40" : isFeatured ? "h-64 w-full lg:h-72 lg:w-[55%]" : "h-56 w-full"
             }`}
           >
             <img
               src={post.image_url!}
               alt={post.title}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+              className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03]"
               loading="lazy"
             />
             {post.is_pinned && (
@@ -140,11 +139,9 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             {post.title}
           </p>
 
-          {(
-            <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-2 sm:text-sm" : "line-clamp-2"}`}>
-              {post.excerpt}
-            </p>
-          )}
+          <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-3 sm:text-sm" : "line-clamp-2"}`}>
+            {post.content}
+          </p>
 
           {/* Footer — stats */}
           <div className={`mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
