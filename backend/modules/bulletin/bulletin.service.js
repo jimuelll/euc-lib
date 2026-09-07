@@ -41,7 +41,7 @@ const getPosts = async (userId, page = 1, limit = 4, archiveScope = "active", se
   const monthFilter = normalizedMonth ? "AND DATE_FORMAT(bp.created_at, '%Y-%m') = ?" : "";
   const normalizedType = ["announcement", "event"].includes(postType) ? postType : "all";
   const typeFilter = normalizedType === "all" ? "" : "AND bp.post_type = ?";
-  const upcomingFilter = upcomingOnly ? "AND bp.post_type = 'event' AND bp.event_starts_at >= NOW()" : "";
+  const upcomingFilter = upcomingOnly ? "AND bp.post_type = 'event' AND COALESCE(bp.event_ends_at, bp.event_starts_at) >= NOW()" : "";
   const filterParams = [...searchParams, ...(normalizedMonth ? [normalizedMonth] : []), ...(normalizedType === "all" ? [] : [normalizedType])];
 
   const [[{ total }]] = await db.query(
@@ -169,7 +169,7 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
   }
   const postType = post_type === "event" ? "event" : "announcement";
   if (postType === "event" && !event_starts_at) throw Object.assign(new Error("An event start date and time is required"), { status: 400 });
-  if (event_ends_at && event_starts_at && new Date(event_ends_at) < new Date(event_starts_at)) throw Object.assign(new Error("The event end time must be after its start time"), { status: 400 });
+  if (event_ends_at && event_starts_at && new Date(event_ends_at) <= new Date(event_starts_at)) throw Object.assign(new Error("The event end time must be after its start time"), { status: 400 });
   const sqlDate = (value) => value ? String(value).replace("T", " ") : null;
 
   // Enforce single pin — unpin any currently pinned post first
@@ -309,6 +309,25 @@ const toggleLike = async (postId, userId) => {
   return { liked: !existing, total };
 };
 
+const getLikes = async (postId) => {
+  const [[post]] = await db.query(
+    "SELECT id FROM bulletin_posts WHERE id = ? AND deleted_at IS NULL",
+    [postId]
+  );
+  if (!post) throw Object.assign(new Error("Post not found"), { status: 404 });
+
+  const [likes] = await db.query(
+    `SELECT u.id, u.name, u.role, bl.created_at
+     FROM bulletin_likes bl
+     JOIN users u ON u.id = bl.user_id
+     WHERE bl.post_id = ?
+     ORDER BY bl.created_at DESC, bl.id DESC`,
+    [postId]
+  );
+
+  return { data: likes };
+};
+
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 const addComment = async (postId, userId, text) => {
@@ -372,6 +391,7 @@ module.exports = {
   restorePost,
   pinPost,
   toggleLike,
+  getLikes,
   addComment,
   deleteComment,
 };

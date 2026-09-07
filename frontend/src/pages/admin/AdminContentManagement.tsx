@@ -26,13 +26,14 @@ const Events = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [title, setTitle] = useState("");
   const [starts, setStarts] = useState("");
+  const [ends, setEnds] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState("");
   const load = () => axiosInstance.get<Event[]>("/api/events?all=1").then((response) => setEvents(response.data));
   useEffect(() => { void load(); }, []);
   const addEvent = async () => {
     setPending("add"); setError("");
-    try { await axiosInstance.post("/api/events", { title, starts_at: starts }); setTitle(""); setStarts(""); await load(); }
+    try { await axiosInstance.post("/api/events", { title, starts_at: starts, ends_at: ends || null }); setTitle(""); setStarts(""); setEnds(""); await load(); }
     catch (err: any) { setError(err.response?.data?.message || "Could not add event."); }
     finally { setPending(null); }
   };
@@ -43,7 +44,7 @@ const Events = () => {
     catch (err: any) { setError(err.response?.data?.message || "Could not delete event."); }
     finally { setPending(null); }
   };
-  return <AdminPanel title="Upcoming events" description="Manage the events shown alongside the public bulletin."><div className="mb-6 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Event title" disabled={Boolean(pending)} /><Input type="datetime-local" value={starts} onChange={(event) => setStarts(event.target.value)} disabled={Boolean(pending)} /><Button disabled={!title.trim() || !starts || Boolean(pending)} onClick={() => void addEvent()}>{pending === "add" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding…</> : <><Plus className="mr-2 h-4 w-4" />Add event</>}</Button></div>{error && <p className="mb-4 text-sm text-destructive">{error}</p>}<div className="divide-y divide-border border-y border-border">{events.map((event) => <div className="flex items-center justify-between gap-4 py-3" key={event.id}><div><p className="font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{new Date(event.starts_at).toLocaleString()}</p></div><Button variant="ghost" size="icon" aria-label={`Delete ${event.title}`} disabled={Boolean(pending)} onClick={() => void removeEvent(event)}>{pending === `delete-${event.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div>)}{!events.length && <p className="py-6 text-sm text-muted-foreground">No upcoming events.</p>}</div></AdminPanel>;
+  return <AdminPanel title="Upcoming events" description="Manage the events shown alongside the public bulletin."><div className="mb-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Event title" disabled={Boolean(pending)} /><Input type="datetime-local" value={starts} onChange={(event) => setStarts(event.target.value)} disabled={Boolean(pending)} aria-label="Event start" /><Input type="datetime-local" value={ends} min={starts || undefined} onChange={(event) => setEnds(event.target.value)} disabled={Boolean(pending)} aria-label="Event end" /><Button disabled={!title.trim() || !starts || Boolean(pending)} onClick={() => void addEvent()}>{pending === "add" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding…</> : <><Plus className="mr-2 h-4 w-4" />Add event</>}</Button></div><p className="mb-6 text-xs text-muted-foreground">Add an end date for a multi-day event; leave it blank for a single start time.</p>{error && <p className="mb-4 text-sm text-destructive">{error}</p>}<div className="divide-y divide-border border-y border-border">{events.map((event) => <div className="flex items-center justify-between gap-4 py-3" key={event.id}><div><p className="font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{new Date(event.starts_at).toLocaleString()}{event.ends_at ? ` – ${new Date(event.ends_at).toLocaleString()}` : ""}</p></div><Button variant="ghost" size="icon" aria-label={`Delete ${event.title}`} disabled={Boolean(pending)} onClick={() => void removeEvent(event)}>{pending === `delete-${event.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div>)}{!events.length && <p className="py-6 text-sm text-muted-foreground">No upcoming events.</p>}</div></AdminPanel>;
 };
 const CMS_TABS = {
   homepage: { label: "Homepage", description: "Manage the hero, operating hours, and contact details shown on the public homepage.", icon: Globe2 },

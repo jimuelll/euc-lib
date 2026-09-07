@@ -69,13 +69,13 @@ const updateAboutSettings = async (payload, updatedBy) => {
   } = payload;
 
   const toJson = (val, fieldName) => {
-    if (!Array.isArray(val)) {
+    if (val !== undefined && !Array.isArray(val)) {
       throw Object.assign(
         new Error(`Field "${fieldName}" must be an array`),
         { status: 400 }
       );
     }
-    return JSON.stringify(val);
+    return JSON.stringify(Array.isArray(val) ? val : []);
   };
 
   const policiesJson   = toJson(policies,   "policies");

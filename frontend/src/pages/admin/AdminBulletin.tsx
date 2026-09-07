@@ -324,6 +324,7 @@ const AdminBulletin = () => {
                                 {post.post_type === "event" ? (
                                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                     <span>{post.event_starts_at ? `Starts ${DATE_TIME_FORMATTER.format(new Date(post.event_starts_at))}` : "Start time not set"}</span>
+                                    {post.event_ends_at ? <span>Ends {DATE_TIME_FORMATTER.format(new Date(post.event_ends_at))}</span> : null}
                                     {post.event_location ? <span>{post.event_location}</span> : null}
                                     {post.event_registration_url ? <a className="text-primary hover:underline" href={post.event_registration_url} target="_blank" rel="noreferrer">Registration link</a> : null}
                                   </div>

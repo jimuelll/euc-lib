@@ -40,6 +40,19 @@ const getPostById = async (req, res) => {
   }
 };
 
+const getLikes = async (req, res) => {
+  try {
+    const postId = parseInt(req.params.postId, 10);
+    if (isNaN(postId) || postId < 1) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    res.json(await service.getLikes(postId));
+  } catch (err) {
+    console.error("[bulletin] getLikes:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch likes" });
+  }
+};
+
 const createPost = async (req, res) => {
   try {
     const { title, excerpt, content, image_url, image_public_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url } = req.body;
@@ -152,6 +165,7 @@ const deleteComment = async (req, res) => {
 
 module.exports = {
   getPosts,
+  getLikes,
   getPostById,
   createPost,
   deletePost,

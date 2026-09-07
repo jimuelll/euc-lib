@@ -30,16 +30,6 @@ const updateAbout = async (req, res) => {
       spaces,
     } = req.body;
 
-    if (!library_name?.trim()) {
-      return res.status(400).json({ message: "library_name is required" });
-    }
-    if (!mission_title?.trim()) {
-      return res.status(400).json({ message: "mission_title is required" });
-    }
-    if (!history_title?.trim()) {
-      return res.status(400).json({ message: "history_title is required" });
-    }
-
     if (established !== null && established !== undefined) {
       const year = Number(established);
       const currentYear = new Date().getFullYear();

@@ -11,7 +11,7 @@ const toSqlDateTime = (value) => {
 
 router.get("/", async (_req, res) => {
   try {
-    const [rows] = await db.query("SELECT id,title,starts_at,ends_at FROM library_events WHERE starts_at >= NOW() ORDER BY starts_at ASC LIMIT 8");
+    const [rows] = await db.query("SELECT id,title,starts_at,ends_at FROM library_events WHERE COALESCE(ends_at, starts_at) >= NOW() ORDER BY starts_at ASC LIMIT 8");
     res.json(rows);
   } catch (error) { res.status(500).json({ message: "Could not load events" }); }
 });
@@ -22,7 +22,7 @@ router.post("/", authMiddleware(["admin", "super_admin"]), async (req, res) => {
     const endsAt = ends_at === undefined || ends_at === null || ends_at === "" ? null : toSqlDateTime(ends_at);
     if (!title?.trim() || !startsAt) return res.status(400).json({ message: "A title and valid start time are required" });
     if (ends_at && !endsAt) return res.status(400).json({ message: "End time must be a valid date and time" });
-    if (endsAt && new Date(endsAt).getTime() < new Date(startsAt).getTime()) return res.status(400).json({ message: "End time cannot be before the start time" });
+    if (endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) return res.status(400).json({ message: "End time must be after the start time" });
     const [result] = await db.query("INSERT INTO library_events (title,starts_at,ends_at,created_by) VALUES (?,?,?,?)", [title.trim(), startsAt, endsAt, req.user.id]);
     res.status(201).json({ id: result.insertId });
   } catch (error) { res.status(500).json({ message: "Could not create event" }); }

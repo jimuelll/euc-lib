@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Heart, MessageCircle, Send, Loader2,
+  Heart, MessageCircle, Send, Loader2, Users,
   Trash2, Download, X, ZoomIn, ZoomOut, Pin, PinOff, Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -27,6 +27,14 @@ interface PostModalProps {
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 const CAN_DELETE_ROLES = ["admin", "super_admin"];
+const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+interface PostLiker {
+  id: number;
+  name: string;
+  role: string;
+  created_at: string;
+}
 const CAN_PIN_ROLES = ["admin", "super_admin"];
 
 const ModalSectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -55,6 +63,9 @@ export function PostModal({
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [likers, setLikers] = useState<PostLiker[]>([]);
+  const [likersLoading, setLikersLoading] = useState(false);
+  const [likersVisible, setLikersVisible] = useState(false);
 
   const [pinned, setPinned] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
@@ -85,6 +96,8 @@ export function PostModal({
     setDownloadError(null);
     setLightboxOpen(false);
     setArchiveConfirm(false);
+    setLikers([]);
+    setLikersVisible(false);
     loadComments(post.id);
   }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -232,6 +245,24 @@ export function PostModal({
       document.body.removeChild(a);
     } catch {
       setDownloadError("Could not start the download. Open the image in a new tab and try again.");
+    }
+  };
+
+  const toggleLikers = async () => {
+    if (!post) return;
+    if (likersVisible) {
+      setLikersVisible(false);
+      return;
+    }
+    setLikersVisible(true);
+    setLikersLoading(true);
+    try {
+      const { data } = await axiosInstance.get(`/api/bulletin/${post.id}/likes`);
+      setLikers(data.data ?? []);
+    } catch {
+      setLikers([]);
+    } finally {
+      setLikersLoading(false);
     }
   };
 
@@ -403,6 +434,12 @@ export function PostModal({
           )}
 
           <div className="divide-y divide-border">
+            {post.post_type === "event" && (
+              <div className="space-y-1 px-5 py-4 text-sm sm:px-6">
+                <p className="font-medium text-foreground">{post.event_starts_at ? EVENT_DATE_FORMAT.format(new Date(post.event_starts_at)) : "Date to be announced"}{post.event_ends_at ? ` – ${EVENT_DATE_FORMAT.format(new Date(post.event_ends_at))}` : ""}</p>
+                {post.event_location ? <p className="text-muted-foreground">{post.event_location}</p> : null}
+              </div>
+            )}
             <div className="px-5 sm:px-6 py-5">
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {post.content}
@@ -425,6 +462,18 @@ export function PostModal({
                 <span className="opacity-70">{liked ? "Liked" : "Like"}</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => void toggleLikers()}
+                aria-expanded={likersVisible}
+                className="flex min-w-0 flex-1 items-center justify-center gap-2.5 border-r border-border px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                style={{ fontFamily: "var(--font-heading)" }}
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>{likeCount}</span>
+                <span className="opacity-70">Liked by</span>
+              </button>
+
               <div
                 className="flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
@@ -434,6 +483,17 @@ export function PostModal({
                 <span className="opacity-70">Comments</span>
               </div>
             </div>
+
+            {likersVisible && (
+              <div className="px-5 py-4 sm:px-6" aria-live="polite">
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>People who liked this post</p>
+                {likersLoading ? <p className="text-sm text-muted-foreground">Loading likes…</p> : likers.length ? (
+                  <div className="divide-y divide-border border border-border">
+                    {likers.map((liker) => <div key={liker.id} className="flex items-center justify-between gap-3 px-3 py-2.5"><span className="text-sm font-medium text-foreground">{liker.name}</span><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{liker.role.replace("_", " ")}</span></div>)}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No likes yet.</p>}
+              </div>
+            )}
 
             <div className="px-5 sm:px-6 pt-5 pb-3">
               <div className="flex items-center gap-3 mb-4">

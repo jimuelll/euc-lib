@@ -24,6 +24,13 @@ export const cardVariants = {
 };
 
 const ADMIN_ROLES = ["admin", "super_admin"];
+const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+const eventPeriod = (startsAt?: string | null, endsAt?: string | null) => {
+  if (!startsAt) return "Date to be announced";
+  const start = EVENT_DATE_FORMAT.format(new Date(startsAt));
+  return endsAt ? `${start} – ${EVENT_DATE_FORMAT.format(new Date(endsAt))}` : start;
+};
 
 export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCardProps) {
   const isList = variant === "list";
@@ -142,7 +149,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
 
           {post.post_type === "event" ? (
             <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.1em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
-              <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{post.event_starts_at ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(post.event_starts_at)) : "Date to be announced"}</span>
+              <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{eventPeriod(post.event_starts_at, post.event_ends_at)}</span>
               {post.event_location ? <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3 w-3" />{post.event_location}</span> : null}
             </div>
           ) : null}
@@ -183,22 +190,21 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         </div>
       </button>
 
-      {/* ── Archive hover action ── */}
+      {/* Archive is a sibling action so it never covers the post title or metadata. */}
       {canArchive && (
         <button
           onClick={handleArchiveClick}
           disabled={archiveBusy}
           title={archiveConfirm ? "Click again to confirm" : "Archive post"}
           className={`
-            absolute top-2 right-2
+            relative m-2 shrink-0 self-start
             flex min-h-11 min-w-11 items-center gap-1.5 px-2
             text-[9px] font-bold uppercase tracking-[0.12em]
             border transition-all duration-150
-            opacity-0 group-hover:opacity-100 group-focus-within:opacity-100
             disabled:cursor-not-allowed
             ${archiveConfirm
               ? "border-destructive/60 bg-destructive/10 text-destructive opacity-100"
-              : "border-border/60 bg-background/80 text-muted-foreground hover:border-destructive/60 hover:text-destructive hover:bg-destructive/5"
+              : "border-border/60 bg-background text-muted-foreground hover:border-destructive/60 hover:text-destructive hover:bg-destructive/5"
             }
           `}
           style={{ fontFamily: "var(--font-heading)" }}

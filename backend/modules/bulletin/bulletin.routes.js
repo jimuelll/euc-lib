@@ -8,6 +8,7 @@ const ADMIN_ONLY = ["admin", "super_admin"];
 
 // ─── Public — no login required ───────────────────────────────────────────────
 router.get("/",        optionalAuthMiddleware(), controller.getPosts);
+router.get("/:postId/likes", optionalAuthMiddleware(), controller.getLikes);
 router.get("/:postId", optionalAuthMiddleware(), controller.getPostById);
 
 // ─── Protected — must be logged in ───────────────────────────────────────────

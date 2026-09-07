@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ImagePlus, X, Loader2, AlertCircle, Pin } from "lucide-react";
+import { ImagePlus, X, Loader2, AlertCircle, Pin, CalendarDays } from "lucide-react";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -21,6 +21,11 @@ interface FormState {
   excerpt: string;
   content: string;
   is_pinned: boolean;
+  post_type: "announcement" | "event";
+  event_starts_at: string;
+  event_ends_at: string;
+  event_location: string;
+  event_registration_url: string;
 }
 
 const MAX_EXCERPT    = 200;
@@ -54,7 +59,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const { user } = useAuth();
   const canPin   = CAN_PIN_ROLES.includes(user?.role ?? "");
 
-  const [form, setForm]               = useState<FormState>({ title: "", excerpt: "", content: "", is_pinned: false });
+  const [form, setForm]               = useState<FormState>({ title: "", excerpt: "", content: "", is_pinned: false, post_type: "announcement", event_starts_at: "", event_ends_at: "", event_location: "", event_registration_url: "" });
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +110,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   }, [resetUpload]);
 
   const handleClose = useCallback(() => {
-    setForm({ title: "", excerpt: "", content: "", is_pinned: false });
+    setForm({ title: "", excerpt: "", content: "", is_pinned: false, post_type: "announcement", event_starts_at: "", event_ends_at: "", event_location: "", event_registration_url: "" });
     clearImage();
     setSubmitError(null);
     onClose();
@@ -120,6 +125,14 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
     setSubmitError(null);
     if (!form.title.trim() || !form.excerpt.trim() || !form.content.trim()) {
       setSubmitError("Title, excerpt, and content are all required.");
+      return;
+    }
+    if (form.post_type === "event" && !form.event_starts_at) {
+      setSubmitError("An event start date and time is required.");
+      return;
+    }
+    if (form.event_ends_at && new Date(form.event_ends_at) <= new Date(form.event_starts_at)) {
+      setSubmitError("The event end date and time must be after the start.");
       return;
     }
     setSubmitting(true);
@@ -221,6 +234,52 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               {form.title.length}/{MAX_TITLE}
             </p>
           </div>
+
+          <div className="px-5 py-4">
+            <FieldLabel>Post Type</FieldLabel>
+            <div className="grid grid-cols-2 gap-2">
+              {(["announcement", "event"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, post_type: type }))}
+                  className={`flex h-10 items-center justify-center gap-2 border text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                    form.post_type === type
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                  style={{ fontFamily: "var(--font-heading)" }}
+                >
+                  {type === "event" ? <CalendarDays className="h-3.5 w-3.5" /> : null}
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.post_type === "event" && (
+            <div className="space-y-4 px-5 py-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel required>Starts</FieldLabel>
+                  <input name="event_starts_at" type="datetime-local" value={form.event_starts_at} onChange={handleChange} className={`${inputBase} h-10`} />
+                </div>
+                <div>
+                  <FieldLabel>Ends</FieldLabel>
+                  <input name="event_ends_at" type="datetime-local" value={form.event_ends_at} min={form.event_starts_at || undefined} onChange={handleChange} className={`${inputBase} h-10`} />
+                </div>
+              </div>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">Use a later end date for an event that spans multiple days.</p>
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <input name="event_location" value={form.event_location} onChange={handleChange} maxLength={255} placeholder="e.g. Main library" className={`${inputBase} h-10`} />
+              </div>
+              <div>
+                <FieldLabel>Registration Link</FieldLabel>
+                <input name="event_registration_url" type="url" value={form.event_registration_url} onChange={handleChange} maxLength={512} placeholder="https://…" className={`${inputBase} h-10`} />
+              </div>
+            </div>
+          )}
 
           {/* Excerpt */}
           <div className="px-5 py-4">

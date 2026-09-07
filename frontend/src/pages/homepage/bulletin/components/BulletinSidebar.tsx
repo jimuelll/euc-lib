@@ -31,6 +31,7 @@ export function BulletinSidebar() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const load = async () => {
     try {
       const { data } = await axiosInstance.get("/api/events");
@@ -40,7 +41,7 @@ export function BulletinSidebar() {
         return {
           id: event.id,
           title: event.title,
-          date: start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+          date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
           time: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${end ? ` – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`,
         };
       }));
@@ -49,7 +50,7 @@ export function BulletinSidebar() {
     }
   };
   useEffect(() => { void load(); }, []);
-  const save = async () => { if (!title.trim() || !startsAt) return; await axiosInstance.post("/api/events", { title, starts_at: startsAt }); setTitle(""); setStartsAt(""); setOpen(false); await load(); };
+  const save = async () => { if (!title.trim() || !startsAt) return; await axiosInstance.post("/api/events", { title, starts_at: startsAt, ends_at: endsAt || null }); setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false); await load(); };
   return (
     <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
 
@@ -108,7 +109,7 @@ export function BulletinSidebar() {
         <div className="h-[3px] w-full bg-warning" />
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader><div className="space-y-3"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={startsAt} onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" className="h-10 w-full border border-border bg-background px-3 text-sm" /><button onClick={() => void save()} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground">Add event</button></div></DialogContent></Dialog>
+      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader><div className="space-y-3"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={startsAt} onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" aria-label="Event start" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={endsAt} min={startsAt || undefined} onChange={(e) => setEndsAt(e.target.value)} type="datetime-local" aria-label="Event end" className="h-10 w-full border border-border bg-background px-3 text-sm" /><p className="text-xs text-muted-foreground">Leave the end blank for a single-date event.</p><button onClick={() => void save()} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground">Add event</button></div></DialogContent></Dialog>
 
     </aside>
   );
