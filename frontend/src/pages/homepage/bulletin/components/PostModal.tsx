@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Heart, MessageCircle, Send, Loader2,
+  Heart, Send, Loader2,
   Trash2, Download, X, ZoomIn, ZoomOut, Pin, PinOff, Archive,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -27,7 +27,6 @@ interface PostModalProps {
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 const CAN_DELETE_ROLES = ["admin", "super_admin"];
-const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 interface PostLiker {
   id: number;
@@ -430,12 +429,6 @@ export function PostModal({
           )}
 
           <div className="divide-y divide-border">
-            {post.post_type === "event" && (
-              <div className="space-y-1 px-5 py-4 text-sm sm:px-6">
-                <p className="font-medium text-foreground">{post.event_starts_at ? EVENT_DATE_FORMAT.format(new Date(post.event_starts_at)) : "Date to be announced"}{post.event_ends_at ? ` – ${EVENT_DATE_FORMAT.format(new Date(post.event_ends_at))}` : ""}</p>
-                {post.event_location ? <p className="text-muted-foreground">{post.event_location}</p> : null}
-              </div>
-            )}
             <div className="px-5 sm:px-6 py-5">
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {post.content}
@@ -452,14 +445,13 @@ export function PostModal({
                 <Heart className={`h-3.5 w-3.5 ${liked ? "fill-current text-primary" : ""}`} />
                 <span>{likeCount} {likeCount === 1 ? "like" : "likes"}</span>
               </button>
-              <span className="text-muted-foreground">{comments.length} {comments.length === 1 ? "comment" : "comments"}</span>
             </div>
 
             <div className="flex items-stretch border-b border-border">
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
-                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 border-r border-border px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
                   liked
                     ? "bg-primary/[0.04] text-primary"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -470,14 +462,6 @@ export function PostModal({
                 <span className="opacity-70">{liked ? "Liked" : "Like"}</span>
               </button>
 
-              <div
-                className="flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                <span>{comments.length}</span>
-                <span className="opacity-70">Comments</span>
-              </div>
             </div>
 
             <div className="px-5 sm:px-6 pt-5 pb-3">

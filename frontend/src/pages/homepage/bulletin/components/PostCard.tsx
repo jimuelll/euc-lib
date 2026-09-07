@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, Pin, Archive, Loader2, CalendarDays, MapPin } from "lucide-react";
+import { Heart, MessageCircle, Pin, Archive, Loader2 } from "lucide-react";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import axiosInstance from "@/utils/AxiosInstance";
@@ -24,13 +24,6 @@ export const cardVariants = {
 };
 
 const ADMIN_ROLES = ["admin", "super_admin"];
-const EVENT_DATE_FORMAT = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-
-const eventPeriod = (startsAt?: string | null, endsAt?: string | null) => {
-  if (!startsAt) return "Date to be announced";
-  const start = EVENT_DATE_FORMAT.format(new Date(startsAt));
-  return endsAt ? `${start} – ${EVENT_DATE_FORMAT.format(new Date(endsAt))}` : start;
-};
 
 export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCardProps) {
   const isList = variant === "list";
@@ -147,14 +140,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             {post.title}
           </p>
 
-          {post.post_type === "event" ? (
-            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.1em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
-              <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{eventPeriod(post.event_starts_at, post.event_ends_at)}</span>
-              {post.event_location ? <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3 w-3" />{post.event_location}</span> : null}
-            </div>
-          ) : null}
-
-          {(isList || !hasImage || isFeatured) && (
+          {(
             <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-2 sm:text-sm" : "line-clamp-2"}`}>
               {post.excerpt}
             </p>

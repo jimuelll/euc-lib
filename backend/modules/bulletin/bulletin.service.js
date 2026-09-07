@@ -167,9 +167,7 @@ const createPost = async (authorId, { title, excerpt, content, image_url, image_
       { status: 400 }
     );
   }
-  const postType = post_type === "event" ? "event" : "announcement";
-  if (postType === "event" && !event_starts_at) throw Object.assign(new Error("An event start date and time is required"), { status: 400 });
-  if (event_ends_at && event_starts_at && new Date(event_ends_at) <= new Date(event_starts_at)) throw Object.assign(new Error("The event end time must be after its start time"), { status: 400 });
+  const postType = "announcement";
   const sqlDate = (value) => value ? String(value).replace("T", " ") : null;
 
   // Enforce single pin — unpin any currently pinned post first
