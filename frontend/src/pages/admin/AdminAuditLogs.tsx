@@ -88,11 +88,26 @@ const auditChanges = (metadata: unknown): Array<{ field: string; value: string }
   if (!metadata) return [];
   try {
     const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
-    return Array.isArray((parsed as { changes?: unknown }).changes)
-      ? (parsed as { changes: Array<{ field?: unknown; value?: unknown }> }).changes
-        .filter((change) => typeof change.field === "string" && typeof change.value === "string")
-        .map((change) => ({ field: change.field as string, value: change.value as string }))
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+
+    const { changes, ...fields } = parsed as {
+      changes?: unknown;
+      [key: string]: unknown;
+    };
+    const directFields = Object.entries(fields)
+      .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))
+      .map(([field, value]) => ({
+        field: field.replace(/_/g, " "),
+        value: String(value),
+      }));
+    const changedFields = Array.isArray(changes)
+      ? changes
+        .filter((change): change is { field: string; value: string } =>
+          !!change && typeof change === "object" && typeof change.field === "string" && typeof change.value === "string"
+        )
       : [];
+
+    return [...directFields, ...changedFields];
   } catch { return []; }
 };
 
