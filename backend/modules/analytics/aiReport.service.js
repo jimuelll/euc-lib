@@ -28,7 +28,7 @@ function isIdentitySeekingQuestion(question) {
   return asksWhichPeople || asksNamedPeople || asksWhoDidActivity || asksForTopPerson || asksForPersonalField;
 }
 
-function normalizeDateRange({ dateFrom, dateTo }) {
+function normalizeDateRange({ dateFrom, dateTo }, { allowLongRange = false } = {}) {
   if (!DATE_ONLY.test(String(dateFrom || "")) || !DATE_ONLY.test(String(dateTo || ""))) {
     throw requestError("Choose a valid start and end date.");
   }
@@ -41,11 +41,31 @@ function normalizeDateRange({ dateFrom, dateTo }) {
     || end.toISOString().slice(0, 10) !== dateTo
   ) throw requestError("Choose a valid date range.");
   if (start > end) throw requestError("The start date must be on or before the end date.");
-  if (Math.floor((end - start) / 86400000) + 1 > MAX_REPORT_DAYS) {
+  if (!allowLongRange && Math.floor((end - start) / 86400000) + 1 > MAX_REPORT_DAYS) {
     throw requestError(`Reports can cover up to ${MAX_REPORT_DAYS} days.`);
   }
 
   return { dateFrom, dateTo, days: Math.floor((end - start) / 86400000) + 1 };
+}
+
+async function resolveReportRange(input) {
+  if (!input.allTime) return normalizeDateRange(input);
+  const [[row]] = await db.query(
+    `SELECT
+       DATE_FORMAT(COALESCE(MIN(event_date), CURDATE()), '%Y-%m-%d') AS dateFrom,
+       DATE_FORMAT(CURDATE(), '%Y-%m-%d') AS dateTo
+     FROM (
+       SELECT MIN(borrowed_at) AS event_date FROM borrowings WHERE deleted_at IS NULL
+       UNION ALL SELECT MIN(returned_at) FROM borrowings WHERE deleted_at IS NULL AND returned_at IS NOT NULL
+       UNION ALL SELECT MIN(reserved_at) FROM reservations WHERE deleted_at IS NULL
+       UNION ALL SELECT MIN(fulfilled_at) FROM reservations WHERE deleted_at IS NULL AND fulfilled_at IS NOT NULL
+       UNION ALL SELECT MIN(cancelled_at) FROM reservations WHERE deleted_at IS NULL AND cancelled_at IS NOT NULL
+       UNION ALL SELECT MIN(created_at) FROM attendance_logs
+       UNION ALL SELECT MIN(visit_date) FROM site_daily_visits
+       UNION ALL SELECT MIN(settled_at) FROM borrowings WHERE deleted_at IS NULL AND settled_at IS NOT NULL
+     ) report_events`
+  );
+  return { ...normalizeDateRange(row, { allowLongRange: true }), allTime: true };
 }
 
 const number = (value) => Number(value || 0);
@@ -62,7 +82,7 @@ const toDateOnly = (value) => {
  * event records deliberately never leave this service.
  */
 async function buildAiReportEvidence(input) {
-  const range = normalizeDateRange(input);
+  const range = await resolveReportRange(input);
   const startAt = `${range.dateFrom} 00:00:00`;
   const endExclusive = `${range.dateTo} 00:00:00`;
   const previousEnd = new Date(`${range.dateFrom}T00:00:00Z`);
@@ -224,7 +244,7 @@ async function buildAiReportEvidence(input) {
   const [[previousVisits]] = previousVisitsResult;
   const [[previousFines]] = previousFinesResult;
   const dailyRowsByDate = new Map(dailyActivityResult[0].map((row) => [toDateOnly(row.day), row]));
-  const dailyActivity = Array.from({ length: range.days }, (_, index) => {
+  const dailyActivity = range.allTime ? dailyActivityResult[0] : Array.from({ length: range.days }, (_, index) => {
     const date = new Date(`${range.dateFrom}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + index);
     return dailyRowsByDate.get(date.toISOString().slice(0, 10)) || { day: date.toISOString().slice(0, 10) };
   });
@@ -286,8 +306,10 @@ function reportPrompt(evidence, question) {
   return [
     "You are an operations analyst writing a concise internal library performance brief.",
     "Use ONLY the JSON evidence below. Do not infer causes, add facts, mention personal data, or claim access to any other source.",
-    "Do not restate every metric. Compare the selected period with the previous equal-length period and surface only the changes that matter.",
-    "Write plain text with these short headings: Performance assessment, What changed, Recommended follow-up.",
+    evidence.range.allTime
+      ? "This report covers the entire recorded history. Do not compare it with the period before records began; summarize the most important long-term totals and patterns instead."
+      : "Do not restate every metric. Compare the selected period with the previous equal-length period and surface only the changes that matter.",
+    `Write plain text with these short headings: Performance assessment, ${evidence.range.allTime ? "Key findings" : "What changed"}, Recommended follow-up.`,
     "Under What changed, give at most three evidence-backed findings. Explain the operational implication without inventing a cause.",
     "Under Recommended follow-up, give one or two concrete actions tied to the evidence. Current watch items are a snapshot at generation time, not selected-period activity.",
     "State the inclusive reporting dates exactly and make comparisons numerically precise. If a previous value is zero, use an absolute change instead of a percentage.",

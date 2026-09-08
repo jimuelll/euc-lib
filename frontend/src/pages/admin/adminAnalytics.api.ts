@@ -2,7 +2,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 import type { AnalyticsRange, DashboardResponse } from "./AdminAnalytics";
 
 export interface AiReportEvidence {
-  range: { dateFrom: string; dateTo: string; days: number };
+  range: { dateFrom: string; dateTo: string; days: number; allTime?: boolean };
   previous_range: { dateFrom: string; dateTo: string; days: number };
   activity: {
     circulation: { borrowed: number; returned: number };
@@ -39,6 +39,6 @@ export async function fetchAdminDashboard(range: AnalyticsRange): Promise<Dashbo
   return (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range } })).data;
 }
 
-export async function createAiAnalyticsReport(input: { dateFrom: string; dateTo: string; question?: string }): Promise<AiAnalyticsReportResponse> {
+export async function createAiAnalyticsReport(input: { dateFrom?: string; dateTo?: string; allTime?: boolean; question?: string }): Promise<AiAnalyticsReportResponse> {
   return (await axiosInstance.post<AiAnalyticsReportResponse>("/api/admin/dashboard/ai-report", input)).data;
 }

@@ -49,7 +49,7 @@ const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP
 const chartPalette = ["#800000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
 export type AnalyticsRange = "7d" | "30d" | "month" | "year";
 type AnalyticsTab = "overview" | "circulation" | "visitors" | "collection" | "ai-report";
-type ReportRange = "today" | "7d" | "30d" | "month" | "custom";
+type ReportRange = "today" | "7d" | "30d" | "month" | "custom" | "all-time";
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string }[] = [
   { value: "7d", label: "Last 7 days", shortLabel: "7 days" }, { value: "30d", label: "Last 30 days", shortLabel: "30 days" },
   { value: "month", label: "This month", shortLabel: "Month" }, { value: "year", label: "This year", shortLabel: "Year" },
@@ -57,7 +57,7 @@ const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string 
 const REPORT_RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
   { value: "today", label: "Today" }, { value: "7d", label: "Past 7 days" },
   { value: "30d", label: "Past 30 days" }, { value: "month", label: "This month" },
-  { value: "custom", label: "Custom" },
+  { value: "custom", label: "Custom" }, { value: "all-time", label: "All time" },
 ];
 const REPORT_QUESTION_SUGGESTIONS = [
   "What changed most during this period?",
@@ -65,7 +65,7 @@ const REPORT_QUESTION_SUGGESTIONS = [
   "How many people visited the library?",
 ];
 const dateForInput = (date: Date) => { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 10); };
-const reportDatesFor = (range: Exclude<ReportRange, "custom">) => {
+const reportDatesFor = (range: Exclude<ReportRange, "custom" | "all-time">) => {
   const today = new Date(); const end = dateForInput(today);
   if (range === "today") return { dateFrom: end, dateTo: end };
   if (range === "month") return { dateFrom: `${end.slice(0, 8)}01`, dateTo: end };
@@ -96,7 +96,7 @@ const AdminAnalytics = () => {
   const [answeredQuestion, setAnsweredQuestion] = useState("");
   const [reportError, setReportError] = useState(""); const [reportPrivacyNotice, setReportPrivacyNotice] = useState(false); const [copied, setCopied] = useState(false);
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
-  const reportDates = useMemo(() => reportRange === "custom" ? { dateFrom: customDateFrom, dateTo: customDateTo } : reportDatesFor(reportRange), [customDateFrom, customDateTo, reportRange]);
+  const reportDates = useMemo(() => reportRange === "custom" ? { dateFrom: customDateFrom, dateTo: customDateTo } : reportRange === "all-time" ? { dateFrom: "", dateTo: "" } : reportDatesFor(reportRange), [customDateFrom, customDateTo, reportRange]);
   const performance = useMemo(() => ({
     borrowed: sum(data.charts.circulationTrend, "borrowed_count"), returned: sum(data.charts.circulationTrend, "returned_count"),
     attendance: sum(data.charts.attendanceTrend, "entry_exit_count") + sum(data.charts.attendanceTrend, "borrowing_count"),
@@ -117,13 +117,15 @@ const AdminAnalytics = () => {
   const updateReportQuestion = (value: string) => { setReportQuestion(value); setReportError(""); setReportPrivacyNotice(false); };
   const generateReport = async () => {
     const question = reportQuestion.trim();
-    if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportPrivacyNotice(false); return; }
-    if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportPrivacyNotice(false); return; }
-    if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportPrivacyNotice(false); return; }
-    if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportPrivacyNotice(false); return; }
+    if (reportRange !== "all-time") {
+      if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportPrivacyNotice(false); return; }
+      if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportPrivacyNotice(false); return; }
+      if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportPrivacyNotice(false); return; }
+      if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportPrivacyNotice(false); return; }
+    }
     setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false);
     try {
-      const nextReport = await createAiAnalyticsReport({ ...reportDates, question: question || undefined });
+      const nextReport = await createAiAnalyticsReport(reportRange === "all-time" ? { allTime: true, question: question || undefined } : { ...reportDates, question: question || undefined });
       setReport(nextReport);
       setAnsweredQuestion(nextReport.mode === "answer" ? question : "");
     } catch (reportFailure: unknown) {
@@ -212,7 +214,7 @@ const AdminAnalytics = () => {
               <Button type="button" className="h-12 min-w-48 rounded-none px-6 font-semibold" onClick={() => void generateReport()} disabled={reportLoading}>{reportLoading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{reportLoading ? "Analyzing…" : reportQuestion.trim() ? "Answer question" : "Generate summary"}</Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">Selected: {isCalendarDate(reportDates.dateFrom) && isCalendarDate(reportDates.dateTo) ? formatReportPeriod(reportDates.dateFrom, reportDates.dateTo) : "Choose valid start and end dates"} · Uses aggregate data only</p>
+            <p className="text-xs text-muted-foreground">Selected: {reportRange === "all-time" ? "Entire recorded history" : isCalendarDate(reportDates.dateFrom) && isCalendarDate(reportDates.dateTo) ? formatReportPeriod(reportDates.dateFrom, reportDates.dateTo) : "Choose valid start and end dates"} · Uses aggregate data only</p>
           </div>
         </section>
 
@@ -226,7 +228,7 @@ const AdminAnalytics = () => {
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-primary-foreground"><Sparkles className="h-4 w-4" /></div>
-                <div><h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3><p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" ? ` · compared with the previous ${report.range.days} days` : ""}</p></div>
+                <div><h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3><p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" && !report.range.allTime ? ` · compared with the previous ${report.range.days} days` : report.range.allTime ? " · entire recorded history" : ""}</p></div>
               </div>
               <Button type="button" size="sm" variant="outline" className="rounded-none" onClick={() => void copyReport()}>{copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}{copied ? "Copied" : report.mode === "answer" ? "Copy answer" : "Copy brief"}</Button>
             </div>
@@ -247,7 +249,7 @@ const AnalyticsPanel = ({ title, description, children }: { title: string; descr
 const SectionIntro = ({ title, description }: { title: string; description: string }) => <div><h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>;
 const PerformanceMetric = ({ label, value, icon: Icon, loading, period }: { label: string; value: number; icon: ComponentType<{ className?: string }>; loading: boolean; period: string }) => <div className="border-b border-border/70 p-5 sm:border-r sm:[&:nth-child(2n)]:border-r-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:[&:nth-child(2n)]:border-r xl:last:border-r-0"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-primary" /></div><p className="mt-3 text-3xl font-semibold tabular-nums text-foreground">{loading ? "—" : value.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">{period}</p></div>;
 const PositionItem = ({ icon: Icon, label, value, tone }: { icon: ComponentType<{ className?: string }>; label: string; value: number | string; tone: "clear" | "attention" | "critical" }) => { const styles = tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-success"; return <div className="flex items-center gap-4 p-5"><Icon className={`h-5 w-5 shrink-0 ${styles}`} /><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p></div></div>; };
-const ReportNarrative = ({ text, mode }: { text: string; mode: "answer" | "summary" }) => mode === "answer" ? <p className="mt-4 max-w-[38ch] whitespace-pre-line text-2xl font-semibold leading-9 tracking-[-0.025em] text-foreground sm:text-3xl sm:leading-10">{text}</p> : <div className="mt-6 space-y-5">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const [first, ...rest] = block.split("\n"); const isHeading = /^(Performance assessment|What changed|Recommended follow-up):?$/i.test(first.trim()); return <div key={`${first}-${index}`}>{isHeading ? <h3 className="text-sm font-semibold text-primary">{first.replace(/:$/, "")}</h3> : null}<p className={`${isHeading ? "mt-1.5" : ""} max-w-[70ch] whitespace-pre-line text-sm leading-6 text-foreground`}>{isHeading ? rest.join("\n") : block}</p></div>; })}</div>;
+const ReportNarrative = ({ text, mode }: { text: string; mode: "answer" | "summary" }) => mode === "answer" ? <p className="mt-4 max-w-[38ch] whitespace-pre-line text-2xl font-semibold leading-9 tracking-[-0.025em] text-foreground sm:text-3xl sm:leading-10">{text}</p> : <div className="mt-6 space-y-5">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const [first, ...rest] = block.split("\n"); const isHeading = /^(Performance assessment|What changed|Key findings|Recommended follow-up):?$/i.test(first.trim()); return <div key={`${first}-${index}`}>{isHeading ? <h3 className="text-sm font-semibold text-primary">{first.replace(/:$/, "")}</h3> : null}<p className={`${isHeading ? "mt-1.5" : ""} max-w-[70ch] whitespace-pre-line text-sm leading-6 text-foreground`}>{isHeading ? rest.join("\n") : block}</p></div>; })}</div>;
 const DistributionList = ({ items }: { items: NamedValue[] }) => items.length ? <div className="space-y-3">{items.map((item, index) => { const max = Math.max(...items.map((entry) => entry.value), 1); return <div key={item.name}><div className="mb-1.5 flex items-center justify-between gap-4"><span className="text-sm capitalize text-foreground">{item.name.replace(/_/g, " ")}</span><span className="text-sm font-semibold tabular-nums text-foreground">{item.value}</span></div><div className="h-1.5 bg-muted"><div className="h-full" style={{ width: `${Math.max((item.value / max) * 100, item.value ? 3 : 0)}%`, backgroundColor: chartPalette[index % chartPalette.length] }} /></div></div>; })}</div> : <p className="text-sm text-muted-foreground">No data for this period.</p>;
 const RankedList = ({ items, emptyText }: { items: { label: string; value: number | string }[]; emptyText: string }) => items.length ? <ol className="divide-y divide-border/70">{items.map((item, index) => <li key={item.label} className="flex items-center gap-4 py-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center bg-muted text-xs font-semibold text-muted-foreground">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm text-foreground" title={item.label}>{item.label}</span><span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{item.value}</span></li>)}</ol> : <p className="text-sm text-muted-foreground">{emptyText}</p>;
 const SnapshotRow = ({ label, value }: { label: string; value: number | string }) => <div className="flex items-center justify-between gap-4 py-3"><span className="text-sm text-muted-foreground">{label}</span><span className="font-semibold tabular-nums text-foreground">{value}</span></div>;
