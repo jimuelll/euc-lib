@@ -48,18 +48,36 @@ const emptyData: DashboardResponse = { stats: emptyStats, charts: { visitTrend: 
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 2 });
 const chartPalette = ["#800000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
 export type AnalyticsRange = "7d" | "30d" | "month" | "year";
+type AnalyticsTab = "overview" | "circulation" | "visitors" | "collection" | "ai-report";
+type ReportRange = "today" | "7d" | "30d" | "month" | "custom";
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string }[] = [
   { value: "7d", label: "Last 7 days", shortLabel: "7 days" }, { value: "30d", label: "Last 30 days", shortLabel: "30 days" },
   { value: "month", label: "This month", shortLabel: "Month" }, { value: "year", label: "This year", shortLabel: "Year" },
 ];
+const REPORT_RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
+  { value: "today", label: "Today" }, { value: "7d", label: "Past 7 days" },
+  { value: "30d", label: "Past 30 days" }, { value: "month", label: "This month" },
+  { value: "custom", label: "Custom" },
+];
+const REPORT_QUESTION_SUGGESTIONS = [
+  "What changed most during this period?",
+  "What was the most borrowed title?",
+  "How many people visited the library?",
+];
 const dateForInput = (date: Date) => { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 10); };
-const reportDatesFor = (range: AnalyticsRange) => {
+const reportDatesFor = (range: Exclude<ReportRange, "custom">) => {
   const today = new Date(); const end = dateForInput(today);
+  if (range === "today") return { dateFrom: end, dateTo: end };
   if (range === "month") return { dateFrom: `${end.slice(0, 8)}01`, dateTo: end };
-  if (range === "year") return { dateFrom: `${end.slice(0, 4)}-01-01`, dateTo: end };
   const start = new Date(today); start.setDate(start.getDate() - (range === "30d" ? 29 : 6));
   return { dateFrom: dateForInput(start), dateTo: end };
 };
+const isCalendarDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && dateForInput(date) === value;
+};
+const inclusiveDays = (dateFrom: string, dateTo: string) => Math.round((new Date(`${dateTo}T00:00:00`).getTime() - new Date(`${dateFrom}T00:00:00`).getTime()) / 86_400_000) + 1;
 const reportDateFormatter = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" });
 const formatReportDate = (value: string) => reportDateFormatter.format(new Date(`${value}T00:00:00`));
 const formatReportPeriod = (dateFrom: string, dateTo: string) => `${formatReportDate(dateFrom)} – ${formatReportDate(dateTo)}`;
@@ -68,12 +86,17 @@ const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total,
 const AdminAnalytics = () => {
   const [data, setData] = useState<DashboardResponse>(emptyData);
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
   const [range, setRange] = useState<AnalyticsRange>("7d"); const [reportQuestion, setReportQuestion] = useState("");
+  const [reportRange, setReportRange] = useState<ReportRange>("7d");
+  const initialReportDates = useMemo(() => reportDatesFor("7d"), []);
+  const [customDateFrom, setCustomDateFrom] = useState(initialReportDates.dateFrom);
+  const [customDateTo, setCustomDateTo] = useState(initialReportDates.dateTo);
   const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null); const [reportLoading, setReportLoading] = useState(false);
   const [answeredQuestion, setAnsweredQuestion] = useState("");
   const [reportError, setReportError] = useState(""); const [reportPrivacyNotice, setReportPrivacyNotice] = useState(false); const [copied, setCopied] = useState(false);
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
-  const reportDates = useMemo(() => reportDatesFor(range), [range]);
+  const reportDates = useMemo(() => reportRange === "custom" ? { dateFrom: customDateFrom, dateTo: customDateTo } : reportDatesFor(reportRange), [customDateFrom, customDateTo, reportRange]);
   const performance = useMemo(() => ({
     borrowed: sum(data.charts.circulationTrend, "borrowed_count"), returned: sum(data.charts.circulationTrend, "returned_count"),
     attendance: sum(data.charts.attendanceTrend, "entry_exit_count") + sum(data.charts.attendanceTrend, "borrowing_count"),
@@ -85,9 +108,19 @@ const AdminAnalytics = () => {
     finally { setLoading(false); setRefreshing(false); }
   }, [range]);
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
-  useEffect(() => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); }, [range]);
+  const clearReportResult = () => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false); };
+  const selectReportRange = (nextRange: ReportRange) => { setReportRange(nextRange); clearReportResult(); };
+  const updateCustomDate = (field: "from" | "to", value: string) => {
+    field === "from" ? setCustomDateFrom(value) : setCustomDateTo(value);
+    clearReportResult();
+  };
+  const updateReportQuestion = (value: string) => { setReportQuestion(value); setReportError(""); setReportPrivacyNotice(false); };
   const generateReport = async () => {
     const question = reportQuestion.trim();
+    if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportPrivacyNotice(false); return; }
+    if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportPrivacyNotice(false); return; }
+    if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportPrivacyNotice(false); return; }
+    if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportPrivacyNotice(false); return; }
     setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false);
     try {
       const nextReport = await createAiAnalyticsReport({ ...reportDates, question: question || undefined });
@@ -109,14 +142,14 @@ const AdminAnalytics = () => {
     catch { setReportPrivacyNotice(false); setReportError("Unable to copy the result. Select the text and copy it manually."); }
   };
 
-  return <AdminPage title="Operations Analytics" actions={<Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>}>
-    <section className="flex flex-col gap-4 border-b border-border/80 pb-5 lg:flex-row lg:items-end lg:justify-between">
+  return <AdminPage title="Operations Analytics" actions={activeTab === "ai-report" ? undefined : <Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>}>
+    {activeTab !== "ai-report" ? <section className="flex flex-col gap-4 border-b border-border/80 pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-2xl"><h2 className="text-lg font-semibold text-foreground">How did the library perform?</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose one period. Performance views update together; inventory snapshots remain current.</p></div>
-      <div className="flex w-full overflow-x-auto border border-border bg-card p-1 lg:w-auto" role="group" aria-label="Analytics period">{RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`min-h-9 shrink-0 px-4 text-sm font-semibold transition-colors ${range === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`} aria-pressed={range === option.value}>{option.shortLabel}</button>)}</div>
-    </section>
-    {error ? <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
-    <Tabs defaultValue="overview" className="space-y-5">
-      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">{["overview", "circulation", "visitors", "collection"].map((tab) => <TabsTrigger key={tab} value={tab} className="min-h-11 shrink-0 rounded-none border-b-2 border-transparent px-5 capitalize shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">{tab}</TabsTrigger>)}</TabsList>
+      <div className="flex w-full overflow-x-auto border border-border bg-card p-1 lg:w-auto" role="group" aria-label="Analytics period">{RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`min-h-9 shrink-0 px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${range === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`} aria-pressed={range === option.value}>{option.shortLabel}</button>)}</div>
+    </section> : null}
+    {activeTab !== "ai-report" && error ? <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalyticsTab)} className="space-y-5">
+      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">{["overview", "circulation", "visitors", "collection", "ai-report"].map((tab) => <TabsTrigger key={tab} value={tab} className="min-h-11 shrink-0 gap-2 rounded-none border-b-2 border-transparent px-5 capitalize shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">{tab === "ai-report" ? <Sparkles className="h-4 w-4" /> : null}{tab === "ai-report" ? "AI Report" : tab}</TabsTrigger>)}</TabsList>
 
       <TabsContent value="overview" className="mt-0 space-y-5">
         <div className="grid border border-border/80 bg-card sm:grid-cols-2 xl:grid-cols-4">
@@ -125,55 +158,6 @@ const AdminAnalytics = () => {
           <PerformanceMetric label="Library scans" value={performance.attendance} icon={DoorOpen} loading={loading} period={rangeLabel} />
           <PerformanceMetric label="Site visitors" value={performance.visitors} icon={Globe2} loading={loading} period={rangeLabel} />
         </div>
-        <section className="overflow-hidden border border-primary/30 bg-card">
-          <div className="grid lg:grid-cols-[minmax(19rem,0.72fr)_minmax(0,1.28fr)]">
-            <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-7 sm:py-8">
-              <div className="flex h-10 w-10 items-center justify-center border border-primary-foreground/25 bg-primary-foreground/10"><Sparkles className="h-5 w-5 text-warning" /></div>
-              <h2 className="mt-6 text-2xl font-semibold tracking-[-0.025em]">Ask or summarize</h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-primary-foreground/80">Ask one question for a focused answer, or leave it blank for a full performance summary.</p>
-              <div className="mt-7 space-y-2">
-                <label htmlFor="analytics-focus" className="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/75">Question <span className="normal-case tracking-normal">(optional)</span></label>
-                <Input id="analytics-focus" value={reportQuestion} maxLength={500} onChange={(event) => setReportQuestion(event.target.value)} placeholder="Example: How many people visited on Sept. 7?" className="h-12 rounded-none border-primary-foreground/30 bg-primary-foreground/10 px-4 text-primary-foreground placeholder:text-primary-foreground/60 focus-visible:ring-primary-foreground/70" />
-                <p className="text-xs leading-5 text-primary-foreground/70">Uses aggregate data from {rangeLabel.toLowerCase()} only.</p>
-              </div>
-              <Button type="button" variant="secondary" className="mt-5 h-12 w-full rounded-none font-semibold" onClick={() => void generateReport()} disabled={reportLoading}>{reportLoading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{reportLoading ? "Analyzing…" : reportQuestion.trim() ? "Answer question" : "Generate summary"}</Button>
-            </div>
-
-            <div className="relative min-h-[320px] bg-[linear-gradient(145deg,hsl(var(--primary)/0.055),transparent_52%)] px-5 py-6 sm:px-8 sm:py-8">
-              {reportError ? <div role="alert" className={`mb-5 flex items-start gap-3 border px-4 py-4 ${reportPrivacyNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
-                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportPrivacyNotice ? "text-warning" : "text-destructive"}`} />
-                <div><p className="text-sm font-semibold">{reportPrivacyNotice ? "Privacy-protected request" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportPrivacyNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
-              </div> : null}
-              {report ? <div className="flex h-full flex-col">
-                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-primary-foreground"><Sparkles className="h-4 w-4" /></div>
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" ? ` · compared with the previous ${report.range.days} days` : ""}</p>
-                    </div>
-                  </div>
-                  <Button type="button" size="sm" variant="outline" className="rounded-none" onClick={() => void copyReport()}>{copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}{copied ? "Copied" : report.mode === "answer" ? "Copy answer" : "Copy brief"}</Button>
-                </div>
-
-                {report.mode === "answer" ? <div className="flex flex-1 flex-col justify-center py-7 sm:py-10">
-                  <p className="max-w-[70ch] text-sm leading-6 text-muted-foreground">{answeredQuestion}</p>
-                  <ReportNarrative text={report.report} mode="answer" />
-                </div> : <ReportNarrative text={report.report} mode="summary" />}
-
-                <div className="mt-auto flex flex-col gap-1 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                  <span>Based on aggregate library operations data</span>
-                  <span className="tabular-nums">{report.range.days} {report.range.days === 1 ? "day" : "days"} analyzed</span>
-                </div>
-              </div> : <div className="flex h-full min-h-[260px] max-w-xl flex-col justify-center">
-                <div className="flex h-11 w-11 items-center justify-center border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
-                <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-foreground">A clearer answer, grounded in your data</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">Ask about a specific date, title, visitor count, or activity. Every answer stays within the selected reporting period.</p>
-                <p className="mt-6 text-sm font-medium text-foreground">Ready for {formatReportPeriod(reportDates.dateFrom, reportDates.dateTo)}</p>
-              </div>}
-            </div>
-          </div>
-        </section>
         <AnalyticsPanel title="Current operational position" description="Today’s carryover items, kept separate from period performance."><div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0"><PositionItem icon={data.stats.overdue_borrowings ? AlertTriangle : CheckCircle2} label="Overdue loans" value={data.stats.overdue_borrowings} tone={data.stats.overdue_borrowings ? "critical" : "clear"} /><PositionItem icon={BookMarked} label="Ready reservations" value={data.stats.ready_reservations} tone={data.stats.ready_reservations ? "attention" : "clear"} /><PositionItem icon={Coins} label="Outstanding fines" value={money.format(data.stats.outstanding_fines)} tone={data.stats.outstanding_fines ? "attention" : "clear"} /></div></AnalyticsPanel>
       </TabsContent>
 
@@ -191,6 +175,70 @@ const AdminAnalytics = () => {
         <AnalyticsPanel title="Catalog by category" description="Titles and physical copies"><ChartContainer className="h-[310px] w-full" config={{ titles: { label: "Titles", color: "#800000" }, copies: { label: "Copies", color: "#b45309" } }}><BarChart data={data.charts.catalogByCategory} layout="vertical" margin={{ left: 12, right: 8 }}><CartesianGrid horizontal={false} /><XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} /><YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={100} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="titles" fill="var(--color-titles)" radius={[0, 2, 2, 0]} /><Bar dataKey="copies" fill="var(--color-copies)" radius={[0, 2, 2, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
         <AnalyticsPanel title="Physical copy condition"><div className="grid items-center gap-5 sm:grid-cols-[1fr_0.8fr]"><ChartContainer className="mx-auto h-[260px] w-full max-w-[300px]" config={{ value: { label: "Copies", color: "#800000" } }}><PieChart><ChartTooltip content={<ChartTooltipContent />} /><Pie data={data.charts.copyCondition} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2}>{data.charts.copyCondition.map((item, index) => <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />)}</Pie></PieChart></ChartContainer><DistributionList items={data.charts.copyCondition} /></div></AnalyticsPanel>
       </div><div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AnalyticsPanel title="Borrowing demand by role"><DistributionList items={data.charts.borrowingByRole} /></AnalyticsPanel><AnalyticsPanel title="Collection snapshot"><div className="divide-y divide-border/70"><SnapshotRow label="Catalog titles" value={data.stats.total_books} /><SnapshotRow label="Active copies" value={data.stats.total_book_copies} /><SnapshotRow label="Available" value={data.stats.available_book_copies} /><SnapshotRow label="Damaged" value={data.stats.damaged_book_copies} /><SnapshotRow label="Lost" value={data.stats.lost_book_copies} /></div></AnalyticsPanel></div></TabsContent>
+
+      <TabsContent value="ai-report" className="mt-0 space-y-5">
+        <section className="overflow-hidden border border-primary/30 bg-card">
+          <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-8 sm:py-7">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="flex h-10 w-10 items-center justify-center border border-primary-foreground/25 bg-primary-foreground/10"><Sparkles className="h-5 w-5 text-warning" /></div>
+                <h2 className="mt-5 text-2xl font-semibold tracking-[-0.025em]">Ask your library data</h2>
+                <p className="mt-2 max-w-[65ch] text-sm leading-6 text-primary-foreground/80">Choose any reporting period here. Ask one focused question, or leave the question blank for a complete performance summary.</p>
+              </div>
+              <div className="shrink-0 border border-primary-foreground/20 bg-primary-foreground/10 px-4 py-3 text-sm">
+                <p className="font-medium">Independent report period</p>
+                <p className="mt-1 text-xs text-primary-foreground/70">This does not change the analytics dashboard.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
+            <div>
+              <p id="report-period-label" className="text-sm font-semibold text-foreground">Reporting period</p>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-labelledby="report-period-label">{REPORT_RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => selectReportRange(option.value)} disabled={reportLoading} className={`min-h-10 border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${reportRange === option.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"}`} aria-pressed={reportRange === option.value}>{option.label}</button>)}</div>
+            </div>
+
+            {reportRange === "custom" ? <div className="grid gap-4 border-y border-border/70 bg-muted/20 px-4 py-5 sm:grid-cols-2 sm:px-5">
+              <div><label htmlFor="report-date-from" className="text-sm font-medium text-foreground">Start date</label><Input id="report-date-from" type="date" value={customDateFrom} onChange={(event) => updateCustomDate("from", event.target.value)} disabled={reportLoading} className="mt-2 h-11 rounded-none bg-background" /></div>
+              <div><label htmlFor="report-date-to" className="text-sm font-medium text-foreground">End date</label><Input id="report-date-to" type="date" value={customDateTo} onChange={(event) => updateCustomDate("to", event.target.value)} disabled={reportLoading} className="mt-2 h-11 rounded-none bg-background" /></div>
+            </div> : null}
+
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div>
+                <label htmlFor="analytics-focus" className="text-sm font-semibold text-foreground">Question <span className="font-normal text-muted-foreground">(optional)</span></label>
+                <Input id="analytics-focus" value={reportQuestion} maxLength={500} onChange={(event) => updateReportQuestion(event.target.value)} disabled={reportLoading} placeholder="Ask about circulation, attendance, reservations, or collection activity" className="mt-2 h-12 rounded-none px-4" />
+                <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Try asking:</span>{REPORT_QUESTION_SUGGESTIONS.map((suggestion) => <button key={suggestion} type="button" onClick={() => updateReportQuestion(suggestion)} disabled={reportLoading} className="border border-border bg-muted/30 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">{suggestion}</button>)}</div>
+              </div>
+              <Button type="button" className="h-12 min-w-48 rounded-none px-6 font-semibold" onClick={() => void generateReport()} disabled={reportLoading}>{reportLoading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{reportLoading ? "Analyzing…" : reportQuestion.trim() ? "Answer question" : "Generate summary"}</Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">Selected: {isCalendarDate(reportDates.dateFrom) && isCalendarDate(reportDates.dateTo) ? formatReportPeriod(reportDates.dateFrom, reportDates.dateTo) : "Choose valid start and end dates"} · Uses aggregate data only</p>
+          </div>
+        </section>
+
+        {reportError ? <div role="alert" className={`flex items-start gap-3 border px-4 py-4 ${reportPrivacyNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
+          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportPrivacyNotice ? "text-warning" : "text-destructive"}`} />
+          <div><p className="text-sm font-semibold">{reportPrivacyNotice ? "Privacy-protected request" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportPrivacyNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
+        </div> : null}
+
+        <section className="min-h-[330px] border border-border/80 bg-[linear-gradient(145deg,hsl(var(--primary)/0.055),transparent_52%)] px-5 py-6 sm:px-8 sm:py-8" aria-live="polite">
+          {report ? <div className="flex min-h-[270px] flex-col">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-primary-foreground"><Sparkles className="h-4 w-4" /></div>
+                <div><h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3><p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" ? ` · compared with the previous ${report.range.days} days` : ""}</p></div>
+              </div>
+              <Button type="button" size="sm" variant="outline" className="rounded-none" onClick={() => void copyReport()}>{copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}{copied ? "Copied" : report.mode === "answer" ? "Copy answer" : "Copy brief"}</Button>
+            </div>
+            {report.mode === "answer" ? <div className="flex flex-1 flex-col justify-center py-7 sm:py-10"><p className="max-w-[70ch] text-sm leading-6 text-muted-foreground">{answeredQuestion}</p><ReportNarrative text={report.report} mode="answer" /></div> : <ReportNarrative text={report.report} mode="summary" />}
+            <div className="mt-auto flex flex-col gap-1 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>Based on aggregate library operations data; no patron identities are shared</span><span className="tabular-nums">{report.range.days} {report.range.days === 1 ? "day" : "days"} analyzed</span></div>
+          </div> : <div className="flex min-h-[270px] max-w-2xl flex-col justify-center">
+            <div className="flex h-11 w-11 items-center justify-center border border-primary/20 bg-primary/10 text-primary">{reportLoading ? <RefreshCcw className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}</div>
+            <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-foreground">{reportLoading ? "Analyzing this reporting period…" : "Your report will appear here"}</h3>
+            <p className="mt-2 max-w-[65ch] text-sm leading-6 text-muted-foreground">{reportLoading ? "The answer will use only the aggregate evidence available within your selected dates." : "Ask a specific question for a direct, copy-ready answer. Leave it blank when you want the broader performance story."}</p>
+          </div>}
+        </section>
+      </TabsContent>
     </Tabs>
   </AdminPage>;
 };
