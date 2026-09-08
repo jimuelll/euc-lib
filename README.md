@@ -1,118 +1,133 @@
 # Enverga-Candelaria Library Management System
 
-A full-stack web system for Manuel S. Enverga University Foundation – Candelaria Inc. It brings the library's public services, student self-service, circulation-desk work, and administration into one role-aware platform.
+Full-stack library services platform for Manuel S. Enverga University Foundation – Candelaria. The system combines the public library website, patron self-service, circulation-desk workflows, content management, analytics, and administration in one role-aware application.
 
-The application lets patrons discover resources, manage borrows and reservations, view library activity, and receive notifications. Library personnel use the same system to maintain the catalogue, process barcode-supported circulation and attendance, manage clearances, and monitor library operations.
+## What the system does
 
-## System at a glance
+### For patrons
+
+- Browse and search the public catalogue.
+- View book availability and related recommendations.
+- Borrow and reserve library materials.
+- Review current loans, borrowing history, reservations, fines, attendance, subscriptions, and notifications in **My Library**.
+- Scan a student or employee ID for library attendance.
+- Read and interact with bulletin posts.
+
+### For library staff
+
+- Maintain books, copies, barcodes, book types, and catalogue metadata.
+- Look up patrons and process barcode-supported borrowing, returns, and renewals.
+- Manage reservation queues and attendance records.
+- Review clearance status, fines, and cash payments.
+- Publish bulletin content and manage library-facing information.
+
+### For administrators
+
+- Manage users, library settings, holidays, academic programs, and academic terms.
+- Manage the About page, homepage content, subscriptions, announcements, and notifications.
+- Review analytics, exports, circulation reports, clearance exceptions, and audit data.
+- Run aggregate AI analytics reports with Gemini or Groq.
+- Maintain Gemini semantic catalogue embeddings and book recommendations.
+- Create, download, validate, and restore database snapshots.
+
+## Architecture
 
 ```text
-React + Vite client
-  │  HTTP /api and authenticated WebSocket /ws
-  ▼
-Express API
-  ├── Authentication, role checks, validation, rate limiting, audit-aware operations
-  ├── Library modules: catalogue, circulation, reservations, attendance, payments, clearance
-  ├── Content modules: bulletin, About page, academic subscriptions, notifications
-  └── Analytics, settings, backups, and reporting
-  │
-  ├── MySQL — operational data, accounts, activity, settings, and snapshot metadata
-  └── Cloudinary — bulletin/media assets and authenticated saved database snapshots
+React + TypeScript + Vite frontend
+        │
+        │ HTTP /api and authenticated WebSocket /ws
+        ▼
+Express backend
+        │
+        ├── MySQL/MariaDB operational database
+        ├── Cloudinary media and snapshot storage
+        ├── Gemini semantic embeddings and optional AI reports
+        └── Optional Groq AI reports
 ```
 
-## User roles
-
-| Role | Main access |
-| --- | --- |
-| Patron (student/employee) | Catalogue, account, My Library, borrowing/reservations, attendance history, subscriptions, and notifications |
-| `scanner` | QR/barcode attendance scanning and circulation scanning |
-| `staff` | Circulation desk, catalogue work, user lookup/creation, reservations, and clearance processing |
-| `admin` | Staff capabilities plus user administration, settings, reporting, analytics, content administration, payments, and attendance logs |
-| `super_admin` | Full administrative access, including audit logs, saved snapshots/restores, book-type policies, and catalogue schema changes |
-
-All protected API routes use JWT authentication. Access tokens are short-lived; refresh sessions are stored in HTTP-only cookies and rotated on refresh. New or reset accounts are gated through a required password change.
-
-## Capabilities
-
-### Public and patron experience
-
-- Home, About, Services, public catalogue, and bulletin-board pages
-- Searchable catalogue with available-copy visibility
-- Sign-in, refresh-session sign-out, password change, and profile editing
-- **My Library** dashboard for current borrows, borrow history, fines, reservations, attendance history, subscriptions, and notifications
-- Borrowing and reservation workflows, including active/history views and ready-for-pickup status
-- QR/barcode attendance check-in and check-out
-- Academic-subscription directory
-- Bulletin posts with authenticated likes and comments; staff and administrators can publish posts
-- Real-time unread notification count and notification read controls
-
-### Library desk and staff operations
-
-- User lookup and account creation; staff/admin barcode image retrieval
-- Catalogue maintenance for books and individual copies, including copy barcodes and copy-condition updates
-- ISBN lookup while adding catalogue records
-- Barcode-based circulation: look up a patron/copy, borrow, return, renew, and review the circulation log
-- Reservation queue handling: mark ready, fulfil, cancel, restore, and manage records
-- Attendance scanner and administrative attendance logs
-- Fine and payment overview plus settlement support
-- Clearance queue, cash-payment recording, receipt retrieval, fine adjustments, and transaction reversal controls
-
-### Administration and governance
-
-- User search, update, archive/restore, and bulk student-like-account deactivation
-- Configurable catalogue schema, book/material types, lending duration, fine interval, fine rate, and initial fine policies
-- Library settings and holiday calendar; due-date and overdue processing use these rules
-- Admin dashboard, analytics, visit tracking, reports, attendance data, and super-admin audit logs
-- Administration of the About page, bulletin posts, academic subscriptions, and targeted notifications
-- Exportable database backups and Cloudinary-hosted saved snapshots. Restoring a saved snapshot creates a pre-restore recovery snapshot; the newest 30 snapshots are retained.
-
-## Architecture and code layout
-
-| Path | Responsibility |
-| --- | --- |
-| `frontend/` | React 18 + TypeScript single-page application |
-| `frontend/src/pages/` | Public, patron, scanner, and administrative routes/screens |
-| `frontend/src/context/` | Authentication and real-time notification state |
-| `backend/` | Express server, middleware, MySQL pool, WebSocket server, and feature modules |
-| `backend/modules/` | API modules for auth, users, catalogue, borrowing, circulation, reservations, attendance, content, analytics, notifications, settings, backup, and clearance |
-| `backend/realtime/` | Authenticated WebSocket notification hub at `/ws` |
-| `db/fresh-start.sql` | Complete fresh-install database baseline |
-
-The backend exposes REST endpoints below `/api`. Public routes are limited to authentication, public content, and anonymous visit tracking; the remaining application routes are protected after the global authentication middleware. The server also recalculates overdue borrowings at startup and every five minutes.
+The frontend and backend are separate Node.js applications. There is no root `package.json` or root workspace runner; install and run dependencies from `frontend/` and `backend/` independently.
 
 ## Technology
 
-**Frontend:** React 18, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS, shadcn/ui, Recharts, Axios, Framer Motion, and ZXing barcode/QR scanning.
+- **Frontend:** React 18, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS, Radix UI/shadcn-style components, Recharts, Axios, Framer Motion, and ZXing.
+- **Backend:** Node.js, Express 5, MySQL2, JWT, cookie-parser, WebSockets (`ws`), Helmet, CORS, rate limiting, Cloudinary, QR Code, and JsBarcode.
+- **Database:** MySQL-compatible SQL schema. The checked-in dump was generated from MariaDB 10.4.
 
-**Backend:** Node.js, Express 5, MySQL (`mysql2`), JWT, cookie-based refresh sessions, WebSockets (`ws`), Helmet, CORS, rate limiting, Cloudinary, QR Code, and JsBarcode.
+## User roles
 
-## Run locally
+The database supports these roles:
 
-### Prerequisites
+| Role | Scope |
+| --- | --- |
+| `student` | Patron self-service and student library workflows |
+| `employee` | Employee patron workflows |
+| `alumni` | Alumni patron workflows |
+| `scanner` | Attendance and circulation scanning workflows |
+| `staff` | Desk operations, catalogue work, reservations, and patron administration |
+| `admin` | Staff capabilities plus content, settings, reporting, analytics, and user administration |
+| `super_admin` | Full administration, audit logs, catalogue policy/schema controls, and backups/restores |
 
-- Node.js 20 or later
-- MySQL 8 or a compatible MySQL service
-- A Cloudinary account for media uploads and saved cloud snapshots
+Protected API routes use JWT authentication and role checks. New or reset accounts can be required to change their password before continuing.
 
-There is no root workspace runner. Run the API and client in separate terminals.
+## Repository layout
 
-### 1. Prepare the database
+```text
+.
+├── backend/
+│   ├── app.js                  Express middleware and route mounting
+│   ├── server.js               HTTP/WebSocket server entry point
+│   ├── db.js                   MySQL connection pool
+│   ├── middlewares/            Validation, rate limiting, maintenance, audit logging
+│   ├── modules/                Feature routes, controllers, and services
+│   ├── realtime/               Authenticated notification WebSocket hub
+│   └── package.json
+├── frontend/
+│   ├── src/App.tsx             Route tree and application providers
+│   ├── src/components/         Shared UI and layout components
+│   ├── src/context/            Auth and notification state
+│   ├── src/hooks/              Reusable client hooks
+│   ├── src/pages/              Public, patron, scanner, and admin screens
+│   ├── src/services/            API and content services
+│   ├── vite.config.ts          Dev server and `/api` proxy
+│   ├── vercel.json              Vercel rewrites
+│   └── package.json
+├── db/
+│   ├── fresh-start.sql         Current destructive schema baseline and defaults
+│   └── realistic-demo-data.sql Demo users and catalogue data
+├── PRODUCT.md                  Product context and constraints
+└── README.md
+```
 
-Select the application's MySQL database, then import `db/fresh-start.sql`.
-The file first deletes this application's known tables and recreates them, so it
-is safe to retry after a partial import. It is destructive: do not import it
-into an installation whose application data you need to retain.
+## Requirements
 
-This release intentionally starts from a clean database. The baseline includes
-the complete current schema, starter configuration, catalog material model, and
-snapshot control tables; there is no migration runner or additional SQL to run.
+- Node.js 20 or newer.
+- MySQL 8+ or a compatible MariaDB installation.
+- A database named `library` or another database selected through `DB_NAME`.
+- Cloudinary credentials for media uploads and saved snapshot storage.
+- Gemini credentials for semantic recommendations and embedding backfills.
+- Gemini or Groq credentials for AI analytics reports.
 
-### 2. Start the backend
+## Local setup
+
+### 1. Create the database
+
+Select the target database, then import the current baseline:
 
 ```powershell
-cd backend
-npm install
+mysql -u <user> -p <database> < db/fresh-start.sql
 ```
+
+`db/fresh-start.sql` drops and recreates the application tables in the selected database. It is safe to retry after a partial import, but it is destructive and must not be used against data that needs to be preserved.
+
+For a local demo dataset, run this after the baseline import:
+
+```powershell
+mysql -u <user> -p <database> < db/realistic-demo-data.sql
+```
+
+The demo script documents its own test accounts and password. Use demo data only in a non-production database.
+
+### 2. Configure the backend
 
 Create `backend/.env`:
 
@@ -134,11 +149,29 @@ JWT_REFRESH_EXPIRES_IN=7d
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# Semantic recommendations and embedding backfills
+AI_EMBEDDING_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+
+# Aggregate analytics reports; Gemini is the default
+AI_REPORT_PROVIDER=gemini
+GEMINI_REPORT_MODEL=gemini-2.5-flash
+
+# Use these instead when AI_REPORT_PROVIDER=groq
+# GROQ_API_KEY=your_groq_api_key
+# GROQ_REPORT_MODEL=openai/gpt-oss-20b
+
+# Optional: changes the JSON body limit used by backup import
+# BACKUP_MAX_BYTES=52428800
 ```
 
-Start the API:
+Install and start the API from `backend/`:
 
 ```powershell
+cd backend
+npm install
 node server.js
 ```
 
@@ -148,14 +181,9 @@ For automatic restarts during development:
 npx nodemon server.js
 ```
 
-The API listens on `http://localhost:4000`; its authenticated WebSocket endpoint is `ws://localhost:4000/ws?token=<access-token>`.
+The API listens on `http://localhost:4000`. The authenticated notification socket is available at `ws://localhost:4000/ws?token=<access-token>`.
 
-### 3. Start the frontend
-
-```powershell
-cd frontend
-npm install
-```
+### 3. Configure the frontend
 
 Create `frontend/.env`:
 
@@ -165,39 +193,87 @@ VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
 VITE_CLOUDINARY_UPLOAD_PRESET=your_unsigned_upload_preset
 ```
 
-Run the development server:
+Install and start the frontend from `frontend/`:
 
 ```powershell
+cd frontend
+npm install
 npm run dev
 ```
 
-Open `http://localhost:8080`. Vite proxies `/api` requests to the local API.
+Open `http://localhost:8080`. Vite proxies local `/api` requests to the backend.
 
-## Common commands
+## Available commands
 
-Run these from `frontend/`:
+Run these commands from `frontend/`:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite development server on port 8080 |
+| `npm run build` | Build the production frontend |
+| `npm run build:dev` | Build using Vite's development mode |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview the production build |
+
+Run the backend directly from `backend/` because its `package.json` currently has no npm scripts:
 
 ```powershell
-npm run dev       # local development server
-npm run build     # production build
-npm run lint      # ESLint
-npm run test      # Vitest test suite
-npm run preview   # preview the production build
+node server.js
+npx nodemon server.js
 ```
 
-## Deployment configuration
+There is currently no configured `npm test` script in the frontend or backend package manifests.
 
-The frontend includes a Vercel configuration in `frontend/vercel.json` that rewrites `/api/*` to the deployed Render backend and rewrites client routes to `index.html`.
+## Frontend routes
 
-Before deploying, update the backend CORS allowlist in `backend/app.js` for the intended frontend origin, configure all backend environment variables, and import `db/fresh-start.sql` into the deployment database. Cloudinary credentials are required for bulletin/media handling and for saved snapshot operations. Snapshot files are uploaded as authenticated raw Cloudinary assets; metadata remains in MySQL.
+The main routes registered in `frontend/src/App.tsx` are:
+
+| Area | Routes |
+| --- | --- |
+| Public | `/`, `/about`, `/services`, `/services/subscriptions`, `/catalogue`, `/bulletin`, `/login`, `/scan-qr`, `/change-password` |
+| Patron | `/services/borrowing`, `/my-library`, `/edit-profile` |
+| Staff/admin | `/admin`, `/admin/manage`, `/admin/catalog`, `/admin/circulation`, `/admin/reservations`, `/admin/clearance`, `/admin/holidays`, `/admin/content` |
+| Admin-only | `/admin/analytics`, `/admin/report`, `/admin/notifications`, `/admin/attendance-logs` |
+| Super-admin | `/admin/book-types`, `/admin/backup`, `/admin/audit-logs` |
+
+Some older admin URLs redirect into the consolidated content or clearance pages, including `/admin/bulletin`, `/admin/subscriptions`, `/admin/edit-about`, and `/admin/payment`.
+
+## Backend route groups
+
+The Express application mounts feature modules under `/api`:
+
+- **Public/content:** `/auth`, `/about`, `/site-content`, `/bulletin`, `/events`, `/catalogue`, `/analytics/visit`.
+- **Patron:** `/borrowing`, `/reservations`, `/my-library`, `/notifications`, `/subscriptions`, `/recommendations`.
+- **Staff/admin:** `/admin`, `/attendance`, `/admin/catalogue`, `/admin/circulation`, `/admin/analytics`, `/admin/clearance`, `/admin/library-settings`.
+- **Super-admin:** `/admin/backup`, audit-log views, catalogue schema/book-type controls, and embedding maintenance.
+
+The exact endpoint contracts live beside each feature in `backend/modules/*/*.routes.js`. The backend also runs overdue-borrowing synchronization at startup and every five minutes.
+
+## Deployment
+
+The frontend includes `frontend/vercel.json`, which:
+
+1. Rewrites `/api/*` to the deployed Render backend at `https://euc-lib.onrender.com/api/:path*`.
+2. Rewrites client-side routes to `index.html` for Vercel hosting.
+
+Before deploying:
+
+- Configure all backend secrets and database settings in the backend host.
+- Set `VITE_BASE_URL` and Cloudinary frontend variables in the frontend host.
+- Import `db/fresh-start.sql` into the deployment database only when initializing a new environment.
+- Add the production frontend origin to the CORS allowlist in `backend/app.js`.
+- Confirm the backend host can reach MySQL/MariaDB and Cloudinary.
+- Configure Gemini or Groq only if recommendations, embedding maintenance, or AI reports are enabled.
 
 ## Security and operational notes
 
-- Do not commit either `.env` file or database credentials.
-- Use independent, high-entropy values for `JWT_SECRET` and `JWT_REFRESH_SECRET` in each environment.
-- Saved snapshot restore replaces data across the available database tables. Restrict this capability to `super_admin` accounts and verify the recovery snapshot before proceeding.
-- The frontend's unsigned upload preset should be narrowly scoped in Cloudinary.
+- Never commit `backend/.env` or `frontend/.env`.
+- Use separate high-entropy values for `JWT_SECRET` and `JWT_REFRESH_SECRET` in every environment.
+- Keep Cloudinary upload presets narrowly scoped; browser uploads use the unsigned preset configured in the frontend.
+- Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing.
+- AI analytics reports send aggregate evidence only. The backend rejects questions that request individual visitor or patron identities.
+- Treat `db/fresh-start.sql` as a reset script, not a migration. There is no migration runner in this repository.
 
-## Documentation status
+## Project notes
 
-This README reflects the feature modules and routes currently present in the repository. It supersedes the older distinction that labelled Backup and Clearance as UI-only: both now have corresponding protected backend modules. `AdminInternet.tsx` and `AdminEditHomepage.tsx` are present as standalone frontend files but are not registered application routes in `frontend/src/App.tsx`.
+The root `package-lock.json` is only a placeholder. The authoritative dependency manifests and lockfiles are `backend/package.json` / `backend/package-lock.json` and `frontend/package.json` / `frontend/package-lock.json`.

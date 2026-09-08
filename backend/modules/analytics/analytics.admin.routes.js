@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../auth/auth.middleware");
-const { handleGetAuditLog, handleGetAuditLogMeta, handleGetDashboardOverview } = require("./analytics.controller");
+const { handleGetAuditLog, handleGetAuditLogMeta, handleGetDashboardOverview, handleCreateAiAnalyticsReport } = require("./analytics.controller");
 
 const router = express.Router();
 
@@ -8,6 +8,12 @@ router.get(
   "/dashboard",
   authMiddleware(["staff", "admin", "super_admin"]),
   handleGetDashboardOverview
+);
+
+router.post(
+  "/dashboard/ai-report",
+  authMiddleware(["staff", "admin", "super_admin"]),
+  handleCreateAiAnalyticsReport
 );
 
 router.get(

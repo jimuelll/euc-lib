@@ -5,6 +5,7 @@ const {
   logSiteVisit,
   newVisitorId,
 } = require("./analytics.service");
+const { createAiAnalyticsReport } = require("./aiReport.service");
 
 const VISITOR_COOKIE = "siteVisitorId";
 
@@ -54,6 +55,18 @@ async function handleGetDashboardOverview(req, res) {
   }
 }
 
+async function handleCreateAiAnalyticsReport(req, res) {
+  try {
+    const result = await createAiAnalyticsReport(req.body || {});
+    res.json(result);
+  } catch (err) {
+    if (err.status && err.status < 500) return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}) });
+    if (err.status === 503) return res.status(503).json({ message: err.message });
+    console.error("[analytics] create AI report:", err);
+    res.status(500).json({ message: "Failed to generate the AI report" });
+  }
+}
+
 async function handleGetAuditLog(req, res) {
   try {
     const result = await getAuditLog({
@@ -85,5 +98,6 @@ module.exports = {
   handleGetAuditLog,
   handleGetAuditLogMeta,
   handleGetDashboardOverview,
+  handleCreateAiAnalyticsReport,
   handleTrackVisit,
 };

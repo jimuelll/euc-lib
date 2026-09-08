@@ -537,9 +537,11 @@ async function getDashboardOverview({ range } = {}) {
        FROM borrowings b
        JOIN books bk ON bk.id = b.book_id
        WHERE b.deleted_at IS NULL
+         AND b.created_at >= CURDATE() - INTERVAL ? DAY
        GROUP BY b.book_id, bk.title
        ORDER BY total DESC, bk.title ASC
-       LIMIT 5`
+       LIMIT 5`,
+      [daysAgo]
     ),
     db.query(
       `SELECT
@@ -568,8 +570,10 @@ async function getDashboardOverview({ range } = {}) {
        JOIN users u ON u.id = b.user_id
        WHERE b.deleted_at IS NULL
          AND u.deleted_at IS NULL
+         AND b.created_at >= CURDATE() - INTERVAL ? DAY
        GROUP BY u.role
-       ORDER BY value DESC, u.role ASC`
+       ORDER BY value DESC, u.role ASC`,
+      [daysAgo]
     ),
     db.query(
       `SELECT

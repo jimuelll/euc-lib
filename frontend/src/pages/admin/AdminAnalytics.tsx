@@ -1,632 +1,207 @@
-import { useCallback, useEffect, useState, type ComponentType, type ReactNode } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  ArchiveRestore,
-  AlertTriangle,
-  BarChart3,
-  BookMarked,
-  BookCopy,
-  Coins,
-  DoorOpen,
-  LibraryBig,
-  PackageCheck,
-  RefreshCcw,
-  CheckCircle2,
-  ShieldAlert,
-  List,
-  Users,
-} from "lucide-react";
-import { getApiErrorMessage } from "@/utils/apiError";
-import { fetchAdminDashboard } from "./adminAnalytics.api";
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { AlertTriangle, BookCopy, BookMarked, Check, CheckCircle2, Coins, Copy, DoorOpen, Globe2, RefreshCcw, Sparkles } from "lucide-react";
+import { getApiErrorCode, getApiErrorMessage } from "@/utils/apiError";
+import { createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse } from "./adminAnalytics.api";
 import { Button } from "@/components/ui/button";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { AdminPage, AdminPanel } from "./components/AdminPage";
+import { Input } from "@/components/ui/input";
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdminPage } from "./components/AdminPage";
 
 export interface DashboardStats {
-  total_books: number;
-  total_book_copies: number;
-  available_book_copies: number;
-  borrowed_book_copies: number;
-  damaged_book_copies: number;
-  lost_book_copies: number;
-  active_users: number;
-  total_users: number;
-  active_borrowings: number;
-  overdue_borrowings: number;
-  borrowings_today: number;
-  returns_today: number;
-  active_reservations: number;
-  ready_reservations: number;
-  reservations_today: number;
-  fulfilled_reservations_today: number;
-  attendance_today: number;
-  borrowing_attendance_today: number;
-  entry_exit_attendance_today: number;
-  unique_visitors_today: number;
-  visit_hits_today: number;
-  total_unique_visitors: number;
-  total_visit_hits: number;
-  active_notifications: number;
-  active_subscriptions: number;
-  upcoming_holidays: number;
-  settled_fines_total: number;
-  overdue_fine_per_hour: number;
-  outstanding_fines: number;
+  total_books: number; total_book_copies: number; available_book_copies: number; borrowed_book_copies: number;
+  damaged_book_copies: number; lost_book_copies: number; active_users: number; total_users: number;
+  active_borrowings: number; overdue_borrowings: number; borrowings_today: number; returns_today: number;
+  active_reservations: number; ready_reservations: number; reservations_today: number; fulfilled_reservations_today: number;
+  attendance_today: number; borrowing_attendance_today: number; entry_exit_attendance_today: number;
+  unique_visitors_today: number; visit_hits_today: number; total_unique_visitors: number; total_visit_hits: number;
+  active_notifications: number; active_subscriptions: number; upcoming_holidays: number; settled_fines_total: number;
+  overdue_fine_per_hour: number; outstanding_fines: number;
 }
-
-export interface NamedValue {
-  name: string;
-  value: number;
-}
-
+export interface NamedValue { name: string; value: number }
 export interface TrendPoint {
-  label: string;
-  unique_visitors?: number;
-  visit_hits?: number;
-  borrowed_count?: number;
-  returned_count?: number;
-  entry_exit_count?: number;
-  borrowing_count?: number;
-  created_count?: number;
-  fulfilled_count?: number;
-  cancelled_count?: number;
-  settled_amount?: number;
+  label: string; unique_visitors?: number; visit_hits?: number; borrowed_count?: number; returned_count?: number;
+  entry_exit_count?: number; borrowing_count?: number; created_count?: number; fulfilled_count?: number;
+  cancelled_count?: number; settled_amount?: number;
 }
-
-export interface PopularBookPoint {
-  name: string;
-  total: number;
-}
-
-export interface CategoryPoint {
-  name: string;
-  titles: number;
-  copies: number;
-}
-
+export interface PopularBookPoint { name: string; total: number }
+export interface CategoryPoint { name: string; titles: number; copies: number }
 export interface DashboardResponse {
   stats: DashboardStats;
   charts: {
-    visitTrend: TrendPoint[];
-    circulationTrend: TrendPoint[];
-    attendanceTrend: TrendPoint[];
-    reservationTrend: TrendPoint[];
-    borrowingStatus: NamedValue[];
-    reservationStatus: NamedValue[];
-    userRoles: NamedValue[];
-    popularBooks: PopularBookPoint[];
-    catalogByCategory: CategoryPoint[];
-    copyCondition: NamedValue[];
-    borrowingByRole: NamedValue[];
-    fineCollectionTrend: TrendPoint[];
+    visitTrend: TrendPoint[]; circulationTrend: TrendPoint[]; attendanceTrend: TrendPoint[]; reservationTrend: TrendPoint[];
+    borrowingStatus: NamedValue[]; reservationStatus: NamedValue[]; userRoles: NamedValue[]; popularBooks: PopularBookPoint[];
+    catalogByCategory: CategoryPoint[]; copyCondition: NamedValue[]; borrowingByRole: NamedValue[]; fineCollectionTrend: TrendPoint[];
   };
 }
 
-const emptyData: DashboardResponse = {
-  stats: {
-    total_books: 0,
-    total_book_copies: 0,
-    available_book_copies: 0,
-    borrowed_book_copies: 0,
-    damaged_book_copies: 0,
-    lost_book_copies: 0,
-    active_users: 0,
-    total_users: 0,
-    active_borrowings: 0,
-    overdue_borrowings: 0,
-    borrowings_today: 0,
-    returns_today: 0,
-    active_reservations: 0,
-    ready_reservations: 0,
-    reservations_today: 0,
-    fulfilled_reservations_today: 0,
-    attendance_today: 0,
-    borrowing_attendance_today: 0,
-    entry_exit_attendance_today: 0,
-    unique_visitors_today: 0,
-    visit_hits_today: 0,
-    total_unique_visitors: 0,
-    total_visit_hits: 0,
-    active_notifications: 0,
-    active_subscriptions: 0,
-    upcoming_holidays: 0,
-    settled_fines_total: 0,
-    overdue_fine_per_hour: 0,
-    outstanding_fines: 0,
-  },
-  charts: {
-    visitTrend: [],
-    circulationTrend: [],
-    attendanceTrend: [],
-    reservationTrend: [],
-    borrowingStatus: [],
-    reservationStatus: [],
-    userRoles: [],
-    popularBooks: [],
-    catalogByCategory: [],
-    copyCondition: [],
-    borrowingByRole: [],
-    fineCollectionTrend: [],
-  },
-};
+const emptyStats = Object.fromEntries([
+  "total_books", "total_book_copies", "available_book_copies", "borrowed_book_copies", "damaged_book_copies", "lost_book_copies",
+  "active_users", "total_users", "active_borrowings", "overdue_borrowings", "borrowings_today", "returns_today", "active_reservations",
+  "ready_reservations", "reservations_today", "fulfilled_reservations_today", "attendance_today", "borrowing_attendance_today",
+  "entry_exit_attendance_today", "unique_visitors_today", "visit_hits_today", "total_unique_visitors", "total_visit_hits",
+  "active_notifications", "active_subscriptions", "upcoming_holidays", "settled_fines_total", "overdue_fine_per_hour", "outstanding_fines",
+].map((key) => [key, 0])) as unknown as DashboardStats;
+const emptyData: DashboardResponse = { stats: emptyStats, charts: { visitTrend: [], circulationTrend: [], attendanceTrend: [], reservationTrend: [], borrowingStatus: [], reservationStatus: [], userRoles: [], popularBooks: [], catalogByCategory: [], copyCondition: [], borrowingByRole: [], fineCollectionTrend: [] } };
 
-const currencyFormatter = new Intl.NumberFormat("en-PH", {
-  style: "currency",
-  currency: "PHP",
-});
-
+const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 2 });
 const chartPalette = ["#800000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
 export type AnalyticsRange = "7d" | "30d" | "month" | "year";
-
-const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
-  { value: "month", label: "This month" },
-  { value: "year", label: "This year" },
+const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string }[] = [
+  { value: "7d", label: "Last 7 days", shortLabel: "7 days" }, { value: "30d", label: "Last 30 days", shortLabel: "30 days" },
+  { value: "month", label: "This month", shortLabel: "Month" }, { value: "year", label: "This year", shortLabel: "Year" },
 ];
+const dateForInput = (date: Date) => { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 10); };
+const reportDatesFor = (range: AnalyticsRange) => {
+  const today = new Date(); const end = dateForInput(today);
+  if (range === "month") return { dateFrom: `${end.slice(0, 8)}01`, dateTo: end };
+  if (range === "year") return { dateFrom: `${end.slice(0, 4)}-01-01`, dateTo: end };
+  const start = new Date(today); start.setDate(start.getDate() - (range === "30d" ? 29 : 6));
+  return { dateFrom: dateForInput(start), dateTo: end };
+};
+const reportDateFormatter = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" });
+const formatReportDate = (value: string) => reportDateFormatter.format(new Date(`${value}T00:00:00`));
+const formatReportPeriod = (dateFrom: string, dateTo: string) => `${formatReportDate(dateFrom)} – ${formatReportDate(dateTo)}`;
+const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total, item) => total + Number(item[key] || 0), 0);
 
 const AdminAnalytics = () => {
   const [data, setData] = useState<DashboardResponse>(emptyData);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [range, setRange] = useState<AnalyticsRange>("7d");
-  const [groupViews, setGroupViews] = useState({
-    circulation: "charts" as "charts" | "text",
-    collection: "charts" as "charts" | "text",
-    activity: "charts" as "charts" | "text",
-  });
-
+  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState("");
+  const [range, setRange] = useState<AnalyticsRange>("7d"); const [reportQuestion, setReportQuestion] = useState("");
+  const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null); const [reportLoading, setReportLoading] = useState(false);
+  const [answeredQuestion, setAnsweredQuestion] = useState("");
+  const [reportError, setReportError] = useState(""); const [reportPrivacyNotice, setReportPrivacyNotice] = useState(false); const [copied, setCopied] = useState(false);
+  const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
+  const reportDates = useMemo(() => reportDatesFor(range), [range]);
+  const performance = useMemo(() => ({
+    borrowed: sum(data.charts.circulationTrend, "borrowed_count"), returned: sum(data.charts.circulationTrend, "returned_count"),
+    attendance: sum(data.charts.attendanceTrend, "entry_exit_count") + sum(data.charts.attendanceTrend, "borrowing_count"),
+    visitors: sum(data.charts.visitTrend, "unique_visitors"),
+  }), [data]);
   const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    if (mode === "refresh") setRefreshing(true);
-    setError("");
-
-    try {
-      setData(await fetchAdminDashboard(range));
-    } catch (error: unknown) {
-      setError(getApiErrorMessage(error, "Failed to load dashboard data"));
-    } finally {
-      if (mode === "initial") setLoading(false);
-      if (mode === "refresh") setRefreshing(false);
-    }
+    mode === "initial" ? setLoading(true) : setRefreshing(true); setError("");
+    try { setData(await fetchAdminDashboard(range)); } catch (loadError: unknown) { setError(getApiErrorMessage(loadError, "Failed to load analytics.")); }
+    finally { setLoading(false); setRefreshing(false); }
   }, [range]);
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); }, [range]);
+  const generateReport = async () => {
+    const question = reportQuestion.trim();
+    setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false);
+    try {
+      const nextReport = await createAiAnalyticsReport({ ...reportDates, question: question || undefined });
+      setReport(nextReport);
+      setAnsweredQuestion(nextReport.mode === "answer" ? question : "");
+    } catch (reportFailure: unknown) {
+      setReportPrivacyNotice(getApiErrorCode(reportFailure) === "AI_REPORT_PRIVACY_RESTRICTED");
+      setReportError(getApiErrorMessage(reportFailure, "Unable to generate the performance brief. Try again."));
+    }
+    finally { setReportLoading(false); }
+  };
+  const copyReport = async () => {
+    if (!report) return;
+    const period = formatReportPeriod(report.range.dateFrom, report.range.dateTo);
+    const copyText = report.mode === "answer"
+      ? [`Library analytics answer`, `Question: ${answeredQuestion}`, `Answer: ${report.report}`, `Period: ${period}`, "Source: Aggregate library operations data for this period."].join("\n")
+      : [`Library performance brief`, `Period: ${period}`, "", report.report, "", "Source: Aggregate library operations data for this period."].join("\n");
+    try { await navigator.clipboard.writeText(copyText); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
+    catch { setReportPrivacyNotice(false); setReportError("Unable to copy the result. Select the text and copy it manually."); }
+  };
 
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+  return <AdminPage title="Operations Analytics" actions={<Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>}>
+    <section className="flex flex-col gap-4 border-b border-border/80 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-2xl"><h2 className="text-lg font-semibold text-foreground">How did the library perform?</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose one period. Performance views update together; inventory snapshots remain current.</p></div>
+      <div className="flex w-full overflow-x-auto border border-border bg-card p-1 lg:w-auto" role="group" aria-label="Analytics period">{RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`min-h-9 shrink-0 px-4 text-sm font-semibold transition-colors ${range === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`} aria-pressed={range === option.value}>{option.shortLabel}</button>)}</div>
+    </section>
+    {error ? <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
+    <Tabs defaultValue="overview" className="space-y-5">
+      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">{["overview", "circulation", "visitors", "collection"].map((tab) => <TabsTrigger key={tab} value={tab} className="min-h-11 shrink-0 rounded-none border-b-2 border-transparent px-5 capitalize shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none">{tab}</TabsTrigger>)}</TabsList>
 
-  return (
-    <AdminPage
-      eyebrow="Analytics"
-      title="Operations Analytics"
-      actions={<Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh Data</Button>}
-    >
-      <AdminPanel title="Library status" contentClassName="p-0">
-        <div className="grid divide-y divide-border/70 md:grid-cols-3 md:divide-x md:divide-y-0">
-          <StatusItem
-            icon={data.stats.overdue_borrowings ? AlertTriangle : CheckCircle2}
-            tone={data.stats.overdue_borrowings ? "critical" : "clear"}
-            title={data.stats.overdue_borrowings ? `${data.stats.overdue_borrowings} overdue item${data.stats.overdue_borrowings === 1 ? "" : "s"}` : "No overdue items"}
-            detail={data.stats.overdue_borrowings ? "Requires follow-up" : "All clear"}
-          />
-          <StatusItem
-            icon={data.stats.outstanding_fines > 0 ? Coins : CheckCircle2}
-            tone={data.stats.outstanding_fines > 0 ? "critical" : "clear"}
-            title={data.stats.outstanding_fines > 0 ? `${currencyFormatter.format(data.stats.outstanding_fines)} unsettled` : "No outstanding fines"}
-            detail={data.stats.outstanding_fines > 0 ? "Payment follow-up needed" : "All fines are settled"}
-          />
-          <StatusItem
-            icon={BookMarked}
-            tone={data.stats.ready_reservations ? "attention" : "clear"}
-            title={`${data.stats.ready_reservations} reservation${data.stats.ready_reservations === 1 ? "" : "s"} ready`}
-            detail={data.stats.ready_reservations ? "Awaiting pickup" : "Nothing awaiting pickup"}
-          />
+      <TabsContent value="overview" className="mt-0 space-y-5">
+        <div className="grid border border-border/80 bg-card sm:grid-cols-2 xl:grid-cols-4">
+          <PerformanceMetric label="Borrowed" value={performance.borrowed} icon={BookCopy} loading={loading} period={rangeLabel} />
+          <PerformanceMetric label="Returned" value={performance.returned} icon={CheckCircle2} loading={loading} period={rangeLabel} />
+          <PerformanceMetric label="Library scans" value={performance.attendance} icon={DoorOpen} loading={loading} period={rangeLabel} />
+          <PerformanceMetric label="Site visitors" value={performance.visitors} icon={Globe2} loading={loading} period={rangeLabel} />
         </div>
-      </AdminPanel>
-
-      <AdminPanel title="Today's operations" contentClassName="p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Overdue borrowings" value={data.stats.overdue_borrowings} icon={ShieldAlert} tone="critical" loading={loading} />
-          <MetricCard label="Reservations ready" value={data.stats.ready_reservations} icon={BookMarked} tone="attention" loading={loading} />
-          <MetricCard label="Borrowings today" value={data.stats.borrowings_today} icon={ArchiveRestore} loading={loading} />
-          <MetricCard label="Returns today" value={data.stats.returns_today} icon={BookCopy} loading={loading} />
-          <MetricCard label="Attendance today" value={data.stats.attendance_today} icon={DoorOpen} loading={loading} />
-        </div>
-      </AdminPanel>
-
-      <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <AdminPanel title="Core library metrics">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MetricCard label="Active users" value={data.stats.active_users} icon={Users} loading={loading} />
-            <MetricCard label="Catalog titles" value={data.stats.total_books} icon={LibraryBig} loading={loading} />
-            <MetricCard label="Copies on loan" value={data.stats.borrowed_book_copies} icon={BookCopy} loading={loading} />
-            <MetricCard label="Available copies" value={data.stats.available_book_copies} icon={PackageCheck} loading={loading} />
-          </div>
-        </AdminPanel>
-        <AdminPanel title="Reference metrics">
-          <div className="divide-y divide-border/70">
-            <CompactMetric label="Damaged copies" value={data.stats.damaged_book_copies} />
-            <CompactMetric label="Lost copies" value={data.stats.lost_book_copies} />
-            <CompactMetric label="Site visitors today" value={data.stats.unique_visitors_today} />
-            <CompactMetric label="Site page hits today" value={data.stats.visit_hits_today} />
-            <CompactMetric label="Upcoming holidays" value={data.stats.upcoming_holidays} />
-          </div>
-        </AdminPanel>
-      </div>
-
-      {error ? (
-        <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border border-border/80 bg-card/95 px-4 py-2.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>Quick filters</span>
-        <div className="flex flex-wrap items-center gap-1">
-          {RANGE_OPTIONS.map((option) => (
-            <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`border-b-2 px-3 py-1.5 text-xs font-semibold transition-colors ${range === option.value ? "border-warning text-warning" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{option.label}</button>
-          ))}
-        </div>
-      </div>
-
-      {groupViews.circulation === "text" ? <AnalyticsTextView group="circulation" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, circulation: view }))} /> : <AnalyticsGroup title="Circulation and reservations" summary="Trends, demand, and current circulation status." defaultOpen actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, circulation: view }))} />}>
-
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="Circulation Trend" description="Borrow and return volume over the last seven days.">
-            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ borrowed_count: { label: "Borrowed", color: "#1d4ed8" }, returned_count: { label: "Returned", color: "#0f766e" } }}>
-              <BarChart data={data.charts.circulationTrend}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="borrowed_count" fill="var(--color-borrowed_count)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="returned_count" fill="var(--color-returned_count)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
-
-          <AdminPanel title="Reservation Flow" description="Requests created, fulfilled, and cancelled over the last seven days.">
-            <ChartContainer
-              className="h-[240px] w-full sm:h-[280px]"
-              config={{
-                created_count: { label: "Created", color: "#1d4ed8" },
-                fulfilled_count: { label: "Fulfilled", color: "#0f766e" },
-                cancelled_count: { label: "Cancelled", color: "#b45309" },
-              }}
-            >
-              <BarChart data={data.charts.reservationTrend}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="created_count" fill="var(--color-created_count)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="fulfilled_count" fill="var(--color-fulfilled_count)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="cancelled_count" fill="var(--color-cancelled_count)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <AdminPanel title="Most Borrowed Books" description="Top borrowed titles based on the complete borrowing history.">
-            <ChartContainer className="h-[260px] w-full sm:h-[300px]" config={{ total: { label: "Borrow Count", color: "#b45309" } }}>
-              <BarChart data={data.charts.popularBooks} margin={{ left: 8, right: 8 }}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="total" fill="var(--color-total)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
-
-          <AdminPanel title="Circulation Snapshot" description="A quick operational summary without forcing you to decode combined figures.">
-            <div className="space-y-4">
-              <SnapshotRow label="Items currently borrowed" value={data.stats.active_borrowings} />
-              <SnapshotRow label="Overdue borrowings" value={data.stats.overdue_borrowings} />
-              <SnapshotRow label="Active reservations" value={data.stats.active_reservations} />
-              <SnapshotRow label="Ready for pickup" value={data.stats.ready_reservations} />
-              <SnapshotRow label="Fulfilled reservations today" value={data.stats.fulfilled_reservations_today} />
-              <SnapshotRow label="Borrowing attendance today" value={data.stats.borrowing_attendance_today} />
+        <section className="overflow-hidden border border-primary/30 bg-card">
+          <div className="grid lg:grid-cols-[minmax(19rem,0.72fr)_minmax(0,1.28fr)]">
+            <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-7 sm:py-8">
+              <div className="flex h-10 w-10 items-center justify-center border border-primary-foreground/25 bg-primary-foreground/10"><Sparkles className="h-5 w-5 text-warning" /></div>
+              <h2 className="mt-6 text-2xl font-semibold tracking-[-0.025em]">Ask or summarize</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-primary-foreground/80">Ask one question for a focused answer, or leave it blank for a full performance summary.</p>
+              <div className="mt-7 space-y-2">
+                <label htmlFor="analytics-focus" className="text-xs font-semibold uppercase tracking-[0.12em] text-primary-foreground/75">Question <span className="normal-case tracking-normal">(optional)</span></label>
+                <Input id="analytics-focus" value={reportQuestion} maxLength={500} onChange={(event) => setReportQuestion(event.target.value)} placeholder="Example: How many people visited on Sept. 7?" className="h-12 rounded-none border-primary-foreground/30 bg-primary-foreground/10 px-4 text-primary-foreground placeholder:text-primary-foreground/60 focus-visible:ring-primary-foreground/70" />
+                <p className="text-xs leading-5 text-primary-foreground/70">Uses aggregate data from {rangeLabel.toLowerCase()} only.</p>
+              </div>
+              <Button type="button" variant="secondary" className="mt-5 h-12 w-full rounded-none font-semibold" onClick={() => void generateReport()} disabled={reportLoading}>{reportLoading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{reportLoading ? "Analyzing…" : reportQuestion.trim() ? "Answer question" : "Generate summary"}</Button>
             </div>
-          </AdminPanel>
-        </div>
-      </AnalyticsGroup>}
 
-      {groupViews.collection === "text" ? <AnalyticsTextView group="collection" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} /> : <AnalyticsGroup title="Collection health" summary="Inventory mix, condition, and collection use by role." actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, collection: view }))} />}>
+            <div className="relative min-h-[320px] bg-[linear-gradient(145deg,hsl(var(--primary)/0.055),transparent_52%)] px-5 py-6 sm:px-8 sm:py-8">
+              {reportError ? <div role="alert" className={`mb-5 flex items-start gap-3 border px-4 py-4 ${reportPrivacyNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
+                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportPrivacyNotice ? "text-warning" : "text-destructive"}`} />
+                <div><p className="text-sm font-semibold">{reportPrivacyNotice ? "Privacy-protected request" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportPrivacyNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
+              </div> : null}
+              {report ? <div className="flex h-full flex-col">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-primary-foreground"><Sparkles className="h-4 w-4" /></div>
+                    <div>
+                      <h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" ? ` · compared with the previous ${report.range.days} days` : ""}</p>
+                    </div>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" className="rounded-none" onClick={() => void copyReport()}>{copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}{copied ? "Copied" : report.mode === "answer" ? "Copy answer" : "Copy brief"}</Button>
+                </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="Catalog by Category" description="Title and copy concentration across the catalog's configured category metadata.">
-            <ChartContainer
-              className="h-[280px] w-full sm:h-[320px]"
-              config={{
-                titles: { label: "Titles", color: "#800000" },
-                copies: { label: "Copies", color: "#b45309" },
-              }}
-            >
-              <BarChart data={data.charts.catalogByCategory} margin={{ left: 8, right: 8 }}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="titles" fill="var(--color-titles)" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="copies" fill="var(--color-copies)" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
+                {report.mode === "answer" ? <div className="flex flex-1 flex-col justify-center py-7 sm:py-10">
+                  <p className="max-w-[70ch] text-sm leading-6 text-muted-foreground">{answeredQuestion}</p>
+                  <ReportNarrative text={report.report} mode="answer" />
+                </div> : <ReportNarrative text={report.report} mode="summary" />}
 
-          <AdminPanel title="Inventory Condition Mix" description="Active physical-copy condition based on the dedicated copy records in the schema.">
-            <ChartContainer
-              className="h-[280px] w-full sm:h-[320px]"
-              config={Object.fromEntries(data.charts.copyCondition.map((item, index) => [item.name, { label: item.name, color: chartPalette[index % chartPalette.length] }]))}
-            >
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                <Pie data={data.charts.copyCondition} dataKey="value" nameKey="name" innerRadius={48} outerRadius={88}>
-                  {data.charts.copyCondition.map((item, index) => (
-                    <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="name" />} />
-              </PieChart>
-            </ChartContainer>
-          </AdminPanel>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="Borrowing Demand by User Role" description="Total circulation demand by account role, useful for spotting who the collection is serving most.">
-            <ChartContainer className="h-[250px] w-full sm:h-[300px]" config={{ value: { label: "Borrowings", color: "#1d4ed8" } }}>
-              <BarChart data={data.charts.borrowingByRole} layout="vertical" margin={{ left: 8, right: 8 }}>
-                <CartesianGrid horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={72} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="value" fill="var(--color-value)" radius={[0, 2, 2, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
-
-          <AdminPanel title="Collection Notes" description="Important operational details that work better as labeled rows than mixed stat cards.">
-            <div className="space-y-4">
-              <SnapshotRow label="Active copies" value={data.stats.total_book_copies} />
-              <SnapshotRow label="Available copies" value={data.stats.available_book_copies} />
-              <SnapshotRow label="Borrowed copies" value={data.stats.borrowed_book_copies} />
-              <SnapshotRow label="Damaged copies" value={data.stats.damaged_book_copies} />
-              <SnapshotRow label="Lost copies" value={data.stats.lost_book_copies} />
-              <SnapshotRow label="Upcoming holidays" value={data.stats.upcoming_holidays} />
+                <div className="mt-auto flex flex-col gap-1 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <span>Based on aggregate library operations data</span>
+                  <span className="tabular-nums">{report.range.days} {report.range.days === 1 ? "day" : "days"} analyzed</span>
+                </div>
+              </div> : <div className="flex h-full min-h-[260px] max-w-xl flex-col justify-center">
+                <div className="flex h-11 w-11 items-center justify-center border border-primary/20 bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></div>
+                <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-foreground">A clearer answer, grounded in your data</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Ask about a specific date, title, visitor count, or activity. Every answer stays within the selected reporting period.</p>
+                <p className="mt-6 text-sm font-medium text-foreground">Ready for {formatReportPeriod(reportDates.dateFrom, reportDates.dateTo)}</p>
+              </div>}
             </div>
-          </AdminPanel>
-        </div>
-      </AnalyticsGroup>}
+          </div>
+        </section>
+        <AnalyticsPanel title="Current operational position" description="Today’s carryover items, kept separate from period performance."><div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0"><PositionItem icon={data.stats.overdue_borrowings ? AlertTriangle : CheckCircle2} label="Overdue loans" value={data.stats.overdue_borrowings} tone={data.stats.overdue_borrowings ? "critical" : "clear"} /><PositionItem icon={BookMarked} label="Ready reservations" value={data.stats.ready_reservations} tone={data.stats.ready_reservations ? "attention" : "clear"} /><PositionItem icon={Coins} label="Outstanding fines" value={money.format(data.stats.outstanding_fines)} tone={data.stats.outstanding_fines ? "attention" : "clear"} /></div></AnalyticsPanel>
+      </TabsContent>
 
-      {groupViews.activity === "text" ? <AnalyticsTextView group="activity" data={data} loading={loading} rangeLabel={RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period"} onViewChange={(view) => setGroupViews((current) => ({ ...current, activity: view }))} /> : <AnalyticsGroup title="Patron and platform activity" summary="Attendance, visitors, account mix, and fine collections." actions={<AnalyticsModeToggle value="charts" onChange={(view) => setGroupViews((current) => ({ ...current, activity: view }))} />}>
+      <TabsContent value="circulation" className="mt-0 space-y-5"><SectionIntro title="Circulation performance" description={`Borrowing and reservation movement for ${rangeLabel.toLowerCase()}.`} /><div className="grid gap-5 xl:grid-cols-2">
+        <AnalyticsPanel title="Borrowed and returned" description="Daily circulation volume"><ChartContainer className="h-[280px] w-full" config={{ borrowed_count: { label: "Borrowed", color: "#800000" }, returned_count: { label: "Returned", color: "#0f766e" } }}><BarChart data={data.charts.circulationTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="borrowed_count" fill="var(--color-borrowed_count)" radius={[2, 2, 0, 0]} /><Bar dataKey="returned_count" fill="var(--color-returned_count)" radius={[2, 2, 0, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
+        <AnalyticsPanel title="Reservation outcomes" description="Created, fulfilled, and cancelled"><ChartContainer className="h-[280px] w-full" config={{ created_count: { label: "Created", color: "#800000" }, fulfilled_count: { label: "Fulfilled", color: "#0f766e" }, cancelled_count: { label: "Cancelled", color: "#b45309" } }}><LineChart data={data.charts.reservationTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="created_count" stroke="var(--color-created_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="fulfilled_count" stroke="var(--color-fulfilled_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="cancelled_count" stroke="var(--color-cancelled_count)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
+      </div><div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]"><AnalyticsPanel title="Current loan status"><DistributionList items={data.charts.borrowingStatus} /></AnalyticsPanel><AnalyticsPanel title="Most borrowed titles"><RankedList items={data.charts.popularBooks.map((item) => ({ label: item.name, value: item.total }))} emptyText="No borrowing history yet." /></AnalyticsPanel></div></TabsContent>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="Attendance Trend" description="Entry and borrowing scans captured over the last seven days.">
-            <ChartContainer
-              className="h-[240px] w-full sm:h-[280px]"
-              config={{
-                entry_exit_count: { label: "Entry / Exit", color: "#800000" },
-                borrowing_count: { label: "Borrowing", color: "#0f766e" },
-              }}
-            >
-              <LineChart data={data.charts.attendanceTrend}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Line type="monotone" dataKey="entry_exit_count" stroke="var(--color-entry_exit_count)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="borrowing_count" stroke="var(--color-borrowing_count)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ChartContainer>
-          </AdminPanel>
+      <TabsContent value="visitors" className="mt-0 space-y-5"><SectionIntro title="Visitor and engagement activity" description={`Physical visits, borrowing scans, and website usage for ${rangeLabel.toLowerCase()}.`} /><div className="grid gap-5 xl:grid-cols-2">
+        <AnalyticsPanel title="Library attendance" description="Entry/exit and borrowing-purpose scans"><ChartContainer className="h-[280px] w-full" config={{ entry_exit_count: { label: "Entry / exit", color: "#800000" }, borrowing_count: { label: "Borrowing", color: "#0f766e" } }}><LineChart data={data.charts.attendanceTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="entry_exit_count" stroke="var(--color-entry_exit_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="borrowing_count" stroke="var(--color-borrowing_count)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
+        <AnalyticsPanel title="Website activity" description="Unique visitors and tracked page hits"><ChartContainer className="h-[280px] w-full" config={{ unique_visitors: { label: "Unique visitors", color: "#800000" }, visit_hits: { label: "Page hits", color: "#b45309" } }}><LineChart data={data.charts.visitTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="unique_visitors" stroke="var(--color-unique_visitors)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="visit_hits" stroke="var(--color-visit_hits)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
+      </div><div className="grid gap-5 xl:grid-cols-2"><AnalyticsPanel title="User role distribution"><DistributionList items={data.charts.userRoles} /></AnalyticsPanel><AnalyticsPanel title="Fine collections" description="Settled payments over the latest six months"><ChartContainer className="h-[250px] w-full" config={{ settled_amount: { label: "Settled fines", color: "#0f766e" } }}><LineChart data={data.charts.fineCollectionTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent formatter={(value) => money.format(Number(value || 0))} />} /><Line type="monotone" dataKey="settled_amount" stroke="var(--color-settled_amount)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel></div></TabsContent>
 
-          <AdminPanel title="Site Traffic Trend" description="Unique visitors and total tracked hits over the last seven days.">
-            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ unique_visitors: { label: "Unique Visitors", color: "#800000" }, visit_hits: { label: "Visit Hits", color: "#b45309" } }}>
-              <LineChart data={data.charts.visitTrend}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Line type="monotone" dataKey="unique_visitors" stroke="var(--color-unique_visitors)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="visit_hits" stroke="var(--color-visit_hits)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ChartContainer>
-          </AdminPanel>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-2">
-          <AdminPanel title="User Role Distribution" description="Current account mix across roles in the users table.">
-            <ChartContainer className="h-[240px] w-full sm:h-[280px]" config={{ value: { label: "Users", color: "#800000" } }}>
-              <BarChart data={data.charts.userRoles} layout="vertical" margin={{ left: 8, right: 8 }}>
-                <CartesianGrid horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={72} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="value" fill="var(--color-value)" radius={[0, 2, 2, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </AdminPanel>
-
-          <AdminPanel title="Fine Collections Trend" description="Settled overdue payments over the last six months based on borrowing settlement timestamps.">
-            <ChartContainer className="h-[250px] w-full sm:h-[300px]" config={{ settled_amount: { label: "Settled Fines", color: "#0f766e" } }}>
-              <LineChart data={data.charts.fineCollectionTrend}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => currencyFormatter.format(Number(value || 0))} />} />
-                <Line type="monotone" dataKey="settled_amount" stroke="var(--color-settled_amount)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ChartContainer>
-          </AdminPanel>
-        </div>
-      </AnalyticsGroup>}
-    </AdminPage>
-  );
+      <TabsContent value="collection" className="mt-0 space-y-5"><SectionIntro title="Collection performance" description="Inventory composition, condition, and who the collection is serving." /><div className="grid gap-5 xl:grid-cols-2">
+        <AnalyticsPanel title="Catalog by category" description="Titles and physical copies"><ChartContainer className="h-[310px] w-full" config={{ titles: { label: "Titles", color: "#800000" }, copies: { label: "Copies", color: "#b45309" } }}><BarChart data={data.charts.catalogByCategory} layout="vertical" margin={{ left: 12, right: 8 }}><CartesianGrid horizontal={false} /><XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} /><YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={100} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="titles" fill="var(--color-titles)" radius={[0, 2, 2, 0]} /><Bar dataKey="copies" fill="var(--color-copies)" radius={[0, 2, 2, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
+        <AnalyticsPanel title="Physical copy condition"><div className="grid items-center gap-5 sm:grid-cols-[1fr_0.8fr]"><ChartContainer className="mx-auto h-[260px] w-full max-w-[300px]" config={{ value: { label: "Copies", color: "#800000" } }}><PieChart><ChartTooltip content={<ChartTooltipContent />} /><Pie data={data.charts.copyCondition} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2}>{data.charts.copyCondition.map((item, index) => <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />)}</Pie></PieChart></ChartContainer><DistributionList items={data.charts.copyCondition} /></div></AnalyticsPanel>
+      </div><div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AnalyticsPanel title="Borrowing demand by role"><DistributionList items={data.charts.borrowingByRole} /></AnalyticsPanel><AnalyticsPanel title="Collection snapshot"><div className="divide-y divide-border/70"><SnapshotRow label="Catalog titles" value={data.stats.total_books} /><SnapshotRow label="Active copies" value={data.stats.total_book_copies} /><SnapshotRow label="Available" value={data.stats.available_book_copies} /><SnapshotRow label="Damaged" value={data.stats.damaged_book_copies} /><SnapshotRow label="Lost" value={data.stats.lost_book_copies} /></div></AnalyticsPanel></div></TabsContent>
+    </Tabs>
+  </AdminPage>;
 };
 
-const AnalyticsTextView = ({ group, data, loading, rangeLabel, onViewChange }: { group: "circulation" | "collection" | "activity"; data: DashboardResponse; loading: boolean; rangeLabel: string; onViewChange: (view: "charts" | "text") => void }) => {
-  const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total, item) => total + Number(item[key] || 0), 0);
-
-  return group === "circulation" ? (
-      <AnalyticsGroup title="Circulation and reservations" summary={`Readable totals for ${rangeLabel.toLowerCase()}.`} defaultOpen actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <AdminPanel title="Circulation totals"><TextMetricGrid loading={loading} metrics={[{ label: "Borrowed", value: sum(data.charts.circulationTrend, "borrowed_count") }, { label: "Returned", value: sum(data.charts.circulationTrend, "returned_count") }, { label: "Currently borrowed", value: data.stats.active_borrowings }, { label: "Overdue", value: data.stats.overdue_borrowings, tone: "critical" }]} /></AdminPanel>
-          <AdminPanel title="Reservation totals"><TextMetricGrid loading={loading} metrics={[{ label: "Created", value: sum(data.charts.reservationTrend, "created_count") }, { label: "Fulfilled", value: sum(data.charts.reservationTrend, "fulfilled_count") }, { label: "Cancelled", value: sum(data.charts.reservationTrend, "cancelled_count") }, { label: "Ready for pickup", value: data.stats.ready_reservations, tone: "attention" }]} /></AdminPanel>
-        </div>
-        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AdminPanel title="Most borrowed books"><RankedList items={data.charts.popularBooks.map((item) => ({ label: item.name, value: item.total }))} emptyText="No borrowing history yet." /></AdminPanel><AdminPanel title="Current circulation"><div className="divide-y divide-border/70"><CompactMetric label="Active reservations" value={data.stats.active_reservations} /><CompactMetric label="Fulfilled today" value={data.stats.fulfilled_reservations_today} /><CompactMetric label="Borrowing attendance" value={data.stats.borrowing_attendance_today} /></div></AdminPanel></div>
-      </AnalyticsGroup>
-  ) : group === "collection" ? (
-
-      <AnalyticsGroup title="Collection health" summary="Catalog and inventory figures in a compact reading layout." actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
-        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Catalog by category"><RankedList items={data.charts.catalogByCategory.map((item) => ({ label: item.name, value: `${item.titles} titles · ${item.copies} copies` }))} emptyText="No catalog categories yet." /></AdminPanel><AdminPanel title="Inventory condition"><RankedList items={data.charts.copyCondition.map((item) => ({ label: item.name, value: item.value, tone: item.name === "damaged" || item.name === "lost" ? "attention" : "neutral" }))} emptyText="No copy conditions recorded." /></AdminPanel></div>
-        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Borrowing by user role"><RankedList items={data.charts.borrowingByRole.map((item) => ({ label: item.name, value: item.value }))} emptyText="No borrowing activity yet." /></AdminPanel><AdminPanel title="Collection reference"><div className="divide-y divide-border/70"><CompactMetric label="Active copies" value={data.stats.total_book_copies} /><CompactMetric label="Available copies" value={data.stats.available_book_copies} /><CompactMetric label="Damaged copies" value={data.stats.damaged_book_copies} /><CompactMetric label="Lost copies" value={data.stats.lost_book_copies} /></div></AdminPanel></div>
-      </AnalyticsGroup>
-  ) : (
-
-      <AnalyticsGroup title="Patron and platform activity" summary="Attendance, website activity, users, and fine collections in text form." actions={<AnalyticsModeToggle value="text" onChange={onViewChange} />}>
-        <div className="grid gap-5 xl:grid-cols-2"><AdminPanel title="Seven-day activity"><TextMetricGrid loading={loading} metrics={[{ label: "Entry / exit scans", value: sum(data.charts.attendanceTrend, "entry_exit_count") }, { label: "Borrowing scans", value: sum(data.charts.attendanceTrend, "borrowing_count") }, { label: "Site visitors", value: sum(data.charts.visitTrend, "unique_visitors") }, { label: "Page hits", value: sum(data.charts.visitTrend, "visit_hits") }]} /></AdminPanel><AdminPanel title="Fine collections"><TextMetricGrid loading={loading} metrics={[{ label: "Settled this period", value: currencyFormatter.format(sum(data.charts.fineCollectionTrend, "settled_amount")) }, { label: "Outstanding fines", value: currencyFormatter.format(data.stats.outstanding_fines), tone: data.stats.outstanding_fines > 0 ? "critical" : "neutral" }, { label: "Active users", value: data.stats.active_users }, { label: "Active notifications", value: data.stats.active_notifications }]} /></AdminPanel></div>
-        <AdminPanel title="User role distribution"><RankedList items={data.charts.userRoles.map((item) => ({ label: item.name, value: item.value }))} emptyText="No active users found." /></AdminPanel>
-      </AnalyticsGroup>
-  );
-};
-
-const TextMetricGrid = ({ loading, metrics }: { loading: boolean; metrics: { label: string; value: number | string; tone?: "neutral" | "attention" | "critical" }[] }) => <div className="grid gap-3 sm:grid-cols-2">{metrics.map((metric) => <TextMetric key={metric.label} {...metric} loading={loading} />)}</div>;
-
-const TextMetric = ({ label, value, tone = "neutral", loading }: { label: string; value: number | string; tone?: "neutral" | "attention" | "critical"; loading: boolean }) => <div className={`border p-4 ${tone === "critical" ? "border-l-4 border-destructive/80 bg-destructive/5" : tone === "attention" ? "border-l-4 border-warning/80 bg-warning/5" : "border-border/80 bg-background"}`}><p className="text-[10px] font-bold uppercase tracking-[0.17em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>{label}</p><p className="mt-3 text-2xl font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{loading ? "..." : value}</p></div>;
-
-const RankedList = ({ items, emptyText }: { items: { label: string; value: number | string; tone?: "neutral" | "attention" }[]; emptyText: string }) => items.length ? <div className="divide-y divide-border/70">{items.map((item) => <div key={item.label} className={`flex items-center justify-between gap-4 py-3 ${item.tone === "attention" ? "text-warning" : ""}`}><span className="text-sm capitalize text-foreground">{item.label}</span><span className="shrink-0 font-semibold" style={{ fontFamily: "var(--font-heading)" }}>{item.value}</span></div>)}</div> : <p className="text-sm text-muted-foreground">{emptyText}</p>;
-
-const AnalyticsGroup = ({
-  title,
-  summary,
-  defaultOpen = false,
-  actions,
-  children,
-}: {
-  title: string;
-  summary: string;
-  defaultOpen?: boolean;
-  actions?: ReactNode;
-  children: ReactNode;
-}) => (
-  <details open={defaultOpen} className="admin-panel-surface admin-etched-border border border-border/80 bg-card/95">
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden sm:px-6">
-      <div>
-        <h2 className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{summary}</p>
-      </div>
-      <div className="flex items-center gap-3" onClick={(event) => event.stopPropagation()}>
-        {actions}
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Details</span>
-      </div>
-    </summary>
-    <div className="space-y-6 border-t border-border/70 p-5 sm:p-6">{children}</div>
-  </details>
-);
-
-const AnalyticsModeToggle = ({ value, onChange }: { value: "charts" | "text"; onChange: (view: "charts" | "text") => void }) => (
-  <div className="flex overflow-hidden border border-border" role="group" aria-label="Section display mode">
-    <Button type="button" size="sm" variant={value === "charts" ? "default" : "ghost"} className="rounded-none" onClick={() => onChange("charts")}><BarChart3 className="mr-1.5 h-3.5 w-3.5" />Charts</Button>
-    <Button type="button" size="sm" variant={value === "text" ? "default" : "ghost"} className="rounded-none" onClick={() => onChange("text")}><List className="mr-1.5 h-3.5 w-3.5" />Text</Button>
-  </div>
-);
-
-const StatusItem = ({
-  icon: Icon,
-  tone,
-  title,
-  detail,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  tone: "clear" | "attention" | "critical";
-  title: string;
-  detail: string;
-}) => {
-  const styles = {
-    clear: "text-success border-success/30 bg-success/5",
-    attention: "text-warning border-warning/30 bg-warning/5",
-    critical: "text-destructive border-destructive/30 bg-destructive/5",
-  }[tone];
-
-  return (
-    <div className="flex items-center gap-3 p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center border ${styles}`}><Icon className="h-5 w-5" /></div>
-      <div>
-        <p className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{title}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-      </div>
-    </div>
-  );
-};
-
-const MetricCard = ({
-  label,
-  value,
-  icon: Icon,
-  tone = "neutral",
-  loading,
-}: {
-  label: string;
-  value: number;
-  icon: ComponentType<{ className?: string }>;
-  tone?: "neutral" | "attention" | "critical";
-  loading: boolean;
-}) => {
-  const styles = {
-    neutral: "border-border/80 bg-background",
-    attention: "border-l-4 border-warning/80 bg-warning/5",
-    critical: "border-l-4 border-destructive/80 bg-destructive/5",
-  }[tone];
-
-  return (
-    <div className={`min-w-0 border p-4 ${styles}`}>
-      <div className="flex items-start justify-between gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-[0.17em] text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>{label}</span>
-        <Icon className={`h-4 w-4 shrink-0 ${tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-primary"}`} />
-      </div>
-      <p className="mt-4 text-3xl font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{loading ? "..." : value}</p>
-    </div>
-  );
-};
-
-const CompactMetric = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex items-center justify-between gap-4 py-3">
-    <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{value}</span>
-  </div>
-);
-
-const SnapshotRow = ({ label, value }: { label: string; value: number | string }) => (
-  <div className="flex items-center justify-between border border-border/70 px-4 py-3">
-    <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-      {value}
-    </span>
-  </div>
-);
+const AnalyticsPanel = ({ title, description, children }: { title: string; description?: string; children: ReactNode }) => <section className="min-w-0 border border-border/80 bg-card"><header className="border-b border-border/70 px-5 py-4"><h2 className="font-semibold text-foreground">{title}</h2>{description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}</header><div className="p-5">{children}</div></section>;
+const SectionIntro = ({ title, description }: { title: string; description: string }) => <div><h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>;
+const PerformanceMetric = ({ label, value, icon: Icon, loading, period }: { label: string; value: number; icon: ComponentType<{ className?: string }>; loading: boolean; period: string }) => <div className="border-b border-border/70 p-5 sm:border-r sm:[&:nth-child(2n)]:border-r-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:[&:nth-child(2n)]:border-r xl:last:border-r-0"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-primary" /></div><p className="mt-3 text-3xl font-semibold tabular-nums text-foreground">{loading ? "—" : value.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">{period}</p></div>;
+const PositionItem = ({ icon: Icon, label, value, tone }: { icon: ComponentType<{ className?: string }>; label: string; value: number | string; tone: "clear" | "attention" | "critical" }) => { const styles = tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-success"; return <div className="flex items-center gap-4 p-5"><Icon className={`h-5 w-5 shrink-0 ${styles}`} /><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p></div></div>; };
+const ReportNarrative = ({ text, mode }: { text: string; mode: "answer" | "summary" }) => mode === "answer" ? <p className="mt-4 max-w-[38ch] whitespace-pre-line text-2xl font-semibold leading-9 tracking-[-0.025em] text-foreground sm:text-3xl sm:leading-10">{text}</p> : <div className="mt-6 space-y-5">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const [first, ...rest] = block.split("\n"); const isHeading = /^(Performance assessment|What changed|Recommended follow-up):?$/i.test(first.trim()); return <div key={`${first}-${index}`}>{isHeading ? <h3 className="text-sm font-semibold text-primary">{first.replace(/:$/, "")}</h3> : null}<p className={`${isHeading ? "mt-1.5" : ""} max-w-[70ch] whitespace-pre-line text-sm leading-6 text-foreground`}>{isHeading ? rest.join("\n") : block}</p></div>; })}</div>;
+const DistributionList = ({ items }: { items: NamedValue[] }) => items.length ? <div className="space-y-3">{items.map((item, index) => { const max = Math.max(...items.map((entry) => entry.value), 1); return <div key={item.name}><div className="mb-1.5 flex items-center justify-between gap-4"><span className="text-sm capitalize text-foreground">{item.name.replace(/_/g, " ")}</span><span className="text-sm font-semibold tabular-nums text-foreground">{item.value}</span></div><div className="h-1.5 bg-muted"><div className="h-full" style={{ width: `${Math.max((item.value / max) * 100, item.value ? 3 : 0)}%`, backgroundColor: chartPalette[index % chartPalette.length] }} /></div></div>; })}</div> : <p className="text-sm text-muted-foreground">No data for this period.</p>;
+const RankedList = ({ items, emptyText }: { items: { label: string; value: number | string }[]; emptyText: string }) => items.length ? <ol className="divide-y divide-border/70">{items.map((item, index) => <li key={item.label} className="flex items-center gap-4 py-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center bg-muted text-xs font-semibold text-muted-foreground">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm text-foreground" title={item.label}>{item.label}</span><span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{item.value}</span></li>)}</ol> : <p className="text-sm text-muted-foreground">{emptyText}</p>;
+const SnapshotRow = ({ label, value }: { label: string; value: number | string }) => <div className="flex items-center justify-between gap-4 py-3"><span className="text-sm text-muted-foreground">{label}</span><span className="font-semibold tabular-nums text-foreground">{value}</span></div>;
 
 export default AdminAnalytics;
