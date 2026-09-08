@@ -65,7 +65,9 @@ const getBooks = async (req, res) => {
     if (!req.publicCatalogue && req.query.page !== undefined) {
       return res.json(await service.searchBooksPage({
         query,
-        showArchived: req.query.archived === "true",
+        status: ["active", "archived", "all"].includes(String(req.query.status))
+          ? String(req.query.status)
+          : (req.query.archived === "true" ? "archived" : "active"),
         materialType: String(req.query.materialType ?? "all"),
         page: Number(req.query.page),
         limit: Number(req.query.limit) || 25,

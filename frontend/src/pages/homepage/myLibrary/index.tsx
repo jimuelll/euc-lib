@@ -25,6 +25,7 @@ import type {
   AttendanceSession,
   DashboardSubscription,
 } from "./types";
+import { RecommendationStrip } from "@/components/recommendations/RecommendationStrip";
 
 const fadeUp = (delay = 0) => ({
   hidden: { opacity: 0, y: 16 },
@@ -331,6 +332,11 @@ const MyLibrary = () => {
               hint={`${summary?.attendance_logs ?? 0} recorded library visits`}
             />
           </motion.div>
+
+          <div className="mt-8 space-y-5">
+            <RecommendationStrip personal materialType="book" />
+            <RecommendationStrip personal materialType="thesis" />
+          </div>
 
           {loading ? (
             <div className="mt-8 grid gap-5 lg:grid-cols-2">

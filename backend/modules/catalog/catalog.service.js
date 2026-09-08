@@ -1,6 +1,7 @@
 const db = require("../../db");
 const { httpError, validateBookTypeInput, validateIsbn } = require("./catalog.validation");
 const { parseMetadata, hydrateCatalogRecord } = require("./catalog.projection");
+const recommendations = require("../recommendations/recommendations.service");
 const MATERIAL_KEYS = ["material_type"];
 const OPERATIONAL_BOOK_KEYS = new Set(["title", "author", "isbn", "copies", "book_type_id", "material_type"]);
 const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "copies", "material_type", "metadata"];
@@ -300,6 +301,7 @@ const createBook = async (data, createdBy) => {
     await syncBookCopies(bookId, copies, conn);
 
     await conn.commit();
+    void recommendations.queueEnrichmentAndEmbedding(bookId).catch((err) => console.error("[recommendations] enrichment queue:", err));
     return bookId;
   } catch (err) {
     await conn.rollback();
@@ -339,6 +341,7 @@ const updateBook = async (id, data) => {
     }
 
     await conn.commit();
+    void recommendations.queueEnrichmentAndEmbedding(id).catch((err) => console.error("[recommendations] enrichment queue:", err));
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -451,14 +454,15 @@ const getCopyByBarcode = async (barcode) => {
   return rows[0] ?? null;
 };
 
-const searchBooksPage = async ({ query = "", showArchived = false, materialType = "all", page = 1, limit = 25 } = {}) => {
+const searchBooksPage = async ({ query = "", status = "active", materialType = "all", page = 1, limit = 25 } = {}) => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
   const like = `%${String(query).trim()}%`;
-  const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
+  const safeStatus = ["active", "archived", "all"].includes(status) ? status : "active";
+  const deletedFilter = safeStatus === "all" ? "1 = 1" : `bk.deleted_at ${safeStatus === "archived" ? "IS NOT NULL" : "IS NULL"}`;
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
   const params = [like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
-  const where = `WHERE bk.deleted_at ${deletedFilter}
+  const where = `WHERE ${deletedFilter}
     AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?) ${materialFilter}`;
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
   const [rows] = await db.query(

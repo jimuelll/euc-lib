@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -14,6 +14,8 @@ import type { User, UserFormState, QrTarget } from "../AdminManage.types";
 import type { AcademicProgram, AcademicTerm } from "../useAdminManage";
 import { formatRole } from "../AdminManage.data";
 import { printCodeLabel } from "@/utils/printCodeLabel";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -267,17 +269,19 @@ const TermSelect = ({ value, terms, onChange, disabled = false }: { value: strin
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-export const StatusBadge = ({ isArchived }: { isArchived: boolean }) => (
+export const StatusBadge = ({ status }: { status: "active" | "inactive" | "archived" }) => (
   <span
     className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] border ${
-      isArchived
+      status === "archived"
         ? "bg-warning/10 text-warning border-warning/30"
-        : "bg-success/10 text-success border-success/30"
+        : status === "active"
+          ? "bg-success/10 text-success border-success/30"
+          : "bg-muted text-muted-foreground border-border"
     }`}
     style={{ fontFamily: "var(--font-heading)" }}
   >
-    {isArchived ? <Archive className="h-2.5 w-2.5" /> : null}
-    {isArchived ? "Archived" : "Active"}
+    {status === "archived" ? <Archive className="h-2.5 w-2.5" /> : null}
+    {status === "archived" ? "Archived" : status === "active" ? "Active" : "Inactive"}
   </span>
 );
 
@@ -294,21 +298,22 @@ interface CreateFormProps {
   onTogglePassword: () => void;
   onSubmit:         () => void;
   onReset:          () => void;
+  embedded?:        boolean;
 }
 
 export const CreateForm = ({
   form, showPassword, allowedRoles, programs, terms, loading,
-  onField, onTogglePassword, onSubmit, onReset,
+  onField, onTogglePassword, onSubmit, onReset, embedded = false,
 }: CreateFormProps) => (
   <form
-    className="admin-panel-surface admin-etched-border mt-6 border border-border bg-background"
+    className={embedded ? "py-5" : "admin-panel-surface admin-etched-border mt-6 border border-border bg-background"}
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    <div className="border-b border-border px-6 py-4 bg-[linear-gradient(180deg,hsl(var(--primary)/0.07),transparent)]">
+    {!embedded && <div className="border-b border-border px-6 py-4 bg-[linear-gradient(180deg,hsl(var(--primary)/0.07),transparent)]">
       <SectionLabel>New User Details</SectionLabel>
-    </div>
+    </div>}
 
-    <div className="p-6 space-y-5">
+    <div className={embedded ? "space-y-5" : "p-6 space-y-5"}>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <FieldLabel>Full Name</FieldLabel>
@@ -348,7 +353,7 @@ export const CreateForm = ({
       <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
 
-    <div className="flex gap-2 border-t border-border px-6 py-4">
+    <div className={embedded ? "mt-6 flex gap-2 border-t border-border py-4" : "flex gap-2 border-t border-border px-6 py-4"}>
       <ActionButton type="submit" disabled={loading}>
         {loading ? "Creating…" : "Create User"}
       </ActionButton>
@@ -372,69 +377,27 @@ interface SearchBarProps {
   onRoleFilterChange: (v: string) => void;
   onStatusFilterChange: (v: string) => void;
   onSearch:         () => void;
-  onToggleArchived: () => void;
+  onArchivedViewChange: (archived: boolean) => void;
+  onCreate: () => void;
 }
 
 export const SearchBar = ({
-  value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange, onRoleFilterChange, onStatusFilterChange, onSearch, onToggleArchived,
+  value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange,
+  onRoleFilterChange, onStatusFilterChange, onSearch, onArchivedViewChange, onCreate,
 }: SearchBarProps) => (
-  <div className="mt-6 space-y-0">
-    {/* Section header with toggle */}
-    <div className="flex items-center justify-between border border-border border-b-0 bg-[linear-gradient(180deg,hsl(var(--primary)/0.06),transparent)] px-4 py-2.5">
-      <div className="flex items-center gap-2.5">
-        <div className="h-px w-4 bg-warning shrink-0" />
-        <span
-          className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {showArchived ? "Archived Users" : "Active Users"}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onToggleArchived}
-          className={`flex items-center gap-1.5 border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors ${
-            showArchived
-              ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
-              : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
-          }`}
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          <Archive className="h-3 w-3" />
-          {showArchived ? "Archived" : "Active"}
-        </button>
-      </div>
+  <div className="flex flex-col gap-2 border border-border bg-card p-3 lg:flex-row lg:items-center">
+    <div className="relative min-w-0 flex-1">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input placeholder="Search by ID or name…" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSearch(); }} className="h-11 rounded-none pl-9" />
     </div>
-
-    {/* Archived banner */}
-    {showArchived && (
-      <div className="flex items-center gap-2.5 px-4 py-2 bg-warning/5 border border-t-0 border-warning/20">
-        <Archive className="h-3 w-3 text-warning/60 shrink-0" />
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.15em] text-warning/70"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Showing archived users — restore to make them active again
-        </p>
-      </div>
-    )}
-
-    {/* Input */}
-    <div className="flex flex-wrap gap-2 border border-t-0 border-border bg-muted/10 p-2">
-      <select aria-label="Filter users by role" value={roleFilter} onChange={(event) => onRoleFilterChange(event.target.value)} className="h-9 min-w-32 border border-border bg-background px-2 text-sm"><option value="all">All roles</option>{allowedRoles.map((role) => <option key={role} value={role}>{formatRole(role)}</option>)}</select>
-      {!showArchived && <select aria-label="Filter users by account status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-9 min-w-28 border border-border bg-background px-2 text-sm"><option value="all">All status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>}
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+      <select aria-label="Filter users by role" value={roleFilter} onChange={(event) => onRoleFilterChange(event.target.value)} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="all">All roles</option>{allowedRoles.map((role) => <option key={role} value={role}>{formatRole(role)}</option>)}</select>
+      {!showArchived ? <select aria-label="Filter users by account status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="all">All access</option><option value="active">Active</option><option value="inactive">Inactive</option></select> : null}
+      <select aria-label="Filter archived users" value={showArchived ? "archived" : "current"} onChange={(event) => onArchivedViewChange(event.target.value === "archived")} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="current">Current users</option><option value="archived">Archived users</option></select>
     </div>
-    <div className="flex gap-0">
-      <Input
-        placeholder="Search by ID or name, or leave blank to show all…"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onSearch()}
-        className="rounded-none flex-1 border-r-0"
-      />
-      <ActionButton onClick={onSearch} disabled={loading}>
-        {loading ? "Searching…" : "Search"}
-      </ActionButton>
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" className="h-11 flex-1 rounded-none lg:flex-none" onClick={() => onSearch()} disabled={loading}><Search className="mr-2 h-4 w-4" />Search</Button>
+      <Button type="button" className="h-11 flex-1 rounded-none lg:flex-none" onClick={onCreate}><UserPlus className="mr-2 h-4 w-4" />Create user</Button>
     </div>
   </div>
 );
@@ -445,14 +408,15 @@ interface SearchResultsTableProps {
   results:      User[];
   showArchived: boolean;
   onSelect:     (u: User) => void;
+  onViewQr:     (u: User) => void;
 }
 
-export const SearchResultsTable = ({ results, showArchived, onSelect }: SearchResultsTableProps) => (
-  <div className="mt-4 border border-border overflow-x-auto">
+export const SearchResultsTable = ({ results, showArchived, onSelect, onViewQr }: SearchResultsTableProps) => (
+  <div className="overflow-x-auto">
     <table className="w-full text-left text-sm">
       <thead className="border-b border-border bg-secondary/40">
         <tr>
-          {["ID", "Name", "Program / Course", "Role", "Status"].map((h) => (
+          {["User", "Program / Course", "Role", "Account", ""].map((h) => (
             <th
               key={h}
               className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
@@ -464,25 +428,30 @@ export const SearchResultsTable = ({ results, showArchived, onSelect }: SearchRe
         </tr>
       </thead>
       <tbody>
-        {results.map((u, i) => (
+        {results.map((u) => (
           <tr
             key={u.student_employee_id}
-            className={`border-t border-border cursor-pointer transition-colors hover:bg-secondary/50 ${
-              showArchived ? "opacity-70" : ""
-            } ${i % 2 === 0 ? "bg-background" : "bg-secondary/20"}`}
+            tabIndex={0}
+            className={`border-t border-border cursor-pointer transition-colors hover:bg-secondary/50 focus-visible:bg-secondary/50 focus-visible:outline-none ${showArchived ? "bg-muted/20 text-muted-foreground" : "bg-background"}`}
             onClick={() => onSelect(u)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(u); } }}
           >
-            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{u.student_employee_id}</td>
-            <td className="px-4 py-3 text-xs font-medium text-foreground">{u.name}</td>
-            <td className="px-4 py-3 text-xs text-muted-foreground">{u.program_course ?? "—"}</td>
+            <td className="max-w-[320px] px-4 py-3"><p className="truncate text-sm font-semibold text-foreground">{u.name}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{u.student_employee_id}</p></td>
+            <td className="px-4 py-3 text-sm text-muted-foreground">{u.program_course ?? "—"}</td>
             <td
-              className="px-4 py-3 text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+              className="px-4 py-3 text-xs font-medium capitalize text-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              {u.role.replace("_", " ")}
+              {formatRole(u.role)}
             </td>
             <td className="px-4 py-3">
-              <StatusBadge isArchived={showArchived} />
+              <StatusBadge status={showArchived ? "archived" : u.is_active === 0 ? "inactive" : "active"} />
+            </td>
+            <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${u.name}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onSelect(u)}>{showArchived ? "Review account" : "Edit account"}</DropdownMenuItem>{!showArchived ? <DropdownMenuItem onClick={() => onViewQr(u)}><QrCode className="mr-2 h-4 w-4" />View QR code</DropdownMenuItem> : null}</DropdownMenuContent>
+              </DropdownMenu>
             </td>
           </tr>
         ))}
@@ -508,18 +477,19 @@ interface EditFormProps {
   onViewQr:         () => void;
   onArchive:        () => void;
   onRestore:        () => void;
+  embedded?:        boolean;
 }
 
 export const EditForm = ({
   selectedUser, form, showPassword, allowedRoles, programs, terms, loading, showArchived,
-  onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore,
+  onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore, embedded = false,
 }: EditFormProps) => (
   <form
-    className="mt-6 border border-border bg-background"
+    className={embedded ? "py-5" : "mt-6 border border-border bg-background"}
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
     {/* Header band */}
-    <div className="bg-primary relative overflow-hidden">
+    {!embedded && <div className="bg-primary relative overflow-hidden">
       <div className="h-[3px] w-full bg-warning" />
       <div className="px-6 py-4 flex items-center justify-between">
         <div>
@@ -536,11 +506,11 @@ export const EditForm = ({
             {selectedUser.student_employee_id}
           </p>
         </div>
-        <StatusBadge isArchived={showArchived} />
+        <StatusBadge status={showArchived ? "archived" : selectedUser.is_active === 0 ? "inactive" : "active"} />
       </div>
-    </div>
+    </div>}
 
-    <div className="p-6 space-y-5">
+    <div className={embedded ? "space-y-5" : "p-6 space-y-5"}>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <FieldLabel>Full Name</FieldLabel>
@@ -605,7 +575,7 @@ export const EditForm = ({
     </div>
 
     {/* Action bar */}
-    <div className="border-t border-border px-6 py-4 flex gap-2 flex-wrap">
+    <div className={embedded ? "mt-6 flex flex-wrap gap-2 border-t border-border py-4" : "border-t border-border px-6 py-4 flex gap-2 flex-wrap"}>
       {showArchived ? (
         <ActionButton type="button" variant="warning" onClick={onRestore} disabled={loading}>
           <ArchiveRestore className="h-3.5 w-3.5" />

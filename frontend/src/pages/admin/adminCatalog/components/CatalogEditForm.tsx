@@ -15,6 +15,7 @@ type Props = {
   onUpdate: () => void;
   onArchive: () => void;
   onDeselect: () => void;
+  inSheet?: boolean;
 };
 
 const FormLabel = ({ children, htmlFor, required = false }: { children: React.ReactNode; htmlFor?: string; required?: boolean }) => (
@@ -25,7 +26,7 @@ const FormLabel = ({ children, htmlFor, required = false }: { children: React.Re
 
 export default function CatalogEditForm({
   book, fields, values, errors, bookTypes, loading, barcodeStrip,
-  onFieldChange, onUpdate, onArchive, onDeselect,
+  onFieldChange, onUpdate, onArchive, onDeselect, inSheet = false,
 }: Props) {
   const materialType = book.material_type === "thesis" ? "thesis" : "book";
   const materialLabel = materialType === "book" ? "Book" : "Thesis";
@@ -35,12 +36,12 @@ export default function CatalogEditForm({
     .filter((field) => (field.scope ?? "shared") === "shared" || field.scope === materialType);
 
   return (
-    <div className="admin-panel-surface admin-etched-border mt-5 border border-border bg-card">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-5 py-3">
+    <div className={inSheet ? "" : "admin-panel-surface admin-etched-border mt-5 border border-border bg-card"}>
+      {!inSheet && <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-5 py-3">
         <p className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>Editing</p>
         <span className="max-w-[220px] truncate text-sm text-muted-foreground">{book.title}</span>
-      </div>
-      <div className="p-5">
+      </div>}
+      <div className={inSheet ? "py-5" : "p-5"}>
         <div className="grid gap-5 sm:grid-cols-2">
           {materialType === "book" && (
             <div>
@@ -73,7 +74,7 @@ export default function CatalogEditForm({
             <Trash2 className="h-4 w-4" /> {loading ? "Archiving…" : `Archive ${materialLabel}`}
           </button>
           <button onClick={onDeselect} disabled={loading} className="ml-auto flex min-h-11 items-center gap-2 border border-border px-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
-            <RefreshCw className="h-4 w-4" /> Deselect
+            <RefreshCw className="h-4 w-4" /> {inSheet ? "Close" : "Deselect"}
           </button>
         </div>
       </div>

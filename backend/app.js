@@ -8,6 +8,8 @@ const authRoutes        = require("./modules/auth/auth.routes");
 const adminRoutes       = require("./modules/admin/admin.routes");
 const catalogRoutes     = require("./modules/catalog/catalog.routes");
 const publicCatalogRoutes = require("./modules/catalog/catalog.public.routes");
+const recommendationPublicRoutes = require("./modules/recommendations/recommendations.public.routes");
+const recommendationRoutes = require("./modules/recommendations/recommendations.routes");
 const borrowingRoutes   = require("./modules/borrowing/borrowing.routes");
 const reservationRoutes = require("./modules/reservation/reservation.routes");
 const adminReservationRoutes = require("./modules/reservation/adminReservation.routes");
@@ -71,6 +73,7 @@ app.use("/api/about",    aboutRoutes);
 app.use("/api/site-content", siteContentRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api", publicCatalogRoutes);
+app.use("/api", recommendationPublicRoutes);
 app.use("/api/admin/users", require("./modules/admin/barcode.routes"));
 
 // --- Global Protection ---
@@ -88,6 +91,7 @@ app.use("/api/admin/about",  aboutRoutes);
 app.use("/api/attendance",   attendanceRoutes);
 app.use("/api",              subscriptionsRoutes);
 app.use("/api",              myLibraryRoutes);
+app.use("/api",              recommendationRoutes);
 app.use("/api",              notificationsRoutes);
 app.use("/api/admin",        librarySettingsRoutes);
 app.use("/api/admin",        backupRoutes);

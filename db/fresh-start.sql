@@ -42,6 +42,9 @@ DROP TABLE IF EXISTS
   `clearance_transactions`,
   `attendance_logs`,
   `borrowings`,
+  `recommendation_feedback`,
+  `book_enrichment`,
+  `book_embeddings`,
   `book_copies`,
   `books`,
   `book_types`,
@@ -271,6 +274,47 @@ CREATE TABLE `book_copies` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Recommendation vectors are operational data, intentionally separate from
+-- flexible catalogue metadata so vectors are never exposed publicly.
+CREATE TABLE `book_embeddings` (
+  `book_id` int(11) NOT NULL,
+  `model` varchar(128) NOT NULL,
+  `content_hash` char(64) NOT NULL,
+  `vector_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`vector_json`)),
+  `dimensions` int(11) DEFAULT NULL,
+  `status` enum('stale','ready','failed') NOT NULL DEFAULT 'stale',
+  `embedded_at` datetime DEFAULT NULL,
+  `last_error` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`book_id`),
+  KEY `idx_book_embeddings_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `book_enrichment` (
+  `book_id` int(11) NOT NULL,
+  `source` varchar(32) NOT NULL DEFAULT 'none',
+  `enrichment_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`enrichment_json`)),
+  `status` enum('stale','ready','failed') NOT NULL DEFAULT 'stale',
+  `enriched_at` datetime DEFAULT NULL,
+  `last_error` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`book_id`),
+  KEY `idx_book_enrichment_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `recommendation_feedback` (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `book_id` int(11) NOT NULL,
+  `feedback` enum('dismissed') NOT NULL DEFAULT 'dismissed',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_recommendation_feedback_user_book` (`user_id`, `book_id`),
+  KEY `idx_recommendation_feedback_book` (`book_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -1148,7 +1192,8 @@ INSERT INTO `users` (`student_employee_id`, `name`, `password_hash`, `role`, `is
 VALUES ('SA0001', 'Development Super Admin', '$2b$12$buA8cKPLUl3yVNMs01sibeSWY4/0AFzv/FNPNUa61RLI3CryzEHpG', 'super_admin', 1, 0, '', '');
 
 INSERT INTO `about_settings` (`id`, `library_name`, `mission_title`, `mission_text`, `history_title`, `history_text`, `policies`, `facilities`, `staff`, `spaces`)
-VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '', '[]', '[]', '[]', '[]');
+VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '', '[]', '[]', '[]', '[]')
+ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 
 INSERT INTO `book_types` (`name`, `default_borrow_days`, `fine_per_hour`, `fine_interval`, `initial_fine`, `is_active`)
 VALUES ('General collection', 7, 1.00, 'hour', 0.00, 1);
@@ -1169,11 +1214,15 @@ INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `lo
 ('thesis_keywords', 'Keywords', 'textarea', NULL, 0, 1, 24, 1, 0, 'thesis'),
 ('thesis_abstract', 'Abstract', 'textarea', NULL, 0, 1, 25, 0, 0, 'thesis');
 
-INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00);
+INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00)
+ON DUPLICATE KEY UPDATE `overdue_fine_per_hour` = VALUES(`overdue_fine_per_hour`);
 INSERT INTO `site_content_settings` (`id`, `hero_kicker`, `hero_title`, `hero_highlight`, `hero_description`, `hours`, `hero_stats`, `address`, `contact_email`, `contact_phone`) VALUES
-(1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567');
-INSERT INTO `auth_restore_state` (`id`) VALUES (1);
-INSERT INTO `system_maintenance_state` (`id`, `mode`) VALUES (1, 'normal');
+(1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567')
+ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
+INSERT INTO `auth_restore_state` (`id`) VALUES (1)
+ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
+INSERT INTO `system_maintenance_state` (`id`, `mode`) VALUES (1, 'normal')
+ON DUPLICATE KEY UPDATE `mode` = VALUES(`mode`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

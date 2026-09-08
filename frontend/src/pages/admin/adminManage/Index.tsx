@@ -3,8 +3,6 @@ import AdminManageBuilder from "./AdminManageBuilder";
 
 const AdminManage = () => {
   const {
-    functionType,
-    setFunctionType,
     form,
     setField,
     showPassword,
@@ -23,7 +21,7 @@ const AdminManage = () => {
     userPagination,
     handleSearchUsers,
     showArchived,
-    handleToggleArchived,
+    setArchivedView,
     selectedUser,
     selectUserForEdit,
     loading,
@@ -40,8 +38,6 @@ const AdminManage = () => {
     <>
       {confirmDialog}
       <AdminManageBuilder
-        functionType={functionType}
-        onFunctionTypeChange={(v) => { setFunctionType(v); resetForm(); }}
         form={form}
         showPassword={showPassword}
         allowedRoles={allowedRoles}
@@ -61,7 +57,7 @@ const AdminManage = () => {
         userPagination={userPagination}
         onSearch={handleSearchUsers}
         showArchived={showArchived}
-        onToggleArchived={handleToggleArchived}
+        onArchivedViewChange={setArchivedView}
         selectedUser={selectedUser}
         onSelectUser={selectUserForEdit}
         onCreateUser={handleCreateUser}

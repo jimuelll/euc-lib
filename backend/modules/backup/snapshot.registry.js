@@ -8,10 +8,10 @@ const SYSTEM_TABLES = [SNAPSHOT_TABLE, "audit_events", "auth_restore_state", "re
 // maintenance lock, or the session invalidation marker.
 const APPLICATION_TABLES = Object.freeze([
   "about_settings", "academic_programs", "academic_subscriptions", "academic_terms", "attendance_logs",
-  "auth_audit_events", "auth_refresh_sessions", "book_copies", "book_types", "books", "borrowings",
+  "auth_audit_events", "auth_refresh_sessions", "book_copies", "book_embeddings", "book_enrichment", "book_types", "books", "borrowings",
   "bulletin_comments", "bulletin_likes", "bulletin_posts", "catalog_schema", "clearance_transaction_items",
   "clearance_transactions", "library_circulation_settings", "library_events", "library_holidays", "notification_reads",
-  "notifications", "reservations", "site_content_settings", "site_daily_visits", "users",
+  "notifications", "recommendation_feedback", "reservations", "site_content_settings", "site_daily_visits", "users",
 ]);
 
 module.exports = { SNAPSHOT_TABLE, SYSTEM_TABLES, APPLICATION_TABLES };

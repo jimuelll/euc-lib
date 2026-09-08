@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -7,6 +7,7 @@ import PublicPageMasthead from "@/components/PublicPageMasthead";
 import { useDebounce } from "@/hooks/use-debounce";
 import axiosInstance from "@/utils/AxiosInstance";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RecommendationStrip } from "@/components/recommendations/RecommendationStrip";
 
 interface Book {
   id: number;
@@ -58,6 +59,7 @@ const Catalogue = () => {
   const [error, setError]             = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [pagination, setPagination]   = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
   const debouncedQuery = useDebounce(query, 400);
 
@@ -103,7 +105,7 @@ const Catalogue = () => {
     }
   }, []);
 
-  useEffect(() => { void searchBooks(debouncedQuery, 1); }, [debouncedQuery, searchBooks]);
+  useEffect(() => { setSelectedBook(null); void searchBooks(debouncedQuery, 1); }, [debouncedQuery, searchBooks]);
 
   const extraFields = schema
     .filter((f) => f.public && !CORE_KEYS.has(f.key))
@@ -187,9 +189,12 @@ const Catalogue = () => {
                 const isReferenceOnly = book.material_type === "thesis" || book.canBorrow === false;
                 const availability = isReferenceOnly ? null : getAvailabilityLabel(book.available);
                 return (
-                  <div
-                    key={book.id}
-                    className="group flex items-start gap-3 border-b border-r border-border bg-background px-4 py-5 transition-colors duration-200 hover:bg-secondary/50 sm:gap-5 sm:px-6"
+                  <Fragment key={book.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBook(book)}
+                    aria-pressed={selectedBook?.id === book.id}
+                    className={`group flex w-full items-start gap-3 border-b border-r border-border bg-background px-4 py-5 text-left transition-colors duration-200 hover:bg-secondary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning sm:gap-5 sm:px-6 ${selectedBook?.id === book.id ? "bg-secondary/50" : ""}`}
                   >
                     <span
                       className="mt-0.5 w-5 shrink-0 text-right text-[10px] font-bold tracking-[0.15em] text-muted-foreground/55 sm:w-6"
@@ -250,7 +255,13 @@ const Catalogue = () => {
                         )}
                       </div>
                     )}
-                  </div>
+                  </button>
+                  {selectedBook?.id === book.id ? (
+                    <div className="border-b border-r border-border bg-secondary/20 px-4 py-5 sm:px-6">
+                      <RecommendationStrip seedBookId={book.id} materialType={book.material_type || "book"} title={book.material_type === "thesis" ? `Related theses for ${book.title}` : `Similar books to ${book.title}`} />
+                    </div>
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </div>

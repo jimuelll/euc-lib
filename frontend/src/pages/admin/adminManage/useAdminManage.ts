@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
-import type { FunctionType, User, UserFormState, QrTarget } from "./AdminManage.types";
+import type { User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 
@@ -10,10 +10,6 @@ export type AcademicProgram = { id: number; name: string };
 export type AcademicTerm = { id: number; name: string; starts_on: string; ends_on: string; is_current: number };
 
 interface UseAdminManageReturn {
-  // Mode
-  functionType:    FunctionType;
-  setFunctionType: (v: FunctionType) => void;
-
   // Form
   form:            UserFormState;
   setField:        <K extends keyof UserFormState>(key: K, value: string) => void;
@@ -37,7 +33,7 @@ interface UseAdminManageReturn {
   userPagination:       { page: number; limit: number; total: number; totalPages: number };
   handleSearchUsers:    (page?: number) => Promise<void>;
   showArchived:         boolean;
-  handleToggleArchived: () => void;
+  setArchivedView:      (archived: boolean) => void;
 
   // Selected user
   selectedUser:      User | null;
@@ -45,10 +41,10 @@ interface UseAdminManageReturn {
 
   // Actions
   loading:           boolean;
-  handleCreateUser:  () => Promise<void>;
-  handleUpdateUser:  () => Promise<void>;
-  handleArchiveUser: () => Promise<void>;
-  handleRestoreUser: () => Promise<void>;
+  handleCreateUser:  () => Promise<boolean>;
+  handleUpdateUser:  () => Promise<boolean>;
+  handleArchiveUser: () => Promise<boolean>;
+  handleRestoreUser: () => Promise<boolean>;
   confirmDialog: JSX.Element;
 
   // QR
@@ -59,7 +55,6 @@ interface UseAdminManageReturn {
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
 
-  const [functionType,  setFunctionType]  = useState<FunctionType>("edit");
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
   const [loading,       setLoading]       = useState(false);
@@ -102,15 +97,16 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const togglePassword = () => setShowPassword((v) => !v);
 
   // ── Toggle archived view ───────────────────────────────────────────────────
-  const handleToggleArchived = () => {
-    const next = !showArchived;
-    setShowArchived(next);
+  const setArchivedView = (archived: boolean) => {
+    setShowArchived(archived);
     setSelectedUser(null);
     void (async () => {
       setLoading(true);
       try {
-        const res = await axiosInstance.get("/api/admin/users", { params: { student_employee_id: searchQuery.trim() || undefined, name: searchQuery.trim() || undefined, role: roleFilter === "all" ? undefined : roleFilter, status: statusFilter === "all" ? undefined : statusFilter, archived: next ? "true" : undefined } });
-        setSearchResults(res.data);
+        const res = await axiosInstance.get("/api/admin/users", { params: { student_employee_id: searchQuery.trim() || undefined, name: searchQuery.trim() || undefined, role: roleFilter === "all" ? undefined : roleFilter, status: archived || statusFilter === "all" ? undefined : statusFilter, archived: archived ? "true" : undefined, page: 1, limit: 25 } });
+        const rows = res.data.rows ?? res.data;
+        setSearchResults(rows);
+        setUserPagination(res.data.pagination ?? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 });
       } catch (err: any) { toast.error(err.response?.data?.message || "Failed to load users"); }
       finally { setLoading(false); }
     })();
@@ -121,11 +117,11 @@ export const useAdminManage = (): UseAdminManageReturn => {
     const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId } = form;
     if (!fullName || !id || !role || !password || !rePassword) {
       toast.error("All required fields must be filled");
-      return;
+      return false;
     }
     if (password !== rePassword) {
       toast.error("Passwords do not match");
-      return;
+      return false;
     }
     setLoading(true);
     try {
@@ -143,8 +139,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
       setQrTarget({ studentId: id, name: fullName });
       resetForm();
       await handleSearchUsers();
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to create user");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -161,7 +159,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
           student_employee_id: trimmedQuery || undefined,
           name:                trimmedQuery || undefined,
           role:                roleFilter === "all" ? undefined : roleFilter,
-          status:              statusFilter === "all" ? undefined : statusFilter,
+          status:              showArchived || statusFilter === "all" ? undefined : statusFilter,
           archived:            showArchived ? "true" : undefined,
           page,
           limit: 25,
@@ -210,13 +208,13 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Update ─────────────────────────────────────────────────────────────────
   const handleUpdateUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return false;
     const { fullName, role, address, contact, programId, academicTermId, password, rePassword } = form;
     const updates: any = { name: fullName, role, address, contact, program_id: programId || null, academic_term_id: academicTermId || null };
     if (password) {
       if (password !== rePassword) {
         toast.error("Passwords do not match");
-        return;
+        return false;
       }
       updates.password = password;
     }
@@ -229,8 +227,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
       toast.success(res.data.message);
       resetForm();
       await handleSearchUsers();
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Update failed");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -239,14 +239,14 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // ── Archive — DELETE /api/admin/users/:id ──────────────────────────────────
   // Sets is_active=0 and deleted_at=NOW(). One action, one outcome.
   const handleArchiveUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return false;
     const shouldArchive = await confirm({
       title: `Archive ${selectedUser.name}?`,
       description: "They will lose access to the system and disappear from active searches until restored.",
       actionLabel: "Archive User",
       tone: "danger",
     });
-    if (!shouldArchive) return;
+    if (!shouldArchive) return false;
     setLoading(true);
     try {
       const res = await axiosInstance.delete(
@@ -255,8 +255,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
       toast.success(res.data.message || "User archived");
       resetForm();
       await handleSearchUsers();
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Archive failed");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -265,13 +267,13 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // ── Restore — PATCH /api/admin/users/:id/restore ───────────────────────────
   // Clears deleted_at and sets is_active=1. User is fully active again.
   const handleRestoreUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return false;
     const shouldRestore = await confirm({
       title: `Restore ${selectedUser.name}?`,
       description: "They will be able to log in and appear in active searches again.",
       actionLabel: "Restore User",
     });
-    if (!shouldRestore) return;
+    if (!shouldRestore) return false;
     setLoading(true);
     try {
       const res = await axiosInstance.patch(
@@ -280,8 +282,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
       toast.success(res.data.message || "User restored");
       resetForm();
       await handleSearchUsers();
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Restore failed");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -326,8 +330,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
   }; */
 
   return {
-    functionType,
-    setFunctionType,
     form,
     setField,
     showPassword,
@@ -346,7 +348,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     userPagination,
     handleSearchUsers,
     showArchived,
-    handleToggleArchived,
+    setArchivedView,
     selectedUser,
     selectUserForEdit,
     loading,

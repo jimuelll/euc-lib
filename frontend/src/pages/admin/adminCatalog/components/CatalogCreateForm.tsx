@@ -19,6 +19,7 @@ type Props = {
   onLookupIsbn: () => void;
   onSubmit: () => void;
   onClear: () => void;
+  inSheet?: boolean;
 };
 
 const FormLabel = ({ children, htmlFor, required = false }: { children: React.ReactNode; htmlFor?: string; required?: boolean }) => (
@@ -29,7 +30,7 @@ const FormLabel = ({ children, htmlFor, required = false }: { children: React.Re
 
 export default function CatalogCreateForm({
   fields, materialType, values, errors, bookTypes, loading, isbnLookup,
-  onMaterialChange, onFieldChange, onLookupIsbn, onSubmit, onClear,
+  onMaterialChange, onFieldChange, onLookupIsbn, onSubmit, onClear, inSheet = false,
 }: Props) {
   const fieldsForMaterial = fields
     .filter((field) => !field.archived)
@@ -40,11 +41,11 @@ export default function CatalogCreateForm({
   const isbnError = errors.isbn;
 
   return (
-    <div className="admin-panel-surface admin-etched-border mt-5 border border-border bg-card">
-      <div className="border-b border-border bg-muted/30 px-5 py-3">
+    <div className={inSheet ? "" : "admin-panel-surface admin-etched-border mt-5 border border-border bg-card"}>
+      {!inSheet && <div className="border-b border-border bg-muted/30 px-5 py-3">
         <p className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>New {materialLabel} Entry</p>
-      </div>
-      <div className="p-5">
+      </div>}
+      <div className={inSheet ? "py-5" : "p-5"}>
         <div className="mb-5">
           <SegmentedNavigation
             ariaLabel="Material type"

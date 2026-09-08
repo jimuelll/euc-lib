@@ -24,6 +24,9 @@ export type Book = {
   edition?: string;
   publication_year?: number;
   copies?: number;
+  available?: number;
+  total_copies?: number;
+  deleted_at?: string | null;
   material_type?: "book" | "thesis";
   book_type_id?: number | string;
   metadata?: Record<string, CatalogFormValue>;

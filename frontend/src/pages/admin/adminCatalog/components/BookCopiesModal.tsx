@@ -10,7 +10,7 @@ type Copy = {
   barcode: string;
   condition: "good" | "damaged" | "lost";
   is_active: number;
-  status: "available" | "borrowed";
+  status: "available" | "borrowed" | "reserved";
   due_date?: string;
   borrower_name?: string;
   notes?: string;
@@ -20,6 +20,7 @@ type Props = {
   bookId: number;
   bookTitle: string;
   onClose: () => void;
+  embedded?: boolean;
 };
 
 const CONDITION_CONFIG: Record<string, { label: string; className: string }> = {
@@ -31,6 +32,7 @@ const CONDITION_CONFIG: Record<string, { label: string; className: string }> = {
 const STATUS_CONFIG = {
   available: { label: "Available", className: "border-success/30 text-success bg-success/5"           },
   borrowed:  { label: "Borrowed",  className: "border-destructive/30 text-destructive bg-destructive/5" },
+  reserved:  { label: "Reserved",  className: "border-warning/40 text-warning bg-warning/5"           },
 };
 
 const fetchBarcodeObjectUrl = async (barcode: string): Promise<string> => {
@@ -68,7 +70,7 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
+const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props) => {
   const [copies, setCopies]           = useState<Copy[]>([]);
   const [loading, setLoading]         = useState(true);
   const [scanning, setScanning]       = useState(false);
@@ -159,8 +161,8 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
   const borrowed  = copies.filter((c) => c.status === "borrowed").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative w-full max-w-2xl border border-border bg-background shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className={embedded ? "flex min-h-0 flex-1 flex-col" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"}>
+      <div className={embedded ? "relative flex min-h-0 w-full flex-1 flex-col overflow-hidden border border-border bg-background" : "relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden border border-border bg-background shadow-2xl"}>
 
         {/* Gold top rule */}
         <div className="h-[3px] w-full bg-warning shrink-0" />
@@ -195,13 +197,13 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
                 <ScanLine className="h-3.5 w-3.5" />
                 {scanning ? "Stop Scan" : "Scan"}
               </button>
-              <button
+              {!embedded && <button
                 onClick={onClose}
                 className="p-1.5 text-primary-foreground/40 hover:text-primary-foreground transition-colors"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </button>}
             </div>
           </div>
 
@@ -233,7 +235,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose }: Props) => {
         </div>
 
         {/* ── Scrollable body ────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-auto">
 
           {/* Scanner view */}
           {scanning && (
