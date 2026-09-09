@@ -50,6 +50,7 @@ const chartPalette = ["#800000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#b
 export type AnalyticsRange = "7d" | "30d" | "month" | "year";
 type AnalyticsTab = "overview" | "circulation" | "visitors" | "collection" | "ai-report";
 type ReportRange = "today" | "7d" | "30d" | "month" | "custom" | "all-time";
+type ReportNotice = "privacy" | "scope" | "date" | null;
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string }[] = [
   { value: "7d", label: "Last 7 days", shortLabel: "7 days" }, { value: "30d", label: "Last 30 days", shortLabel: "30 days" },
   { value: "month", label: "This month", shortLabel: "Month" }, { value: "year", label: "This year", shortLabel: "Year" },
@@ -94,7 +95,7 @@ const AdminAnalytics = () => {
   const [customDateTo, setCustomDateTo] = useState(initialReportDates.dateTo);
   const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null); const [reportLoading, setReportLoading] = useState(false);
   const [answeredQuestion, setAnsweredQuestion] = useState("");
-  const [reportError, setReportError] = useState(""); const [reportPrivacyNotice, setReportPrivacyNotice] = useState(false); const [copied, setCopied] = useState(false);
+  const [reportError, setReportError] = useState(""); const [reportNotice, setReportNotice] = useState<ReportNotice>(null); const [copied, setCopied] = useState(false);
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
   const reportDates = useMemo(() => reportRange === "custom" ? { dateFrom: customDateFrom, dateTo: customDateTo } : reportRange === "all-time" ? { dateFrom: "", dateTo: "" } : reportDatesFor(reportRange), [customDateFrom, customDateTo, reportRange]);
   const performance = useMemo(() => ({
@@ -108,28 +109,29 @@ const AdminAnalytics = () => {
     finally { setLoading(false); setRefreshing(false); }
   }, [range]);
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
-  const clearReportResult = () => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false); };
+  const clearReportResult = () => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false); };
   const selectReportRange = (nextRange: ReportRange) => { setReportRange(nextRange); clearReportResult(); };
   const updateCustomDate = (field: "from" | "to", value: string) => {
     field === "from" ? setCustomDateFrom(value) : setCustomDateTo(value);
     clearReportResult();
   };
-  const updateReportQuestion = (value: string) => { setReportQuestion(value); setReportError(""); setReportPrivacyNotice(false); };
+  const updateReportQuestion = (value: string) => { setReportQuestion(value); setReportError(""); setReportNotice(null); };
   const generateReport = async () => {
     const question = reportQuestion.trim();
     if (reportRange !== "all-time") {
-      if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportPrivacyNotice(false); return; }
-      if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportPrivacyNotice(false); return; }
-      if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportPrivacyNotice(false); return; }
-      if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportPrivacyNotice(false); return; }
+      if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportNotice(null); return; }
+      if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportNotice(null); return; }
+      if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportNotice(null); return; }
+      if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportNotice(null); return; }
     }
-    setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportPrivacyNotice(false); setCopied(false);
+    setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false);
     try {
       const nextReport = await createAiAnalyticsReport(reportRange === "all-time" ? { allTime: true, question: question || undefined } : { ...reportDates, question: question || undefined });
       setReport(nextReport);
       setAnsweredQuestion(nextReport.mode === "answer" ? question : "");
     } catch (reportFailure: unknown) {
-      setReportPrivacyNotice(getApiErrorCode(reportFailure) === "AI_REPORT_PRIVACY_RESTRICTED");
+      const errorCode = getApiErrorCode(reportFailure);
+      setReportNotice(errorCode === "AI_REPORT_PRIVACY_RESTRICTED" ? "privacy" : errorCode === "AI_REPORT_IRRELEVANT_QUESTION" ? "scope" : errorCode === "AI_REPORT_DATE_NOT_RECORDED" || errorCode === "AI_REPORT_DATE_OUTSIDE_RANGE" ? "date" : null);
       setReportError(getApiErrorMessage(reportFailure, "Unable to generate the performance brief. Try again."));
     }
     finally { setReportLoading(false); }
@@ -141,7 +143,7 @@ const AdminAnalytics = () => {
       ? [`Library analytics answer`, `Question: ${answeredQuestion}`, `Answer: ${report.report}`, `Period: ${period}`, "Source: Aggregate library operations data for this period."].join("\n")
       : [`Library performance brief`, `Period: ${period}`, "", report.report, "", "Source: Aggregate library operations data for this period."].join("\n");
     try { await navigator.clipboard.writeText(copyText); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
-    catch { setReportPrivacyNotice(false); setReportError("Unable to copy the result. Select the text and copy it manually."); }
+    catch { setReportNotice(null); setReportError("Unable to copy the result. Select the text and copy it manually."); }
   };
 
   return <AdminPage title="Operations Analytics" actions={activeTab === "ai-report" ? undefined : <Button type="button" variant="outline" className="rounded-none" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>}>
@@ -218,9 +220,9 @@ const AdminAnalytics = () => {
           </div>
         </section>
 
-        {reportError ? <div role="alert" className={`flex items-start gap-3 border px-4 py-4 ${reportPrivacyNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
-          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportPrivacyNotice ? "text-warning" : "text-destructive"}`} />
-          <div><p className="text-sm font-semibold">{reportPrivacyNotice ? "Privacy-protected request" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportPrivacyNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
+        {reportError ? <div role="alert" className={`flex items-start gap-3 border px-4 py-4 ${reportNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
+          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportNotice ? "text-warning" : "text-destructive"}`} />
+          <div><p className="text-sm font-semibold">{reportNotice === "privacy" ? "Privacy-protected request" : reportNotice === "scope" ? "Question outside report scope" : reportNotice === "date" ? "Check the requested date" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
         </div> : null}
 
         <section className="min-h-[330px] border border-border/80 bg-[linear-gradient(145deg,hsl(var(--primary)/0.055),transparent_52%)] px-5 py-6 sm:px-8 sm:py-8" aria-live="polite">

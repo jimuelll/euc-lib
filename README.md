@@ -20,11 +20,13 @@ Full-stack library services platform for Manuel S. Enverga University Foundation
 - Manage reservation queues and attendance records.
 - Review clearance status, fines, and cash payments.
 - Publish bulletin content and manage library-facing information.
+- Open a role-aware user guide with plain-language instructions for each available module.
 
 ### For administrators
 
 - Manage users, library settings, holidays, academic programs, and academic terms.
 - Manage the About page, homepage content, subscriptions, announcements, and notifications.
+- Draft, publish, reorder, hide, and archive user-guide modules from Content Management.
 - Review analytics, exports, circulation reports, clearance exceptions, and audit data.
 - Run aggregate AI analytics reports with Gemini or Groq.
 - Maintain Gemini semantic catalogue embeddings and book recommendations.
@@ -93,6 +95,7 @@ Protected API routes use JWT authentication and role checks. New or reset accoun
 │   └── package.json
 ├── db/
 │   ├── fresh-start.sql         Current destructive schema baseline and defaults
+│   ├── migrations/             Additive SQL changes for existing databases
 │   └── realistic-demo-data.sql Demo users and catalogue data
 ├── PRODUCT.md                  Product context and constraints
 └── README.md
@@ -126,6 +129,14 @@ mysql -u <user> -p <database> < db/realistic-demo-data.sql
 ```
 
 The demo script documents its own test accounts and password. Use demo data only in a non-production database.
+
+If the database already exists, do not rerun the destructive baseline. Apply the user-guide migration instead:
+
+```powershell
+mysql -u <user> -p <database> < db/migrations/2026-09-09-add-user-guide.sql
+```
+
+The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content.
 
 ### 2. Configure the backend
 
@@ -232,7 +243,7 @@ The main routes registered in `frontend/src/App.tsx` are:
 | --- | --- |
 | Public | `/`, `/about`, `/services`, `/services/subscriptions`, `/catalogue`, `/bulletin`, `/login`, `/scan-qr`, `/change-password` |
 | Patron | `/services/borrowing`, `/my-library`, `/edit-profile` |
-| Staff/admin | `/admin`, `/admin/manage`, `/admin/catalog`, `/admin/circulation`, `/admin/reservations`, `/admin/clearance`, `/admin/holidays`, `/admin/content` |
+| Staff/admin | `/admin`, `/admin/manage`, `/admin/catalog`, `/admin/circulation`, `/admin/reservations`, `/admin/clearance`, `/admin/holidays`, `/admin/user-guide`, `/admin/content` |
 | Admin-only | `/admin/analytics`, `/admin/report`, `/admin/notifications`, `/admin/attendance-logs` |
 | Super-admin | `/admin/book-types`, `/admin/backup`, `/admin/audit-logs` |
 
@@ -244,7 +255,8 @@ The Express application mounts feature modules under `/api`:
 
 - **Public/content:** `/auth`, `/about`, `/site-content`, `/bulletin`, `/events`, `/catalogue`, `/analytics/visit`.
 - **Patron:** `/borrowing`, `/reservations`, `/my-library`, `/notifications`, `/subscriptions`, `/recommendations`.
-- **Staff/admin:** `/admin`, `/attendance`, `/admin/catalogue`, `/admin/circulation`, `/admin/analytics`, `/admin/clearance`, `/admin/library-settings`.
+- **Staff/admin:** `/admin`, `/attendance`, `/user-guide`, `/admin/catalogue`, `/admin/circulation`, `/admin/analytics`, `/admin/clearance`, `/admin/library-settings`.
+- **Guide editing:** `/admin/user-guide` supports drafts, publishing, ordering, visibility, and archival for `admin` and `super_admin` roles.
 - **Super-admin:** `/admin/backup`, audit-log views, catalogue schema/book-type controls, and embedding maintenance.
 
 The exact endpoint contracts live beside each feature in `backend/modules/*/*.routes.js`. The backend also runs overdue-borrowing synchronization at startup and every five minutes.
@@ -272,7 +284,7 @@ Before deploying:
 - Keep Cloudinary upload presets narrowly scoped; browser uploads use the unsigned preset configured in the frontend.
 - Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing.
 - AI analytics reports send aggregate evidence only. The backend rejects questions that request individual visitor or patron identities.
-- Treat `db/fresh-start.sql` as a reset script, not a migration. There is no migration runner in this repository.
+- Treat `db/fresh-start.sql` as a reset script, not a migration. Additive SQL files in `db/migrations/` must currently be applied manually because there is no migration runner.
 
 ## Project notes
 

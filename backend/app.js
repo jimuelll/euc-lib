@@ -29,6 +29,7 @@ const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
 const clearanceRoutes = require("./modules/clearance/clearance.routes");
 const siteContentRoutes = require("./modules/siteContent/siteContent.routes");
+const userGuideRoutes = require("./modules/userGuide/userGuide.routes");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -96,6 +97,7 @@ app.use("/api",              notificationsRoutes);
 app.use("/api/admin",        librarySettingsRoutes);
 app.use("/api/admin",        backupRoutes);
 app.use("/api/admin",        clearanceRoutes);
+app.use("/api",              userGuideRoutes);
 
 
 module.exports = app;

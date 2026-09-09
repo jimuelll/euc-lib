@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpenText, CalendarDays, FileText, Globe2, Loader2, Plus, Trash2 } from "lucide-react";
+import { BookOpenCheck, BookOpenText, CalendarDays, FileText, Globe2, Loader2, Plus, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { AdminPage, AdminPanel } from "./components/AdminPage";
 import AdminAbout from "./adminAbout/Index";
 import AdminBulletin from "./AdminBulletin";
 import AdminSubscriptions from "./adminSubscriptions";
+import UserGuideEditor from "./adminUserGuide/UserGuideEditor";
 import axiosInstance from "@/utils/AxiosInstance";
 import { getSiteContent, updateSiteContent, type SiteContent } from "@/services/site-content.service";
 
@@ -52,6 +53,7 @@ const CMS_TABS = {
   bulletin: { label: "Bulletin", description: "Publish announcements and keep the public bulletin organized.", icon: FileText },
   events: { label: "Events", description: "Schedule events displayed beside the public bulletin.", icon: CalendarDays },
   subscriptions: { label: "Subscriptions", description: "Curate academic resources available through the library.", icon: BookOpenText },
+  guide: { label: "User guide", description: "Write role-specific help, save unfinished work as a draft, and publish it when it is ready.", icon: BookOpenCheck },
 } as const;
 export default function AdminContentManagement() {
   const [params, setParams] = useSearchParams();
@@ -61,12 +63,13 @@ export default function AdminContentManagement() {
   const CurrentIcon = current.icon;
   const select = (value: string) => setParams({ tab: value });
   return <AdminPage title="Content management" contentWidth="wide"><Tabs value={tab} onValueChange={select}>
-    <div className="border-y border-border bg-muted/20 px-2 py-2 sm:px-3"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0"><TabsTrigger value="homepage" className="gap-2 rounded-sm px-3 py-2 text-xs"><Globe2 className="h-4 w-4" />Homepage</TabsTrigger><TabsTrigger value="about" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />About</TabsTrigger><TabsTrigger value="bulletin" className="gap-2 rounded-sm px-3 py-2 text-xs"><FileText className="h-4 w-4" />Bulletin</TabsTrigger><TabsTrigger value="events" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarDays className="h-4 w-4" />Events</TabsTrigger><TabsTrigger value="subscriptions" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />Subscriptions</TabsTrigger></TabsList></div>
+    <div className="border-y border-border bg-muted/20 px-2 py-2 sm:px-3"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0"><TabsTrigger value="homepage" className="gap-2 rounded-sm px-3 py-2 text-xs"><Globe2 className="h-4 w-4" />Homepage</TabsTrigger><TabsTrigger value="about" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />About</TabsTrigger><TabsTrigger value="bulletin" className="gap-2 rounded-sm px-3 py-2 text-xs"><FileText className="h-4 w-4" />Bulletin</TabsTrigger><TabsTrigger value="events" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarDays className="h-4 w-4" />Events</TabsTrigger><TabsTrigger value="subscriptions" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />Subscriptions</TabsTrigger><TabsTrigger value="guide" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenCheck className="h-4 w-4" />User guide</TabsTrigger></TabsList></div>
     <div className="flex items-start gap-3 border-b border-border py-5"><div className="flex h-9 w-9 shrink-0 items-center justify-center border border-warning/30 bg-warning/10 text-warning"><CurrentIcon className="h-4 w-4" /></div><div><h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{current.label}</h2><p className="mt-1 text-sm text-muted-foreground">{current.description}</p></div></div>
     <TabsContent value="homepage" className="mt-5"><HomeContent /></TabsContent>
     <TabsContent value="about" className="mt-5 [&>div>header]:hidden"><AdminAbout /></TabsContent>
     <TabsContent value="bulletin" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>h1]:hidden"><AdminBulletin /></TabsContent>
     <TabsContent value="events" className="mt-5"><Events /></TabsContent>
     <TabsContent value="subscriptions" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>h1]:hidden"><AdminSubscriptions /></TabsContent>
+    <TabsContent value="guide" className="mt-5"><UserGuideEditor /></TabsContent>
   </Tabs></AdminPage>;
 }

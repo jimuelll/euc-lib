@@ -13,6 +13,10 @@ function requestError(message, status = 400, code = null) {
 
 const PRIVACY_RESTRICTION_CODE = "AI_REPORT_PRIVACY_RESTRICTED";
 const PRIVACY_RESTRICTION_MESSAGE = "AI reports cannot identify individual visitors or patrons. Ask for an aggregate count instead. To review authorized individual attendance records, use Attendance History.";
+const IRRELEVANT_QUESTION_CODE = "AI_REPORT_IRRELEVANT_QUESTION";
+const IRRELEVANT_QUESTION_MESSAGE = "AI Reports only answer questions about the library operations data available here. Ask about borrowing, returns, reservations, attendance, website activity, fines, or collection performance.";
+const DATE_NOT_RECORDED_CODE = "AI_REPORT_DATE_NOT_RECORDED";
+const DATE_OUTSIDE_RANGE_CODE = "AI_REPORT_DATE_OUTSIDE_RANGE";
 
 function isIdentitySeekingQuestion(question) {
   if (!question) return false;
@@ -26,6 +30,165 @@ function isIdentitySeekingQuestion(question) {
   const asksForTopPerson = /\b(?:the\s+)?top\s+(?:user|patron|borrower|student|employee|visitor)\b/i.test(question);
   const asksForPersonalField = /\b(?:student|employee|patron|user)\s*(?:id|number|email|address|contact|phone|barcode)\b/i.test(question);
   return asksWhichPeople || asksNamedPeople || asksWhoDidActivity || asksForTopPerson || asksForPersonalField;
+}
+
+const REPORT_INTENTS = [
+  ["circulation", /\b(?:borrow(?:ed|er|ers|ing|ings)?|return(?:ed|ing|s)?|circulation|loan(?:ed|s)?|books?|titles?)\b/i],
+  ["reservations", /\b(?:reserv(?:e|ed|ing|ation|ations)|fulfilled|cancelled|ready for pickup)\b/i],
+  ["attendance", /\b(?:attendance|visit(?:ed|or|ors|ing|s)?|entr(?:y|ies)|exit(?:ed|s)?|check[- ]?(?:in|out|ins|outs)|library scans?|went (?:in|into|to) (?:the )?library)\b/i],
+  ["site_activity", /\b(?:website|site activity|page hits?|online visit(?:or|ors|s)?)\b/i],
+  ["fines", /\b(?:fines?|payments?|settled|collections?|outstanding balance)\b/i],
+  ["catalog", /\b(?:catalog(?:ue)?|collection|copies|copy|inventory|condition|damaged|lost)\b/i],
+];
+const REPORT_INTENT_NAMES = REPORT_INTENTS.map(([intent]) => intent).concat("performance");
+const ANALYTICS_SIGNAL = /\b(?:how many|how much|number of|count|total|sum|amount|most|top|least|popular|highest|lowest|average|rate|ratio|percentage|percent|difference|net|calculate|compute|change|changed|increase|decrease|trend|compare|comparison|performance|summary|summarize|activity|busiest|quietest|outstanding|overdue|available|status|were|was|did|has|have|created|fulfilled|cancelled|collected)\b/i;
+const PERIOD_ANALYSIS = /\b(?:what changed|key findings|performance|operational activity|activity summary|reporting period|selected period|during this period|compare|comparison|trend|busiest|quietest)\b/i;
+const UNSUPPORTED_REQUEST = /(?:\d+(?:\.\d+)?(?:\s*(?:[+*×÷^]|\s[-/]\s)|\s+\b(?:plus|minus|times|multiplied|divided)\b\s*)\d+|\b(?:capital of|weather|recipe|translate|president of|tell (?:me )?(?:a )?joke|write (?:me )?(?:a )?(?:poem|story|email|code))\b)/i;
+
+function classifyReportQuestion(question) {
+  if (!question) return ["summary"];
+  if (UNSUPPORTED_REQUEST.test(question)) return null;
+
+  const clauses = question.split(/\s*(?:;|\b(?:and|also|plus|then)\b)\s*/i).map((part) => part.trim()).filter(Boolean);
+  const clauseMatches = clauses.map((clause) => {
+    const intents = REPORT_INTENTS.filter(([, pattern]) => pattern.test(clause)).map(([intent]) => intent);
+    const datedHistory = /\bwhat happened\b/i.test(clause) && /\b(?:today|yesterday|this (?:week|month|year)|last \d+ days?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}|\d{4}-\d{2}-\d{2})\b/i.test(clause);
+    if (PERIOD_ANALYSIS.test(clause)) return { intents: intents.length ? intents : ["performance"], complete: true };
+    if (datedHistory && intents.length > 0) return { intents, complete: true };
+    return { intents, complete: intents.length > 0 && ANALYTICS_SIGNAL.test(clause) };
+  });
+
+  // Topic-only fragments are allowed only when another clause supplies the
+  // analytical operation, e.g. "compare borrowings and returns". Every clause
+  // must still map to the allowlist, preventing one library word from
+  // laundering an unrelated second request.
+  if (!clauseMatches.some((match) => match.complete) || clauseMatches.some((match) => match.intents.length === 0)) return null;
+  return [...new Set(clauseMatches.flatMap((match) => match.intents))];
+}
+
+function isReportRelevantQuestion(question) {
+  return classifyReportQuestion(question) !== null;
+}
+
+const MONTH_NUMBERS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+function validDateParts(year, month, day) {
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (candidate.getUTCFullYear() !== year || candidate.getUTCMonth() + 1 !== month || candidate.getUTCDate() !== day) return null;
+  return candidate.toISOString().slice(0, 10);
+}
+
+function extractMentionedDate(question, referenceDate = new Date()) {
+  const iso = question.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) return validDateParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  const numeric = question.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\b/);
+  if (numeric) {
+    let year = numeric[3] ? Number(numeric[3]) : referenceDate.getFullYear();
+    if (year < 100) year += 2000;
+    return validDateParts(year, Number(numeric[1]), Number(numeric[2]));
+  }
+
+  const named = question.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/i);
+  if (!named) return null;
+  const month = MONTH_NUMBERS[named[1].toLowerCase().replace(/\.$/, "")];
+  return validDateParts(named[3] ? Number(named[3]) : referenceDate.getFullYear(), month, Number(named[2]));
+}
+
+async function requireRecordedDateQuestion(question, input) {
+  const reference = DATE_ONLY.test(String(input.dateTo || "")) ? new Date(`${input.dateTo}T00:00:00`) : new Date();
+  const date = extractMentionedDate(question, reference);
+  if (!date || !/\bwhat happened\b/i.test(question)) return false;
+
+  if (!input.allTime && DATE_ONLY.test(String(input.dateFrom || "")) && DATE_ONLY.test(String(input.dateTo || "")) && (date < input.dateFrom || date > input.dateTo)) {
+    throw requestError(`The mentioned date (${date}) is outside the selected reporting period. Change the report period and try again.`, 400, DATE_OUTSIDE_RANGE_CODE);
+  }
+
+  const startAt = `${date} 00:00:00`;
+  const next = new Date(`${date}T00:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+  const nextAt = `${next.toISOString().slice(0, 10)} 00:00:00`;
+  const [[row]] = await db.query(
+    `SELECT (
+       EXISTS(SELECT 1 FROM borrowings WHERE deleted_at IS NULL AND (
+         (borrowed_at >= ? AND borrowed_at < ?) OR (returned_at >= ? AND returned_at < ?) OR (settled_at >= ? AND settled_at < ?)
+       )) OR EXISTS(SELECT 1 FROM reservations WHERE deleted_at IS NULL AND (
+         (reserved_at >= ? AND reserved_at < ?) OR (fulfilled_at >= ? AND fulfilled_at < ?) OR (cancelled_at >= ? AND cancelled_at < ?)
+       )) OR EXISTS(SELECT 1 FROM attendance_logs WHERE created_at >= ? AND created_at < ?)
+       OR EXISTS(SELECT 1 FROM site_daily_visits WHERE visit_date = ?)
+     ) AS recorded`,
+    [startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, date]
+  );
+  if (!Number(row?.recorded)) throw requestError(`No recorded library activity was found for ${date}. Try another date or ask for a broader period summary.`, 400, DATE_NOT_RECORDED_CODE);
+  return true;
+}
+
+async function classifyAmbiguousQuestion(question) {
+  const provider = String(process.env.AI_REPORT_PROVIDER || "gemini").trim().toLowerCase();
+  const prompt = [
+    "Classify whether the entire user question can be answered using only aggregate library analytics.",
+    `Allowed intents: ${REPORT_INTENT_NAMES.join(", ")}.`,
+    "Available subjects are borrowing and returns, reservations, physical attendance, anonymized website activity, fine collections, catalog inventory, and period performance.",
+    "Mark relevant=false if any requested part asks for external knowledge, standalone arithmetic, creative writing, advice, raw records, or information outside those subjects.",
+    "Calculations such as totals, differences, averages, rates, ratios, and percentage changes are relevant when every input comes from the listed aggregate library analytics.",
+    "Mark mixed=true when supported and unsupported requests are combined. Do not answer the question.",
+    "Return JSON only with this exact shape: {\"relevant\":boolean,\"mixed\":boolean,\"intents\":string[]}.",
+    `Question: ${question}`,
+  ].join("\n");
+
+  let url;
+  let headers;
+  let body;
+  if (provider === "gemini") {
+    if (!process.env.GEMINI_API_KEY) throw requestError("The AI report scope checker is not configured. Rephrase the question using a suggested analytics topic.", 503);
+    const model = process.env.GEMINI_REPORT_MODEL || "gemini-2.5-flash";
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    headers = { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY };
+    body = JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0, maxOutputTokens: 160, responseMimeType: "application/json" } });
+  } else if (provider === "groq") {
+    if (!process.env.GROQ_API_KEY) throw requestError("The AI report scope checker is not configured. Rephrase the question using a suggested analytics topic.", 503);
+    body = JSON.stringify({
+      model: process.env.GROQ_REPORT_MODEL || "openai/gpt-oss-20b",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0,
+      max_tokens: 300,
+      reasoning_effort: "low",
+      include_reasoning: false,
+      response_format: { type: "json_object" },
+    });
+    url = "https://api.groq.com/openai/v1/chat/completions";
+    headers = { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` };
+  } else {
+    throw requestError(`AI report provider "${provider}" is not supported. Use "gemini" or "groq".`, 503);
+  }
+
+  let response;
+  try {
+    response = await fetch(url, { method: "POST", headers, body, signal: AbortSignal.timeout(15000) });
+  } catch (error) {
+    console.error("[analytics] AI report scope check failed:", error?.name || error?.message || "unknown");
+    throw requestError("The question could not be verified as library-related. Rephrase it using a suggested analytics topic and try again.", 503);
+  }
+  if (!response.ok) {
+    console.error("[analytics] AI report scope provider failed:", response.status, (await response.text()).slice(0, 300));
+    throw requestError("The question could not be verified as library-related. Rephrase it using a suggested analytics topic and try again.", 503);
+  }
+
+  const payload = await response.json();
+  const raw = provider === "groq"
+    ? payload.choices?.[0]?.message?.content
+    : payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("");
+  try {
+    const parsed = JSON.parse(String(raw || "").replace(/^```(?:json)?\s*|\s*```$/gi, "").trim());
+    const intents = Array.isArray(parsed.intents) ? parsed.intents.filter((intent) => REPORT_INTENT_NAMES.includes(intent)) : [];
+    return { relevant: parsed.relevant === true && parsed.mixed !== true && intents.length > 0, mixed: parsed.mixed === true, intents };
+  } catch {
+    throw requestError("The question could not be verified as library-related. Rephrase it using a suggested analytics topic and try again.", 503);
+  }
 }
 
 function normalizeDateRange({ dateFrom, dateTo }, { allowLongRange = false } = {}) {
@@ -404,6 +567,19 @@ async function createAiAnalyticsReport(input) {
   if (isIdentitySeekingQuestion(question)) {
     throw requestError(PRIVACY_RESTRICTION_MESSAGE, 400, PRIVACY_RESTRICTION_CODE);
   }
+  if (question) {
+    const hasReportTopic = REPORT_INTENTS.some(([, pattern]) => pattern.test(question)) || PERIOD_ANALYSIS.test(question);
+    if (UNSUPPORTED_REQUEST.test(question) && !hasReportTopic) throw requestError(IRRELEVANT_QUESTION_MESSAGE, 400, IRRELEVANT_QUESTION_CODE);
+    if (!isReportRelevantQuestion(question) || UNSUPPORTED_REQUEST.test(question)) {
+      const recordedDateQuestion = !UNSUPPORTED_REQUEST.test(question) && !hasReportTopic
+        ? await requireRecordedDateQuestion(question, input)
+        : false;
+      if (!recordedDateQuestion) {
+        const classification = await classifyAmbiguousQuestion(question);
+        if (!classification.relevant) throw requestError(IRRELEVANT_QUESTION_MESSAGE, 400, IRRELEVANT_QUESTION_CODE);
+      }
+    }
+  }
   const evidence = await buildAiReportEvidence(input);
   let report = await generateReportText(evidence, question);
   for (const [token, label] of Object.entries(evidence.private_labels || {})) report = report.split(token).join(label);
@@ -412,4 +588,4 @@ async function createAiAnalyticsReport(input) {
   return { report, mode: question ? "answer" : "summary", range: evidence.range, evidence: publicEvidence };
 }
 
-module.exports = { buildAiReportEvidence, createAiAnalyticsReport, isIdentitySeekingQuestion, normalizeDateRange };
+module.exports = { buildAiReportEvidence, classifyAmbiguousQuestion, classifyReportQuestion, createAiAnalyticsReport, extractMentionedDate, isIdentitySeekingQuestion, isReportRelevantQuestion, normalizeDateRange, requireRecordedDateQuestion };

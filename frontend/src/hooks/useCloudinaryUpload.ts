@@ -32,7 +32,7 @@ interface UseCloudinaryUpload {
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME    as string;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string;
 
-export function useCloudinaryUpload(): UseCloudinaryUpload {
+export function useCloudinaryUpload(folder = "library/bulletin"): UseCloudinaryUpload {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
   const [error, setError]         = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function useCloudinaryUpload(): UseCloudinaryUpload {
         const filename = file instanceof File ? file.name : "image.jpg";
         formData.append("file", file, filename);
         formData.append("upload_preset", UPLOAD_PRESET);
-        formData.append("folder", "library/bulletin");
+        formData.append("folder", folder);
 
         const xhr = new XMLHttpRequest();
 
@@ -92,7 +92,7 @@ export function useCloudinaryUpload(): UseCloudinaryUpload {
         xhr.send(formData);
       });
     },
-    []
+    [folder]
   );
 
   return { upload, uploading, progress, error, reset };

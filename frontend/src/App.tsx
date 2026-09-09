@@ -58,6 +58,7 @@ const AdminAuditLogs = lazy(() => import("./pages/admin/AdminAuditLogs"));
 const AdminBulletin = lazy(() => import("./pages/admin/AdminBulletin"));
 const AdminBookTypes = lazy(() => import("./pages/admin/AdminBookTypes"));
 const AdminContentManagement = lazy(loadAdminContentManagement);
+const AdminUserGuide = lazy(() => import("./pages/admin/AdminUserGuide"));
 
 const queryClient = new QueryClient();
 
@@ -181,6 +182,7 @@ const App = () => (
                     <Route path="holidays" element={<AdminHolidays />} />
                     <Route path="restrictions" element={<AdminManage />} />
                     <Route path="content" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminContentManagement /></ProtectedRoute>} />
+                    <Route path="user-guide" element={<AdminUserGuide />} />
                     <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />
                     <Route path="subscriptions" element={<Navigate to="/admin/content?tab=subscriptions" replace />} />
                     <Route

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
   FileBarChart, ClipboardCheck, PenSquare,
-  CalendarDays, FileText, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2,
+  CalendarDays, FileText, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2, BookOpenCheck,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";
 
@@ -48,6 +48,12 @@ export const sidebarSections: SidebarSection[] = [
     label: "System",
     items: [
       { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["super_admin"] },
+    ],
+  },
+  {
+    label: "Help",
+    items: [
+      { title: "User Guide", url: "/admin/user-guide", icon: BookOpenCheck },
     ],
   },
 ];
