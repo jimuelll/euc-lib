@@ -15,7 +15,7 @@ Full-stack library services platform for Manuel S. Enverga University Foundation
 
 ### For library staff
 
-- Maintain books, copies, barcodes, book types, and catalogue metadata.
+- Maintain books, copies, barcodes, book types, and a configurable catalogue schema.
 - Look up patrons and process barcode-supported borrowing, returns, and renewals.
 - Manage reservation queues and attendance records.
 - Review clearance status, fines, and cash payments.
@@ -24,7 +24,7 @@ Full-stack library services platform for Manuel S. Enverga University Foundation
 
 ### For administrators
 
-- Manage users, library settings, holidays, academic programs, and academic terms.
+- Manage role-specific user accounts, departments, library settings, holidays, academic programs, and academic terms.
 - Manage the About page, homepage content, subscriptions, announcements, and notifications.
 - Draft, publish, reorder, hide, and archive user-guide modules from Content Management.
 - Review analytics, exports, circulation reports, clearance exceptions, and audit data.
@@ -61,15 +61,29 @@ The database supports these roles:
 
 | Role | Scope |
 | --- | --- |
-| `student` | Patron self-service and student library workflows |
-| `employee` | Employee patron workflows |
-| `alumni` | Alumni patron workflows |
-| `scanner` | Attendance and circulation scanning workflows |
-| `staff` | Desk operations, catalogue work, reservations, and patron administration |
-| `admin` | Staff capabilities plus content, settings, reporting, analytics, and user administration |
-| `super_admin` | Full administration, audit logs, catalogue policy/schema controls, and backups/restores |
+| `student` | Library Card Number, Student No., academic program, and year level; patron self-service and student library workflows |
+| `staff` | Library Card Number, Student No., academic program, and year level; elevated desk, catalogue, reservation, and patron-administration access |
+| `alumni` | Library Card Number; alumni patron workflows |
+| `employee` | Employee No. and configurable department; employee patron workflows |
+| `scanner` | Username; attendance and circulation scanning workflows |
+| `admin` | Username; staff capabilities plus content, settings, reporting, analytics, and user administration |
+| `super_admin` | Username; full administration, audit logs, catalogue policy/schema controls, and backups/restores |
 
-Protected API routes use JWT authentication and role checks. New or reset accounts can be required to change their password before continuing.
+Protected API routes use JWT authentication and role checks. New accounts must change their administrator-set password on first sign-in. Student remarks are an internal, student-only edit field and are never shown to patrons.
+
+The legacy `student_employee_id` remains as a compatibility lookup key. It mirrors the account's primary sign-in identifier: Library Card Number for students, staff, and alumni; Employee No. for employees; and Username for scanner and administrator roles.
+
+## Catalogue schema
+
+Standard book records use a configurable default form. Only **Title** and **Primary Author** are required bibliographic fields. ISBN remains optional and supports metadata lookup.
+
+- Identification: Title, Primary Author, ISBN.
+- Publication: Publisher, Publication Place, Copyright Year, Edition, and Physical Description.
+- Classification: Call Number and repeatable Subject headings.
+- Relationships and contributors: Added Title, Series Title, and repeatable Added Authors, Editors, Coordinators, Consultants, Contributors, and Illustrators.
+- Inventory: Loan Policy, Copies, and Location.
+
+Repeatable fields store a list of text entries, so staff can add or remove individual subjects or contributors. The schema editor can reorder, hide, archive, and restore fields; it has no custom-field limit. Existing Category metadata is retained even though Category is no longer on the default book form. Thesis fields remain separate.
 
 ## Repository layout
 
@@ -130,13 +144,15 @@ mysql -u <user> -p <database> < db/realistic-demo-data.sql
 
 The demo script documents its own test accounts and password. Use demo data only in a non-production database.
 
-If the database already exists, do not rerun the destructive baseline. Apply the user-guide migration instead:
+If the database already exists, do not rerun the destructive baseline. Apply the additive migrations in date order:
 
 ```powershell
 mysql -u <user> -p <database> < db/migrations/2026-09-09-add-user-guide.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-19-role-specific-user-accounts.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-19-default-book-catalog-schema.sql
 ```
 
-The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content.
+The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata.
 
 ### 2. Configure the backend
 
@@ -232,14 +248,13 @@ Run these commands from `frontend/`:
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build |
 
-Run the backend directly from `backend/` because its `package.json` currently has no npm scripts:
+Run backend tests from `backend/`:
 
 ```powershell
-node server.js
-npx nodemon server.js
+npm test
 ```
 
-There is currently no configured `npm test` script in the frontend or backend package manifests.
+Run frontend checks from `frontend/` with `npm test`; run backend checks from `backend/` with `npm test`.
 
 ## Frontend routes
 
@@ -274,12 +289,14 @@ The frontend includes `frontend/vercel.json`, which:
 1. Rewrites `/api/*` to the deployed Render backend at `https://euc-lib.onrender.com/api/:path*`.
 2. Rewrites client-side routes to `index.html` for Vercel hosting.
 
+For Vercel, set the project **Root Directory** to `frontend`, use `npm run build` as the build command, and use `dist` as the output directory. Set the production `VITE_BASE_URL` to the full deployed backend URL (currently `https://euc-lib.onrender.com`), not `http://localhost:4000`. The frontend needs this absolute URL for authenticated WebSocket notifications.
+
 Before deploying:
 
 - Configure all backend secrets and database settings in the backend host.
-- Set `VITE_BASE_URL` and Cloudinary frontend variables in the frontend host.
+- Set `VITE_BASE_URL`, `VITE_CLOUDINARY_CLOUD_NAME`, and `VITE_CLOUDINARY_UPLOAD_PRESET` in Vercel. Do not copy local `.env` values such as `http://localhost:4000` to production.
 - Import `db/fresh-start.sql` into the deployment database only when initializing a new environment.
-- Add the production frontend origin to the CORS allowlist in `backend/app.js`.
+- Add the exact production frontend origin to the CORS allowlist in `backend/app.js`. A new Vercel preview URL is a different origin and will be rejected until it is added.
 - Confirm the backend host can reach MySQL/MariaDB and Cloudinary.
 - Configure Gemini or Groq only if recommendations, embedding maintenance, or AI reports are enabled.
 
@@ -288,7 +305,7 @@ Before deploying:
 - Never commit `backend/.env` or `frontend/.env`.
 - Use separate high-entropy values for `JWT_SECRET` and `JWT_REFRESH_SECRET` in every environment.
 - Keep Cloudinary upload presets narrowly scoped; browser uploads use the unsigned preset configured in the frontend.
-- Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing.
+- Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing. Snapshot format version 10 includes Department records and upgrades older snapshots by adding an empty Departments list and mapping legacy user IDs to the new role-specific identifiers.
 - AI analytics reports send aggregate evidence only. The backend rejects questions that request individual visitor or patron identities.
 - Treat `db/fresh-start.sql` as a reset script, not a migration. Additive SQL files in `db/migrations/` must currently be applied manually because there is no migration runner.
 
