@@ -27,10 +27,9 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
   const [showArchivedPanel, setShowArchivedPanel] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
-  // Only non-locked, non-archived fields count toward the cap
+  // Keep this count for administrators' reference. Catalog fields are unlimited.
   const activeCustomFields = fields.filter((f) => !f.locked && !f.archived);
   const customFieldCount   = activeCustomFields.length;
-  const atCap              = false;
 
   const sortedFields   = [...fields].filter((f) => !f.archived && (scopeTab === "all" || (f.scope ?? "shared") === scopeTab)).sort((a, b) => a.order - b.order);
   const archivedFields = fields.filter((f) => f.archived);
@@ -174,10 +173,9 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
     editingOptions, setEditingOptions,
     saving,
     showArchivedPanel, setShowArchivedPanel,
-    activeCustomFields, customFieldCount, atCap, sortedFields, archivedFields,
+    activeCustomFields, customFieldCount, sortedFields, archivedFields,
     saveSchema, handleAddField, handleDeleteField, handleRestoreField, handleSaveLabel,
     handleStartOptionsEdit, handleSaveOptions, handleCancelOptionsEdit,
     handleToggleLocked, handleTogglePublic, handleScopeChange, handleMove,
   };
 };
-

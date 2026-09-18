@@ -73,6 +73,13 @@ const validateFieldValue = (field, value) => {
     return;
   }
 
+  if (field.type === "repeatable") {
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
+      throw createValidationError(`Field "${field.key}" must be a list of non-empty text entries`);
+    }
+    return;
+  }
+
   if (typeof value !== "string") {
     throw createValidationError(`Field "${field.key}" must be a string`);
   }
@@ -91,10 +98,6 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
     if (materialType && materialType !== record.material_type) throw createValidationError("Material type cannot be changed after creation", 400, "material_type");
     materialType = record.material_type;
     req.currentCatalogRecord = record;
-  }
-  if (field.type === "repeatable") {
-    if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) throw createValidationError(`Field "${field.key}" must be a list of non-empty text entries`);
-    return;
   }
   materialType ||= "book";
   const schemaByKey = new Map(schema.map((field) => [field.key, field]));

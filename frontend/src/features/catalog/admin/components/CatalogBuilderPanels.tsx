@@ -36,7 +36,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
     editingOptions, setEditingOptions,
     saving,
     showArchivedPanel, setShowArchivedPanel,
-    customFieldCount, atCap, sortedFields, archivedFields,
+    customFieldCount, sortedFields, archivedFields,
     handleAddField, handleDeleteField, handleRestoreField, handleSaveLabel,
     handleStartOptionsEdit, handleSaveOptions, handleCancelOptionsEdit,
     handleToggleLocked, handleTogglePublic, handleScopeChange, handleMove,
@@ -315,7 +315,6 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                 onChange={(e) => setNewFieldLabel(e.target.value)}
                 placeholder="e.g. Publisher"
                 className={inputClass}
-                disabled={atCap}
                 onKeyDown={(e) => e.key === "Enter" && handleAddField()}
               />
               {newFieldLabel.trim() && (
@@ -328,7 +327,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             {/* Field Type */}
             <div>
               <FieldLabel>Field Type</FieldLabel>
-              <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)} disabled={atCap}>
+              <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)}>
                 <SelectTrigger className={inputClass}>
                   <SelectValue />
                 </SelectTrigger>
@@ -344,7 +343,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
 
             <div>
               <FieldLabel>Appears on</FieldLabel>
-              <Select value={newFieldScope} onValueChange={(v) => setNewFieldScope(v as FieldScope)} disabled={atCap}>
+              <Select value={newFieldScope} onValueChange={(v) => setNewFieldScope(v as FieldScope)}>
                 <SelectTrigger className={inputClass}><SelectValue /></SelectTrigger>
                 <SelectContent className="rounded-none border-border">
                   <SelectItem value="shared">Shared fields</SelectItem>
@@ -368,7 +367,6 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                   onChange={(e) => setNewFieldOptions(e.target.value)}
                   placeholder="Option A, Option B, Option C"
                   className={inputClass}
-                  disabled={atCap}
                 />
               </div>
             )}
@@ -381,7 +379,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
               ].map(({ label, checked, onChange }) => (
                 <label
                   key={label}
-                  className={`flex items-center gap-2.5 cursor-pointer group ${atCap ? "pointer-events-none opacity-40" : ""}`}
+                  className="flex items-center gap-2.5 cursor-pointer group"
                 >
                   <div className="relative flex items-center shrink-0">
                     <input
@@ -389,7 +387,6 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                       checked={checked}
                       onChange={(e) => onChange(e.target.checked)}
                       className="peer sr-only"
-                      disabled={atCap}
                     />
                     <div className="flex h-4 w-4 items-center justify-center border border-border bg-background transition-colors peer-checked:border-primary peer-checked:bg-primary">
                       {checked && (
@@ -412,7 +409,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             {/* Submit */}
             <button
               type="submit"
-              disabled={saving || atCap}
+              disabled={saving}
               className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               style={{ fontFamily: "var(--font-heading)" }}
             >
