@@ -81,5 +81,3 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "repeatable", label: "Repeatable list" },
 ];
 
-/** Must stay in sync with MAX_CUSTOM_FIELDS in catalog.service.js */
-export const MAX_CUSTOM_FIELDS = 15;

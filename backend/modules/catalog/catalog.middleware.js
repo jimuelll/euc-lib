@@ -1,5 +1,5 @@
 const { validate, createValidationError } = require("../../middlewares/validate");
-const { MAX_CUSTOM_FIELDS, getSchema, getCatalogRecordForValidation } = require("./catalog.service");
+const { getSchema, getCatalogRecordForValidation } = require("./catalog.service");
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 const CATALOG_ROLES = ["staff", ...ADMIN_ROLES];
@@ -152,13 +152,6 @@ const validateSchemaPayload = validate((req) => {
 
   if (!Array.isArray(fields)) {
     throw createValidationError("'fields' must be an array");
-  }
-
-  const customFields = fields.filter((f) => !f.locked && !f.archived);
-  if (customFields.length > MAX_CUSTOM_FIELDS) {
-    throw createValidationError(
-      `Too many custom fields. Maximum allowed is ${MAX_CUSTOM_FIELDS} (you have ${customFields.length}).`
-    );
   }
 
   const seenKeys = new Set();

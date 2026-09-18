@@ -10,7 +10,7 @@ import {
   Trash2, Plus, Pencil, X, Check,
   Eye, EyeOff, Loader2, ArchiveRestore, ChevronDown, ChevronUp, Lock, LockOpen,
 } from "lucide-react";
-import { FIELD_TYPES, MAX_CUSTOM_FIELDS } from "../AdminCatalog.types";
+import { FIELD_TYPES } from "../AdminCatalog.types";
 import type { FieldScope, FieldType } from "../AdminCatalog.types";
 import { Badge, FieldLabel, PanelLabel } from "./CatalogBuilderPrimitives";
 import { inputClass, SYSTEM_LOCKED_KEYS, toKey } from "./CatalogBuilderConstants";
@@ -298,27 +298,14 @@ const CatalogBuilderPanels = ({ model }: Props) => {
               </span>
               <span
                 className={`text-[10px] font-bold tabular-nums px-2 py-0.5 border ${
-                  atCap
-                    ? "border-destructive/40 text-destructive bg-destructive/5"
-                    : customFieldCount >= MAX_CUSTOM_FIELDS - 3
-                    ? "border-warning/40 text-warning bg-warning/5"
-                    : "border-border text-muted-foreground/50"
+                  "border-border text-muted-foreground/50"
                 }`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
-                {customFieldCount} / {MAX_CUSTOM_FIELDS}
+                {customFieldCount} configured
               </span>
             </div>
 
-            {/* Cap warning */}
-            {atCap && (
-              <div className="flex items-start gap-2.5 border border-destructive/25 bg-destructive/5 px-3 py-2.5">
-                <X className="h-3.5 w-3.5 text-destructive/60 mt-0.5 shrink-0" />
-                <p className="text-[10px] text-destructive/80 leading-relaxed">
-                  Maximum of {MAX_CUSTOM_FIELDS} custom fields reached. Remove an existing field or restore an archived one to free up a slot.
-                </p>
-              </div>
-            )}
 
             {/* Field Label */}
             <div>
@@ -500,12 +487,8 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                   <button
                     type="button"
                     onClick={() => handleRestoreField(f.key)}
-                    disabled={saving || atCap}
-                    title={
-                      atCap
-                        ? `Remove an active field first (${MAX_CUSTOM_FIELDS} max)`
-                        : `Restore "${f.label}"`
-                    }
+                    disabled={saving}
+                    title={`Restore "${f.label}"`}
                     className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >

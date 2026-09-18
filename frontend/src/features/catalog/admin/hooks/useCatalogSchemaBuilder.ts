@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "@/features/admin";
-import { FieldType, FieldScope, FormField, MAX_CUSTOM_FIELDS } from "../AdminCatalog.types";
+import { FieldType, FieldScope, FormField } from "../AdminCatalog.types";
 import { saveCatalogSchema } from "../catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { SYSTEM_LOCKED_KEYS, toKey } from "../components/CatalogBuilderConstants";
@@ -30,7 +30,7 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
   // Only non-locked, non-archived fields count toward the cap
   const activeCustomFields = fields.filter((f) => !f.locked && !f.archived);
   const customFieldCount   = activeCustomFields.length;
-  const atCap              = customFieldCount >= MAX_CUSTOM_FIELDS;
+  const atCap              = false;
 
   const sortedFields   = [...fields].filter((f) => !f.archived && (scopeTab === "all" || (f.scope ?? "shared") === scopeTab)).sort((a, b) => a.order - b.order);
   const archivedFields = fields.filter((f) => f.archived);
@@ -54,10 +54,6 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
 
   const handleAddField = async () => {
     if (!newFieldLabel.trim()) { toast.error("Field label is required"); return; }
-    if (atCap) {
-      toast.error(`Maximum of ${MAX_CUSTOM_FIELDS} custom fields reached. Remove one before adding another.`);
-      return;
-    }
     const key = toKey(newFieldLabel);
     if (!key || key.length < 2) { toast.error("Label produces an invalid key — try a longer name"); return; }
     if (fields.find((f) => f.key === key)) { toast.error("A field with that name already exists. Restore the archived field instead."); return; }
@@ -100,10 +96,6 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
   };
 
   const handleRestoreField = (key: string) => {
-    if (atCap) {
-      toast.error(`Maximum of ${MAX_CUSTOM_FIELDS} custom fields reached. Remove an active field first.`);
-      return;
-    }
     const maxOrder = Math.max(0, ...fields.filter((f) => !f.archived).map((f) => f.order));
     saveSchema(fields.map((f) => (f.key === key ? { ...f, archived: false, order: maxOrder + 1 } : f)));
   };
@@ -188,5 +180,4 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
     handleToggleLocked, handleTogglePublic, handleScopeChange, handleMove,
   };
 };
-
 

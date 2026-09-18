@@ -2,7 +2,6 @@ const repository = require("./catalog.repository");
 
 const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "copies", "material_type", "metadata"];
 const OPERATIONAL_BOOK_KEYS = new Set(["title", "author", "isbn", "copies", "book_type_id", "material_type"]);
-const MAX_CUSTOM_FIELDS = 15;
 
 const fieldsForMaterial = (schema, materialType) =>
   schema.filter((field) => field.scope === "shared" || field.scope === materialType);
@@ -30,7 +29,6 @@ const upsertSchema = async (fields) => {
 };
 
 module.exports = {
-  MAX_CUSTOM_FIELDS,
   OPERATIONAL_BOOK_KEYS,
   PUBLIC_CATALOGUE_CORE_KEYS,
   fieldsForMaterial,
