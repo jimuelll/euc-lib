@@ -1,3 +1,4 @@
+ALTER TABLE catalog_schema MODIFY `type` enum('text','textarea','number','date','select','repeatable') NOT NULL DEFAULT 'text';
 UPDATE books
 SET metadata = JSON_SET(COALESCE(metadata, JSON_OBJECT()), '$.copyright_year', JSON_EXTRACT(metadata, '$.publication_year'))
 WHERE JSON_EXTRACT(metadata, '$.publication_year') IS NOT NULL AND JSON_EXTRACT(metadata, '$.copyright_year') IS NULL;

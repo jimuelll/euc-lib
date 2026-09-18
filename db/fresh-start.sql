@@ -433,7 +433,7 @@ CREATE TABLE `catalog_schema` (
   `id` int(11) NOT NULL,
   `key` varchar(64) NOT NULL,
   `label` varchar(255) NOT NULL,
-  `type` enum('text','textarea','number','date','select') NOT NULL DEFAULT 'text',
+  `type` enum('text','textarea','number','date','select','repeatable') NOT NULL DEFAULT 'text',
   `options` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`options`)),
   `required` tinyint(1) NOT NULL DEFAULT 0,
   `locked` tinyint(1) NOT NULL DEFAULT 0,
