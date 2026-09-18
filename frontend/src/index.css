@@ -126,6 +126,27 @@
 @layer base {
   * {
     @apply border-border;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.58) hsl(var(--background));
+    scrollbar-width: thin;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0.625rem;
+    height: 0.625rem;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 0.1875rem solid hsl(var(--background));
+    border-radius: 999px;
+    background: hsl(var(--muted-foreground) / 0.58);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--foreground) / 0.62);
   }
 
   body {
