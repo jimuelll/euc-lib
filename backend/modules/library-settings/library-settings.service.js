@@ -106,6 +106,10 @@ const deleteAcademicProgram = async (programId, userId, conn) => {
   if (!affectedRows) throw Object.assign(new Error("Program / course not found"), { status: 404 });
   return { success: true };
 };
+const listDepartments = async ({ activeOnly = true } = {}, conn) => repository.listDepartments({ activeOnly }, conn);
+const createDepartment = async ({ name }, userId, conn) => { const cleanedName = String(name || "").trim(); if (!cleanedName) throw Object.assign(new Error("Department name is required"), { status: 400 }); try { return await repository.createDepartment({ name: cleanedName }, userId, conn); } catch (error) { if (error?.code === "ER_DUP_ENTRY") throw duplicateError("This department already exists"); throw error; } };
+const updateDepartment = async (departmentId, { name }, userId, conn) => { const cleanedName = String(name || "").trim(); if (!Number.isInteger(departmentId) || departmentId < 1) throw Object.assign(new Error("Invalid department"), { status: 400 }); if (!cleanedName) throw Object.assign(new Error("Department name is required"), { status: 400 }); try { const department = await repository.updateDepartment(departmentId, cleanedName, userId, conn); if (!department) throw Object.assign(new Error("Department not found"), { status: 404 }); return department; } catch (error) { if (error?.code === "ER_DUP_ENTRY") throw duplicateError("This department already exists"); throw error; } };
+const deleteDepartment = async (departmentId, userId, conn) => { if (!Number.isInteger(departmentId) || departmentId < 1) throw Object.assign(new Error("Invalid department"), { status: 400 }); const result = await repository.deleteDepartment(departmentId, userId, conn); if (result.usage) throw Object.assign(new Error("This department is assigned to employee records and cannot be deleted"), { status: 409 }); if (!result.affectedRows) throw Object.assign(new Error("Department not found"), { status: 404 }); return { success: true }; };
 
 const listAcademicTerms = async (conn) => repository.listAcademicTerms(conn);
 
@@ -159,6 +163,7 @@ module.exports = {
   createAcademicProgram,
   updateAcademicProgram,
   deleteAcademicProgram,
+  listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listAcademicTerms,
   createAcademicTerm,
   updateAcademicTerm,

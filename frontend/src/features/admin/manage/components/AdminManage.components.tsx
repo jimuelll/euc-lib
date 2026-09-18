@@ -10,7 +10,7 @@ import {
   SelectItem,
 } from "@/components/ui";
 import type { User, UserFormState, QrTarget } from "../AdminManage.types";
-import type { AcademicProgram, AcademicTerm } from "../api";
+import type { AcademicProgram, AcademicTerm, Department } from "../api";
 import { fetchUserBarcode } from "../../api";
 import { formatRole } from "../AdminManage.data";
 import { printCodeLabel } from "@/utils/printCodeLabel";
@@ -260,6 +260,14 @@ const ProgramSelect = ({ value, programs, onChange, disabled = false }: { value:
   </div>
 );
 const TermSelect = ({ value, terms, onChange, disabled = false }: { value: string; terms: AcademicTerm[]; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>Academic term <span className="normal-case tracking-normal">(students)</span></FieldLabel><Select value={value || "__current"} onValueChange={v => onChange(v === "__current" ? "" : v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Current term" /></SelectTrigger><SelectContent className="rounded-none"><SelectItem value="__current">Current term (automatic)</SelectItem>{terms.map(term => <SelectItem key={term.id} value={String(term.id)}>{term.name}{term.is_current ? " · Current" : ""}</SelectItem>)}</SelectContent></Select></div>;
+const TextField = ({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>{label}</FieldLabel><Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-none" disabled={disabled} /></div>;
+const RoleProfileFields = ({ form, programs, departments, onField, disabled = false, includeRemarks = false }: { form: UserFormState; programs: AcademicProgram[]; departments: Department[]; onField: <K extends keyof UserFormState>(key: K, value: string) => void; disabled?: boolean; includeRemarks?: boolean }) => {
+  const academic = ["student", "staff", "alumni"].includes(form.role);
+  if (academic) return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Library Card Number" value={form.libraryCardNumber} onChange={(v) => onField("libraryCardNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div>{form.role !== "alumni" ? <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Student No." value={form.studentNumber} onChange={(v) => onField("studentNumber", v)} disabled={disabled} /><div><FieldLabel>Year Level</FieldLabel><Select value={form.yearLevel} onValueChange={(v) => onField("yearLevel", v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Select year level" /></SelectTrigger><SelectContent>{["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"].map((year) => <SelectItem key={year} value={year}>{year}</SelectItem>)}</SelectContent></Select></div></div><ProgramSelect value={form.programId} programs={programs} onChange={(v) => onField("programId", v)} disabled={disabled} /></> : null}<CommonProfile form={form} onField={onField} disabled={disabled} />{includeRemarks && form.role === "student" ? <div><FieldLabel>Remarks</FieldLabel><textarea value={form.remarks} onChange={(event) => onField("remarks", event.target.value)} disabled={disabled} className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm" /></div> : null}</>;
+  if (form.role === "employee") return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Employee No." value={form.employeeNumber} onChange={(v) => onField("employeeNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div><div><FieldLabel>Department</FieldLabel><Select value={form.departmentId} onValueChange={(v) => onField("departmentId", v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Select department" /></SelectTrigger><SelectContent>{departments.map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent></Select></div><CommonProfile form={form} onField={onField} disabled={disabled} /></>;
+  return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Username" value={form.username} onChange={(v) => onField("username", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div><div className="grid gap-5 sm:grid-cols-2"><TextField label="Address" value={form.address} onChange={(v) => onField("address", v)} disabled={disabled} /><TextField label="Contact" value={form.contact} onChange={(v) => onField("contact", v)} disabled={disabled} /></div></>;
+};
+const CommonProfile = ({ form, onField, disabled }: { form: UserFormState; onField: <K extends keyof UserFormState>(key: K, value: string) => void; disabled: boolean }) => <div className="grid gap-5 sm:grid-cols-2"><TextField label="Address" value={form.address} onChange={(v) => onField("address", v)} disabled={disabled} /><TextField label="Contact" value={form.contact} onChange={(v) => onField("contact", v)} disabled={disabled} /><TextField label="Email" value={form.email} onChange={(v) => onField("email", v)} disabled={disabled} /></div>;
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
@@ -287,6 +295,7 @@ interface CreateFormProps {
   allowedRoles:     string[];
   programs:         AcademicProgram[];
   terms:            AcademicTerm[];
+  departments:      Department[];
   loading:          boolean;
   onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
@@ -296,7 +305,7 @@ interface CreateFormProps {
 }
 
 export const CreateForm = ({
-  form, showPassword, allowedRoles, programs, terms, loading,
+  form, showPassword, allowedRoles, programs, terms, departments, loading,
   onField, onTogglePassword, onSubmit, onReset, embedded = false,
 }: CreateFormProps) => (
   <form
@@ -308,27 +317,9 @@ export const CreateForm = ({
     </div>}
 
     <div className={embedded ? "space-y-5" : "p-6 space-y-5"}>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Full Name</FieldLabel>
-          <Input value={form.fullName} onChange={(e) => onField("fullName", e.target.value)} className="rounded-none" />
-        </div>
-        <div>
-          <FieldLabel>ID Number</FieldLabel>
-          <Input value={form.id} onChange={(e) => onField("id", e.target.value)} className="rounded-none" />
-        </div>
-      </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Address</FieldLabel>
-          <Input value={form.address} onChange={(e) => onField("address", e.target.value)} className="rounded-none" />
-        </div>
-        <div>
-          <FieldLabel>Contact</FieldLabel>
-          <Input value={form.contact} onChange={(e) => onField("contact", e.target.value)} className="rounded-none" />
-        </div>
-      </div>
-      {form.role === "student" ? <><ProgramSelect value={form.programId} programs={programs} onChange={(value) => onField("programId", value)} /><TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} /></> : null}
+      <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
+      {form.role ? <RoleProfileFields form={form} programs={programs} departments={departments} onField={onField} /> : null}
+      {form.role === "student" ? <TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} /> : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <PasswordField
           label="Password"
@@ -344,7 +335,6 @@ export const CreateForm = ({
           onChange={(v) => onField("rePassword", v)}
         />
       </div>
-      <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
     </div>
 
     <div className={embedded ? "mt-6 flex gap-2 border-t border-border py-4" : "flex gap-2 border-t border-border px-6 py-4"}>
@@ -463,6 +453,7 @@ interface EditFormProps {
   allowedRoles:     string[];
   programs:         AcademicProgram[];
   terms:            AcademicTerm[];
+  departments:      Department[];
   loading:          boolean;
   showArchived:     boolean;
   onField:          <K extends keyof UserFormState>(key: K, value: string) => void;
@@ -475,7 +466,7 @@ interface EditFormProps {
 }
 
 export const EditForm = ({
-  selectedUser, form, showPassword, allowedRoles, programs, terms, loading, showArchived,
+  selectedUser, form, showPassword, allowedRoles, programs, terms, departments, loading, showArchived,
   onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore, embedded = false,
 }: EditFormProps) => (
   <form
@@ -505,43 +496,8 @@ export const EditForm = ({
     </div>}
 
     <div className={embedded ? "space-y-5" : "p-6 space-y-5"}>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Full Name</FieldLabel>
-          <Input
-            value={form.fullName}
-            onChange={(e) => onField("fullName", e.target.value)}
-            className="rounded-none"
-            disabled={showArchived}
-          />
-        </div>
-        <div>
-          <FieldLabel>ID Number</FieldLabel>
-          <Input value={form.id} disabled className="rounded-none opacity-50" />
-        </div>
-      </div>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <FieldLabel>Address</FieldLabel>
-          <Input
-            value={form.address}
-            onChange={(e) => onField("address", e.target.value)}
-            className="rounded-none"
-            disabled={showArchived}
-          />
-        </div>
-        <div>
-          <FieldLabel>Contact</FieldLabel>
-          <Input
-            value={form.contact}
-            onChange={(e) => onField("contact", e.target.value)}
-            className="rounded-none"
-            disabled={showArchived}
-          />
-        </div>
-      </div>
-
-      {form.role === "student" ? <><ProgramSelect value={form.programId} programs={programs} onChange={(value) => onField("programId", value)} disabled={showArchived} /><TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} disabled={showArchived} /></> : null}
+      <RoleProfileFields form={form} programs={programs} departments={departments} onField={onField} disabled={showArchived} includeRemarks />
+      {form.role === "student" ? <TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} disabled={showArchived} /> : null}
 
       {/* Password + role only editable in active mode */}
       {!showArchived && (

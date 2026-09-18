@@ -14,6 +14,10 @@ router.get("/academic-programs", authMiddleware(["staff", "admin", "super_admin"
 router.post("/academic-programs", adminOnly, controller.createAcademicProgram);
 router.put("/academic-programs/:programId", adminOnly, controller.updateAcademicProgram);
 router.delete("/academic-programs/:programId", adminOnly, controller.deleteAcademicProgram);
+router.get("/departments", authMiddleware(["staff", "admin", "super_admin"]), controller.listDepartments);
+router.post("/departments", adminOnly, controller.createDepartment);
+router.put("/departments/:departmentId", adminOnly, controller.updateDepartment);
+router.delete("/departments/:departmentId", adminOnly, controller.deleteDepartment);
 router.get("/academic-terms", authMiddleware(["staff", "admin", "super_admin"]), controller.listAcademicTerms);
 router.post("/academic-terms", adminOnly, controller.createAcademicTerm);
 router.put("/academic-terms/:termId", adminOnly, controller.updateAcademicTerm);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { QrTarget, User, UserFormState } from "./AdminManage.types";
-import type { AcademicProgram, AcademicTerm } from "./useAdminManage";
+import type { AcademicProgram, AcademicTerm, Department } from "./useAdminManage";
 import { CreateForm, EditForm, QrModal, SearchBar, SearchResultsTable } from "./components/AdminManage.components";
 
 interface AdminManageBuilderProps {
@@ -14,6 +14,7 @@ interface AdminManageBuilderProps {
   allowedRoles: string[];
   programs: AcademicProgram[];
   terms: AcademicTerm[];
+  departments: Department[];
   loading: boolean;
   onField: <K extends keyof UserFormState>(key: K, value: string) => void;
   onTogglePassword: () => void;
@@ -40,7 +41,7 @@ interface AdminManageBuilderProps {
 }
 
 const AdminManageBuilder = ({
-  form, showPassword, allowedRoles, programs, terms, loading, onField,
+  form, showPassword, allowedRoles, programs, terms, departments, loading, onField,
   onTogglePassword, onResetForm, searchQuery, onSearchQueryChange, roleFilter,
   onRoleFilterChange, statusFilter, onStatusFilterChange, searchResults,
   userPagination, onSearch, showArchived, onArchivedViewChange, selectedUser,
@@ -121,9 +122,9 @@ const AdminManageBuilder = ({
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-6">
             {sheetMode === "create" ? (
-              <CreateForm embedded form={form} showPassword={showPassword} allowedRoles={allowedRoles} programs={programs} terms={terms} loading={loading} onField={onField} onTogglePassword={onTogglePassword} onSubmit={async () => { if (await onCreateUser()) setSheetMode(null); }} onReset={onResetForm} />
+              <CreateForm embedded form={form} showPassword={showPassword} allowedRoles={allowedRoles} programs={programs} terms={terms} departments={departments} loading={loading} onField={onField} onTogglePassword={onTogglePassword} onSubmit={async () => { if (await onCreateUser()) setSheetMode(null); }} onReset={onResetForm} />
             ) : selectedUser ? (
-              <EditForm embedded selectedUser={selectedUser} form={form} showPassword={showPassword} allowedRoles={allowedRoles} programs={programs} terms={terms} loading={loading} showArchived={showArchived} onField={onField} onTogglePassword={onTogglePassword} onSubmit={async () => { if (await onUpdateUser()) setSheetMode(null); }} onViewQr={() => viewQr(selectedUser)} onArchive={async () => { if (await onArchiveUser()) setSheetMode(null); }} onRestore={async () => { if (await onRestoreUser()) setSheetMode(null); }} />
+              <EditForm embedded selectedUser={selectedUser} form={form} showPassword={showPassword} allowedRoles={allowedRoles} programs={programs} terms={terms} departments={departments} loading={loading} showArchived={showArchived} onField={onField} onTogglePassword={onTogglePassword} onSubmit={async () => { if (await onUpdateUser()) setSheetMode(null); }} onViewQr={() => viewQr(selectedUser)} onArchive={async () => { if (await onArchiveUser()) setSheetMode(null); }} onRestore={async () => { if (await onRestoreUser()) setSheetMode(null); }} />
             ) : null}
           </div>
         </SheetContent>

@@ -17,6 +17,7 @@ export const EMPTY_FORM: UserFormState = {
   contact:    "",
   programId:  "",
   academicTermId: "",
+  libraryCardNumber: "", studentNumber: "", employeeNumber: "", username: "", email: "", yearLevel: "", departmentId: "", remarks: "",
   role:       "",
   password:   "",
   rePassword: "",

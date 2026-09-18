@@ -4,9 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import type { User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
-import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm } from "./api";
+import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
 
-export type { AcademicProgram, AcademicTerm } from "./api";
+export type { AcademicProgram, AcademicTerm, Department } from "./api";
 
 interface UseAdminManageReturn {
   // Form
@@ -20,6 +20,7 @@ interface UseAdminManageReturn {
   allowedRoles: string[];
   programs: AcademicProgram[];
   terms: AcademicTerm[];
+  departments: Department[];
 
   // Search
   searchQuery:          string;
@@ -60,6 +61,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
   const [programs,      setPrograms]      = useState<AcademicProgram[]>([]);
   const [terms,         setTerms]         = useState<AcademicTerm[]>([]);
+  const [departments,   setDepartments]   = useState<Department[]>([]);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [roleFilter,    setRoleFilter]    = useState("all");
   const [statusFilter,  setStatusFilter]  = useState("all");
@@ -74,6 +76,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!user) return;
     setAllowedRoles(getAllowedRoles(user.role));
   }, [user]);
+  useEffect(() => { if (user) void fetchDepartments().then(setDepartments).catch(() => setDepartments([])); }, [user]);
 
   useEffect(() => { if (!user) return; void fetchAcademicTerms().then(setTerms).catch(() => setTerms([])); }, [user]);
 
@@ -112,8 +115,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
-    const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId } = form;
-    if (!fullName || !id || !role || !password || !rePassword) {
+    const { fullName, role, password, rePassword } = form;
+    if (!fullName || !role || !password || !rePassword) {
       toast.error("All required fields must be filled");
       return false;
     }
@@ -125,7 +128,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
     try {
       const response = await createUser({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId });
       toast.success(response.message);
-      setQrTarget({ studentId: id, name: fullName });
+      const identifier = form.libraryCardNumber || form.employeeNumber || form.username;
+      setQrTarget({ studentId: identifier, name: fullName });
       resetForm();
       await handleSearchUsers();
       return true;
@@ -178,6 +182,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       contact:    u.contact  || "",
       programId:  u.program_id ? String(u.program_id) : "",
       academicTermId: "",
+      libraryCardNumber: u.library_card_number || "", studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || "", email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
       role:       u.role,
       password:   "",
       rePassword: "",
@@ -187,8 +192,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // ── Update ─────────────────────────────────────────────────────────────────
   const handleUpdateUser = async () => {
     if (!selectedUser) return false;
-    const { fullName, role, address, contact, programId, academicTermId, password, rePassword } = form;
-    const updates: any = { name: fullName, role, address, contact, program_id: programId || null, academic_term_id: academicTermId || null };
+    const { password, rePassword } = form;
     if (password) {
       if (password !== rePassword) {
         toast.error("Passwords do not match");
@@ -200,9 +204,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
     try {
       const response = await updateUser(selectedUser.student_employee_id, {
         ...form,
-        fullName: updates.name,
-        programId: updates.program_id ?? "",
-        academicTermId: updates.academic_term_id ?? "",
       });
       toast.success(response.message);
       resetForm();
@@ -276,6 +277,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     allowedRoles,
     programs,
     terms,
+    departments,
     searchQuery,
     setSearchQuery,
     roleFilter,

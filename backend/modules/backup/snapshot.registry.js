@@ -7,7 +7,7 @@ const SYSTEM_TABLES = [SNAPSHOT_TABLE, "audit_events", "auth_restore_state", "re
 // deliberately excluded: restoring them would overwrite the recovery record,
 // maintenance lock, or the session invalidation marker.
 const APPLICATION_TABLES = Object.freeze([
-  "about_settings", "academic_programs", "academic_subscriptions", "academic_terms", "attendance_logs",
+  "about_settings", "academic_programs", "academic_subscriptions", "academic_terms", "attendance_logs", "departments",
   "auth_audit_events", "auth_refresh_sessions", "book_copies", "book_embeddings", "book_enrichment", "book_types", "books", "borrowings",
   "bulletin_comments", "bulletin_likes", "bulletin_posts", "catalog_schema", "clearance_transaction_items",
   "clearance_transactions", "library_circulation_settings", "library_events", "library_holidays", "notification_reads",

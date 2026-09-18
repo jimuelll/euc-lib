@@ -127,6 +127,11 @@ const deleteAcademicProgram = async (programId, userId, conn = db) => {
   return result.affectedRows;
 };
 
+const listDepartments = async ({ activeOnly = true } = {}, conn = db) => { const [rows] = await conn.query(`SELECT id, name, is_active, created_at, updated_at FROM departments ${activeOnly ? "WHERE is_active = 1" : ""} ORDER BY name ASC`); return rows; };
+const createDepartment = async ({ name }, userId, conn = db) => { const [result] = await conn.query("INSERT INTO departments (name, created_by, updated_by) VALUES (?, ?, ?)", [name, userId ?? null, userId ?? null]); const [[department]] = await conn.query("SELECT id, name, is_active, created_at, updated_at FROM departments WHERE id = ?", [result.insertId]); return department; };
+const updateDepartment = async (departmentId, name, userId, conn = db) => { const [result] = await conn.query("UPDATE departments SET name = ?, updated_by = ? WHERE id = ? AND is_active = 1", [name, userId ?? null, departmentId]); if (!result.affectedRows) return null; const [[department]] = await conn.query("SELECT id, name, is_active, created_at, updated_at FROM departments WHERE id = ?", [departmentId]); return department; };
+const deleteDepartment = async (departmentId, userId, conn = db) => { const [[usage]] = await conn.query("SELECT COUNT(*) AS total FROM users WHERE department_id = ?", [departmentId]); if (Number(usage.total)) return { usage: Number(usage.total) }; const [result] = await conn.query("UPDATE departments SET is_active = 0, updated_by = ? WHERE id = ? AND is_active = 1", [userId ?? null, departmentId]); return { usage: 0, affectedRows: result.affectedRows }; };
+
 const listAcademicTerms = async (conn = db) => {
   const [rows] = await conn.query(
     "SELECT id, name, starts_on, ends_on, is_current, created_at, updated_at FROM academic_terms ORDER BY starts_on DESC, id DESC",
@@ -193,6 +198,7 @@ module.exports = {
   createAcademicProgram,
   updateAcademicProgram,
   deleteAcademicProgram,
+  listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listAcademicTerms,
   createAcademicTerm,
   updateAcademicTerm,

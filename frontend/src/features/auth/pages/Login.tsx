@@ -110,7 +110,7 @@ const Login = () => {
                   Library Access
                 </h1>
                 <p className="mt-1.5 text-[12px] text-primary-foreground/45 leading-relaxed">
-                  Sign in with your student or employee credentials.
+                  Sign in with your library card, employee number, or username.
                 </p>
               </div>
             </div>
@@ -122,14 +122,14 @@ const Login = () => {
                   style={{ fontFamily: "var(--font-heading)" }}
                   htmlFor="login-id"
                 >
-                  ID Number <span className="text-destructive">*</span>
+                  Account ID <span className="text-destructive">*</span>
                 </label>
                 <input
                   id="login-id"
                   type="text"
                   value={id}
                   onChange={(e) => setId(e.target.value)}
-                  placeholder="Student or employee ID"
+                  placeholder="Library card, employee no., or username"
                   autoComplete="username"
                   className="h-10 w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary transition-colors"
                 />

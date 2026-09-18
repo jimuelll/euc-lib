@@ -11,6 +11,7 @@ const AdminManage = () => {
     allowedRoles,
     programs,
     terms,
+    departments,
     searchQuery,
     setSearchQuery,
     roleFilter,
@@ -43,6 +44,7 @@ const AdminManage = () => {
         allowedRoles={allowedRoles}
         programs={programs}
         terms={terms}
+        departments={departments}
         loading={loading}
         onField={setField}
         onTogglePassword={togglePassword}

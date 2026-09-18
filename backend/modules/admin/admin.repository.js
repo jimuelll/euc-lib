@@ -9,6 +9,11 @@ async function findActiveProgram(programId) {
   return program || null;
 }
 
+async function findActiveDepartment(departmentId) {
+  const [[department]] = await db.query("SELECT id FROM departments WHERE id = ? AND is_active = 1 LIMIT 1", [departmentId]);
+  return department || null;
+}
+
 async function findExistingUser(studentEmployeeId) {
   const [users] = await db.query("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL", [studentEmployeeId]);
   return users;
@@ -24,12 +29,12 @@ async function findCurrentAcademicTerm() {
   return term || null;
 }
 
-async function createUser({ studentEmployeeId, name, passwordHash, role, address, contact, programId, academicTermId }) {
+async function createUser({ studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email, name, passwordHash, role, address, contact, programId, academicTermId, yearLevel, departmentId, remarks }) {
   const [result] = await db.query(
     `INSERT INTO users
-      (student_employee_id, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id)
-      VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?)`,
-    [studentEmployeeId, name, passwordHash, role, address || "", contact || "", programId, academicTermId]
+      (student_employee_id, library_card_number, student_number, employee_number, username, email, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id, year_level, department_id, remarks)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?)`,
+    [studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email || null, name, passwordHash, role, address || "", contact || "", programId, academicTermId, yearLevel, departmentId, remarks]
   );
   const userId = result.insertId;
   const barcode = `LIB-USER-${String(userId).padStart(6, "0")}`;
@@ -80,9 +85,9 @@ async function updateUser(studentEmployeeId, updates) {
 }
 
 async function searchUsers({ allowedRoles, showArchived, studentEmployeeId, name, role, status, page, limit = 25 }) {
-  let sql = `SELECT u.student_employee_id, u.name, u.role, u.is_active, u.address, u.contact, u.program_id,
-                    p.name AS program_course, u.deleted_at
-             FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id
+  let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.name, u.role, u.is_active, u.address, u.contact, u.program_id, u.year_level, u.department_id, u.remarks,
+                    p.name AS program_course, d.name AS department_name, u.deleted_at
+             FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id LEFT JOIN departments d ON d.id = u.department_id
              WHERE u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}
                AND u.role IN (${allowedRoles.map(() => "?").join(", ")})`;
   const values = [...allowedRoles];
@@ -172,4 +177,4 @@ async function bulkDeactivateUserIds(userIds, requesterId) {
   );
 }
 
-module.exports = { getConnection, findActiveProgram, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findActiveUser, updateUser, searchUsers, queryToolsSearch, findStudentLikeUsers, bulkDeactivateUserIds };
+module.exports = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findActiveUser, updateUser, searchUsers, queryToolsSearch, findStudentLikeUsers, bulkDeactivateUserIds };

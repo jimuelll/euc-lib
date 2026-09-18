@@ -117,6 +117,10 @@ const deleteAcademicProgram = async (req, res) => {
   }
 };
 
+const listDepartments = async (_req, res) => { try { res.json({ departments: await service.listDepartments() }); } catch { res.status(500).json({ message: "Failed to fetch departments" }); } };
+const createDepartment = async (req, res) => { try { const department = await service.createDepartment({ name: req.body?.name }, req.user?.id); res.status(201).json({ message: "Department added", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add department" }); } };
+const updateDepartment = async (req, res) => { try { const department = await service.updateDepartment(Number.parseInt(req.params.departmentId, 10), { name: req.body?.name }, req.user?.id); res.json({ message: "Department updated", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update department" }); } };
+const deleteDepartment = async (req, res) => { try { await service.deleteDepartment(Number.parseInt(req.params.departmentId, 10), req.user?.id); res.json({ message: "Department removed" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove department" }); } };
 const listAcademicTerms = async (_req, res) => { try { res.json({ terms: await service.listAcademicTerms() }); } catch (error) { res.status(500).json({ message: "Failed to fetch academic terms" }); } };
 const createAcademicTerm = async (req, res) => { try { const term = await service.createAcademicTerm({ name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.status(201).json({ message: "Academic term added", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add academic term" }); } };
 const updateAcademicTerm = async (req, res) => { try { const term = await service.updateAcademicTerm(Number.parseInt(req.params.termId, 10), { name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.json({ message: "Academic term updated", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
@@ -133,6 +137,10 @@ module.exports = {
   createAcademicProgram,
   updateAcademicProgram,
   deleteAcademicProgram,
+  listDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
   listAcademicTerms,
   createAcademicTerm,
   updateAcademicTerm,

@@ -4,6 +4,8 @@ const repository = require("./admin.repository");
 const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service");
 
 const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
+const ACADEMIC_ROLES = ["student", "staff", "alumni"];
+const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy = {
   super_admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
   admin: ["staff", "scanner", "employee", "alumni", "student"],
@@ -22,12 +24,45 @@ async function ensureProgramExists(programId) {
   return program.id;
 }
 
-async function createUser({ student_employee_id, name, role, password, address, contact, program_id, academic_term_id }, creatorRole) {
+async function ensureDepartmentExists(departmentId) {
+  if (!departmentId) return null;
+  const department = await repository.findActiveDepartment(departmentId);
+  if (!department) throw new Error("Select a valid active department");
+  return department.id;
+}
+
+function roleProfile(input, role) {
+  const value = (key) => String(input[key] || "").trim();
+  const libraryCardNumber = value("library_card_number");
+  const studentNumber = value("student_number");
+  const employeeNumber = value("employee_number");
+  const username = value("username");
+  if (ACADEMIC_ROLES.includes(role)) {
+    if (!libraryCardNumber) throw new Error("Library Card Number is required");
+    if (role !== "alumni" && !studentNumber) throw new Error("Student No. is required");
+    if (role !== "alumni" && !input.program_id) throw new Error("Course is required");
+    if (role !== "alumni" && !YEAR_LEVELS.includes(value("year_level"))) throw new Error("Select a valid Year Level");
+    return { studentEmployeeId: libraryCardNumber, libraryCardNumber, studentNumber: studentNumber || null, employeeNumber: null, username: null };
+  }
+  if (role === "employee") {
+    if (!employeeNumber) throw new Error("Employee No. is required");
+    if (!input.department_id) throw new Error("Department is required");
+    return { studentEmployeeId: employeeNumber, libraryCardNumber: null, studentNumber: null, employeeNumber, username: null };
+  }
+  if (!username) throw new Error("Username is required");
+  return { studentEmployeeId: username, libraryCardNumber: null, studentNumber: null, employeeNumber: null, username };
+}
+
+async function createUser(input, creatorRole) {
+  const { name, role, password, address, contact, program_id, academic_term_id, department_id, year_level, email } = input;
   if (!roleHierarchy[creatorRole]?.includes(role)) throw new Error("You are not allowed to create a user with this role");
   if (role === creatorRole && creatorRole !== "super_admin") throw new Error("You cannot create a user with your own role");
-  if ((await repository.findExistingUser(student_employee_id)).length) throw new Error("User already exists");
+  if (!String(name || "").trim() || !password) throw new Error("Name and password are required");
+  const identity = roleProfile(input, role);
+  if ((await repository.findExistingUser(identity.studentEmployeeId)).length) throw new Error("User already exists");
   const password_hash = await bcrypt.hash(password, 12);
-  const programId = await ensureProgramExists(program_id);
+  const programId = ACADEMIC_ROLES.includes(role) && role !== "alumni" ? await ensureProgramExists(program_id) : null;
+  const departmentId = role === "employee" ? await ensureDepartmentExists(department_id) : null;
   let academicTermId = null;
   if (role === "student") {
     if (academic_term_id) {
@@ -38,7 +73,7 @@ async function createUser({ student_employee_id, name, role, password, address, 
       academicTermId = (await repository.findCurrentAcademicTerm())?.id ?? null;
     }
   }
-  const barcode = await repository.createUser({ studentEmployeeId: student_employee_id, name, passwordHash: password_hash, role, address, contact, programId, academicTermId });
+  const barcode = await repository.createUser({ ...identity, email, name: name.trim(), passwordHash: password_hash, role, address, contact, programId, academicTermId, yearLevel: ACADEMIC_ROLES.includes(role) && role !== "alumni" ? year_level : null, departmentId, remarks: null });
   return { message: "User created successfully", barcode };
 }
 
@@ -80,6 +115,7 @@ async function updateUser(student_employee_id, updates, requesterRole) {
   if (!existing) throw new Error("User not found");
   if (!roleHierarchy[requesterRole]?.includes(existing.role)) throw new Error("You are not allowed to update this user");
   const normalized = {};
+  const nextRole = updates.role || existing.role;
   if (updates.name) normalized.name = updates.name;
   if (updates.role) {
     if (!roleHierarchy[requesterRole]?.includes(updates.role)) throw new Error("You are not allowed to assign this role");
@@ -90,9 +126,18 @@ async function updateUser(student_employee_id, updates, requesterRole) {
     normalized.password_hash = await bcrypt.hash(updates.password, 12);
     normalized.must_change_password = 1;
   }
+  const identityKeys = ["library_card_number", "student_number", "employee_number", "username", "program_id", "department_id", "year_level"];
+  if (identityKeys.some((key) => updates[key] !== undefined) || updates.role) {
+    const profile = roleProfile({ ...existing, ...updates }, nextRole);
+    Object.assign(normalized, { student_employee_id: profile.studentEmployeeId, library_card_number: profile.libraryCardNumber, student_number: profile.studentNumber, employee_number: profile.employeeNumber, username: profile.username });
+    normalized.program_id = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? await ensureProgramExists(updates.program_id ?? existing.program_id) : null;
+    normalized.department_id = nextRole === "employee" ? await ensureDepartmentExists(updates.department_id ?? existing.department_id) : null;
+    normalized.year_level = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? (updates.year_level ?? existing.year_level) : null;
+  }
+  if (updates.email !== undefined) normalized.email = updates.email || null;
   if (updates.address !== undefined) normalized.address = updates.address;
   if (updates.contact !== undefined) normalized.contact = updates.contact;
-  if (updates.program_id !== undefined) normalized.program_id = await ensureProgramExists(updates.program_id);
+  if (updates.remarks !== undefined && nextRole === "student") normalized.remarks = updates.remarks || null;
   if (updates.academic_term_id !== undefined) {
     const term = updates.academic_term_id ? await repository.findAcademicTerm(updates.academic_term_id) : null;
     if (updates.academic_term_id && !term) throw new Error("Select a valid academic term");
