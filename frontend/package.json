@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:architecture": "node scripts/architecture-check.mjs",
+    "test:unit": "vitest run --passWithNoTests",
+    "test": "npm run test:architecture && npm run test:unit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

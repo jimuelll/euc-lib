@@ -7,7 +7,7 @@ const {
   queryToolsSearch,
 } = require("./admin.service");
 const qr = require("qrcode");
-const db = require("../../db");
+const repository = require("./admin.repository");
 
 // CREATE
 async function handleCreateUser(req, res) {
@@ -74,10 +74,7 @@ async function handleQueryToolsSearch(req, res) {
 // GET /admin/users/:student_employee_id/barcode-png
 async function handleGetBarcodePng(req, res) {
   try {
-    const [[user]] = await db.query(
-      "SELECT barcode FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
-      [req.params.student_employee_id]
-    );
+    const user = await repository.findActiveUserBarcode(req.params.student_employee_id);
     if (!user?.barcode) {
       return res.status(404).json({ message: "User or barcode not found" });
     }

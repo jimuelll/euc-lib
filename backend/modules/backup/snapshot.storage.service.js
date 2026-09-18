@@ -1,9 +1,14 @@
 const { Readable } = require("stream");
+const { gzip, gunzip } = require("zlib");
+const { promisify } = require("util");
 const cloudinary = require("cloudinary").v2;
-const db = require("../../db");
-const { SNAPSHOT_TABLE } = require("./snapshot.registry");
+const repository = require("./backup.repository");
 
 const MAX_SNAPSHOTS = 30;
+const DEFAULT_SNAPSHOT_MAX_BYTES = 50 * 1024 * 1024;
+const DEFAULT_SNAPSHOT_UPLOAD_TIMEOUT_MS = 2 * 60 * 1000;
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -17,11 +22,45 @@ function requireCloudinary() {
   }
 }
 
-async function uploadSnapshot(payload, createdBy, kind = "manual") {
-  requireCloudinary();
-  const snapshotId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+function configuredPositiveNumber(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function snapshotMaxBytes() {
+  return configuredPositiveNumber("SNAPSHOT_MAX_BYTES", DEFAULT_SNAPSHOT_MAX_BYTES);
+}
+
+function snapshotUploadTimeoutMs() {
+  return configuredPositiveNumber("SNAPSHOT_UPLOAD_TIMEOUT_MS", DEFAULT_SNAPSHOT_UPLOAD_TIMEOUT_MS);
+}
+
+function serializeSnapshot(payload) {
   const contents = JSON.stringify(payload);
-  const upload = await new Promise((resolve, reject) => {
+  const sizeBytes = Buffer.byteLength(contents);
+  const maxBytes = snapshotMaxBytes();
+  if (sizeBytes > maxBytes) {
+    throw Object.assign(
+      new Error(`The snapshot is ${sizeBytes} bytes, which exceeds the configured limit of ${maxBytes} bytes.`),
+      { status: 413 }
+    );
+  }
+  return { contents, sizeBytes };
+}
+
+async function uploadToCloudinary(contents, snapshotId) {
+  const compressed = await gzipAsync(contents);
+  const uploadTimeoutMs = snapshotUploadTimeoutMs();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+    };
     const stream = cloudinary.uploader.upload_stream({
       resource_type: "raw",
       type: "authenticated",
@@ -29,27 +68,41 @@ async function uploadSnapshot(payload, createdBy, kind = "manual") {
       public_id: snapshotId,
       format: "json",
       overwrite: false,
-    }, (error, result) => error ? reject(error) : resolve(result));
-    Readable.from([contents]).pipe(stream);
+    }, (error, result) => error
+      ? finish(reject, error)
+      : finish(resolve, { result, compressedSizeBytes: compressed.byteLength }));
+
+    stream.on("error", (error) => finish(reject, error));
+    timer = setTimeout(() => {
+      const error = Object.assign(new Error("Snapshot upload timed out."), { status: 504 });
+      stream.destroy(error);
+      finish(reject, error);
+    }, uploadTimeoutMs);
+    Readable.from([compressed]).pipe(stream);
   });
+}
+
+async function uploadSnapshot(payload, createdBy, kind = "manual") {
+  requireCloudinary();
+  const snapshotId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const { contents, sizeBytes } = serializeSnapshot(payload);
+  const { result: upload, compressedSizeBytes } = await uploadToCloudinary(contents, snapshotId);
 
   const filename = `euc-library-snapshot-${payload.createdAt.replace(/[:.]/g, "-")}.json`;
-  const [result] = await db.query(
-    `INSERT INTO ${SNAPSHOT_TABLE} (cloudinary_public_id, filename, size_bytes, kind, created_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    [upload.public_id, filename, Buffer.byteLength(contents), kind, createdBy || null]
-  );
+  const result = await repository.createSnapshotRecord({
+    publicId: upload.public_id,
+    filename,
+    sizeBytes: compressedSizeBytes,
+    kind,
+    createdBy,
+  });
 
-  const [expired] = await db.query(
-    `SELECT id, cloudinary_public_id FROM ${SNAPSHOT_TABLE} ORDER BY created_at DESC, id DESC LIMIT 18446744073709551615 OFFSET ?`,
-    [MAX_SNAPSHOTS]
-  );
+  const expired = await repository.pruneSnapshots(MAX_SNAPSHOTS);
   if (expired.length) {
-    await db.query(`DELETE FROM ${SNAPSHOT_TABLE} WHERE id IN (?)`, [expired.map((snapshot) => snapshot.id)]);
     await Promise.allSettled(expired.map((snapshot) => cloudinary.uploader.destroy(snapshot.cloudinary_public_id, { resource_type: "raw", type: "authenticated" })));
   }
 
-  return { id: result.insertId, filename, sizeBytes: Buffer.byteLength(contents), createdAt: payload.createdAt, kind };
+  return { id: result.insertId, filename, sizeBytes: compressedSizeBytes, uncompressedSizeBytes: sizeBytes, createdAt: payload.createdAt, kind };
 }
 
 async function getSnapshotPayload(snapshot) {
@@ -62,7 +115,11 @@ async function getSnapshotPayload(snapshot) {
   });
   const response = await fetch(url);
   if (!response.ok) throw Object.assign(new Error("The snapshot file could not be retrieved from storage."), { status: 502 });
-  return response.json();
+  const stored = Buffer.from(await response.arrayBuffer());
+  const contents = stored[0] === 0x1f && stored[1] === 0x8b
+    ? await gunzipAsync(stored)
+    : stored;
+  return JSON.parse(contents.toString("utf8"));
 }
 
-module.exports = { uploadSnapshot, getSnapshotPayload };
+module.exports = { uploadSnapshot, getSnapshotPayload, serializeSnapshot };

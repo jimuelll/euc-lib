@@ -731,7 +731,8 @@ ALTER TABLE `auth_refresh_sessions`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `jti` (`jti`),
   ADD KEY `idx_auth_refresh_sessions_user_id` (`user_id`),
-  ADD KEY `idx_auth_refresh_sessions_expires_at` (`expires_at`);
+  ADD KEY `idx_auth_refresh_sessions_expires_at` (`expires_at`),
+  ADD KEY `idx_auth_refresh_sessions_revoked_at` (`revoked_at`);
 
 --
 -- Indexes for table `backup_snapshots`

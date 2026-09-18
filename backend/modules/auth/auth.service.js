@@ -4,23 +4,21 @@ const {
   issueRefreshSession,
   revokeAllRefreshSessionsForUser,
 } = require("./authSession.service");
-const db = require("../../db");
-const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../../users/users.service");
+const repository = require("./auth.repository");
+const { getUserByEmployeeID, getUserByID, updateLastLogin } = require("../users/users.service");
 const { normalizeDeviceType } = require("./authDevice");
-const { recordAuditEvent } = require("../analytics/audit.service");
+const { recordAuditEvent } = require("../analytics/analytics.audit.service");
 
 const getTermStatus = async (user) => {
   if (user.role !== "student") return { term_status: "not_applicable", academic_term_name: null };
-  const [[term]] = await db.query("SELECT name, ends_on FROM academic_terms WHERE id = ? LIMIT 1", [user.academic_term_id ?? null]);
+  const term = await repository.getAcademicTerm(user.academic_term_id ?? null);
   if (!term || new Date(term.ends_on) < new Date(new Date().toDateString())) return { term_status: "expired", academic_term_name: term?.name ?? null };
   return { term_status: "current", academic_term_name: term.name };
 };
 
 const recordAuthAuditEvent = async (userId, eventType, { deviceType = "unknown" } = {}) => {
-  await db.query(
-    "INSERT INTO auth_audit_events (user_id, event_type, device_type) VALUES (?, ?, ?)",
-    [userId, eventType, normalizeDeviceType(deviceType)]
-  );
+  const normalizedDeviceType = normalizeDeviceType(deviceType);
+  await repository.recordAuthAuditEvent(userId, eventType, normalizedDeviceType);
   const descriptions = {
     login: "Signed in",
     logout: "Signed out",
@@ -32,7 +30,7 @@ const recordAuthAuditEvent = async (userId, eventType, { deviceType = "unknown" 
     action: eventType,
     description: descriptions[eventType] ?? `Completed ${eventType}`,
     route: "/api/auth",
-    metadata: { device_type: normalizeDeviceType(deviceType) },
+    metadata: { device_type: normalizedDeviceType },
   });
 };
 
@@ -91,10 +89,7 @@ async function changePassword(userId, oldPassword, newPassword, rememberMe = fal
 
   // Hash and update
   const newHash = await bcrypt.hash(newPassword, 12);
-  await db.query(
-    "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
-    [newHash, userId]
-  );
+  await repository.updatePassword(userId, newHash);
 
   await revokeAllRefreshSessionsForUser(userId);
   await recordAuthAuditEvent(user.id, "password_changed", auditContext);
@@ -122,4 +117,4 @@ async function changePassword(userId, oldPassword, newPassword, rememberMe = fal
   };
 }
 
-module.exports = { loginUser, changePassword, recordAuthAuditEvent };
+module.exports = { loginUser, changePassword, getTermStatus, recordAuthAuditEvent };

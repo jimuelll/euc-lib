@@ -1,4 +1,4 @@
-const db = require("../../db");
+const repository = require("./backup.repository");
 const { SYSTEM_TABLES, APPLICATION_TABLES } = require("./snapshot.registry");
 const {
   SNAPSHOT_VERSION,
@@ -8,14 +8,8 @@ const {
   upgradeBackup,
 } = require("./snapshot.transforms");
 
-async function getTableNames(connection = db) {
-  const [rows] = await connection.query(
-    `SELECT TABLE_NAME FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
-       AND TABLE_NAME NOT IN (${SYSTEM_TABLES.map(() => "?").join(", ")}) ORDER BY TABLE_NAME`,
-    SYSTEM_TABLES
-  );
-  const discovered = rows.map((row) => row.TABLE_NAME);
+async function getTableNames(connection) {
+  const discovered = await repository.listApplicationTables(connection, SYSTEM_TABLES);
   const expected = [...APPLICATION_TABLES].sort();
   if (JSON.stringify(discovered) !== JSON.stringify(expected)) {
     throw Object.assign(new Error("Application table registry is out of date. Add the new table and its snapshot default before deployment."), { status: 500 });
@@ -23,36 +17,19 @@ async function getTableNames(connection = db) {
   return expected;
 }
 
-async function getSchemaManifest(connection = db) {
-  const [columns] = await connection.query(
-    `SELECT TABLE_NAME AS tableName, COLUMN_NAME AS name, COLUMN_TYPE AS columnType,
-            IS_NULLABLE AS isNullable, EXTRA AS extra
-       FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME NOT IN (${SYSTEM_TABLES.map(() => "?").join(", ")})
-      ORDER BY TABLE_NAME, ORDINAL_POSITION`,
-    SYSTEM_TABLES
-  );
-  const tables = {};
-  for (const column of columns) {
-    (tables[column.tableName] ??= { columns: [] }).columns.push({
-      name: column.name,
-      columnType: column.columnType,
-      isNullable: column.isNullable,
-      extra: column.extra,
-    });
-  }
-  return tables;
+async function getSchemaManifest(connection) {
+  return repository.getSchemaManifest(SYSTEM_TABLES, connection);
 }
 
 async function createBackupPayload() {
-  const connection = await db.getConnection();
+  const connection = await repository.getConnection();
   try {
     await connection.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
     await connection.query("START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY");
     const tables = await getTableNames(connection);
     const data = {};
     for (const table of tables) {
-      const [rows] = await connection.query(`SELECT * FROM \`${table}\``);
+      const rows = await repository.readTable(table, connection);
       data[table] = rows.map((row) => Object.fromEntries(
         Object.entries(row).map(([key, value]) => [key, encodeValue(value)])
       ));

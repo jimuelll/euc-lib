@@ -8,7 +8,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 
-interface User {
+export interface User {
   id: number;
   role: string;
   name: string;

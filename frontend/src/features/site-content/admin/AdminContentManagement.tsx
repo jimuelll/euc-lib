@@ -1,0 +1,75 @@
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { BookOpenCheck, BookOpenText, CalendarDays, FileText, Globe2, Loader2, Plus, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { AdminPage, AdminPanel } from "@/features/admin";
+import { AdminAbout } from "@/features/about";
+import { AdminBulletin } from "@/features/bulletin";
+import { AdminSubscriptions } from "@/features/subscriptions";
+import { UserGuideEditor } from "@/features/user-guide";
+import { getSiteContent, updateSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
+import { createEvent, deleteEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
+
+type Event = SiteEvent;
+const HomeContent = () => {
+  const [form, setForm] = useState<SiteContent | null>(null); const [saving, setSaving] = useState(false); const [message, setMessage] = useState("");
+  useEffect(() => { getSiteContent().then(setForm).catch(() => setMessage("Could not load site content.")); }, []);
+  if (!form) return <p className="py-8 text-sm text-muted-foreground">Loading homepage content…</p>;
+  const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) => setForm({ ...form, [key]: value });
+  return <AdminPanel title="Homepage content" description="Changes publish directly to the public homepage."><form className="space-y-5" onSubmit={async (e) => { e.preventDefault(); setSaving(true); try { setForm(await updateSiteContent(form)); setMessage("Homepage content saved."); } catch (err: any) { setMessage(err.response?.data?.message || "Could not save changes."); } finally { setSaving(false); } }}><div className="grid gap-4 md:grid-cols-2"><Field label="Institution line"><Input value={form.hero_kicker} onChange={(e) => set("hero_kicker", e.target.value)} /></Field><Field label="Hero image URL"><Input value={form.hero_image_url || ""} onChange={(e) => set("hero_image_url", e.target.value || null)} placeholder="Leave blank for the default image" /></Field><Field label="Hero title"><Input value={form.hero_title} onChange={(e) => set("hero_title", e.target.value)} /></Field><Field label="Highlighted word"><Input value={form.hero_highlight} onChange={(e) => set("hero_highlight", e.target.value)} /></Field></div><Field label="Hero description"><Textarea rows={3} value={form.hero_description} onChange={(e) => set("hero_description", e.target.value)} /></Field><div className="border-y border-border py-5"><p className="mb-4 text-sm font-semibold">Hero statistics</p><p className="mb-4 text-xs text-muted-foreground">These are intentionally customizable rather than tied to private inventory figures.</p><div className="grid gap-3 md:grid-cols-3">{form.hero_stats.map((stat, index) => <div className="space-y-2" key={index}><Input aria-label={`Statistic ${index + 1} value`} value={stat.value} placeholder="Value" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, value: e.target.value } : item))} /><Input aria-label={`Statistic ${index + 1} label`} value={stat.label} placeholder="Label" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, label: e.target.value } : item))} /></div>)}</div></div><div className="border-b border-border pb-5"><p className="mb-4 text-sm font-semibold">Operating hours</p><div className="space-y-3">{form.hours.map((row, index) => <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]" key={index}><Input value={row.day} aria-label="Day" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, day: e.target.value } : h))} /><Input value={row.time} aria-label="Hours" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, time: e.target.value } : h))} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={row.open} onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, open: e.target.checked } : h))} /> Open</label><Button type="button" variant="ghost" size="icon" aria-label="Remove hours row" onClick={() => set("hours", form.hours.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}</div><Button type="button" variant="outline" className="mt-4" onClick={() => set("hours", [...form.hours, { day: "", time: "", open: true }])}><Plus className="mr-2 h-4 w-4" />Add hours</Button></div><div className="grid gap-4 md:grid-cols-3"><Field label="Address"><Input value={form.address} onChange={(e) => set("address", e.target.value)} /></Field><Field label="Email"><Input type="email" value={form.contact_email} onChange={(e) => set("contact_email", e.target.value)} /></Field><Field label="Phone"><Input value={form.contact_phone} onChange={(e) => set("contact_phone", e.target.value)} /></Field></div>{message && <p className="text-sm text-muted-foreground">{message}</p>}<Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save homepage content"}</Button></form></AdminPanel>;
+};
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+const Events = () => {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [title, setTitle] = useState("");
+  const [starts, setStarts] = useState("");
+  const [ends, setEnds] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const load = () => fetchEvents(true).then(setEvents);
+  useEffect(() => { void load(); }, []);
+  const addEvent = async () => {
+    setPending("add"); setError("");
+    try { await createEvent({ title, starts_at: starts, ends_at: ends || null }); setTitle(""); setStarts(""); setEnds(""); await load(); }
+    catch (err: any) { setError(err.response?.data?.message || "Could not add event."); }
+    finally { setPending(null); }
+  };
+  const removeEvent = async (event: Event) => {
+    if (!window.confirm(`Delete ${event.title}?`)) return;
+    setPending(`delete-${event.id}`); setError("");
+    try { await deleteEvent(event.id); await load(); }
+    catch (err: any) { setError(err.response?.data?.message || "Could not delete event."); }
+    finally { setPending(null); }
+  };
+  return <AdminPanel title="Upcoming events" description="Manage the events shown alongside the public bulletin."><div className="mb-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Event title" disabled={Boolean(pending)} /><Input type="datetime-local" value={starts} onChange={(event) => setStarts(event.target.value)} disabled={Boolean(pending)} aria-label="Event start" /><Input type="datetime-local" value={ends} min={starts || undefined} onChange={(event) => setEnds(event.target.value)} disabled={Boolean(pending)} aria-label="Event end" /><Button disabled={!title.trim() || !starts || Boolean(pending)} onClick={() => void addEvent()}>{pending === "add" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding…</> : <><Plus className="mr-2 h-4 w-4" />Add event</>}</Button></div><p className="mb-6 text-xs text-muted-foreground">Add an end date for a multi-day event; leave it blank for a single start time.</p>{error && <p className="mb-4 text-sm text-destructive">{error}</p>}<div className="divide-y divide-border border-y border-border">{events.map((event) => <div className="flex items-center justify-between gap-4 py-3" key={event.id}><div><p className="font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{new Date(event.starts_at).toLocaleString()}{event.ends_at ? ` – ${new Date(event.ends_at).toLocaleString()}` : ""}</p></div><Button variant="ghost" size="icon" aria-label={`Delete ${event.title}`} disabled={Boolean(pending)} onClick={() => void removeEvent(event)}>{pending === `delete-${event.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div>)}{!events.length && <p className="py-6 text-sm text-muted-foreground">No upcoming events.</p>}</div></AdminPanel>;
+};
+const CMS_TABS = {
+  homepage: { label: "Homepage", description: "Manage the hero, operating hours, and contact details shown on the public homepage.", icon: Globe2 },
+  about: { label: "About", description: "Maintain the library story, staff, spaces, and public information.", icon: BookOpenText },
+  bulletin: { label: "Bulletin", description: "Publish announcements and keep the public bulletin organized.", icon: FileText },
+  events: { label: "Events", description: "Schedule events displayed beside the public bulletin.", icon: CalendarDays },
+  subscriptions: { label: "Subscriptions", description: "Curate academic resources available through the library.", icon: BookOpenText },
+  guide: { label: "User guide", description: "Write role-specific help, save unfinished work as a draft, and publish it when it is ready.", icon: BookOpenCheck },
+} as const;
+export default function AdminContentManagement() {
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab") || "homepage";
+  const tab = requested in CMS_TABS ? requested as keyof typeof CMS_TABS : "homepage";
+  const current = CMS_TABS[tab];
+  const CurrentIcon = current.icon;
+  const select = (value: string) => setParams({ tab: value });
+  return <AdminPage title="Content management" contentWidth="wide"><Tabs value={tab} onValueChange={select}>
+    <div className="border-y border-border bg-muted/20 px-2 py-2 sm:px-3"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0"><TabsTrigger value="homepage" className="gap-2 rounded-sm px-3 py-2 text-xs"><Globe2 className="h-4 w-4" />Homepage</TabsTrigger><TabsTrigger value="about" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />About</TabsTrigger><TabsTrigger value="bulletin" className="gap-2 rounded-sm px-3 py-2 text-xs"><FileText className="h-4 w-4" />Bulletin</TabsTrigger><TabsTrigger value="events" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarDays className="h-4 w-4" />Events</TabsTrigger><TabsTrigger value="subscriptions" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />Subscriptions</TabsTrigger><TabsTrigger value="guide" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenCheck className="h-4 w-4" />User guide</TabsTrigger></TabsList></div>
+    <div className="flex items-start gap-3 border-b border-border py-5"><div className="flex h-9 w-9 shrink-0 items-center justify-center border border-warning/30 bg-warning/10 text-warning"><CurrentIcon className="h-4 w-4" /></div><div><h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{current.label}</h2><p className="mt-1 text-sm text-muted-foreground">{current.description}</p></div></div>
+    <TabsContent value="homepage" className="mt-5"><HomeContent /></TabsContent>
+    <TabsContent value="about" className="mt-5 [&>div>header]:hidden"><AdminAbout /></TabsContent>
+    <TabsContent value="bulletin" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>h1]:hidden"><AdminBulletin /></TabsContent>
+    <TabsContent value="events" className="mt-5"><Events /></TabsContent>
+    <TabsContent value="subscriptions" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>h1]:hidden"><AdminSubscriptions /></TabsContent>
+    <TabsContent value="guide" className="mt-5"><UserGuideEditor /></TabsContent>
+  </Tabs></AdminPage>;
+}

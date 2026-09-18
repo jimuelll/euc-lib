@@ -1,6 +1,5 @@
 const { validate, createValidationError } = require("../../middlewares/validate");
-const db = require("../../db");
-const { MAX_CUSTOM_FIELDS, getSchema } = require("./catalog.service");
+const { MAX_CUSTOM_FIELDS, getSchema, getCatalogRecordForValidation } = require("./catalog.service");
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 const CATALOG_ROLES = ["staff", ...ADMIN_ROLES];
@@ -87,7 +86,7 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
   // Updates intentionally do not allow changing a record's profile. Resolve it
   // from the locked row so thesis-only payloads are never validated as books.
   if (req.params?.id) {
-    const [[record]] = await db.query("SELECT material_type, title, author, isbn, copies, book_type_id, metadata FROM books WHERE id = ? AND deleted_at IS NULL", [req.params.id]);
+    const record = await getCatalogRecordForValidation(req.params.id);
     if (!record) throw createValidationError("Catalog record not found");
     if (materialType && materialType !== record.material_type) throw createValidationError("Material type cannot be changed after creation", 400, "material_type");
     materialType = record.material_type;

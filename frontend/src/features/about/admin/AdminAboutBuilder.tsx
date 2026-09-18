@@ -1,0 +1,108 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { AdminPage, AdminPanel } from "@/features/admin";
+import { useAboutData } from "./AdminAboutData";
+import { ContentRowsSkeleton } from "@/components/ui/content-skeletons";
+import {
+  Divider,
+  Field,
+  SpacesEditor,
+  StaffEditor,
+  StringListEditor,
+} from "./components/AdminAboutComponents";
+
+const AdminAboutBuilder = () => {
+  const { form, setField, loading, saving, handleSubmit } = useAboutData();
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl py-3"><ContentRowsSkeleton rows={5} /></div>
+    );
+  }
+
+  return (
+    <AdminPage
+      eyebrow="Content Management"
+      title="Edit About Page"
+      contentWidth="wide"
+    >
+      <AdminPanel title="Public page content" className="max-w-5xl">
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <Divider label="Library Identity" />
+          <Field label="Library Name">
+            <Input
+              value={form.library_name}
+              onChange={(e) => setField("library_name", e.target.value)}
+              placeholder="Enverga-Candelaria Library"
+            />
+          </Field>
+
+          <Divider label="Mission & Vision" />
+          <Field label="Section Title">
+            <Input
+              value={form.mission_title}
+              onChange={(e) => setField("mission_title", e.target.value)}
+              placeholder="Empowering Academic Growth"
+            />
+          </Field>
+          <Field label="Mission Text">
+            <Textarea
+              value={form.mission_text}
+              onChange={(e) => setField("mission_text", e.target.value)}
+              placeholder="Describe the library mission and vision..."
+              rows={4}
+            />
+          </Field>
+
+          <Divider label="Library History" />
+          <Field label="Section Title">
+            <Input
+              value={form.history_title}
+              onChange={(e) => setField("history_title", e.target.value)}
+              placeholder="Est. 1975"
+            />
+          </Field>
+          <Field label="History Text">
+            <Textarea
+              value={form.history_text}
+              onChange={(e) => setField("history_text", e.target.value)}
+              placeholder="Brief history of the library..."
+              rows={4}
+            />
+          </Field>
+
+          <Divider label="Rules & Policies" />
+          <StringListEditor
+            label="Borrowing Policies"
+            items={form.policies}
+            placeholder="e.g. Maximum of 5 books at a time"
+            onChange={(v) => setField("policies", v)}
+          />
+
+          <Divider label="Facilities & Resources" />
+          <StringListEditor
+            label="Facility Items"
+            items={form.facilities}
+            placeholder="e.g. 3 reading halls with 200+ seating capacity"
+            onChange={(v) => setField("facilities", v)}
+          />
+
+          <Divider label="Staff Directory" />
+          <StaffEditor staff={form.staff} onChange={(v) => setField("staff", v)} />
+
+          <Divider label="Library Spaces" />
+          <SpacesEditor spaces={form.spaces} onChange={(v) => setField("spaces", v)} />
+
+          <div className="sticky bottom-4 z-10 border border-border bg-card p-3 shadow-[0_10px_28px_hsl(var(--primary)/0.12)]">
+            <Button type="submit" disabled={saving} className="w-full rounded-none sm:w-auto">
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </form>
+      </AdminPanel>
+    </AdminPage>
+  );
+};
+
+export default AdminAboutBuilder;

@@ -1,23 +1,5 @@
-const service = require("../reservation/reservation.service");
-const db      = require("../../db");
+const service = require("./adminReservation.service");
 const notificationsService = require("../notifications/notifications.service");
-
-const getReservationNotificationTarget = async (reservationId) => {
-  const [[row]] = await db.query(
-    `SELECT
-       r.id,
-       r.user_id,
-       r.status,
-       bk.title
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
-     WHERE r.id = ?
-     LIMIT 1`,
-    [reservationId]
-  );
-
-  return row ?? null;
-};
 
 const getAdminReservations = async (req, res) => {
   try {
@@ -43,8 +25,7 @@ const markReservationReady = async (req, res) => {
     if (isNaN(reservationId) || reservationId < 1) {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
-    await service.markReservationReady(reservationId);
-    const target = await getReservationNotificationTarget(reservationId);
+    const target = await service.markReservationReady(reservationId);
     if (target) {
       await notificationsService.createNotification({
         type: "reservation_ready",
@@ -75,8 +56,7 @@ const cancelReservationAdmin = async (req, res) => {
     if (isNaN(reservationId) || reservationId < 1) {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
-    await service.cancelReservationAdmin(reservationId);
-    const target = await getReservationNotificationTarget(reservationId);
+    const target = await service.cancelReservationAdmin(reservationId);
     if (target) {
       await notificationsService.createNotification({
         type: "reservation_cancelled",
@@ -102,20 +82,7 @@ const deleteReservationAdmin = async (req, res) => {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
 
-    // Only terminal reservations (cancelled, expired, fulfilled) can be soft-deleted
-    const [[row]] = await db.query(
-      "SELECT status FROM reservations WHERE id = ? AND deleted_at IS NULL",
-      [reservationId]
-    );
-    if (!row) return res.status(404).json({ message: "Reservation not found" });
-    if (["pending", "ready"].includes(row.status)) {
-      return res.status(409).json({ message: "Cancel or fulfil the reservation before archiving it" });
-    }
-
-    await db.query(
-      "UPDATE reservations SET deleted_at = NOW(), deleted_by = ? WHERE id = ?",
-      [req.user.id, reservationId]
-    );
+    await service.archiveReservation(reservationId, req.user.id);
     res.json({ message: "Reservation archived successfully" });
   } catch (err) {
     console.error("[admin/reservations] deleteReservationAdmin:", err);

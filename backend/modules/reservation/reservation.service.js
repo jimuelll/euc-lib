@@ -1,50 +1,10 @@
-const db = require("../../db");
+const repository = require("./reservation.repository");
 const notificationsService = require("../notifications/notifications.service");
 const { assertEligible } = require("../clearance/clearance.service");
 const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
-const { metadataValue } = require("../catalog/catalog.projection");
-
-const getReservationNotificationTarget = async (reservationId, conn = db) => {
-  const [[row]] = await conn.query(
-    `SELECT
-       r.id,
-       r.user_id,
-       bk.title
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     WHERE r.id = ?
-     LIMIT 1`,
-    [reservationId]
-  );
-
-  return row ?? null;
-};
 
 const syncExpired = async () => {
-  const [expiredRows] = await db.query(
-    `SELECT
-       r.id,
-       r.user_id,
-       bk.title
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     WHERE r.status IN ('pending', 'ready')
-       AND r.expires_at IS NOT NULL
-       AND r.expires_at < NOW()
-       AND r.deleted_at IS NULL`
-  );
-
-  if (!expiredRows.length) return;
-
-  await db.query(
-    `UPDATE reservations
-     SET status = 'expired', reserved_copy_id = NULL
-     WHERE status IN ('pending', 'ready')
-       AND expires_at IS NOT NULL
-       AND expires_at < NOW()
-       AND deleted_at IS NULL`
-  );
-
+  const expiredRows = await repository.syncExpired();
   for (const row of expiredRows) {
     await notificationsService.createNotification({
       type: "reservation_expired",
@@ -59,110 +19,30 @@ const syncExpired = async () => {
 
 const getActiveReservations = async (userId) => {
   await syncExpired();
-  const [rows] = await db.query(
-    `SELECT r.id, bk.title, bk.author, ${metadataValue("bk", "location")},
-            r.status, r.reserved_at, r.expires_at, r.notes
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     WHERE r.user_id = ? AND r.status IN ('pending', 'ready')
-       AND r.deleted_at IS NULL
-     ORDER BY r.reserved_at DESC`,
-    [userId]
-  );
-  return rows;
+  return repository.findActiveReservations(userId);
 };
 
-const getReservationHistory = async (userId, { page, limit } = {}) => {
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-  const [[{ total }]] = paged ? await db.query(
-    `SELECT COUNT(*) AS total FROM reservations
-     WHERE user_id = ? AND status IN ('cancelled', 'expired', 'fulfilled') AND deleted_at IS NULL`,
-    [userId]
-  ) : [[{ total: 0 }]];
-  const [rows] = await db.query(
-    `SELECT r.id, bk.title, bk.author,
-            r.status, r.reserved_at, r.expires_at,
-            r.fulfilled_at, r.cancelled_at
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id
-     WHERE r.user_id = ?
-       AND r.status IN ('cancelled', 'expired', 'fulfilled')
-       AND r.deleted_at IS NULL
-     ORDER BY r.reserved_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
-  );
-  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
-};
+const getReservationHistory = async (userId, options = {}) =>
+  repository.findReservationHistory(userId, options);
 
-const searchCatalogue = async (query, { page, limit } = {}) => {
-  const like = `%${query}%`;
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-  const [[{ total }]] = paged ? await db.query(
-    `SELECT COUNT(*) AS total FROM books bk
-     WHERE bk.deleted_at IS NULL AND bk.material_type = 'book'
-       AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
-    [like, like, like]
-  ) : [[{ total: 0 }]];
-  const [rows] = await db.query(
-    `SELECT
-       bk.id,
-       bk.title,
-       bk.author,
-       ${metadataValue("bk", "category")},
-       bk.isbn,
-       bk.copies,
-       ${metadataValue("bk", "location")},
-       bk.material_type,
-       TRUE AS canBorrow,
-       TRUE AS canReserve,
-       GREATEST(0,
-         COUNT(DISTINCT bc.id) -
-         COUNT(DISTINCT CASE WHEN br.status IN ('borrowed', 'overdue') OR rr.id IS NOT NULL THEN bc.id END)
-       ) AS available
-     FROM books bk
-     LEFT JOIN book_copies bc
-       ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
-     LEFT JOIN borrowings br
-       ON br.copy_id = bc.id AND br.status IN ('borrowed', 'overdue')
-     LEFT JOIN reservations rr
-       ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
-     WHERE bk.deleted_at IS NULL
-       AND bk.material_type = 'book'
-       AND (bk.title  LIKE ?
-        OR bk.author LIKE ?
-        OR bk.isbn   LIKE ?)
-     GROUP BY bk.id
-     ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
-  );
-  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
-};
+const searchCatalogue = async (query, options = {}) =>
+  repository.searchCatalogue(query, options);
 
 const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
   await syncOverdueBorrowings();
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
     await assertEligible(userId, conn);
 
-    const [[book]] = await conn.query(
-      "SELECT id, title, material_type FROM books WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
-      [bookId]
-    );
+    const book = await repository.findBookForReservation(bookId, conn);
     if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
-    if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be reserved"), { status: 409 });
+    if (book.material_type === "thesis") {
+      throw Object.assign(new Error("Theses are reference-only and cannot be reserved"), { status: 409 });
+    }
 
-    const [[existing]] = await conn.query(
-      `SELECT id FROM reservations
-       WHERE user_id = ? AND book_id = ? AND status IN ('pending', 'ready')
-         AND deleted_at IS NULL`,
-      [userId, bookId]
-    );
+    const existing = await repository.findActiveReservationByUserBook(userId, bookId, conn);
     if (existing) {
       throw Object.assign(
         new Error("You already have an active reservation for this book"),
@@ -173,16 +53,11 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + hoursUntilExpiry);
     const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace("T", " ");
-
-    const [result] = await conn.query(
-      `INSERT INTO reservations (user_id, book_id, status, expires_at)
-       VALUES (?, ?, 'pending', ?)`,
-      [userId, bookId, expiresAtStr]
-    );
+    const result = await repository.createReservation(userId, bookId, expiresAtStr, conn);
 
     await conn.commit();
 
-    const target = await getReservationNotificationTarget(result.insertId);
+    const target = await repository.getReservationNotificationTarget(result.insertId);
     if (target) {
       await notificationsService.createNotification({
         type: "reservation_created",
@@ -207,28 +82,18 @@ const reserveBook = async (userId, bookId, hoursUntilExpiry = 48) => {
 };
 
 const cancelReservation = async (reservationId, userId) => {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.query(
-      `SELECT id, user_id, status FROM reservations
-       WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
-      [reservationId]
-    );
+    const row = await repository.findReservationForUserCancel(reservationId, conn);
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
     if (row.user_id !== userId) throw Object.assign(new Error("Forbidden"), { status: 403 });
     if (!["pending", "ready"].includes(row.status)) {
       throw Object.assign(new Error("Reservation cannot be cancelled"), { status: 409 });
     }
 
-    await conn.query(
-      `UPDATE reservations
-       SET status = 'cancelled', cancelled_at = NOW()
-       WHERE id = ?`,
-      [reservationId]
-    );
-
+    await repository.cancelReservation(reservationId, conn);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -238,142 +103,28 @@ const cancelReservation = async (reservationId, userId) => {
   }
 };
 
-const getAdminReservations = async ({
-  search,
-  status,
-  dateFrom,
-  dateTo,
-  archived = false,
-  page = 1,
-  limit = 15,
-}) => {
+const getAdminReservations = async (options) => {
   await syncExpired();
-
-  const offset = (page - 1) * limit;
-  const conditions = [`r.deleted_at IS ${archived ? "NOT NULL" : "NULL"}`];
-  const params = [];
-
-  if (status && status !== "all") {
-    conditions.push("r.status = ?");
-    params.push(status);
-  }
-
-  if (search?.trim()) {
-    conditions.push(`(
-      bk.title               LIKE ? OR
-      bk.author              LIKE ? OR
-      u.name                 LIKE ? OR
-      u.student_employee_id  LIKE ?
-    )`);
-    const like = `%${search.trim()}%`;
-    params.push(like, like, like, like);
-  }
-
-  if (dateFrom) {
-    conditions.push("r.reserved_at >= ?");
-    params.push(`${dateFrom} 00:00:00`);
-  }
-
-  if (dateTo) {
-    conditions.push("r.reserved_at < DATE_ADD(?, INTERVAL 1 DAY)");
-    params.push(dateTo);
-  }
-
-  const where = `WHERE ${conditions.join(" AND ")}`;
-  const baseFromClause = `
-     FROM reservations r
-     JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
-     JOIN users  u  ON u.id  = r.user_id AND u.deleted_at IS NULL
-     ${where}
-  `;
-
-  const [[{ total }]] = await db.query(
-    `SELECT COUNT(*) AS total
-     ${baseFromClause}`,
-    params
-  );
-
-  const [[summary]] = await db.query(
-    `SELECT
-       COUNT(*) AS total_records,
-       SUM(CASE WHEN r.status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
-       SUM(CASE WHEN r.status = 'ready' THEN 1 ELSE 0 END) AS ready_count,
-       SUM(CASE WHEN r.status = 'fulfilled' THEN 1 ELSE 0 END) AS fulfilled_count,
-       SUM(CASE WHEN r.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
-       SUM(CASE WHEN r.status = 'expired' THEN 1 ELSE 0 END) AS expired_count
-     ${baseFromClause}`,
-    params
-  );
-
-  const [rows] = await db.query(
-    `SELECT
-       r.id,
-       r.book_id,
-       r.status,
-       r.reserved_at,
-       r.expires_at,
-       r.notes,
-       bk.title    AS book_title,
-       bk.author   AS book_author,
-       ${metadataValue("bk", "location", "book_location")},
-       u.name                AS user_name,
-       u.student_employee_id
-     ${baseFromClause}
-     ORDER BY r.reserved_at DESC
-     LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
-  );
-
-  return {
-    rows,
-    total,
-    page,
-    totalPages: Math.ceil(total / limit),
-    summary: {
-      total_records: Number(summary?.total_records ?? 0),
-      pending_count: Number(summary?.pending_count ?? 0),
-      ready_count: Number(summary?.ready_count ?? 0),
-      fulfilled_count: Number(summary?.fulfilled_count ?? 0),
-      cancelled_count: Number(summary?.cancelled_count ?? 0),
-      expired_count: Number(summary?.expired_count ?? 0),
-    },
-  };
+  return repository.getAdminReservations(options);
 };
 
 const markReservationReady = async (reservationId) => {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.query(
-      "SELECT id, book_id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
-      [reservationId]
-    );
+    const row = await repository.findReservationForReady(reservationId, conn);
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
     if (row.status !== "pending") {
-      throw Object.assign(
-        new Error("Only pending reservations can be marked ready"),
-        { status: 409 }
-      );
+      throw Object.assign(new Error("Only pending reservations can be marked ready"), { status: 409 });
     }
 
-    const [[copy]] = await conn.query(
-      `SELECT bc.id
-       FROM book_copies bc
-       WHERE bc.book_id = ? AND bc.is_active = 1
-         AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
-         AND NOT EXISTS (SELECT 1 FROM borrowings b WHERE b.copy_id = bc.id AND b.status IN ('borrowed', 'overdue'))
-         AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL)
-       LIMIT 1 FOR UPDATE`,
-      [row.book_id]
-    );
-    if (!copy) throw Object.assign(new Error("No borrowable copy is available to prepare for pickup"), { status: 409 });
+    const copy = await repository.findAvailableCopyForReservation(row.book_id, conn);
+    if (!copy) {
+      throw Object.assign(new Error("No borrowable copy is available to prepare for pickup"), { status: 409 });
+    }
 
-    await conn.query(
-      "UPDATE reservations SET status = 'ready', reserved_copy_id = ? WHERE id = ?",
-      [copy.id, reservationId]
-    );
-
+    await repository.markReady(reservationId, copy.id, conn);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -387,27 +138,17 @@ const markReservationReady = async (reservationId) => {
 };
 
 const fulfillReservation = async (reservationId) => {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
-      [reservationId]
-    );
+    const row = await repository.findReservationForFulfill(reservationId, conn);
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
     if (row.status !== "ready") {
-      throw Object.assign(
-        new Error("Only ready reservations can be fulfilled"),
-        { status: 409 }
-      );
+      throw Object.assign(new Error("Only ready reservations can be fulfilled"), { status: 409 });
     }
 
-    await conn.query(
-      "UPDATE reservations SET status = 'fulfilled', fulfilled_at = NOW() WHERE id = ?",
-      [reservationId]
-    );
-
+    await repository.fulfillReservation(reservationId, conn);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -418,24 +159,17 @@ const fulfillReservation = async (reservationId) => {
 };
 
 const cancelReservationAdmin = async (reservationId) => {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.query(
-      "SELECT id, status FROM reservations WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
-      [reservationId]
-    );
+    const row = await repository.findReservationForAdminCancel(reservationId, conn);
     if (!row) throw Object.assign(new Error("Reservation not found"), { status: 404 });
     if (!["pending", "ready"].includes(row.status)) {
       throw Object.assign(new Error("Reservation cannot be cancelled"), { status: 409 });
     }
 
-    await conn.query(
-      "UPDATE reservations SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?",
-      [reservationId]
-    );
-
+    await repository.cancelReservationAdmin(reservationId, conn);
     await conn.commit();
   } catch (err) {
     await conn.rollback();
@@ -446,21 +180,14 @@ const cancelReservationAdmin = async (reservationId) => {
 };
 
 const restoreReservation = async (reservationId) => {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
 
-    const [[row]] = await conn.query(
-      "SELECT id FROM reservations WHERE id = ? AND deleted_at IS NOT NULL FOR UPDATE",
-      [reservationId]
-    );
+    const row = await repository.findArchivedReservation(reservationId, conn);
     if (!row) throw Object.assign(new Error("Archived reservation not found"), { status: 404 });
 
-    await conn.query(
-      "UPDATE reservations SET deleted_at = NULL, deleted_by = NULL WHERE id = ?",
-      [reservationId]
-    );
-
+    await repository.restoreReservation(reservationId, conn);
     await conn.commit();
   } catch (err) {
     await conn.rollback();

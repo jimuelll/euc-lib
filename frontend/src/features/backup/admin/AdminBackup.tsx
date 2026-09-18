@@ -1,0 +1,302 @@
+import { useEffect, useRef, useState } from "react";
+import { ArchiveRestore, DatabaseBackup, Download, FileDown, Loader2, ShieldAlert, Upload } from "lucide-react";
+import { toast } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AdminPage, AdminPanel } from "@/features/admin";
+import { useAuth } from "@/context/AuthContext";
+import { checkBackupCompatibility, createBackupSnapshot, downloadBackup, downloadBackupSnapshot, fetchBackupSnapshots, fetchBackupStatus, fetchSnapshotCompatibility, restoreBackup, restoreBackupSnapshot, type BackupStatus, type Compatibility, type Snapshot } from "@/features/backup/api";
+
+const MAX_BACKUP_SIZE = 40 * 1024 * 1024;
+
+function filenameFromHeader(header?: string) {
+  return header?.match(/filename="?([^";]+)"?/)?.[1] ?? `euc-library-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+}
+
+async function readBackupText(file: File, maxBytes: number) {
+  const source = file.name.toLowerCase().endsWith(".gz")
+    ? file.stream().pipeThrough(new DecompressionStream("gzip"))
+    : file.stream();
+  const reader = source.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`The expanded backup exceeds the server import limit of ${(maxBytes / 1024 / 1024).toFixed(0)} MB.`);
+    }
+    chunks.push(value);
+  }
+  const data = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(data);
+}
+
+const AdminBackup = () => {
+  const { logout } = useAuth();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [exporting, setExporting] = useState(false);
+  const [savingSnapshot, setSavingSnapshot] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(true);
+  const [snapshotToRestore, setSnapshotToRestore] = useState<Snapshot | null>(null);
+  const [snapshotCompatibility, setSnapshotCompatibility] = useState<Compatibility | null>(null);
+  const [checkingCompatibility, setCheckingCompatibility] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState<"normal" | "restoring">("normal");
+  const [maxImportBytes, setMaxImportBytes] = useState(50 * 1024 * 1024);
+  const [lastBackup, setLastBackup] = useState<{ name: string; size: number; createdAt: string } | null>(null);
+
+  const loadSnapshots = async () => {
+    setLoadingSnapshots(true);
+    try {
+      setSnapshots(await fetchBackupSnapshots());
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not load saved snapshots.");
+    } finally {
+      setLoadingSnapshots(false);
+    }
+  };
+
+  useEffect(() => { void loadSnapshots(); }, []);
+  useEffect(() => {
+    fetchBackupStatus()
+      .then((data) => { setMaintenanceMode(data.mode); if (data.maxImportBytes) setMaxImportBytes(data.maxImportBytes); })
+      .catch(() => undefined);
+  }, []);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await downloadBackup();
+      const name = filenameFromHeader(response.contentDisposition);
+      const url = URL.createObjectURL(response.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setLastBackup({ name, size: response.blob.size, createdAt: new Date().toLocaleString() });
+      toast.success("Database backup downloaded.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not create the backup.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleCreateSnapshot = async () => {
+    setSavingSnapshot(true);
+    try {
+      await createBackupSnapshot();
+      toast.success("Snapshot saved securely.");
+      await loadSnapshots();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not save the snapshot.");
+    } finally {
+      setSavingSnapshot(false);
+    }
+  };
+
+  const handleDownloadSnapshot = async (snapshot: Snapshot) => {
+    try {
+      const response = await downloadBackupSnapshot(snapshot.id);
+      const url = URL.createObjectURL(response.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filenameFromHeader(response.contentDisposition);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not download the snapshot.");
+    }
+  };
+
+  const handleRestoreSnapshot = async () => {
+    if (!snapshotToRestore || !snapshotCompatibility?.compatible) return;
+    setRestoring(true);
+    try {
+      await restoreBackupSnapshot(snapshotToRestore.id);
+      toast.success("Snapshot restored. All sessions, including yours, are ending now.");
+      setSnapshotToRestore(null);
+      await logout();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not restore the snapshot.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > Math.min(MAX_BACKUP_SIZE, maxImportBytes)) {
+      toast.error("The compressed backup file must be 40 MB or smaller.");
+      return;
+    }
+    try {
+      const contents = await readBackupText(file, maxImportBytes);
+      const backup = JSON.parse(contents);
+      const compatibility = await checkBackupCompatibility(backup);
+      if (!compatibility.compatible) { toast.error(compatibility.message); return; }
+      if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
+      setRestoring(true);
+      await restoreBackup(backup);
+      toast.success("Database restored. All sessions, including yours, are ending now.");
+      await logout();
+    } catch (error: any) {
+      const message = error instanceof SyntaxError
+        ? "The selected file is not valid JSON."
+        : error.response?.data?.message || "Could not restore the backup.";
+      toast.error(message);
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const inspectSnapshot = async (snapshot: Snapshot) => {
+    setCheckingCompatibility(true);
+    setSnapshotCompatibility(null);
+    try {
+      const data = await fetchSnapshotCompatibility(snapshot.id);
+      setSnapshotToRestore(snapshot);
+      setSnapshotCompatibility(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not verify snapshot compatibility.");
+    } finally { setCheckingCompatibility(false); }
+  };
+
+  return (
+    <AdminPage
+      eyebrow="System"
+      title="Backup"
+      description="Save secure recovery points, download a portable copy, or restore the complete library database to a previous point in time."
+      contentWidth="wide"
+    >
+      <AdminPanel
+        title="Create a recovery point"
+        description="Saved snapshots are retained in secure cloud storage. The latest 30 are kept automatically."
+        actions={
+          <>
+            <Button type="button" onClick={handleCreateSnapshot} disabled={exporting || savingSnapshot || restoring}>
+              {savingSnapshot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
+              {savingSnapshot ? "Saving snapshot..." : "Save Snapshot"}
+            </Button>
+            <Button type="button" variant="outline" onClick={handleExport} disabled={exporting || savingSnapshot || restoring}>
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
+              {exporting ? "Creating download..." : "Download Backup"}
+            </Button>
+            <Button type="button" variant="outline" disabled={exporting || savingSnapshot || restoring} asChild>
+              <label htmlFor="restore-input" className="cursor-pointer">
+                {restoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {restoring ? "Restoring..." : "Restore"}
+                <input ref={inputRef} id="restore-input" type="file" className="hidden" accept="application/json,application/gzip,.json,.gz" onChange={handleRestore} />
+              </label>
+            </Button>
+          </>
+        }
+      >
+        <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Snapshot data uses the current metadata catalog model. Compatibility is verified before restoration; restoring never changes database structure and signs out every user.
+        </p>
+        <p className={`mt-3 text-xs font-medium ${maintenanceMode === "restoring" ? "text-warning" : "text-muted-foreground"}`}>
+          Maintenance status: {maintenanceMode === "restoring" ? "restore in progress" : "normal"}.
+        </p>
+      </AdminPanel>
+
+      <AdminPanel
+        title="Saved snapshots"
+        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point, then signs out all users; incompatible snapshots remain available to download."
+        className="max-w-4xl"
+      >
+        {loadingSnapshots ? (
+          <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading saved snapshots...</div>
+        ) : snapshots.length ? (
+          <div className="divide-y divide-border/70 border-y border-border/70">
+            {snapshots.map((snapshot) => (
+              <div key={snapshot.id} className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{new Date(snapshot.createdAt).toLocaleString()}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {(snapshot.sizeBytes / 1024).toFixed(1)} KB · {snapshot.kind === "pre_restore" ? "Automatic pre-restore point" : "Manual snapshot"}
+                    {snapshot.createdBy ? ` · Saved by ${snapshot.createdBy}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadSnapshot(snapshot)} disabled={restoring}>
+                    <FileDown className="mr-2 h-3.5 w-3.5" /> Download
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void inspectSnapshot(snapshot)} disabled={restoring || checkingCompatibility}>
+                    <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> Restore
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">No saved snapshots yet. Save one before any major catalog or account changes.</p>
+        )}
+      </AdminPanel>
+
+      <AdminPanel
+        title="Latest export"
+        description="The browser saves each backup directly to your downloads folder."
+        className="max-w-4xl"
+      >
+        {lastBackup ? (
+          <div className="flex flex-col gap-3 rounded-md border border-border/70 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{lastBackup.name}</p>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {(lastBackup.size / 1024).toFixed(1)} KB • {lastBackup.createdAt}
+              </p>
+            </div>
+            <Download className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No backup has been exported in this session.</p>
+        )}
+      </AdminPanel>
+
+      <AlertDialog open={Boolean(snapshotToRestore)} onOpenChange={(open) => !open && !restoring && setSnapshotToRestore(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
+            <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
+            <AlertDialogDescription className="leading-6">
+              {snapshotCompatibility?.compatible ? "Compatible: " : "Incompatible: "}{snapshotCompatibility?.message ?? "Checking compatibility…"} This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first, then every user—including you—will sign in again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={restoring || !snapshotCompatibility?.compatible} onClick={(event) => { event.preventDefault(); void handleRestoreSnapshot(); }}>
+              {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Restore snapshot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AdminPage>
+  );
+};
+
+export default AdminBackup;

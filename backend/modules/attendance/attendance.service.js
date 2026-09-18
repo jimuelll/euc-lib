@@ -1,307 +1,88 @@
-const db = require("../../db");
+const repository = require("./attendance.repository");
 
-/**
- * Resolve a user from either their barcode or student_employee_id.
- */
-const resolveUser = async (scannedId) => {
-  const [[user]] = await db.query(
-    `SELECT id, name, role, student_employee_id, barcode
-     FROM users
-     WHERE (barcode = ? OR student_employee_id = ?)
-       AND is_active = 1
-     LIMIT 1`,
-    [scannedId, scannedId]
-  );
-  return user ?? null;
-};
-
-/**
- * Record a check-in or check-out.
- *
- * Uses GET_LOCK per user to prevent race conditions where two simultaneous
- * scans both pass the "last log" check before either inserts.
- *
- * Business rule: a user cannot check-in twice in a row without checking out,
- * and vice versa. We look at the most recent log to enforce this.
- */
 const recordScan = async ({ scannedId, type, scannedBy, ipAddress }) => {
-  // FIX: Guard against null/empty scannedId reaching the resolver
   if (!scannedId || scannedId === "null") {
     throw Object.assign(new Error("Invalid scanned ID"), { status: 400 });
   }
 
-  const user = await resolveUser(scannedId);
-  if (!user) {
-    throw Object.assign(new Error("ID not recognised — user not found"), { status: 404 });
-  }
+  const user = await repository.resolveUser(scannedId);
+  if (!user) throw Object.assign(new Error("ID not recognised — user not found"), { status: 404 });
 
-  // FIX: Use GET_LOCK to serialize concurrent scans for the same user,
-  // preventing the race condition where two requests both pass the duplicate check.
   const lockName = `att_scan_${user.id}`;
-  const [[lockRow]] = await db.query("SELECT GET_LOCK(?, 5) AS acquired", [lockName]);
-  if (!lockRow.acquired) {
+  if (!(await repository.acquireScanLock(lockName))) {
     throw Object.assign(new Error("Could not acquire scan lock — please try again"), { status: 503 });
   }
 
   try {
-    // FIX: Use a range query on created_at instead of DATE(created_at) = CURDATE()
-    // so the composite index idx_user_date (user_id, created_at) can be used efficiently.
-    const [[lastLog]] = await db.query(
-      `SELECT type FROM attendance_logs
-       WHERE user_id = ?
-         AND created_at >= CURDATE()
-         AND created_at < CURDATE() + INTERVAL 1 DAY
-         AND purpose = 'entry_exit'
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [user.id]
-    );
-
-    // Prevent duplicate consecutive check-in / check-out
+    const lastLog = await repository.getLatestEntryExitLog(user.id);
     if (lastLog?.type === type) {
       const isCheckIn = type === "check_in";
       throw Object.assign(
-        new Error(
-          isCheckIn
-            ? `${user.name} is already timed in for today.`
-            : `${user.name} is already timed out for today.`
-        ),
+        new Error(isCheckIn ? `${user.name} is already timed in for today.` : `${user.name} is already timed out for today.`),
         {
           status: 409,
           code: isCheckIn ? "ALREADY_TIMED_IN" : "ALREADY_TIMED_OUT",
-          user: {
-            id: user.id,
-            name: user.name,
-            student_employee_id: user.student_employee_id,
-          },
+          user: { id: user.id, name: user.name, student_employee_id: user.student_employee_id },
           type,
-        }
+        },
       );
     }
-
-    await db.query(
-      `INSERT INTO attendance_logs
-         (user_id, scanned_id, type, purpose, scanned_by, ip_address)
-       VALUES (?, ?, ?, 'entry_exit', ?, ?)`,
-      [user.id, scannedId, type, scannedBy ?? null, ipAddress ?? null]
-    );
+    await repository.insertScan({ userId: user.id, scannedId, type, scannedBy, ipAddress });
   } finally {
-    // Always release the lock, even if an error was thrown
-    await db.query("SELECT RELEASE_LOCK(?)", [lockName]);
+    await repository.releaseScanLock(lockName);
   }
 
   return {
     type,
-    user: {
-      id: user.id,
-      name: user.name,
-      student_employee_id: user.student_employee_id,
-    },
+    user: { id: user.id, name: user.name, student_employee_id: user.student_employee_id },
   };
 };
 
-/**
- * All entry/exit logs for today (scanner / admin dashboard use).
- * FIX: Added cursor-based pagination via `lastId` to prevent unbounded result sets.
- *      Uses range query on created_at to leverage the idx_user_date index.
- *
- * @param {object} options
- * @param {number} [options.limit=100]   - Max rows to return
- * @param {number} [options.lastId=null] - Cursor: return rows with id < lastId (older)
- */
 const getTodayLogs = async ({ limit = 100, lastId = null } = {}) => {
-  const params = [];
-  let cursorClause = "";
-
-  if (lastId) {
-    cursorClause = "AND al.id < ?";
-    params.push(lastId);
-  }
-
-  // Cap limit to 200 to prevent accidental large fetches
   const safeLimit = Math.min(Math.max(1, Number(limit) || 100), 200);
-  params.push(safeLimit);
-
-  const [rows] = await db.query(
-    `SELECT
-       al.id,
-       al.type,
-       al.created_at AS timestamp,
-       u.name,
-       u.student_employee_id,
-       u.role
-     FROM attendance_logs al
-     JOIN users u ON u.id = al.user_id
-     WHERE al.created_at >= CURDATE()
-       AND al.created_at < CURDATE() + INTERVAL 1 DAY
-       AND al.purpose = 'entry_exit'
-       ${cursorClause}
-     ORDER BY al.created_at DESC
-     LIMIT ?`,
-    params
-  );
-  return rows;
+  return repository.getTodayLogs({ limit: safeLimit, lastId });
 };
 
-const getLogs = async ({
-  page = 1,
-  limit = 25,
-  search = "",
-  type = "all",
-  purpose = "all",
-  dateFrom = "",
-  dateTo = "",
-} = {}) => {
-  const offset = (page - 1) * limit;
-  const conditions = [];
-  const params = [];
-
-  if (type && type !== "all") {
-    conditions.push("al.type = ?");
-    params.push(type);
-  }
-
-  if (purpose && purpose !== "all") {
-    conditions.push("al.purpose = ?");
-    params.push(purpose);
-  }
-
-  if (dateFrom) {
-    conditions.push("al.created_at >= ?");
-    params.push(`${dateFrom} 00:00:00`);
-  }
-
-  if (dateTo) {
-    conditions.push("al.created_at < DATE_ADD(?, INTERVAL 1 DAY)");
-    params.push(dateTo);
-  }
-
-  if (search.trim()) {
-    const like = `%${search.trim()}%`;
-    conditions.push(`(
-      u.name LIKE ? OR
-      u.student_employee_id LIKE ? OR
-      al.scanned_id LIKE ? OR
-      scanner.name LIKE ?
-    )`);
-    params.push(like, like, like, like);
-  }
-
-  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const baseFromClause = `
-    FROM attendance_logs al
-    JOIN users u ON u.id = al.user_id
-    LEFT JOIN users scanner ON scanner.id = al.scanned_by
-    ${whereClause}
-  `;
-
-  const [[totalRow]] = await db.query(
-    `SELECT COUNT(*) AS total ${baseFromClause}`,
-    params,
-  );
-
-  const [[summaryRow]] = await db.query(
-    `SELECT
-       COUNT(*) AS total_records,
-       SUM(CASE WHEN al.type = 'check_in' THEN 1 ELSE 0 END) AS check_in_count,
-       SUM(CASE WHEN al.type = 'check_out' THEN 1 ELSE 0 END) AS check_out_count,
-       COUNT(DISTINCT al.user_id) AS unique_users,
-       SUM(CASE WHEN al.purpose = 'borrowing' THEN 1 ELSE 0 END) AS borrowing_scan_count
-     ${baseFromClause}`,
-    params,
-  );
-
-  const [rows] = await db.query(
-    `SELECT
-       al.id,
-       al.type,
-       al.purpose,
-       al.scanned_id,
-       al.created_at AS timestamp,
-       u.name,
-       u.student_employee_id,
-       u.role,
-       scanner.name AS scanned_by_name
-     ${baseFromClause}
-     ORDER BY al.created_at DESC, al.id DESC
-     LIMIT ? OFFSET ?`,
-    [...params, limit, offset],
-  );
-
+const getLogs = async ({ page = 1, limit = 25, search = "", type = "all", purpose = "all", dateFrom = "", dateTo = "" } = {}) => {
+  const result = await repository.getLogs({ page, limit, search, type, purpose, dateFrom, dateTo });
+  const total = result.total;
   return {
-    rows,
-    pagination: {
-      page,
-      limit,
-      total: Number(totalRow?.total ?? 0),
-      totalPages: Math.max(1, Math.ceil(Number(totalRow?.total ?? 0) / limit)),
-    },
+    rows: result.rows,
+    pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
     summary: {
-      total_records: Number(summaryRow?.total_records ?? 0),
-      check_in_count: Number(summaryRow?.check_in_count ?? 0),
-      check_out_count: Number(summaryRow?.check_out_count ?? 0),
-      unique_users: Number(summaryRow?.unique_users ?? 0),
-      borrowing_scan_count: Number(summaryRow?.borrowing_scan_count ?? 0),
+      total_records: Number(result.summary?.total_records ?? 0),
+      check_in_count: Number(result.summary?.check_in_count ?? 0),
+      check_out_count: Number(result.summary?.check_out_count ?? 0),
+      unique_users: Number(result.summary?.unique_users ?? 0),
+      borrowing_scan_count: Number(result.summary?.borrowing_scan_count ?? 0),
     },
   };
 };
 
 const getSessionsForDate = async (date) => {
   if (!date) return [];
-  const [rows] = await db.query(
-    `SELECT
-       in_log.id,
-       u.name,
-       u.student_employee_id,
-       in_log.created_at AS checked_in_at,
-       (
-         SELECT out_log.created_at
-         FROM attendance_logs out_log
-         WHERE out_log.user_id = in_log.user_id
-           AND out_log.purpose = 'entry_exit'
-           AND out_log.type = 'check_out'
-           AND out_log.created_at > in_log.created_at
-           AND out_log.created_at < DATE_ADD(?, INTERVAL 1 DAY)
-           AND NOT EXISTS (
-             SELECT 1 FROM attendance_logs next_in
-             WHERE next_in.user_id = in_log.user_id
-               AND next_in.purpose = 'entry_exit'
-               AND next_in.type = 'check_in'
-               AND next_in.created_at > in_log.created_at
-               AND next_in.created_at < out_log.created_at
-           )
-         ORDER BY out_log.created_at ASC LIMIT 1
-       ) AS checked_out_at
-     FROM attendance_logs in_log
-     JOIN users u ON u.id = in_log.user_id
-     WHERE in_log.purpose = 'entry_exit'
-       AND in_log.type = 'check_in'
-       AND in_log.created_at >= ? AND in_log.created_at < DATE_ADD(?, INTERVAL 1 DAY)
-     ORDER BY in_log.created_at ASC`,
-    [date, date, date]
-  );
-  return rows.map((row) => ({ ...row, duration_minutes: row.checked_out_at ? Math.max(0, Math.round((new Date(row.checked_out_at) - new Date(row.checked_in_at)) / 60000)) : null, status: row.checked_out_at ? "complete" : "incomplete" }));
+  const rows = await repository.getSessionsForDate(date);
+  return rows.map((row) => ({
+    ...row,
+    duration_minutes: row.checked_out_at
+      ? Math.max(0, Math.round((new Date(row.checked_out_at) - new Date(row.checked_in_at)) / 60000))
+      : null,
+    status: row.checked_out_at ? "complete" : "incomplete",
+  }));
 };
 
-/**
- * Logged-in user's own attendance history.
- */
 const getMyLogs = async (userId, { page, limit } = {}) => {
   const paged = Number.isFinite(Number(page));
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-  const [[{ total }]] = paged ? await db.query(
-    "SELECT COUNT(*) AS total FROM attendance_logs WHERE user_id = ? AND purpose = 'entry_exit'",
-    [userId]
-  ) : [[{ total: 0 }]];
-  const [rows] = await db.query(
-    `SELECT id, type, created_at AS timestamp
-     FROM attendance_logs
-     WHERE user_id = ? AND purpose = 'entry_exit'
-     ORDER BY created_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 100"}`,
-    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
-  );
-  return paged ? { rows, pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.ceil(Number(total) / safeLimit) } } : rows;
+  const result = await repository.getMyLogs(userId, {
+    paged,
+    limit: safeLimit,
+    offset: (safePage - 1) * safeLimit,
+  });
+  return paged
+    ? { rows: result.rows, pagination: { page: safePage, limit: safeLimit, total: result.total, totalPages: Math.ceil(result.total / safeLimit) } }
+    : result.rows;
 };
 
 module.exports = { recordScan, getTodayLogs, getLogs, getSessionsForDate, getMyLogs };

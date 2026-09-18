@@ -7,11 +7,29 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and package-manager artifacts
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+
 frontend/node_modules
 backend/node_modules
 
-dist
+# Build output, coverage, caches, and generated metadata
+dist/
 dist-ssr
+build/
+coverage/
+.vite/
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo
+.eslintcache
+vite.config.ts.timestamp-*.mjs
+
 *.local
 
 # Editor directories and files
@@ -25,6 +43,9 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.*
+!.env.example
+!.env.*.example
 
 backend/.env
 frontend/.env

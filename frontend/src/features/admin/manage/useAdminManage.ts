@@ -1,0 +1,301 @@
+import { useState, useEffect } from "react";
+import { toast } from "@/components/ui/sonner";
+import { useAuth } from "@/context/AuthContext";
+import type { User, UserFormState, QrTarget } from "./AdminManage.types";
+import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
+import { useAdminConfirmDialog } from "@/features/admin";
+import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm } from "./api";
+
+export type { AcademicProgram, AcademicTerm } from "./api";
+
+interface UseAdminManageReturn {
+  // Form
+  form:            UserFormState;
+  setField:        <K extends keyof UserFormState>(key: K, value: string) => void;
+  showPassword:    boolean;
+  togglePassword:  () => void;
+  resetForm:       () => void;
+
+  // Roles
+  allowedRoles: string[];
+  programs: AcademicProgram[];
+  terms: AcademicTerm[];
+
+  // Search
+  searchQuery:          string;
+  setSearchQuery:       (v: string) => void;
+  roleFilter:           string;
+  setRoleFilter:        (v: string) => void;
+  statusFilter:         string;
+  setStatusFilter:      (v: string) => void;
+  searchResults:        User[];
+  userPagination:       { page: number; limit: number; total: number; totalPages: number };
+  handleSearchUsers:    (page?: number) => Promise<void>;
+  showArchived:         boolean;
+  setArchivedView:      (archived: boolean) => void;
+
+  // Selected user
+  selectedUser:      User | null;
+  selectUserForEdit: (u: User) => void;
+
+  // Actions
+  loading:           boolean;
+  handleCreateUser:  () => Promise<boolean>;
+  handleUpdateUser:  () => Promise<boolean>;
+  handleArchiveUser: () => Promise<boolean>;
+  handleRestoreUser: () => Promise<boolean>;
+  confirmDialog: JSX.Element;
+
+  // QR
+  qrTarget:    QrTarget | null;
+  setQrTarget: (v: QrTarget | null) => void;
+}
+
+export const useAdminManage = (): UseAdminManageReturn => {
+  const { user } = useAuth();
+
+  const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
+  const [showPassword,  setShowPassword]  = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
+  const [programs,      setPrograms]      = useState<AcademicProgram[]>([]);
+  const [terms,         setTerms]         = useState<AcademicTerm[]>([]);
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [roleFilter,    setRoleFilter]    = useState("all");
+  const [statusFilter,  setStatusFilter]  = useState("all");
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
+  const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
+  const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
+  const [showArchived,  setShowArchived]  = useState(false);
+  const { confirm, confirmDialog } = useAdminConfirmDialog();
+
+  useEffect(() => {
+    if (!user) return;
+    setAllowedRoles(getAllowedRoles(user.role));
+  }, [user]);
+
+  useEffect(() => { if (!user) return; void fetchAcademicTerms().then(setTerms).catch(() => setTerms([])); }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void fetchAcademicPrograms()
+      .then(setPrograms)
+      .catch(() => setPrograms([]));
+  }, [user]);
+
+  // ── Form helpers ───────────────────────────────────────────────────────────
+  const setField = <K extends keyof UserFormState>(key: K, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setSelectedUser(null);
+  };
+
+  const togglePassword = () => setShowPassword((v) => !v);
+
+  // ── Toggle archived view ───────────────────────────────────────────────────
+  const setArchivedView = (archived: boolean) => {
+    setShowArchived(archived);
+    setSelectedUser(null);
+    void (async () => {
+      setLoading(true);
+      try {
+        const result = await searchUsers({ query: searchQuery, role: roleFilter, status: statusFilter, archived, page: 1 });
+        setSearchResults(result.rows);
+        setUserPagination(result.pagination);
+      } catch (err: any) { toast.error(err.response?.data?.message || "Failed to load users"); }
+      finally { setLoading(false); }
+    })();
+  };
+
+  // ── Create ─────────────────────────────────────────────────────────────────
+  const handleCreateUser = async () => {
+    const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId } = form;
+    if (!fullName || !id || !role || !password || !rePassword) {
+      toast.error("All required fields must be filled");
+      return false;
+    }
+    if (password !== rePassword) {
+      toast.error("Passwords do not match");
+      return false;
+    }
+    setLoading(true);
+    try {
+      const response = await createUser({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId });
+      toast.success(response.message);
+      setQrTarget({ studentId: id, name: fullName });
+      resetForm();
+      await handleSearchUsers();
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Failed to create user");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+  const handleSearchUsers = async (page = 1) => {
+    const trimmedQuery = searchQuery.trim();
+
+    setLoading(true);
+    try {
+      const result = await searchUsers({ query: trimmedQuery, role: roleFilter, status: statusFilter, archived: showArchived, page });
+      setSearchResults(result.rows);
+      setUserPagination(result.pagination);
+      if (!result.rows.length) {
+        toast.info(trimmedQuery ? "No users found" : `No ${showArchived ? "archived" : "active"} users found`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Search failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) void handleSearchUsers();
+    // Records are the primary task view; creation stays available as a deliberate mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    if (user) void handleSearchUsers();
+    // Filters update the persistent records table immediately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleFilter, statusFilter]);
+
+  // ── Select for edit ────────────────────────────────────────────────────────
+  const selectUserForEdit = (u: User) => {
+    setSelectedUser(u);
+    setForm({
+      fullName:   u.name,
+      id:         u.student_employee_id,
+      address:    u.address  || "",
+      contact:    u.contact  || "",
+      programId:  u.program_id ? String(u.program_id) : "",
+      academicTermId: "",
+      role:       u.role,
+      password:   "",
+      rePassword: "",
+    });
+  };
+
+  // ── Update ─────────────────────────────────────────────────────────────────
+  const handleUpdateUser = async () => {
+    if (!selectedUser) return false;
+    const { fullName, role, address, contact, programId, academicTermId, password, rePassword } = form;
+    const updates: any = { name: fullName, role, address, contact, program_id: programId || null, academic_term_id: academicTermId || null };
+    if (password) {
+      if (password !== rePassword) {
+        toast.error("Passwords do not match");
+        return false;
+      }
+      updates.password = password;
+    }
+    setLoading(true);
+    try {
+      const response = await updateUser(selectedUser.student_employee_id, {
+        ...form,
+        fullName: updates.name,
+        programId: updates.program_id ?? "",
+        academicTermId: updates.academic_term_id ?? "",
+      });
+      toast.success(response.message);
+      resetForm();
+      await handleSearchUsers();
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Update failed");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Archive — DELETE /api/admin/users/:id ──────────────────────────────────
+  // Sets is_active=0 and deleted_at=NOW(). One action, one outcome.
+  const handleArchiveUser = async () => {
+    if (!selectedUser) return false;
+    const shouldArchive = await confirm({
+      title: `Archive ${selectedUser.name}?`,
+      description: "They will lose access to the system and disappear from active searches until restored.",
+      actionLabel: "Archive User",
+      tone: "danger",
+    });
+    if (!shouldArchive) return false;
+    setLoading(true);
+    try {
+      const response = await archiveUser(selectedUser.student_employee_id);
+      toast.success(response.message || "User archived");
+      resetForm();
+      await handleSearchUsers();
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Archive failed");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Restore — PATCH /api/admin/users/:id/restore ───────────────────────────
+  // Clears deleted_at and sets is_active=1. User is fully active again.
+  const handleRestoreUser = async () => {
+    if (!selectedUser) return false;
+    const shouldRestore = await confirm({
+      title: `Restore ${selectedUser.name}?`,
+      description: "They will be able to log in and appear in active searches again.",
+      actionLabel: "Restore User",
+    });
+    if (!shouldRestore) return false;
+    setLoading(true);
+    try {
+      const response = await restoreUser(selectedUser.student_employee_id);
+      toast.success(response.message || "User restored");
+      resetForm();
+      await handleSearchUsers();
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Restore failed");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    form,
+    setField,
+    showPassword,
+    togglePassword,
+    resetForm,
+    allowedRoles,
+    programs,
+    terms,
+    searchQuery,
+    setSearchQuery,
+    roleFilter,
+    setRoleFilter,
+    statusFilter,
+    setStatusFilter,
+    searchResults,
+    userPagination,
+    handleSearchUsers,
+    showArchived,
+    setArchivedView,
+    selectedUser,
+    selectUserForEdit,
+    loading,
+    handleCreateUser,
+    handleUpdateUser,
+    handleArchiveUser,
+    handleRestoreUser,
+    confirmDialog,
+    qrTarget,
+    setQrTarget,
+  };
+};

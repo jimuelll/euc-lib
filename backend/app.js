@@ -4,32 +4,17 @@ const helmet  = require("helmet");
 const morgan  = require("morgan");
 const cookieParser = require("cookie-parser");
 
-const authRoutes        = require("./modules/auth/auth.routes");
-const adminRoutes       = require("./modules/admin/admin.routes");
-const catalogRoutes     = require("./modules/catalog/catalog.routes");
-const publicCatalogRoutes = require("./modules/catalog/catalog.public.routes");
-const recommendationPublicRoutes = require("./modules/recommendations/recommendations.public.routes");
-const recommendationRoutes = require("./modules/recommendations/recommendations.routes");
-const borrowingRoutes   = require("./modules/borrowing/borrowing.routes");
-const reservationRoutes = require("./modules/reservation/reservation.routes");
-const adminReservationRoutes = require("./modules/reservation/adminReservation.routes");
-const circulationRoutes = require("./modules/circulation/circulation.routes");
-const bulletinRoutes    = require("./modules/bulletin/bulletin.routes");
-const eventRoutes       = require("./modules/events/events.routes");
-const aboutRoutes       = require("./modules/about/about.routes");
-const attendanceRoutes  = require("./modules/attendance/attendance.routes");
-const subscriptionsRoutes = require("./modules/subscriptions/subscriptions.routes");
-const analyticsRoutes = require("./modules/analytics/analytics.routes");
-const analyticsAdminRoutes = require("./modules/analytics/analytics.admin.routes");
-const myLibraryRoutes = require("./modules/myLibrary/myLibrary.routes");
-const notificationsRoutes = require("./modules/notifications/notifications.routes");
-const librarySettingsRoutes = require("./modules/librarySettings/librarySettings.routes");
-const backupRoutes = require("./modules/backup/backup.routes");
+const {
+  authRoutes, adminRoutes, catalogRoutes, publicCatalogRoutes,
+  recommendationPublicRoutes, recommendationRoutes, borrowingRoutes,
+  reservationRoutes, adminReservationRoutes, circulationRoutes, bulletinRoutes,
+  eventRoutes, aboutRoutes, attendanceRoutes, subscriptionsRoutes,
+  analyticsRoutes, analyticsAdminRoutes, myLibraryRoutes, notificationsRoutes,
+  librarySettingsRoutes, backupRoutes, clearanceRoutes, siteContentRoutes,
+  userGuideRoutes,
+} = require("./modules");
 const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
-const clearanceRoutes = require("./modules/clearance/clearance.routes");
-const siteContentRoutes = require("./modules/siteContent/siteContent.routes");
-const userGuideRoutes = require("./modules/userGuide/userGuide.routes");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");

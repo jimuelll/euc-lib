@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const db = require("../../db");
+const repository = require("./recommendations.repository");
 const { hydrateCatalogRecord, parseMetadata } = require("../catalog/catalog.projection");
 
 const BOOK_LIMIT = 5;
@@ -32,25 +32,10 @@ const embeddingText = (book, enrichment = {}) => {
 const contentHash = (book, enrichment) => crypto.createHash("sha256").update(embeddingText(book, enrichment)).digest("hex");
 
 const publicFields = async () => {
-  const [fields] = await db.query("SELECT `key` FROM catalog_schema WHERE `public` = 1 AND archived = 0");
-  return new Set(fields.map((field) => field.key));
+  return new Set(await repository.getPublicFieldKeys());
 };
 const activeCandidates = async (materialType, excludedIds = []) => {
-  const exclusion = excludedIds.length ? " AND bk.id NOT IN (?)" : "";
-  const params = [materialType, ...(excludedIds.length ? [excludedIds] : [])];
-  const [rows] = await db.query(
-    `SELECT bk.*, COUNT(DISTINCT bc.id) AS total_copies,
-       GREATEST(0, COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id END)) AS available,
-       COUNT(DISTINCT completed.id) AS popularity
-     FROM books bk
-     LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bc.deleted_at IS NULL
-     LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue') AND br.deleted_at IS NULL
-     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
-     LEFT JOIN borrowings completed ON completed.book_id = bk.id AND completed.status = 'returned' AND completed.deleted_at IS NULL
-     WHERE bk.material_type = ? AND bk.deleted_at IS NULL${exclusion}
-     GROUP BY bk.id`, params
-  );
-  return rows;
+  return repository.findActiveCandidates(materialType, excludedIds);
 };
 const serialize = async (records) => {
   const fields = [...await publicFields()];
@@ -93,12 +78,12 @@ const ruleReason = (seed, candidate) => {
 };
 
 const getEmbedding = async (bookId) => {
-  const [[row]] = await db.query("SELECT vector_json FROM book_embeddings WHERE book_id = ? AND status = 'ready' LIMIT 1", [bookId]);
+  const row = await repository.findEmbedding(bookId);
   try { return row ? JSON.parse(row.vector_json) : null; } catch { return null; }
 };
 const semanticMatches = async (seed, candidates, limit, excluded = new Set()) => {
   const vector = await getEmbedding(seed.id); if (!vector) return [];
-  const [rows] = await db.query("SELECT book_id, vector_json FROM book_embeddings WHERE status = 'ready' AND book_id IN (?)", [candidates.map((candidate) => candidate.id)]);
+  const rows = await repository.findEmbeddings(candidates.map((candidate) => candidate.id));
   const byId = new Map(rows.map((row) => { try { return [row.book_id, JSON.parse(row.vector_json)]; } catch { return [row.book_id, null]; } }));
   return candidates.filter((candidate) => !excluded.has(candidate.id) && byId.has(candidate.id))
     .map((candidate) => ({ ...candidate, score: cosine(vector, byId.get(candidate.id)), source: "ai", reason: "Similar subject and catalogue details" }))
@@ -106,7 +91,7 @@ const semanticMatches = async (seed, candidates, limit, excluded = new Set()) =>
 };
 
 const recommendationsForSeed = async (bookId) => {
-  const [[seed]] = await db.query("SELECT * FROM books WHERE id = ? AND deleted_at IS NULL LIMIT 1", [bookId]);
+  const seed = await repository.findBook(bookId);
   if (!seed) { const error = new Error("Catalogue record not found"); error.status = 404; throw error; }
   const candidates = await activeCandidates(seed.material_type, [seed.id]);
   const ruleLimit = seed.material_type === "book" ? 3 : THESIS_LIMIT;
@@ -117,23 +102,13 @@ const recommendationsForSeed = async (bookId) => {
 };
 
 const historySeeds = async (userId, materialType) => {
-  const [rows] = await db.query(
-    `SELECT bk.*, MAX(activity.at) AS activity_at
-     FROM (
-       SELECT book_id, returned_at AS at FROM borrowings WHERE user_id = ? AND status IN ('borrowed','overdue','returned') AND deleted_at IS NULL
-       UNION ALL
-       SELECT book_id, COALESCE(fulfilled_at, reserved_at) AS at FROM reservations WHERE user_id = ? AND status IN ('pending','ready','fulfilled') AND deleted_at IS NULL
-     ) activity JOIN books bk ON bk.id = activity.book_id
-     WHERE bk.material_type = ? AND bk.deleted_at IS NULL GROUP BY bk.id ORDER BY activity_at DESC LIMIT 12`, [userId, userId, materialType]
-  );
-  return rows;
+  return repository.findHistorySeeds(userId, materialType);
 };
 const personalized = async (userId, materialType) => {
   if (!["book", "thesis"].includes(materialType)) { const error = new Error("materialType must be book or thesis"); error.status = 400; throw error; }
   const seeds = await historySeeds(userId, materialType);
   if (!seeds.length) return { material_type: materialType, rows: [], has_history: false };
-  const [[dismissed]] = await db.query("SELECT GROUP_CONCAT(book_id) AS ids FROM recommendation_feedback WHERE user_id = ? AND feedback = 'dismissed'", [userId]);
-  const dismissIds = String(dismissed?.ids || "").split(",").filter(Boolean).map(Number);
+  const dismissIds = await repository.findDismissedBookIds(userId);
   const candidates = await activeCandidates(materialType, [...seeds.map((seed) => seed.id), ...dismissIds]);
   const anchor = seeds[0];
   const ruleLimit = materialType === "book" ? 3 : THESIS_LIMIT;
@@ -145,16 +120,16 @@ const personalized = async (userId, materialType) => {
 };
 
 const dismiss = async (userId, bookId) => {
-  const [[book]] = await db.query("SELECT id FROM books WHERE id = ? AND deleted_at IS NULL", [bookId]);
+  const book = await repository.findBookId(bookId);
   if (!book) { const error = new Error("Catalogue record not found"); error.status = 404; throw error; }
-  await db.query("INSERT INTO recommendation_feedback (user_id, book_id, feedback) VALUES (?, ?, 'dismissed') ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP", [userId, bookId]);
+  await repository.dismissBook(userId, bookId);
 };
 
 const toText = (value) => typeof value === "string" ? value : (value?.value || value?.text || "");
 const unique = (values) => [...new Set(values.filter(Boolean).map((value) => String(value).trim()))];
 const fetchJson = async (url) => { const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(`Metadata source failed (${response.status})`); return response.json(); };
 const enrichBook = async (bookId) => {
-  const [[book]] = await db.query("SELECT id, isbn FROM books WHERE id = ? AND material_type = 'book' AND deleted_at IS NULL", [bookId]);
+  const book = await repository.findBookIsbn(bookId);
   if (!book?.isbn) return null;
   try {
     const open = await fetchJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(book.isbn)}&format=json&jscmd=data`);
@@ -172,20 +147,18 @@ const enrichBook = async (bookId) => {
       language: googleRecord.language || "", pageCount: googleRecord.pageCount || openRecord.number_of_pages || null,
       publishedDate: googleRecord.publishedDate || openRecord.publish_date || "",
     };
-    await db.query(`INSERT INTO book_enrichment (book_id, source, enrichment_json, status, enriched_at, last_error) VALUES (?, 'openlibrary_googlebooks', ?, 'ready', CURRENT_TIMESTAMP, NULL)
-      ON DUPLICATE KEY UPDATE source=VALUES(source), enrichment_json=VALUES(enrichment_json), status='ready', enriched_at=CURRENT_TIMESTAMP, last_error=NULL`, [book.id, JSON.stringify(enrichment)]);
+    await repository.saveEnrichment(book.id, enrichment);
     return enrichment;
   } catch (error) {
-    await db.query(`INSERT INTO book_enrichment (book_id, source, status, last_error) VALUES (?, 'none', 'failed', ?)
-      ON DUPLICATE KEY UPDATE status='failed', last_error=VALUES(last_error)`, [book.id, String(error.message || error).slice(0, 500)]);
+    await repository.markEnrichmentFailed(book.id, String(error.message || error).slice(0, 500));
     return {};
   }
 };
 
 const embedBook = async (bookId) => {
-  const [[book]] = await db.query("SELECT * FROM books WHERE id = ? AND deleted_at IS NULL", [bookId]);
+  const book = await repository.findBookForEmbedding(bookId);
   if (!book) return null;
-  const [[enrichmentRow]] = await db.query("SELECT enrichment_json FROM book_enrichment WHERE book_id = ? AND status = 'ready'", [bookId]);
+  const enrichmentRow = await repository.findReadyEnrichment(bookId);
   let enrichment = {}; try { enrichment = enrichmentRow ? JSON.parse(enrichmentRow.enrichment_json) : {}; } catch { enrichment = {}; }
   const hash = contentHash(book, enrichment); const model = embeddingModel();
   if (process.env.AI_EMBEDDING_PROVIDER !== "gemini" || !process.env.GEMINI_API_KEY) throw new Error("Gemini embedding provider is not configured");
@@ -199,18 +172,16 @@ const embedBook = async (bookId) => {
   }
   const payload = await response.json(); const vector = payload.embedding?.values;
   if (!Array.isArray(vector) || !vector.length) throw new Error("Gemini returned no embedding vector");
-  await db.query(`INSERT INTO book_embeddings (book_id, model, content_hash, vector_json, dimensions, status, embedded_at, last_error)
-    VALUES (?, ?, ?, ?, ?, 'ready', CURRENT_TIMESTAMP, NULL)
-    ON DUPLICATE KEY UPDATE model=VALUES(model), content_hash=VALUES(content_hash), vector_json=VALUES(vector_json), dimensions=VALUES(dimensions), status='ready', embedded_at=CURRENT_TIMESTAMP, last_error=NULL`, [book.id, model, hash, JSON.stringify(vector), vector.length]);
+  await repository.saveEmbedding({ bookId: book.id, model, hash, vector });
   return { bookId: book.id, dimensions: vector.length };
 };
-const markEmbeddingStale = async (bookId) => db.query("INSERT INTO book_embeddings (book_id, model, content_hash, status) VALUES (?, ?, '', 'stale') ON DUPLICATE KEY UPDATE status='stale'", [bookId, embeddingModel()]);
+const markEmbeddingStale = async (bookId) => repository.markEmbeddingStale(bookId, embeddingModel());
 const queueEmbedding = async (bookId) => {
   await markEmbeddingStale(bookId);
   setImmediate(async () => {
     try { await embedBook(bookId); }
     catch (error) {
-      await db.query("UPDATE book_embeddings SET status = 'failed', last_error = ? WHERE book_id = ?", [String(error.message || error).slice(0, 500), bookId]).catch(() => {});
+      await repository.markEmbeddingFailed(bookId, String(error.message || error).slice(0, 500)).catch(() => {});
       console.error("[recommendations] embedding failed:", error.message);
     }
   });
@@ -243,14 +214,7 @@ const runBackfill = async (books) => {
 };
 const startBackfill = async () => {
   if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
-  const [books] = await db.query(
-    `SELECT bk.id, bk.title
-     FROM books bk
-     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
-     WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL
-       AND (enrichment.book_id IS NULL OR enrichment.status <> 'ready' OR enrichment.enrichment_json IS NULL)
-     ORDER BY bk.id`
-  );
+  const books = await repository.findBooksForBackfill();
   activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, failed: 0, skipped: 0, currentTitle: null, errors: [] };
   if (!books.length) { activeBackfill.status = "completed"; return { ...activeBackfill }; }
   setImmediate(() => runBackfill(books).catch((error) => {
@@ -261,8 +225,7 @@ const startBackfill = async () => {
 };
 const backfillProgress = () => ({ ...activeBackfill, errors: [...activeBackfill.errors] });
 const embeddingStatus = async () => {
-  const [[row]] = await db.query("SELECT COUNT(*) AS total, SUM(status = 'ready') AS ready, SUM(status = 'stale') AS stale, SUM(status = 'failed') AS failed FROM book_embeddings");
-  const [errors] = await db.query("SELECT book_id, last_error FROM book_embeddings WHERE status = 'failed' AND last_error IS NOT NULL ORDER BY updated_at DESC LIMIT 3");
+  const { row, errors } = await repository.getEmbeddingStatus();
   return { total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })) };
 };
 

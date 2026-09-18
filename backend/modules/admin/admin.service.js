@@ -1,113 +1,61 @@
 const bcrypt = require("bcryptjs");
-const db = require("../../db");
 const qr = require("qrcode");
+const repository = require("./admin.repository");
 const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service");
 
 const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
-
-// Role hierarchy map
 const roleHierarchy = {
   super_admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
   admin: ["staff", "scanner", "employee", "alumni", "student"],
   staff: ["scanner", "employee", "alumni", "student"],
 };
-
 const searchRoleHierarchy = {
   super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
   admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
   staff: ["employee", "alumni", "student"],
 };
 
-// CREATE USER
 async function ensureProgramExists(programId) {
   if (!programId) return null;
-  const [[program]] = await db.query(
-    "SELECT id FROM academic_programs WHERE id = ? AND is_active = 1 LIMIT 1",
-    [programId]
-  );
+  const program = await repository.findActiveProgram(programId);
   if (!program) throw new Error("Select a valid active program / course");
   return program.id;
 }
 
 async function createUser({ student_employee_id, name, role, password, address, contact, program_id, academic_term_id }, creatorRole) {
-  if (!roleHierarchy[creatorRole]?.includes(role)) {
-    throw new Error("You are not allowed to create a user with this role");
-  }
-  if (role === creatorRole && creatorRole !== "super_admin") {
-    throw new Error("You cannot create a user with your own role");
-  }
-
-  const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
-    [student_employee_id]
-  );
-  if (existing.length) throw new Error("User already exists");
-
+  if (!roleHierarchy[creatorRole]?.includes(role)) throw new Error("You are not allowed to create a user with this role");
+  if (role === creatorRole && creatorRole !== "super_admin") throw new Error("You cannot create a user with your own role");
+  if ((await repository.findExistingUser(student_employee_id)).length) throw new Error("User already exists");
   const password_hash = await bcrypt.hash(password, 12);
-
   const programId = await ensureProgramExists(program_id);
   let academicTermId = null;
   if (role === "student") {
     if (academic_term_id) {
-      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1", [academic_term_id]);
+      const term = await repository.findAcademicTerm(academic_term_id);
       if (!term) throw new Error("Select a valid academic term");
       academicTermId = term.id;
     } else {
-      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1");
-      academicTermId = term?.id ?? null;
+      academicTermId = (await repository.findCurrentAcademicTerm())?.id ?? null;
     }
   }
-  const [result] = await db.query(
-    `INSERT INTO users 
-      (student_employee_id, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id)
-      VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?)`,
-    [student_employee_id, name, password_hash, role, address || "", contact || "", programId, academicTermId]
-  );
-
-  const userId = result.insertId;
-  const barcode = `LIB-USER-${String(userId).padStart(6, "0")}`;
-
-  await db.query("UPDATE users SET barcode = ? WHERE id = ?", [barcode, userId]);
-
+  const barcode = await repository.createUser({ studentEmployeeId: student_employee_id, name, passwordHash: password_hash, role, address, contact, programId, academicTermId });
   return { message: "User created successfully", barcode };
 }
 
-// DELETE USER (soft delete — sets deleted_at + is_active = 0, preserves borrowing history)
 async function deleteUser(student_employee_id, requesterRole, requesterId) {
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   let user;
   try {
     await conn.beginTransaction();
-    const [[lockedUser]] = await conn.query(
-      "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL FOR UPDATE",
-      [student_employee_id]
-    );
-    if (!lockedUser) throw new Error("User not found");
-    user = lockedUser;
-
+    user = await repository.findUserForUpdate(student_employee_id, conn);
+    if (!user) throw new Error("User not found");
     if (!roleHierarchy[requesterRole]?.includes(user.role)) throw new Error("You are not allowed to deactivate this user");
     if (!user.is_active) throw new Error("User is already deactivated");
-
-    const [activeBorrows] = await conn.query(
-      `SELECT id FROM borrowings WHERE user_id = ? AND status IN ('borrowed', 'overdue') FOR UPDATE`,
-      [user.id]
-    );
-    if (activeBorrows.length > 0) {
-      throw new Error(`User has ${activeBorrows.length} unreturned book${activeBorrows.length > 1 ? "s" : ""} — resolve before deactivating`);
-    }
-
-    const [activeReservations] = await conn.query(
-      `SELECT id FROM reservations WHERE user_id = ? AND status IN ('pending', 'ready') AND deleted_at IS NULL FOR UPDATE`,
-      [user.id]
-    );
-    if (activeReservations.length > 0) {
-      throw new Error(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before deactivating`);
-    }
-
-    await conn.query(
-      "UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ? WHERE id = ?",
-      [requesterId, user.id]
-    );
+    const activeBorrows = await repository.findActiveBorrowings(user.id, conn);
+    if (activeBorrows.length) throw new Error(`User has ${activeBorrows.length} unreturned book${activeBorrows.length > 1 ? "s" : ""} — resolve before deactivating`);
+    const activeReservations = await repository.findActiveReservations(user.id, conn);
+    if (activeReservations.length) throw new Error(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before deactivating`);
+    await repository.deactivateUser(user.id, requesterId, conn);
     await conn.commit();
   } catch (error) {
     await conn.rollback();
@@ -119,345 +67,87 @@ async function deleteUser(student_employee_id, requesterRole, requesterId) {
   return { message: "User deactivated successfully" };
 }
 
-// RESTORE USER
 async function restoreUser(student_employee_id, requesterRole) {
-  const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NOT NULL",
-    [student_employee_id]
-  );
-  if (!existing.length) throw new Error("Archived user not found");
-
-  const user = existing[0];
-
-  if (!roleHierarchy[requesterRole]?.includes(user.role)) {
-    throw new Error("You are not allowed to restore this user");
-  }
-
-  await db.query(
-    "UPDATE users SET deleted_at = NULL, deleted_by = NULL, is_active = 1 WHERE student_employee_id = ?",
-    [student_employee_id]
-  );
+  const user = await repository.findArchivedUser(student_employee_id);
+  if (!user) throw new Error("Archived user not found");
+  if (!roleHierarchy[requesterRole]?.includes(user.role)) throw new Error("You are not allowed to restore this user");
+  await repository.restoreUser(student_employee_id);
   return { message: "User restored successfully" };
 }
 
-// UPDATE USER
 async function updateUser(student_employee_id, updates, requesterRole) {
-  const [existing] = await db.query(
-    "SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL",
-    [student_employee_id]
-  );
-  if (!existing.length) throw new Error("User not found");
-
-  const targetRole = existing[0].role;
-  if (!roleHierarchy[requesterRole]?.includes(targetRole)) {
-    throw new Error("You are not allowed to update this user");
-  }
-
-  const fields = [];
-  const values = [];
-
-  if (updates.name) {
-    fields.push("name = ?");
-    values.push(updates.name);
-  }
-
+  const existing = await repository.findActiveUser(student_employee_id);
+  if (!existing) throw new Error("User not found");
+  if (!roleHierarchy[requesterRole]?.includes(existing.role)) throw new Error("You are not allowed to update this user");
+  const normalized = {};
+  if (updates.name) normalized.name = updates.name;
   if (updates.role) {
-    if (!roleHierarchy[requesterRole]?.includes(updates.role)) {
-      throw new Error("You are not allowed to assign this role");
-    }
-    if (updates.role === requesterRole) {
-      throw new Error("You cannot assign your own role");
-    }
-    fields.push("role = ?");
-    values.push(updates.role);
+    if (!roleHierarchy[requesterRole]?.includes(updates.role)) throw new Error("You are not allowed to assign this role");
+    if (updates.role === requesterRole) throw new Error("You cannot assign your own role");
+    normalized.role = updates.role;
   }
-
   if (updates.password) {
-    const password_hash = await bcrypt.hash(updates.password, 12);
-    fields.push("password_hash = ?");
-    values.push(password_hash);
-    fields.push("must_change_password = 1");
+    normalized.password_hash = await bcrypt.hash(updates.password, 12);
+    normalized.must_change_password = 1;
   }
-
-  if (updates.address !== undefined) {
-    fields.push("address = ?");
-    values.push(updates.address);
-  }
-
-  if (updates.contact !== undefined) {
-    fields.push("contact = ?");
-    values.push(updates.contact);
-  }
-
-  if (updates.program_id !== undefined) {
-    const programId = await ensureProgramExists(updates.program_id);
-    fields.push("program_id = ?");
-    values.push(programId);
-  }
-
+  if (updates.address !== undefined) normalized.address = updates.address;
+  if (updates.contact !== undefined) normalized.contact = updates.contact;
+  if (updates.program_id !== undefined) normalized.program_id = await ensureProgramExists(updates.program_id);
   if (updates.academic_term_id !== undefined) {
-    let termId = null;
-    if (updates.academic_term_id) {
-      const [[term]] = await db.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1", [updates.academic_term_id]);
-      if (!term) throw new Error("Select a valid academic term");
-      termId = term.id;
-    }
-    fields.push("academic_term_id = ?");
-    values.push(termId);
+    const term = updates.academic_term_id ? await repository.findAcademicTerm(updates.academic_term_id) : null;
+    if (updates.academic_term_id && !term) throw new Error("Select a valid academic term");
+    normalized.academic_term_id = term?.id ?? null;
   }
-
-  if (updates.is_active !== undefined) {
-    fields.push("is_active = ?");
-    values.push(updates.is_active ? 1 : 0);
-  }
-
-  if (!fields.length) throw new Error("No valid fields to update");
-
-  values.push(student_employee_id);
-
-  await db.query(
-    `UPDATE users SET ${fields.join(", ")} WHERE student_employee_id = ? AND deleted_at IS NULL`,
-    values
-  );
-
+  if (updates.is_active !== undefined) normalized.is_active = updates.is_active ? 1 : 0;
+  if (!Object.keys(normalized).length) throw new Error("No valid fields to update");
+  await repository.updateUser(student_employee_id, normalized);
   return { message: "User updated successfully" };
 }
 
-// SEARCH USERS
 async function searchUsers(query, requesterRole) {
   const allowedRoles = searchRoleHierarchy[requesterRole];
-  if (!allowedRoles?.length) {
-    throw new Error("You are not allowed to search users");
-  }
-
+  if (!allowedRoles?.length) throw new Error("You are not allowed to search users");
   const showArchived = query.archived === "true";
-  let sql = `SELECT u.student_employee_id, u.name, u.role, u.is_active, u.address, u.contact, u.program_id,
-                    p.name AS program_course, u.deleted_at
-             FROM users u
-             LEFT JOIN academic_programs p ON p.id = u.program_id
-             WHERE u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`;
-  const values = [...allowedRoles];
-
-  sql += ` AND u.role IN (${allowedRoles.map(() => "?").join(", ")})`;
-
-  if (query.student_employee_id && query.name) {
-    sql += " AND (u.student_employee_id = ? OR u.name LIKE ?)";
-    values.push(query.student_employee_id, `%${query.name}%`);
-  } else {
-    if (query.student_employee_id) {
-      sql += " AND u.student_employee_id = ?";
-      values.push(query.student_employee_id);
-    }
-    if (query.name) {
-      sql += " AND u.name LIKE ?";
-      values.push(`%${query.name}%`);
-    }
+  if (query.role && !allowedRoles.includes(query.role)) {
+    if (query.page !== undefined) return { rows: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
+    return [];
   }
-
-  if (query.role) {
-    if (!allowedRoles.includes(query.role)) {
-      if (query.page !== undefined) return { rows: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
-      return [];
-    }
-    sql += " AND u.role = ?";
-    values.push(query.role);
-  }
-
-  if (query.status === "active") {
-    sql += " AND u.is_active = 1";
-  } else if (query.status === "inactive") {
-    sql += " AND u.is_active = 0";
-  }
-
-  if (query.page !== undefined) {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 25));
-    const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM (${sql}) AS matching_users`, values);
-    const [results] = await db.query(`${sql} ORDER BY u.name ASC LIMIT ? OFFSET ?`, [...values, limit, (page - 1) * limit]);
-    return { rows: results, pagination: { page, limit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / limit)) } };
-  }
-  const [results] = await db.query(`${sql} ORDER BY u.name ASC`, values);
-  return results;
+  const result = await repository.searchUsers({
+    allowedRoles,
+    showArchived,
+    studentEmployeeId: query.student_employee_id,
+    name: query.name,
+    role: query.role,
+    status: query.status,
+    page: query.page,
+    limit: query.limit,
+  });
+  if (query.page === undefined) return result;
+  return { rows: result.rows, pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.limit)) } };
 }
 
 async function queryToolsSearch(term, requesterRole) {
   const query = term?.trim();
-  if (!query) {
-    throw new Error("Search term is required");
-  }
-
-  const like = `%${query}%`;
+  if (!query) throw new Error("Search term is required");
   const allowedRoles = searchRoleHierarchy[requesterRole];
-  if (!allowedRoles?.length) {
-    throw new Error("You are not allowed to search query tools");
-  }
-
-  const [users, books, borrowings, reservations, notifications] = await Promise.all([
-    db.query(
-      `SELECT id, student_employee_id, name, role, is_active
-       FROM users
-       WHERE deleted_at IS NULL
-         AND role IN (${allowedRoles.map(() => "?").join(", ")})
-         AND (
-           student_employee_id LIKE ?
-           OR name LIKE ?
-           OR barcode LIKE ?
-         )
-       ORDER BY name ASC
-       LIMIT 10`,
-      [...allowedRoles, like, like, like]
-    ),
-    db.query(
-      `SELECT id, title, author, isbn, copies,
-              JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) AS category,
-              JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.location')) AS location
-       FROM books
-       WHERE deleted_at IS NULL
-         AND (
-           title LIKE ?
-           OR author LIKE ?
-           OR isbn LIKE ?
-         )
-       ORDER BY title ASC
-       LIMIT 10`,
-      [like, like, like]
-    ),
-    db.query(
-      `SELECT
-         b.id,
-         b.status,
-         b.borrowed_at,
-         b.due_date,
-         b.returned_at,
-         u.name AS user_name,
-         u.student_employee_id,
-         bk.title AS book_title,
-         bc.barcode AS copy_barcode
-       FROM borrowings b
-       JOIN users u ON u.id = b.user_id
-       JOIN books bk ON bk.id = b.book_id
-       LEFT JOIN book_copies bc ON bc.id = b.copy_id
-       WHERE b.deleted_at IS NULL
-         AND (
-           u.student_employee_id LIKE ?
-           OR u.name LIKE ?
-           OR bk.title LIKE ?
-           OR bk.isbn LIKE ?
-           OR bc.barcode LIKE ?
-           OR CAST(b.id AS CHAR) LIKE ?
-         )
-       ORDER BY b.borrowed_at DESC
-       LIMIT 10`,
-      [like, like, like, like, like, like]
-    ),
-    db.query(
-      `SELECT
-         r.id,
-         r.status,
-         r.reserved_at,
-         r.expires_at,
-         u.name AS user_name,
-         u.student_employee_id,
-         bk.title AS book_title
-       FROM reservations r
-       JOIN users u ON u.id = r.user_id
-       JOIN books bk ON bk.id = r.book_id
-       WHERE r.deleted_at IS NULL
-         AND (
-           u.student_employee_id LIKE ?
-           OR u.name LIKE ?
-           OR bk.title LIKE ?
-           OR CAST(r.id AS CHAR) LIKE ?
-         )
-       ORDER BY r.reserved_at DESC
-       LIMIT 10`,
-      [like, like, like, like]
-    ),
-    db.query(
-      `SELECT
-         n.id,
-         n.type,
-         n.title,
-         n.created_at,
-         n.audience_type,
-         n.audience_role
-       FROM notifications n
-       WHERE n.title LIKE ?
-          OR n.body LIKE ?
-          OR n.type LIKE ?
-          OR CAST(n.id AS CHAR) LIKE ?
-       ORDER BY n.created_at DESC
-       LIMIT 10`,
-      [like, like, like, like]
-    ),
-  ]);
-
-  return {
-    users: users[0],
-    books: books[0],
-    borrowings: borrowings[0],
-    reservations: reservations[0],
-    notifications: notifications[0],
-  };
+  if (!allowedRoles?.length) throw new Error("You are not allowed to search query tools");
+  return repository.queryToolsSearch(query, allowedRoles);
 }
 
 async function bulkDeactivateStudentLikeUsers(requesterRole, requesterId) {
-  if (!["admin", "super_admin"].includes(requesterRole)) {
-    throw new Error("You are not allowed to bulk deactivate users");
-  }
-
-  const [users] = await db.query(
-    `SELECT
-       u.id,
-       u.student_employee_id,
-       u.role,
-       COUNT(CASE WHEN b.status IN ('borrowed', 'overdue') THEN 1 END) AS active_borrow_count
-     FROM users u
-     LEFT JOIN borrowings b ON b.user_id = u.id AND b.deleted_at IS NULL
-     WHERE u.deleted_at IS NULL
-       AND u.is_active = 1
-       AND u.role IN (${STUDENT_LIKE_ROLES.map(() => "?").join(", ")})
-     GROUP BY u.id, u.student_employee_id, u.role`,
-    STUDENT_LIKE_ROLES
-  );
-
+  if (!["admin", "super_admin"].includes(requesterRole)) throw new Error("You are not allowed to bulk deactivate users");
+  const users = await repository.findStudentLikeUsers();
   const eligibleUsers = users.filter((user) => Number(user.active_borrow_count) === 0);
   const skippedUsers = users.filter((user) => Number(user.active_borrow_count) > 0);
-
-  if (eligibleUsers.length) {
-    await db.query(
-      `UPDATE users
-       SET is_active = 0,
-           deleted_at = NOW(),
-           deleted_by = ?
-       WHERE deleted_at IS NULL
-         AND is_active = 1
-         AND role IN (${STUDENT_LIKE_ROLES.map(() => "?").join(", ")})
-         AND id IN (${eligibleUsers.map(() => "?").join(", ")})`,
-      [requesterId, ...STUDENT_LIKE_ROLES, ...eligibleUsers.map((user) => user.id)]
-    );
-  }
-
+  await repository.bulkDeactivateUserIds(eligibleUsers.map((user) => user.id), requesterId);
   return {
     message: skippedUsers.length
       ? `Deactivated ${eligibleUsers.length} account${eligibleUsers.length === 1 ? "" : "s"}. Skipped ${skippedUsers.length} account${skippedUsers.length === 1 ? "" : "s"} with unreturned books.`
       : `Deactivated ${eligibleUsers.length} student-like account${eligibleUsers.length === 1 ? "" : "s"}.`,
     deactivated_count: eligibleUsers.length,
     skipped_count: skippedUsers.length,
-    skipped_users: skippedUsers.map((user) => ({
-      student_employee_id: user.student_employee_id,
-      role: user.role,
-      active_borrow_count: Number(user.active_borrow_count),
-    })),
+    skipped_users: skippedUsers.map((user) => ({ student_employee_id: user.student_employee_id, role: user.role, active_borrow_count: Number(user.active_borrow_count) })),
   };
 }
 
-module.exports = {
-  createUser,
-  deleteUser,
-  restoreUser,
-  updateUser,
-  searchUsers,
-  queryToolsSearch,
-  bulkDeactivateStudentLikeUsers,
-};
+module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch, bulkDeactivateStudentLikeUsers };

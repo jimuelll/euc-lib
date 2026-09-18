@@ -176,6 +176,12 @@ GEMINI_REPORT_MODEL=gemini-2.5-flash
 
 # Optional: changes the JSON body limit used by backup import
 # BACKUP_MAX_BYTES=52428800
+# Optional: maximum uncompressed snapshot payload saved or exported
+# SNAPSHOT_MAX_BYTES=52428800
+# Optional: Cloudinary snapshot upload timeout in milliseconds
+# SNAPSHOT_UPLOAD_TIMEOUT_MS=120000
+# Optional: stale refresh-session cleanup interval in milliseconds
+# REFRESH_SESSION_PURGE_INTERVAL_MS=3600000
 ```
 
 Install and start the API from `backend/`:

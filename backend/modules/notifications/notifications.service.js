@@ -1,17 +1,12 @@
-const db = require("../../db");
+const repository = require("./notifications.repository");
 const hub = require("../../realtime/notificationHub");
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
-let ensuredNotificationSourceColumns = false;
 
-const ensureNotificationSourceColumns = async (conn = db) => {
-  if (ensuredNotificationSourceColumns) return;
-  // These columns are owned by the fresh-start database baseline. Never alter
-  // a live table during a user request: that makes first-use behavior and
-  // snapshot compatibility depend on request timing.
-  ensuredNotificationSourceColumns = true;
-};
+// Notification source columns are part of the database baseline. This remains
+// as a compatibility entry point for callers from before the repository split.
+const ensureNotificationSourceColumns = async () => undefined;
 
 const normaliseNotification = (row) => ({
   id: row.id,
@@ -32,165 +27,33 @@ const normaliseNotification = (row) => ({
   is_read: !!row.read_at,
 });
 
-const buildAudienceWhere = () => `
-  n.is_active = 1
-  AND (n.expires_at IS NULL OR n.expires_at > NOW())
-  AND (
-    n.audience_type = 'all'
-    OR (n.audience_type = 'user' AND n.audience_user_id = ?)
-    OR (n.audience_type = 'role' AND n.audience_role = ?)
-  )
-`;
-
 const listForUser = async ({ userId, role, limit = DEFAULT_LIMIT, unreadOnly = false }) => {
-  await ensureNotificationSourceColumns();
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
-  const params = [userId, role];
-
-  let unreadClause = "";
-  if (unreadOnly) {
-    unreadClause = "AND nr.read_at IS NULL";
-  }
-
-  const [rows] = await db.query(
-    `SELECT
-       n.*,
-       nr.read_at
-     FROM notifications n
-     LEFT JOIN notification_reads nr
-       ON nr.notification_id = n.id
-      AND nr.user_id = ?
-     WHERE ${buildAudienceWhere()}
-       ${unreadClause}
-     ORDER BY n.created_at DESC
-     LIMIT ?`,
-    [userId, ...params, safeLimit]
-  );
-
+  const rows = await repository.listForUser({ userId, role, limit: safeLimit, unreadOnly });
   return rows.map(normaliseNotification);
 };
 
-const getUnreadCountForUser = async ({ userId, role }) => {
-  await ensureNotificationSourceColumns();
-  const [[row]] = await db.query(
-    `SELECT COUNT(*) AS total
-     FROM notifications n
-     LEFT JOIN notification_reads nr
-       ON nr.notification_id = n.id
-      AND nr.user_id = ?
-     WHERE ${buildAudienceWhere()}
-       AND nr.read_at IS NULL`,
-    [userId, userId, role]
-  );
-
-  return row?.total ?? 0;
-};
+const getUnreadCountForUser = async ({ userId, role }) => repository.getUnreadCountForUser({ userId, role });
 
 const getByIdForUser = async ({ notificationId, userId, role }) => {
-  await ensureNotificationSourceColumns();
-  const [[row]] = await db.query(
-    `SELECT
-       n.*,
-       nr.read_at
-     FROM notifications n
-     LEFT JOIN notification_reads nr
-       ON nr.notification_id = n.id
-      AND nr.user_id = ?
-     WHERE n.id = ?
-       AND ${buildAudienceWhere()}
-     LIMIT 1`,
-    [userId, notificationId, userId, role]
-  );
-
+  const row = await repository.getByIdForUser({ notificationId, userId, role });
   return row ? normaliseNotification(row) : null;
 };
 
 const markAsRead = async ({ notificationId, userId, role }) => {
   const notification = await getByIdForUser({ notificationId, userId, role });
-  if (!notification) {
-    throw Object.assign(new Error("Notification not found"), { status: 404 });
-  }
-
-  await db.query(
-    `INSERT INTO notification_reads (notification_id, user_id, read_at)
-     VALUES (?, ?, NOW())
-     ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
-    [notificationId, userId]
-  );
-
+  if (!notification) throw Object.assign(new Error("Notification not found"), { status: 404 });
+  await repository.markAsRead({ notificationId, userId });
   const unreadCount = await getUnreadCountForUser({ userId, role });
   hub.pushUnreadCount(userId, unreadCount);
-
   return { success: true, unreadCount };
 };
 
 const markAllAsRead = async ({ userId, role }) => {
-  await ensureNotificationSourceColumns();
-  await db.query(
-    `INSERT INTO notification_reads (notification_id, user_id, read_at)
-     SELECT n.id, ?, NOW()
-     FROM notifications n
-     LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ?
-     WHERE ${buildAudienceWhere()} AND nr.read_at IS NULL
-     ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
-    [userId, userId, userId, role]
-  );
+  await repository.markAllAsRead({ userId, role });
   const unreadCount = await getUnreadCountForUser({ userId, role });
   hub.pushUnreadCount(userId, unreadCount);
   return { success: true, unreadCount };
-};
-
-const resolveRecipients = async ({ audienceType, audienceUserId, audienceRole }) => {
-  if (audienceType === "user") return audienceUserId ? [audienceUserId] : [];
-
-  if (audienceType === "role") {
-    const [rows] = await db.query(
-      `SELECT id
-       FROM users
-       WHERE role = ?
-         AND is_active = 1
-         AND deleted_at IS NULL`,
-      [audienceRole]
-    );
-    return rows.map((row) => row.id);
-  }
-
-  const [rows] = await db.query(
-    `SELECT id
-     FROM users
-     WHERE is_active = 1
-       AND deleted_at IS NULL`
-  );
-  return rows.map((row) => row.id);
-};
-
-const findExistingNotification = async ({
-  type,
-  audienceType,
-  audienceUserId,
-  audienceRole,
-  sourceType = null,
-  sourceId = null,
-}, conn = db) => {
-  if (!sourceType || sourceId === null || sourceId === undefined) {
-    return null;
-  }
-
-  const [[row]] = await conn.query(
-    `SELECT id
-     FROM notifications
-     WHERE type = ?
-       AND audience_type = ?
-       AND audience_user_id <=> ?
-       AND audience_role <=> ?
-       AND source_type = ?
-       AND source_id = ?
-     ORDER BY id DESC
-     LIMIT 1`,
-    [type, audienceType, audienceUserId, audienceRole, sourceType, sourceId]
-  );
-
-  return row ?? null;
 };
 
 const createNotification = async ({
@@ -207,51 +70,18 @@ const createNotification = async ({
   sourceId = null,
   replaceExisting = false,
 }) => {
-  await ensureNotificationSourceColumns();
-
   const existingNotification = replaceExisting
-    ? await findExistingNotification({
-        type,
-        audienceType,
-        audienceUserId,
-        audienceRole,
-        sourceType,
-        sourceId,
-      })
+    ? await repository.findExistingNotification({ type, audienceType, audienceUserId, audienceRole, sourceType, sourceId })
     : null;
 
   let notificationId = existingNotification?.id ?? null;
-
   if (notificationId) {
-    await db.query(
-      `UPDATE notifications
-       SET title = ?,
-           body = ?,
-           href = ?,
-           expires_at = ?,
-           created_by = ?,
-           source_type = ?,
-           source_id = ?,
-           is_active = 1,
-           created_at = NOW()
-       WHERE id = ?`,
-      [title, body, href, expiresAt, createdBy, sourceType, sourceId, notificationId]
-    );
-
-    await db.query(
-      `DELETE FROM notification_reads
-       WHERE notification_id = ?`,
-      [notificationId]
-    );
+    await repository.updateNotification({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId });
   } else {
-    const [result] = await db.query(
-      `INSERT INTO notifications
-        (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId]
-    );
-
-    notificationId = result.insertId;
+    notificationId = await repository.createNotification({
+      type, title, body, href, audienceType, audienceUserId, audienceRole,
+      expiresAt, createdBy, sourceType, sourceId,
+    });
   }
 
   const baseNotification = {
@@ -274,63 +104,32 @@ const createNotification = async ({
   };
 
   if (audienceType === "user" && audienceUserId) {
-    const unreadCount = await getUnreadCountForUser({ userId: audienceUserId, role: await getUserRole(audienceUserId) });
+    const unreadCount = await getUnreadCountForUser({ userId: audienceUserId, role: await repository.getUserRole(audienceUserId) });
     hub.pushNotification(audienceUserId, { type: "notification.created", notification: baseNotification, unreadCount });
   } else {
-    // Broadcast once to currently connected matching clients. Each client fetches
-    // its own unread count; the request no longer queries or pushes every user.
     hub.pushAudienceChanged({ audienceType, audienceRole });
   }
 
   return baseNotification;
 };
 
-const getUserRole = async (userId) => {
-  const [[row]] = await db.query(
-    `SELECT role
-     FROM users
-     WHERE id = ?
-     LIMIT 1`,
-    [userId]
-  );
-
-  return row?.role ?? "student";
-};
-
 const listAdminNotifications = async ({ page = 1, limit = DEFAULT_LIMIT } = {}) => {
-  await ensureNotificationSourceColumns();
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
   const safePage = Math.max(1, Number(page) || 1);
-  const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM notifications");
-
-  const [rows] = await db.query(
-    `SELECT
-       n.*,
-       creator.name AS creator_name
-     FROM notifications n
-     LEFT JOIN users creator ON creator.id = n.created_by
-     ORDER BY n.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [safeLimit, (safePage - 1) * safeLimit]
-  );
-
-  return { rows: rows.map((row) => ({
-    ...normaliseNotification(row),
-    creator_name: row.creator_name ?? null,
-  })), pagination: { page: safePage, limit: safeLimit, total: Number(total), totalPages: Math.max(1, Math.ceil(Number(total) / safeLimit)) } };
+  const result = await repository.listAdminNotifications({ page: safePage, limit: safeLimit });
+  return {
+    rows: result.rows.map((row) => ({ ...normaliseNotification(row), creator_name: row.creator_name ?? null })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total: result.total,
+      totalPages: Math.max(1, Math.ceil(result.total / safeLimit)),
+    },
+  };
 };
 
 const getAdminStats = async () => {
-  await ensureNotificationSourceColumns();
-  const [[row]] = await db.query(
-    `SELECT
-       COUNT(*) AS total_notifications,
-       SUM(CASE WHEN created_at >= CURDATE() THEN 1 ELSE 0 END) AS created_today,
-       SUM(CASE WHEN audience_type = 'all' THEN 1 ELSE 0 END) AS broadcast_notifications,
-       SUM(CASE WHEN audience_type = 'user' THEN 1 ELSE 0 END) AS direct_notifications
-     FROM notifications`
-  );
-
+  const row = await repository.getAdminStats();
   return {
     total_notifications: Number(row?.total_notifications ?? 0),
     created_today: Number(row?.created_today ?? 0),

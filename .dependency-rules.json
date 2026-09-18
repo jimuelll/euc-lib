@@ -1,0 +1,21 @@
+{
+  "backend": {
+    "layers": ["routes", "controllers", "services", "repositories", "database"],
+    "allowedDirection": "toward database only through the next layer",
+    "jobsMayCall": ["services"],
+    "controllersMayImport": ["services", "validation", "middleware", "feature public APIs"],
+    "routesMayImport": ["controllers", "middleware", "validation"],
+    "architectureCheck": "backend/npm run architecture:test",
+    "compatibilityShimDirectories": ["backend/users", "backend/modules/librarySettings", "backend/modules/myLibrary", "backend/modules/siteContent", "backend/modules/userGuide"]
+  },
+  "frontend": {
+    "featureLayout": ["api", "hooks", "types", "components"],
+    "pagesComposeFeatures": true,
+    "componentsMayCallApiDirectly": false,
+    "staticDefaultsMayStayMonolithic": true,
+    "sharedLayers": ["src/components/ui", "src/components/layout", "src/lib"],
+    "featureEntryPoint": "src/features/<feature>/index.ts or index.tsx",
+    "legacyCompatibilityDirectories": ["src/pages", "src/services"],
+    "architectureCheck": "frontend/npm run test:architecture"
+  }
+}

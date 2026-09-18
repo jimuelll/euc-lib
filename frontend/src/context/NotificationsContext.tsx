@@ -6,7 +6,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   type NotificationItem,
-} from "@/services/notifications.service";
+} from "@/features/notifications/notifications.service";
 
 interface NotificationsContextValue {
   notifications: NotificationItem[];

@@ -1,59 +1,37 @@
-const db = require("../../db");
+const repository = require("./clearance.repository");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
 
 const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
-const buildStatus = async (userId, conn = db) => {
-  const [overdueRows] = await conn.query(
-    `SELECT b.id, bk.title, b.due_date
-     FROM borrowings b JOIN books bk ON bk.id = b.book_id
-     WHERE b.user_id = ? AND b.status = 'overdue' AND b.deleted_at IS NULL
-     ORDER BY b.due_date ASC`, [userId]
-  );
+const buildStatus = async (userId, conn) => {
+  const overdueRows = await repository.findOverdueBorrowings(userId, conn);
   const fines = await listUnsettledBorrowings({ userId }, conn);
   const reasons = [];
   if (overdueRows.length) reasons.push(`${overdueRows.length} overdue item${overdueRows.length === 1 ? "" : "s"} must be returned`);
   if (fines.summary.total_unsettled_amount > 0) reasons.push(`PHP ${fines.summary.total_unsettled_amount.toFixed(2)} outstanding fine${fines.summary.total_unsettled_amount === 1 ? "" : "s"}`);
-  return { status: reasons.length ? "blocked" : "eligible", reasons, overdueItems: overdueRows, fineRows: fines.rows, outstandingAmount: fines.summary.total_unsettled_amount };
+  return {
+    status: reasons.length ? "blocked" : "eligible",
+    reasons,
+    overdueItems: overdueRows,
+    fineRows: fines.rows,
+    outstandingAmount: fines.summary.total_unsettled_amount,
+  };
 };
 
 const getClearanceProfile = async (studentEmployeeId) => {
   await syncOverdueBorrowings();
-  const [[user]] = await db.query(
-    `SELECT u.id, u.name, u.role, u.student_employee_id, u.is_active, p.name AS program_course
-     FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id
-     WHERE u.student_employee_id = ? AND u.deleted_at IS NULL LIMIT 1`, [String(studentEmployeeId).trim()]
-  );
+  const user = await repository.findUserByStudentEmployeeId(studentEmployeeId);
   if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
   const clearance = await buildStatus(user.id);
-  const [reservations] = await db.query(
-    `SELECT r.id, r.status, r.reserved_at, r.expires_at, bk.title AS book_title
-     FROM reservations r JOIN books bk ON bk.id = r.book_id
-     WHERE r.user_id = ? AND r.status IN ('pending', 'ready') AND r.deleted_at IS NULL
-     ORDER BY r.reserved_at DESC`, [user.id]
-  );
-  const [transactions] = await db.query(
-    `SELECT ct.id, ct.receipt_number, ct.transaction_type, ct.amount, ct.reason, ct.created_at,
-       EXISTS(SELECT 1 FROM clearance_transactions reversed WHERE reversed.reverses_transaction_id = ct.id) AS corrected
-     FROM clearance_transactions ct WHERE ct.user_id = ? ORDER BY ct.created_at DESC, ct.id DESC LIMIT 12`, [user.id]
-  );
+  const reservations = await repository.findUserReservations(user.id);
+  const transactions = await repository.findUserTransactions(user.id);
   return { user, ...clearance, reservations, transactions };
 };
 
 const getClearanceQueue = async ({ page, limit } = {}) => {
   await syncOverdueBorrowings();
-  const [overdueRows] = await db.query(
-    `SELECT u.id AS user_id, u.name, u.student_employee_id,
-       COUNT(b.id) AS overdue_count, MIN(b.due_date) AS oldest_due_date,
-       GROUP_CONCAT(bk.title ORDER BY b.due_date ASC SEPARATOR ' | ') AS overdue_titles
-     FROM borrowings b
-     JOIN users u ON u.id = b.user_id AND u.deleted_at IS NULL
-     JOIN books bk ON bk.id = b.book_id
-     WHERE b.deleted_at IS NULL AND b.status = 'overdue'
-     GROUP BY u.id, u.name, u.student_employee_id
-     ORDER BY oldest_due_date ASC`
-  );
+  const overdueRows = await repository.findQueueOverdueBorrowings();
   const fines = await listUnsettledBorrowings();
   const queue = new Map();
 
@@ -101,11 +79,8 @@ const getClearanceQueue = async ({ page, limit } = {}) => {
   };
 };
 
-const assertEligible = async (userId, conn = db) => {
-  const [[user]] = await conn.query(
-    "SELECT id, is_active FROM users WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
-    [userId]
-  );
+const assertEligible = async (userId, conn) => {
+  const user = await repository.findActiveUser(userId, conn);
   if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
   if (!user.is_active) throw Object.assign(new Error("User account is inactive"), { status: 403 });
   const profile = await buildStatus(userId, conn);
@@ -115,80 +90,107 @@ const assertEligible = async (userId, conn = db) => {
   return profile;
 };
 
-const createTransaction = async ({ userId, type, amount, method = null, reason = null, createdBy, reversesTransactionId = null, allocations }, conn) => {
-  const [result] = await conn.query(
-    `INSERT INTO clearance_transactions (receipt_number, user_id, transaction_type, amount, payment_method, reason, reverses_transaction_id, created_by)
-     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, type, amount, method, reason, reversesTransactionId, createdBy]
-  );
-  const id = result.insertId;
-  const receiptNumber = type === "payment" ? `CLR-${new Date().getFullYear()}-${String(id).padStart(7, "0")}` : null;
-  if (receiptNumber) await conn.query("UPDATE clearance_transactions SET receipt_number = ? WHERE id = ?", [receiptNumber, id]);
-  for (const allocation of allocations) {
-    await conn.query("INSERT INTO clearance_transaction_items (transaction_id, borrowing_id, amount) VALUES (?, ?, ?)", [id, allocation.borrowingId, allocation.amount]);
-    await conn.query("UPDATE borrowings SET settled_amount = GREATEST(0, settled_amount + ?), settled_at = NOW(), settled_by = ? WHERE id = ?", [allocation.amount, createdBy, allocation.borrowingId]);
-  }
-  return { id, receiptNumber };
-};
-
 const recordFullPayment = async ({ studentEmployeeId, createdBy }) => {
   await syncOverdueBorrowings();
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
-    const [[user]] = await conn.query("SELECT id, name, student_employee_id FROM users WHERE student_employee_id = ? AND deleted_at IS NULL FOR UPDATE", [String(studentEmployeeId).trim()]);
+    const user = await repository.findUserForPayment(studentEmployeeId, conn);
     if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
     const fines = await listUnsettledBorrowings({ userId: user.id }, conn);
     const amount = fines.summary.total_unsettled_amount;
     if (amount <= 0) throw Object.assign(new Error("This user has no outstanding fines"), { status: 409 });
-    const transaction = await createTransaction({ userId: user.id, type: "payment", amount, method: "cash", createdBy, allocations: fines.rows.map((row) => ({ borrowingId: row.id, amount: row.unsettled_amount })) }, conn);
+    const transaction = await repository.createTransaction({
+      userId: user.id,
+      type: "payment",
+      amount,
+      method: "cash",
+      createdBy,
+      allocations: fines.rows.map((row) => ({ borrowingId: row.id, amount: row.unsettled_amount })),
+    }, conn);
     await conn.commit();
     const clearance = await getClearanceProfile(user.student_employee_id);
-    await notificationsService.createNotification({ type: "payment_settled", title: "Payment received", body: `A cash payment of PHP ${amount.toFixed(2)} was recorded for your library fines.`, href: "/my-library", audienceType: "user", audienceUserId: user.id, createdBy });
+    await notificationsService.createNotification({
+      type: "payment_settled",
+      title: "Payment received",
+      body: `A cash payment of PHP ${amount.toFixed(2)} was recorded for your library fines.`,
+      href: "/my-library",
+      audienceType: "user",
+      audienceUserId: user.id,
+      createdBy,
+    });
     return { message: "Full payment recorded", receiptNumber: transaction.receiptNumber, transactionId: transaction.id, amount, clearance };
-  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 const adjustFine = async ({ borrowingId, amount, reason, createdBy }) => {
   const reduction = roundCurrency(amount);
   if (reduction <= 0 || !String(reason || "").trim()) throw Object.assign(new Error("A positive reduction and written reason are required"), { status: 400 });
   await syncOverdueBorrowings();
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
-    const [[borrowing]] = await conn.query("SELECT id, user_id FROM borrowings WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [borrowingId]);
+    const borrowing = await repository.findBorrowingForAdjustment(borrowingId, conn);
     if (!borrowing) throw Object.assign(new Error("Borrowing not found"), { status: 404 });
     const fines = await listUnsettledBorrowings({ userId: borrowing.user_id }, conn);
     const row = fines.rows.find((item) => Number(item.id) === Number(borrowingId));
     if (!row || reduction > Number(row.unsettled_amount)) throw Object.assign(new Error("Reduction cannot exceed this borrowing's outstanding fine"), { status: 409 });
-    const tx = await createTransaction({ userId: borrowing.user_id, type: "adjustment", amount: reduction, reason: String(reason).trim(), createdBy, allocations: [{ borrowingId, amount: reduction }] }, conn);
-    await conn.commit(); return { message: "Fine adjustment recorded", transactionId: tx.id };
-  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+    const transaction = await repository.createTransaction({
+      userId: borrowing.user_id,
+      type: "adjustment",
+      amount: reduction,
+      reason: String(reason).trim(),
+      createdBy,
+      allocations: [{ borrowingId, amount: reduction }],
+    }, conn);
+    await conn.commit();
+    return { message: "Fine adjustment recorded", transactionId: transaction.id };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
   if (!String(reason || "").trim()) throw Object.assign(new Error("A written correction reason is required"), { status: 400 });
-  const conn = await db.getConnection();
+  const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
-    const [[tx]] = await conn.query("SELECT * FROM clearance_transactions WHERE id = ? FOR UPDATE", [transactionId]);
-    if (!tx) throw Object.assign(new Error("Transaction not found"), { status: 404 });
-    if (tx.transaction_type === "reversal") throw Object.assign(new Error("A reversal cannot be reversed"), { status: 409 });
-    const [[existing]] = await conn.query("SELECT id FROM clearance_transactions WHERE reverses_transaction_id = ? LIMIT 1", [transactionId]);
-    if (existing) throw Object.assign(new Error("This transaction has already been corrected"), { status: 409 });
-    const [items] = await conn.query("SELECT borrowing_id, amount FROM clearance_transaction_items WHERE transaction_id = ?", [transactionId]);
-    const reversal = await createTransaction({ userId: tx.user_id, type: "reversal", amount: -Number(tx.amount), reason: String(reason).trim(), createdBy, reversesTransactionId: transactionId, allocations: items.map((item) => ({ borrowingId: item.borrowing_id, amount: -Number(item.amount) })) }, conn);
-    await conn.commit(); return { message: "Transaction corrected", transactionId: reversal.id };
-  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+    const transaction = await repository.findTransactionForReverse(transactionId, conn);
+    if (!transaction) throw Object.assign(new Error("Transaction not found"), { status: 404 });
+    if (transaction.transaction_type === "reversal") throw Object.assign(new Error("A reversal cannot be reversed"), { status: 409 });
+    if (await repository.findExistingReversal(transactionId, conn)) throw Object.assign(new Error("This transaction has already been corrected"), { status: 409 });
+    const items = await repository.findTransactionItems(transactionId, conn);
+    const reversal = await repository.createTransaction({
+      userId: transaction.user_id,
+      type: "reversal",
+      amount: -Number(transaction.amount),
+      reason: String(reason).trim(),
+      createdBy,
+      reversesTransactionId: transactionId,
+      allocations: items.map((item) => ({ borrowingId: item.borrowing_id, amount: -Number(item.amount) })),
+    }, conn);
+    await conn.commit();
+    return { message: "Transaction corrected", transactionId: reversal.id };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 const getReceipt = async (receiptNumber) => {
-  const [[transaction]] = await db.query(`SELECT ct.*, u.name AS user_name, u.student_employee_id, p.name AS program_course, staff.name AS recorded_by_name
-    FROM clearance_transactions ct JOIN users u ON u.id = ct.user_id LEFT JOIN academic_programs p ON p.id = u.program_id LEFT JOIN users staff ON staff.id = ct.created_by
-    WHERE ct.receipt_number = ? LIMIT 1`, [receiptNumber]);
+  const transaction = await repository.findReceipt(receiptNumber);
   if (!transaction) throw Object.assign(new Error("Receipt not found"), { status: 404 });
-  const [items] = await db.query(`SELECT cti.amount, bk.title AS book_title FROM clearance_transaction_items cti
-    JOIN borrowings b ON b.id = cti.borrowing_id JOIN books bk ON bk.id = b.book_id WHERE cti.transaction_id = ?`, [transaction.id]);
+  const items = await repository.findReceiptItems(transaction.id);
   return { transaction, items };
 };
 

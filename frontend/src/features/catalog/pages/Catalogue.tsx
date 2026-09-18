@@ -1,0 +1,252 @@
+import { Fragment, useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Search, Loader2 } from "lucide-react";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import PublicPageMasthead from "@/components/layout/PublicPageMasthead";
+import { useDebounce } from "@/hooks/use-debounce";
+import { Skeleton } from "@/components/ui/skeleton";
+import { RecommendationStrip } from "@/features/recommendations";
+import { fetchPublicCatalogSchema, searchPublicCatalogue, type PublicCatalogBook as Book, type PublicCatalogSchemaField as SchemaField } from "@/features/catalog/api";
+
+const CORE_KEYS = new Set(["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies"]);
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex items-center gap-3">
+    <div className="h-px w-6 bg-warning shrink-0" />
+    <p
+      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      style={{ fontFamily: "var(--font-heading)" }}
+    >
+      {children}
+    </p>
+  </div>
+);
+
+const Catalogue = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") || "");
+
+  const [books, setBooks]             = useState<Book[]>([]);
+  const [schema, setSchema]           = useState<SchemaField[]>([]);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [pagination, setPagination]   = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+
+  const debouncedQuery = useDebounce(query, 400);
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("q") || "";
+    setQuery((currentQuery) => (currentQuery === nextQuery ? currentQuery : nextQuery));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const trimmedQuery = debouncedQuery.trim();
+    const currentQuery = searchParams.get("q") || "";
+
+    if (trimmedQuery === currentQuery) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (trimmedQuery) {
+      nextParams.set("q", trimmedQuery);
+    } else {
+      nextParams.delete("q");
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  }, [debouncedQuery, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    fetchPublicCatalogSchema()
+      .then(setSchema)
+      .catch(() => {});
+  }, []);
+
+  const searchBooks = useCallback(async (q: string, page = 1) => {
+    if (!q.trim()) { setBooks([]); setHasSearched(false); setPagination({ page: 1, limit: 20, total: 0, totalPages: 0 }); return; }
+    setLoading(true); setError(null); setHasSearched(true);
+    try {
+      const result = await searchPublicCatalogue(q, page);
+      setBooks(result.rows ?? []);
+      setPagination(result.pagination);
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? "Something went wrong");
+      setBooks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { setSelectedBook(null); void searchBooks(debouncedQuery, 1); }, [debouncedQuery, searchBooks]);
+
+  const extraFields = schema
+    .filter((f) => f.public && !CORE_KEYS.has(f.key))
+    .sort((a, b) => a.order - b.order);
+
+  const getLabelForKey = (key: string) => schema.find((f) => f.key === key)?.label ?? key;
+
+  const getAvailabilityLabel = (available?: number) => {
+    if (available === undefined || available === null) return null;
+    return { available: available > 0 };
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+
+      <PublicPageMasthead
+        title="Library Catalogue"
+        description="Search books and reference theses in the library's collection."
+      >
+          <div className="relative max-w-xl">
+            <div className="absolute inset-y-0 left-0 w-[3px] bg-warning z-10" />
+            <Search className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-warning/50 pointer-events-none z-10" />
+            {loading && (
+              <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-warning/50 z-10" />
+            )}
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by title, author, or ISBN…"
+              className="h-12 w-full border-0 border-b border-primary-foreground/20 pl-12 pr-11 text-sm outline-none transition-colors duration-200 placeholder:text-primary-foreground/45 focus:border-warning"
+              style={{
+                backgroundColor: "hsl(var(--primary) / 0.5)",
+                color: "hsl(var(--primary-foreground))",
+                fontFamily: "var(--font-body)",
+                caretColor: "hsl(var(--warning))",
+              }}
+              onFocus={(e) => { e.currentTarget.style.backgroundColor = "hsl(var(--primary) / 0.7)"; }}
+              onBlur={(e)  => { e.currentTarget.style.backgroundColor = "hsl(var(--primary) / 0.5)"; }}
+            />
+          </div>
+      </PublicPageMasthead>
+
+      {/* ── Results — parchment ground ── */}
+      <main className="bg-background">
+        <div className="container px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-16">
+
+          {error && (
+            <div className="mb-6 border-l-2 border-destructive bg-destructive/5 px-5 py-3.5">
+              <p className="text-xs text-destructive" style={{ fontFamily: "var(--font-heading)" }}>{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && !hasSearched && (
+            <div className="py-16 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
+                Start typing to search the catalogue
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && hasSearched && books.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
+                No catalogue records found matching your search
+              </p>
+            </div>
+          )}
+
+          {!loading && !error && hasSearched && books.length > 0 && (
+            <div className="flex items-center border-b border-border pb-4">
+              <SectionLabel>{pagination.total} result{pagination.total !== 1 ? "s" : ""} found</SectionLabel>
+            </div>
+          )}
+
+          {loading ? <div className="space-y-3 border-l border-border py-1">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-24 w-full rounded-none" />)}</div> : null}
+
+          {!loading && books.length > 0 && (
+            <div className="border-l border-border">
+              {books.map((book, index) => {
+                const isReferenceOnly = book.material_type === "thesis" || book.canBorrow === false;
+                const availability = isReferenceOnly ? null : getAvailabilityLabel(book.available);
+                return (
+                  <Fragment key={book.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBook(book)}
+                    aria-pressed={selectedBook?.id === book.id}
+                    className={`group flex w-full items-start gap-3 border-b border-r border-border bg-background px-4 py-5 text-left transition-colors duration-200 hover:bg-secondary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning sm:gap-5 sm:px-6 ${selectedBook?.id === book.id ? "bg-secondary/50" : ""}`}
+                  >
+                    <span
+                      className="mt-0.5 w-5 shrink-0 text-right text-[10px] font-bold tracking-[0.15em] text-muted-foreground/55 sm:w-6"
+                      style={{ fontFamily: "var(--font-heading)" }}
+                    >
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="break-words text-sm font-bold tracking-tight text-foreground transition-colors duration-200 group-hover:text-primary" style={{ fontFamily: "var(--font-heading)" }}>
+                        {book.title}
+                      </h3>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {book.author && <span className="text-xs text-muted-foreground">{book.author}</span>}
+                        {book.category && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.category}</span></>}
+                        {book.edition && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.edition} ed.</span></>}
+                        {book.publication_year && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.publication_year}</span></>}
+                      </div>
+                      {book.isbn && (
+                        <p className="mt-1.5 break-all text-[10px] tracking-[0.08em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
+                          ISBN {book.isbn}
+                        </p>
+                      )}
+                      {isReferenceOnly && (
+                        <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+                          Thesis · Reference only
+                        </p>
+                      )}
+                      {extraFields.length > 0 && (
+                        <div className="mt-3 grid gap-x-5 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+                          {extraFields.map((field) => {
+                            const val = book[field.key];
+                            if (val === undefined || val === null || val === "") return null;
+                            return (
+                              <span key={field.key} className="min-w-0 break-words text-[11px] leading-relaxed text-muted-foreground">
+                                <span className="mr-1 font-bold uppercase tracking-[0.1em] text-muted-foreground/75" style={{ fontFamily: "var(--font-heading)" }}>
+                                  {getLabelForKey(field.key)}
+                                </span>{String(val)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {availability && (
+                      <div className="ml-2 flex shrink-0 flex-col items-end gap-1 pt-0.5 text-right sm:ml-4">
+                        <span
+                          className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                          style={{ fontFamily: "var(--font-heading)", color: availability.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
+                        >
+                          {availability.available ? "Available" : "Checked Out"}
+                        </span>
+                        {book.copies !== undefined && (
+                          <span className="text-[10px] tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
+                            {book.available ?? 0} of {book.copies} cop{book.copies === 1 ? "y" : "ies"} available
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                  {selectedBook?.id === book.id ? (
+                    <div className="border-b border-r border-border bg-secondary/20 px-4 py-5 sm:px-6">
+                      <RecommendationStrip seedBookId={book.id} materialType={book.material_type || "book"} title={book.material_type === "thesis" ? `Related theses for ${book.title}` : `Similar books to ${book.title}`} />
+                    </div>
+                  ) : null}
+                  </Fragment>
+                );
+              })}
+            </div>
+          )}
+          {!loading && pagination.totalPages > 1 ? <div className="mt-5 flex items-center justify-between gap-2 border-t border-border pt-4"><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => void searchBooks(debouncedQuery, pagination.page - 1)}>Previous</button><span className="text-center text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => void searchBooks(debouncedQuery, pagination.page + 1)}>Next</button></div> : null}
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default Catalogue;
