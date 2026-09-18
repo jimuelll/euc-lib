@@ -1,7 +1,7 @@
 const { createHash } = require("crypto");
 const { APPLICATION_TABLES } = require("./snapshot.registry");
 
-const SNAPSHOT_VERSION = 8;
+const SNAPSHOT_VERSION = 9;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -214,8 +214,26 @@ function upgradeV7ToV8(backup) {
   return backup;
 }
 
+function upgradeV8ToV9(backup) {
+  assertSnapshotIntegrity(backup);
+  // The user-guide table was added after v8. Older snapshots have no rows
+  // for it, so restore them as an empty table rather than rejecting them.
+  backup.tables.user_guide_modules ??= [];
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 9;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
 // Each supported snapshot version advances through one reviewed transformer.
-const SNAPSHOT_TRANSFORMERS = new Map([[3, upgradeV3ToV4], [4, upgradeV4ToV5], [5, upgradeV5ToV6], [6, upgradeV6ToV7], [7, upgradeV7ToV8]]);
+const SNAPSHOT_TRANSFORMERS = new Map([
+  [3, upgradeV3ToV4],
+  [4, upgradeV4ToV5],
+  [5, upgradeV5ToV6],
+  [6, upgradeV6ToV7],
+  [7, upgradeV7ToV8],
+  [8, upgradeV8ToV9],
+]);
 
 function upgradeBackup(backup) {
   if (backup.version > SNAPSHOT_VERSION) {
