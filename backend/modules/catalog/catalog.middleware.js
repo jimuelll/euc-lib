@@ -4,7 +4,7 @@ const { MAX_CUSTOM_FIELDS, getSchema, getCatalogRecordForValidation } = require(
 const ADMIN_ROLES = ["admin", "super_admin"];
 const CATALOG_ROLES = ["staff", ...ADMIN_ROLES];
 const VALID_KEY_REGEX = /^[a-z][a-z0-9_]{1,63}$/;
-const VALID_TYPES = ["text", "textarea", "number", "date", "select"];
+const VALID_TYPES = ["text", "textarea", "number", "date", "select", "repeatable"];
 const VALID_SCOPES = ["shared", "book", "thesis"];
 const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
 const OPERATIONAL_KEYS = new Set(["material_type", "book_type_id", "isbn", "copies"]);
@@ -50,8 +50,8 @@ const validateFieldValue = (field, value) => {
     if (field.key === "copies" && (!Number.isInteger(num) || num < 0)) {
       throw createValidationError('Field "copies" must be a whole number greater than or equal to 0');
     }
-    if (field.key === "publication_year" && (!Number.isInteger(num) || num < 0 || num > 3000)) {
-      throw createValidationError('Field "publication_year" must be a whole number between 0 and 3000');
+    if (["publication_year", "copyright_year"].includes(field.key) && (!Number.isInteger(num) || num < 0 || num > 3000)) {
+      throw createValidationError(`Field "${field.key}" must be a whole number between 0 and 3000`);
     }
     return;
   }
@@ -91,6 +91,10 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
     if (materialType && materialType !== record.material_type) throw createValidationError("Material type cannot be changed after creation", 400, "material_type");
     materialType = record.material_type;
     req.currentCatalogRecord = record;
+  }
+  if (field.type === "repeatable") {
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) throw createValidationError(`Field "${field.key}" must be a list of non-empty text entries`);
+    return;
   }
   materialType ||= "book";
   const schemaByKey = new Map(schema.map((field) => [field.key, field]));

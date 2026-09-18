@@ -171,7 +171,18 @@ const lookupIsbn = async (value) => {
   if (!response.ok) throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
   const record = (await response.json())[`ISBN:${isbn}`];
   if (!record) throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
-  return { isbn, title: record.title || "", author: (record.authors || []).map((item) => item.name).filter(Boolean).join(", "), publication_year: record.publish_date?.match(/\d{4}/)?.[0] || "", publisher: record.publishers?.[0]?.name || "" };
+  const subjects = (record.subjects || []).map((item) => item.name || item).filter(Boolean).slice(0, 10);
+  const pages = Number(record.number_of_pages);
+  return {
+    isbn,
+    title: record.title || "",
+    author: (record.authors || []).map((item) => item.name).filter(Boolean).join(", "),
+    copyright_year: record.publish_date?.match(/\d{4}/)?.[0] || "",
+    publisher: record.publishers?.[0]?.name || "",
+    publication_place: record.publish_places?.[0]?.name || "",
+    physical_description: Number.isFinite(pages) && pages > 0 ? `${pages} pages` : "",
+    subjects,
+  };
 };
 
 module.exports = { searchBooks, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, updateCopyCondition, lookupIsbn };

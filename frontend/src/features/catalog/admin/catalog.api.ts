@@ -3,7 +3,7 @@ import type { Book, BookType, CatalogFormValues, CatalogPagination, FormField } 
 export type { BookType } from "./AdminCatalog.types";
 
 type MessageResponse = { message: string };
-export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; publication_year?: string | number };
+export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; copyright_year?: string | number; publication_place?: string; physical_description?: string; subjects?: string[] };
 export type CatalogSearchResponse = { rows: Book[]; pagination: CatalogPagination };
 
 export async function fetchCatalogSchema(): Promise<FormField[]> {

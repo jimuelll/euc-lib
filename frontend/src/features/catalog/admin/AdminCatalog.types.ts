@@ -1,4 +1,4 @@
-export type FieldType = "text" | "number" | "date" | "select" | "textarea";
+export type FieldType = "text" | "number" | "date" | "select" | "textarea" | "repeatable";
 export type FieldScope = "shared" | "book" | "thesis";
 
 export type FormField = {
@@ -35,7 +35,7 @@ export type Book = {
   [key: string]: unknown;
 };
 
-export type CatalogFormValue = string | number | boolean | null | undefined;
+export type CatalogFormValue = string | string[] | number | boolean | null | undefined;
 export type CatalogFormValues = Record<string, CatalogFormValue>;
 
 export type BookType = {
@@ -53,12 +53,23 @@ export const DEFAULT_FIELDS: FormField[] = [
   { key: "title",            label: "Title",            type: "text",   required: true, locked: true, public: true, order: 0, scope: "shared" },
   { key: "author",           label: "Author",           type: "text",   required: true, locked: true, public: true, order: 1, scope: "shared" },
   { key: "isbn",             label: "ISBN",             type: "text",   public: true,   order: 2 },
-  { key: "category",         label: "Category",         type: "select", public: true,   order: 3,
-    options: ["Computer Science","Engineering","Mathematics","Science","Literature","History","Business","Other"] },
-  { key: "copies",           label: "Copies",           type: "number", public: true,   order: 4 },
-  { key: "location",         label: "Location",         type: "text",   public: false,  order: 5 },
-  { key: "edition",          label: "Edition",          type: "text",   public: true,   order: 6 },
-  { key: "publication_year", label: "Publication Year", type: "number", public: true,   order: 7 },
+  { key: "publisher",        label: "Publisher",        type: "text",       public: true,  order: 3, scope: "book" },
+  { key: "publication_place",label: "Publication Place",type: "text",       public: true,  order: 4, scope: "book" },
+  { key: "copyright_year",   label: "Copyright Year",   type: "number",     public: true,  order: 5, scope: "book" },
+  { key: "edition",          label: "Edition",          type: "text",       public: true,  order: 6, scope: "book" },
+  { key: "physical_description", label: "Physical Description", type: "textarea", public: true, order: 7, scope: "book" },
+  { key: "call_number",      label: "Call Number",      type: "text",       public: false, order: 8, scope: "book" },
+  { key: "subjects",         label: "Subjects",         type: "repeatable", public: true,  order: 9, scope: "book" },
+  { key: "added_title",      label: "Added Title",      type: "text",       public: true,  order: 10, scope: "book" },
+  { key: "series_title",     label: "Series Title",     type: "text",       public: true,  order: 11, scope: "book" },
+  { key: "added_authors",    label: "Added Authors",    type: "repeatable", public: true,  order: 12, scope: "book" },
+  { key: "editors",          label: "Editors",          type: "repeatable", public: true,  order: 13, scope: "book" },
+  { key: "coordinators",     label: "Coordinators",     type: "repeatable", public: true,  order: 14, scope: "book" },
+  { key: "consultants",      label: "Consultants",      type: "repeatable", public: true,  order: 15, scope: "book" },
+  { key: "contributors",     label: "Contributors",     type: "repeatable", public: true,  order: 16, scope: "book" },
+  { key: "illustrators",     label: "Illustrators",     type: "repeatable", public: true,  order: 17, scope: "book" },
+  { key: "copies",           label: "Copies",           type: "number",     public: true,  order: 18, scope: "book" },
+  { key: "location",         label: "Location",         type: "text",       public: false, order: 19, scope: "book" },
 ];
 
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
@@ -67,6 +78,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: "date",     label: "Date" },
   { value: "select",   label: "Dropdown" },
   { value: "textarea", label: "Textarea" },
+  { value: "repeatable", label: "Repeatable list" },
 ];
 
 /** Must stay in sync with MAX_CUSTOM_FIELDS in catalog.service.js */

@@ -198,15 +198,15 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
   const paged = Number.isFinite(Number(page));
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-  const baseParams = [like, like, like, ...materialParams];
+  const baseParams = [like, like, like, like, ...materialParams];
 
   if (publicOnly) {
     const [[{ total }]] = paged
       ? await db.query(
         `SELECT COUNT(*) AS total FROM books bk
          WHERE bk.deleted_at ${deletedFilter}
-           AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)`,
-        [like, like, like]
+           AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL)`,
+        [like, like, like, like]
       )
       : [[{ total: 0 }]];
     const [rows] = await db.query(
@@ -221,10 +221,10 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
        LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue')
        LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
        WHERE bk.deleted_at ${deletedFilter}
-         AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)
+         AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL)
        GROUP BY bk.id
        ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-      paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
+      paged ? [like, like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like, like]
     );
     return { rows, total: Number(total), paged, page: safePage, limit: safeLimit };
   }
@@ -241,7 +241,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
      LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue')
      LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      WHERE bk.deleted_at ${deletedFilter}
-       AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)
+       AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL)
        ${materialFilter}
      GROUP BY bk.id
      ORDER BY bk.title ASC
@@ -258,8 +258,8 @@ async function searchBooksPage({ query = "", status = "active", materialType = "
   const safeStatus = ["active", "archived", "all"].includes(status) ? status : "active";
   const deletedFilter = safeStatus === "all" ? "1 = 1" : `bk.deleted_at ${safeStatus === "archived" ? "IS NOT NULL" : "IS NULL"}`;
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
-  const params = [like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
-  const where = `WHERE ${deletedFilter} AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?) ${materialFilter}`;
+  const params = [like, like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
+  const where = `WHERE ${deletedFilter} AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL) ${materialFilter}`;
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
   const [rows] = await db.query(
     `SELECT bk.*, COUNT(DISTINCT bc.id) AS total_copies,
