@@ -131,8 +131,6 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
     }
   };
 
-  const colSpan = showArchived ? 8 : 8; // keeps consistent (action column always present)
-
   return (
     <div className="admin-panel-surface admin-etched-border mt-8 space-y-0 border border-border bg-card">
       {confirmDialog}

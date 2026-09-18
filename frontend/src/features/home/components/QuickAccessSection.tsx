@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
-  CalendarCheck,
   FileText,
   Library,
   Monitor,

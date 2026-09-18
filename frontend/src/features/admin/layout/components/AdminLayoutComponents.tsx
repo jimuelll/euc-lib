@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/layout/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import {
   DropdownMenu,
@@ -34,7 +34,6 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { user, logout } = useAuth();
-  const { pathname } = useLocation();
   const visibleSections = sidebarSections
     .map((section) => ({
       ...section,

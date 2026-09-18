@@ -11,19 +11,6 @@ const upcomingEvents: UpcomingEvent[] = [
   { title: "Author Meet & Greet",       date: "April 22, 2026",   time: "3:00 PM – 5:00 PM" },
 ];
 
-// ── Sidebar section heading — ruled label ────────────────────────────────────
-const SidebarHeading = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex items-center gap-3 mb-4">
-    <span
-      className="text-[9px] font-bold uppercase tracking-[0.28em] text-warning shrink-0"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {children}
-    </span>
-    <div className="flex-1 h-px bg-border" />
-  </div>
-);
-
 export function BulletinSidebar() {
   const { user } = useAuth();
   const canManage = ["admin", "super_admin"].includes(user?.role ?? "");

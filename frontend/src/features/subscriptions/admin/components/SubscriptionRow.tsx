@@ -1,7 +1,7 @@
 import {
   BookOpen, ExternalLink, Eye, EyeOff, GripVertical, Pencil, Trash2,
 } from "lucide-react";
-import { FONT, LABEL_CLS } from "../subscriptions.styles";
+import { FONT } from "../subscriptions.styles";
 import type { Subscription } from "../subscriptions.types";
 
 // ─── Thumbnail ────────────────────────────────────────────────────────────────

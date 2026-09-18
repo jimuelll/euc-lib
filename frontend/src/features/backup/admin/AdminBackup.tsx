@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import { useAuth } from "@/context/AuthContext";
-import { checkBackupCompatibility, createBackupSnapshot, downloadBackup, downloadBackupSnapshot, fetchBackupSnapshots, fetchBackupStatus, fetchSnapshotCompatibility, restoreBackup, restoreBackupSnapshot, type BackupStatus, type Compatibility, type Snapshot } from "@/features/backup/api";
+import { checkBackupCompatibility, createBackupSnapshot, downloadBackup, downloadBackupSnapshot, fetchBackupSnapshots, fetchBackupStatus, fetchSnapshotCompatibility, restoreBackup, restoreBackupSnapshot, type Compatibility, type Snapshot } from "@/features/backup/api";
 
 const MAX_BACKUP_SIZE = 40 * 1024 * 1024;
 

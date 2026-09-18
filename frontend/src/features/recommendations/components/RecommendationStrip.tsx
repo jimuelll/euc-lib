@@ -5,8 +5,6 @@ import { toast } from "@/components/ui/sonner";
 import { dismissRecommendation, fetchRecommendations } from "../api";
 
 export type Recommendation = { id: number; title: string; author?: string | null; material_type: "book" | "thesis"; available?: number; reason: string; source: "rule" | "ai" };
-type Response = { material_type: "book" | "thesis"; rows: Recommendation[] };
-
 export function RecommendationStrip({ materialType, seedBookId, personal = false, title }: { materialType: "book" | "thesis"; seedBookId?: number | null; personal?: boolean; title?: string }) {
   const [rows, setRows] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(Boolean(seedBookId || personal));

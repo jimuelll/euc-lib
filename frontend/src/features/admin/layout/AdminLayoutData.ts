@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
-  FileBarChart, ClipboardCheck, PenSquare,
+  FileBarChart, ClipboardCheck,
   CalendarDays, FileText, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2, BookOpenCheck,
 } from "lucide-react";
 import type { SidebarSection } from "./AdminLayout.types";

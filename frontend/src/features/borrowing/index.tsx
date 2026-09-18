@@ -69,7 +69,7 @@ const LibraryServices = () => {
   }, [debouncedSearch, fetchCatalogue]);
 
   const handleReserveSuccess = useCallback(
-    (newReservation: ActiveReservation, bookId: number) => {
+    (newReservation: ActiveReservation) => {
       setActiveReservations((prev) => [newReservation, ...prev]);
     },
     []
