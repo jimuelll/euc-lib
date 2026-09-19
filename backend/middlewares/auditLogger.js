@@ -119,6 +119,9 @@ function parseJson(value) {
 
 function normalizeComparable(value) {
   const parsed = parseJson(value);
+  if (parsed === undefined || parsed === null || (typeof parsed === "string" && !parsed.trim())) return null;
+  if (Array.isArray(parsed) && parsed.length === 0) return null;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length === 0) return null;
   if (parsed && typeof parsed === "object") return JSON.stringify(parsed);
   return parsed == null ? parsed : String(parsed);
 }
@@ -126,6 +129,12 @@ function normalizeComparable(value) {
 function change(field, label, before, after) {
   if (normalizeComparable(before) === normalizeComparable(after)) return null;
   return { field: label, before: valueFor(before), after: valueFor(after) };
+}
+
+function addedChanges(changes) {
+  return changes
+    .filter((entry) => entry?.after && entry.after !== "Cleared" && entry.after !== "Not set")
+    .map((entry) => ({ field: `Added ${entry.field}`, value: entry.after }));
 }
 
 function bodyChanges(path, body = {}, before = null) {
@@ -169,8 +178,9 @@ function snapshotChanges(path, before, after, body = {}) {
       ...Object.keys(newMetadata || {}),
       ...Object.keys(body || {}).filter((key) => !["title", "author", "isbn", "material_type", "book_type_id", "copies", "metadata"].includes(key)),
     ]);
+    const hasPersistedMetadata = Boolean(after && has(after, "metadata"));
     const metadataChanges = [...metadataKeys].sort().flatMap((key) =>
-      change(`metadata.${key}`, labels.get(key) || humanizeFieldKey(key), oldMetadata?.[key], newMetadata?.[key] ?? body[key]) || []
+      change(`metadata.${key}`, labels.get(key) || humanizeFieldKey(key), oldMetadata?.[key], hasPersistedMetadata ? newMetadata?.[key] : body[key]) || []
     );
     return [...coreChanges, ...metadataChanges];
   }
@@ -282,8 +292,8 @@ function getDescription(method, path, body, before, after) {
   return `${verb} ${resource || "system data"}${describeTarget(body, path, after || before)}`;
 }
 
-function metadataFor(path, body, before, after, details = null) {
-  const changes = snapshotChanges(path, before, after, body);
+function metadataFor(path, body, before, after, details = null, isCreation = false) {
+  const changes = isCreation ? addedChanges(snapshotChanges(path, before, after, body)) : snapshotChanges(path, before, after, body);
   const metadata = { changes };
  if (body.reason && (path.includes("/clearance") || path.includes("/reverse") || path.includes("/adjust"))) metadata.reason = valueFor(body.reason);
   if (path.includes("/users") && body.password) metadata.security_change = "Password value withheld; password changed";
@@ -317,7 +327,8 @@ async function auditLogger(req, res, next) {
     void (async () => {
       let after = null;
       try { after = await readSnapshot(path, req.body); } catch (error) { console.error("[audit] Failed to read post-change snapshot:", error.message); }
-      const metadata = metadataFor(path, req.body, before, after, res.locals.auditDetails);
+      const isCreation = req.method === "POST" && getAction(req.method, path) === "created";
+      const metadata = metadataFor(path, req.body, before, after, res.locals.auditDetails, isCreation);
       const baseDescription = getDescription(req.method, path, req.body, before, after);
       const noChange = ["PUT", "PATCH"].includes(req.method)
         && before && after && Array.isArray(metadata?.changes) && metadata.changes.length === 0;
