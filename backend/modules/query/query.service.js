@@ -1,4 +1,5 @@
 const db = require("../../db");
+const clearanceService = require("../clearance/clearance.service");
 
 const PAGE_LIMIT = 25;
 const EXPORT_LIMIT = 10000;
@@ -87,9 +88,14 @@ const DATASETS = {
     order: "s.created_at DESC, s.id DESC",
     filters: ["category", "subscriptionStatus"],
   },
+  clearance: {
+    label: "Clearance exceptions",
+    columns: [["name", "Patron"], ["studentEmployeeId", "Student / employee ID"], ["overdueCount", "Overdue returns"], ["oldestDueDate", "Oldest due date"], ["overdueTitles", "Overdue titles"], ["outstandingAmount", "Unpaid fines (PHP)"], ["fineRecords", "Fine records"]],
+    filters: ["clearanceReason"],
+  },
 };
 
-const isDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const isDate = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 const value = (filters, key) => typeof filters[key] === "string" ? filters[key].trim() : "";
 const safePage = (input) => Math.max(Number.parseInt(input, 10) || 1, 1);
 const safeLimit = (input, max = 100) => Math.min(Math.max(Number.parseInt(input, 10) || PAGE_LIMIT, 1), max);
@@ -113,6 +119,7 @@ function pushIdFilter(where, params, column, rawValue) {
 
 function buildWhere(datasetName, filters = {}) {
   const dataset = getDataset(datasetName);
+  if (datasetName === "clearance") throw Object.assign(new Error("Clearance exceptions use a live query."), { status: 400 });
   const where = [dataset.base]; const params = [];
   const search = value(filters, "search");
   if (search) { where.push(`(${dataset.search.map((field) => `${field} LIKE ?`).join(" OR ")})`); params.push(...dataset.search.map(() => `%${search.slice(0, 120)}%`)); }
@@ -132,24 +139,59 @@ function buildWhere(datasetName, filters = {}) {
   if (datasetName === "borrowings") { pushInFilter(where, params, "b.status", value(filters, "status"), BORROWING_STATUSES); pushInFilter(where, params, "u.role", value(filters, "borrowerRole"), ROLES); pushIdFilter(where, params, "bt.id", value(filters, "bookType")); pushIdFilter(where, params, "issuer.id", value(filters, "issuedBy")); }
   if (datasetName === "reservations") { pushInFilter(where, params, "r.status", value(filters, "status"), RESERVATION_STATUSES); pushIdFilter(where, params, "bt.id", value(filters, "bookType")); }
   if (datasetName === "attendance") { pushInFilter(where, params, "a.purpose", value(filters, "purpose"), ["entry_exit", "borrowing"]); pushInFilter(where, params, "a.type", value(filters, "scanType"), ["check_in", "check_out"]); }
-  if (datasetName === "notifications") { const audience = value(filters, "audience"); if (audience && audience !== "all") { pushInFilter(where, params, "n.audience_type", audience, ["all", "user", "role"]); } const status = value(filters, "notificationStatus"); if (status === "active") where.push("n.is_active = 1 AND (n.expires_at IS NULL OR n.expires_at >= NOW())"); else if (status === "inactive") where.push("n.is_active = 0"); else if (status === "expired") where.push("n.expires_at IS NOT NULL AND n.expires_at < NOW()"); else if (status && status !== "all") throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); }
+  if (datasetName === "notifications") { const audience = value(filters, "audience"); if (audience && audience !== "all") { pushInFilter(where, params, "n.audience_type", audience === "public" ? "all" : audience, ["all", "user", "role"]); } const status = value(filters, "notificationStatus"); if (status === "active") where.push("n.is_active = 1 AND (n.expires_at IS NULL OR n.expires_at >= NOW())"); else if (status === "inactive") where.push("n.is_active = 0"); else if (status === "expired") where.push("n.expires_at IS NOT NULL AND n.expires_at < NOW()"); else if (status && status !== "all") throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); }
   if (datasetName === "subscriptions") { const category = value(filters, "category"); if (category && category !== "all") { where.push("s.category = ?"); params.push(category); } const status = value(filters, "subscriptionStatus"); if (status && status !== "all") pushInFilter(where, params, "s.is_active", status, ["0", "1"]); }
   return { dataset, clause: where.join(" AND "), params };
 }
 
+function queryColumns(dataset) {
+  return dataset.columns.map(([key, label]) => ({ key, label, type: key === "oldestDueDate" ? "date" : ["createdAt", "borrowedAt", "dueDate", "returnedAt", "reservedAt", "expiresAt", "fulfilledAt"].includes(key) ? "dateTime" : "text" }));
+}
+
+function validateClearanceFilters(filters) {
+  if (value(filters, "dateFrom") || value(filters, "dateTo")) throw Object.assign(new Error("Date filters do not apply to live clearance exceptions."), { status: 400 });
+  const reason = value(filters, "clearanceReason");
+  if (reason && !["all", "overdue", "fines", "both"].includes(reason)) throw Object.assign(new Error("Choose a valid clearance reason."), { status: 400 });
+  return { search: value(filters, "search").slice(0, 120).toLocaleLowerCase(), reason };
+}
+
+function filterClearanceRows(rows, filters) {
+  const { search, reason } = validateClearanceFilters(filters);
+  return rows.filter((row) => {
+    if (search && !`${row.name} ${row.studentEmployeeId} ${row.overdueTitles.join(" ")}`.toLocaleLowerCase().includes(search)) return false;
+    if (reason === "overdue" && !row.overdueCount || reason === "fines" && !row.outstandingAmount || reason === "both" && (!row.overdueCount || !row.outstandingAmount)) return false;
+    return true;
+  }).map((row) => ({ ...row, overdueTitles: row.overdueTitles.join("; ") }));
+}
+
+async function getClearanceRows(filters) {
+  validateClearanceFilters(filters);
+  return filterClearanceRows(await clearanceService.getClearanceQueue(), filters);
+}
+
 async function listQuery({ dataset: datasetName = "catalog", page, limit, ...filters }) {
-  const { dataset, clause, params } = buildWhere(datasetName, filters);
   const currentPage = safePage(page); const currentLimit = safeLimit(limit);
+  if (datasetName === "clearance") {
+    const dataset = getDataset(datasetName); const rows = await getClearanceRows(filters); const total = rows.length;
+    const summary = rows.reduce((totals, row) => ({ overduePatrons: totals.overduePatrons + Number(row.overdueCount > 0), unpaidFinePatrons: totals.unpaidFinePatrons + Number(row.outstandingAmount > 0), overdueItems: totals.overdueItems + row.overdueCount, outstandingAmount: totals.outstandingAmount + row.outstandingAmount }), { overduePatrons: 0, unpaidFinePatrons: 0, overdueItems: 0, outstandingAmount: 0 });
+    return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows: rows.slice((currentPage - 1) * currentLimit, currentPage * currentLimit), pagination: { page: currentPage, limit: currentLimit, total, totalPages: Math.max(Math.ceil(total / currentLimit), 1) }, summary, filters };
+  }
+  const { dataset, clause, params } = buildWhere(datasetName, filters);
   const [[count]] = await db.query(`SELECT COUNT(*) AS total ${dataset.from} WHERE ${clause}`, params);
   const [rows] = await db.query(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${dataset.order} LIMIT ? OFFSET ?`, [...params, currentLimit, (currentPage - 1) * currentLimit]);
-  return { dataset: datasetName, label: dataset.label, columns: dataset.columns.map(([key, label]) => ({ key, label })), rows, pagination: { page: currentPage, limit: currentLimit, total: Number(count.total), totalPages: Math.max(Math.ceil(Number(count.total) / currentLimit), 1) }, filters };
+  return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, pagination: { page: currentPage, limit: currentLimit, total: Number(count.total), totalPages: Math.max(Math.ceil(Number(count.total) / currentLimit), 1) }, filters };
 }
 
 async function exportQuery({ dataset: datasetName = "catalog", ...filters }) {
+  if (datasetName === "clearance") {
+    const dataset = getDataset(datasetName); const rows = await getClearanceRows(filters);
+    if (rows.length > EXPORT_LIMIT) throw Object.assign(new Error(`Exports are limited to ${EXPORT_LIMIT.toLocaleString()} records. Narrow the filters and try again.`), { status: 400 });
+    return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, filters };
+  }
   const { dataset, clause, params } = buildWhere(datasetName, filters);
   const [rows] = await db.query(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${dataset.order} LIMIT ?`, [...params, EXPORT_LIMIT + 1]);
   if (rows.length > EXPORT_LIMIT) throw Object.assign(new Error(`Exports are limited to ${EXPORT_LIMIT.toLocaleString()} records. Narrow the filters and try again.`), { status: 400 });
-  return { dataset: datasetName, label: dataset.label, columns: dataset.columns.map(([key, label]) => ({ key, label })), rows, filters };
+  return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, filters };
 }
 
 async function getQueryMeta() {
@@ -163,4 +205,4 @@ async function getQueryMeta() {
   return { datasets: Object.entries(DATASETS).map(([value, dataset]) => ({ value, label: dataset.label, filters: dataset.filters })), bookTypes, categories, programs, issuers, subscriptionCategories, roles: ROLES };
 }
 
-module.exports = { listQuery, exportQuery, getQueryMeta, buildWhere, DATASETS };
+module.exports = { listQuery, exportQuery, getQueryMeta, buildWhere, filterClearanceRows, queryColumns, DATASETS };

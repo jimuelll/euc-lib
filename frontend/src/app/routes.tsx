@@ -58,6 +58,7 @@ export const AppRoutes = () => (
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/my-library" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
       <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+      <Route path="/admin/query/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><QueryPreview /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute roles={["admin", "super_admin", "staff"]}><AdminLayout /></ProtectedRoute>}>
         <Route index element={<AdminHome />} />
         <Route path="analytics" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAnalytics /></ProtectedRoute>} />
@@ -68,7 +69,6 @@ export const AppRoutes = () => (
         <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
         <Route path="backup" element={<ProtectedRoute roles={["super_admin"]}><AdminBackup /></ProtectedRoute>} />
         <Route path="query" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminReport /></ProtectedRoute>} />
-        <Route path="query/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><QueryPreview /></ProtectedRoute>} />
         <Route path="report" element={<Navigate to="/admin/query" replace />} />
         <Route path="audit-logs" element={<ProtectedRoute roles={["super_admin"]}><AdminAuditLogs /></ProtectedRoute>} />
         <Route path="clearance" element={<AdminClearance />} />

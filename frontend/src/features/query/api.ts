@@ -1,10 +1,10 @@
 import axiosInstance from "@/utils/AxiosInstance";
 
-export type QueryColumn = { key: string; label: string };
+export type QueryColumn = { key: string; label: string; type: "text" | "date" | "dateTime" };
 export type QueryRow = Record<string, string | number | null>;
-export type QueryDataset = "catalog" | "users" | "borrowings" | "reservations" | "attendance" | "notifications" | "subscriptions";
+export type QueryDataset = "catalog" | "users" | "borrowings" | "reservations" | "attendance" | "notifications" | "subscriptions" | "clearance";
 export type QueryFilters = Record<string, string | number | undefined> & { dataset: QueryDataset; page?: number; limit?: number };
-export type QueryResult = { dataset: QueryDataset; label: string; columns: QueryColumn[]; rows: QueryRow[]; pagination?: { page: number; limit: number; total: number; totalPages: number }; filters: Record<string, string> };
+export type QueryResult = { dataset: QueryDataset; label: string; columns: QueryColumn[]; rows: QueryRow[]; pagination?: { page: number; limit: number; total: number; totalPages: number }; summary?: { overduePatrons: number; unpaidFinePatrons: number; overdueItems: number; outstandingAmount: number }; filters: Record<string, string> };
 export type QueryMeta = { datasets: { value: QueryDataset; label: string; filters: string[] }[]; bookTypes: { id: number; name: string }[]; categories: { value: string }[]; programs: { id: number; name: string }[]; issuers: { id: number; name: string }[]; subscriptionCategories: { value: string }[]; roles: string[] };
 
 const compact = (filters: QueryFilters) => Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== "" && value !== "all"));

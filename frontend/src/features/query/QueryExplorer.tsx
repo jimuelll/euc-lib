@@ -1,63 +1,164 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink, RefreshCcw, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ChevronDown, Download, ExternalLink, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AdminPanel } from "@/features/admin";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { downloadQueryCsv, fetchQuery, fetchQueryMeta, type QueryDataset, type QueryFilters, type QueryMeta, type QueryResult } from "./api";
+import { formatQueryValue } from "./format";
 
+const INITIAL_DATASET: QueryDataset = "catalog";
+const wideScreen = () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
 const initialFilters = (dataset: QueryDataset): QueryFilters => ({ dataset, search: "", dateFrom: "", dateTo: "" });
-const display = (value: unknown) => value === null || value === undefined || value === "" ? "—" : String(value);
+const number = new Intl.NumberFormat("en-PH");
+const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const fallbackDatasets: QueryMeta["datasets"] = [
+  { value: "catalog", label: "Catalog", filters: ["materialType", "bookType", "category", "availability", "condition"] },
+  { value: "users", label: "Users", filters: ["role", "accountStatus", "program"] },
+  { value: "borrowings", label: "Borrowings", filters: ["status", "borrowerRole", "bookType", "issuedBy"] },
+  { value: "reservations", label: "Reservations", filters: ["status", "bookType"] },
+  { value: "attendance", label: "Attendance", filters: ["purpose", "scanType"] },
+  { value: "notifications", label: "Notifications", filters: ["audience", "notificationStatus"] },
+  { value: "subscriptions", label: "Academic subscriptions", filters: ["category", "subscriptionStatus"] },
+  { value: "clearance", label: "Clearance exceptions", filters: ["clearanceReason"] },
+];
 
-const FilterSelect = ({ id, label, value, onChange, options }: { id: string; label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) => <div className="space-y-2"><Label htmlFor={id} className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</Label><Select value={value || "all"} onValueChange={onChange}><SelectTrigger id={id} className="rounded-none"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All {label.toLowerCase()}s</SelectItem>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>;
+type Option = { value: string; label: string };
+const choices = (values: string[]): Option[] => values.map((value) => ({ value, label: value.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase()) }));
+const validDate = (value: string) => {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
+function FilterSelect({ id, label, value, options, onChange }: { id: string; label: string; value?: string | number; options: Option[]; onChange: (next: string) => void }) {
+  return <div className="min-w-0 space-y-1.5"><Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label><Select value={String(value || "all")} onValueChange={onChange}><SelectTrigger id={id} className="h-11 w-full rounded-none bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>;
+}
 
 const QueryExplorer = () => {
-  const [meta, setMeta] = useState<QueryMeta | null>(null); const [filters, setFilters] = useState<QueryFilters>(initialFilters("catalog"));
-  const [result, setResult] = useState<QueryResult | null>(null); const [loading, setLoading] = useState(true); const [exporting, setExporting] = useState(false); const [error, setError] = useState("");
-  const activeDataset = meta?.datasets.find((dataset) => dataset.value === filters.dataset);
-  const setFilter = (key: string, value: string) => setFilters((current) => ({ ...current, [key]: value }));
-  const load = useCallback(async (page = 1) => { setLoading(true); setError(""); try { setResult(await fetchQuery({ ...filters, page, limit: 25 })); } catch (failure) { setError(getApiErrorMessage(failure, "Unable to load records. Check the filters and try again.")); } finally { setLoading(false); } }, [filters]);
-  useEffect(() => { void fetchQueryMeta().then(setMeta).catch((failure) => setError(getApiErrorMessage(failure, "Unable to load query filters."))); }, []);
-  useEffect(() => { void load(1); }, [load]);
-  const changeDataset = (dataset: QueryDataset) => setFilters(initialFilters(dataset));
-  const previewUrl = useMemo(() => { const params = new URLSearchParams(); Object.entries(filters).forEach(([key, value]) => { if (value && value !== "all") params.set(key, String(value)); }); return `/admin/query/preview?${params.toString()}`; }, [filters]);
-  const exportCsv = async () => { setExporting(true); setError(""); try { await downloadQueryCsv(filters); } catch (failure) { setError(getApiErrorMessage(failure, "Unable to download this CSV. Try again.")); } finally { setExporting(false); } };
-  const query = activeDataset?.filters ?? [];
+  const [meta, setMeta] = useState<QueryMeta | null>(null);
+  const [draft, setDraft] = useState<QueryFilters>(initialFilters(INITIAL_DATASET));
+  const [applied, setApplied] = useState<QueryFilters>(initialFilters(INITIAL_DATASET));
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [showFilters, setShowFilters] = useState(wideScreen);
+  const [error, setError] = useState("");
+  const requestId = useRef(0);
+
+  const datasets = meta?.datasets ?? fallbackDatasets;
+  const selected = datasets.find((dataset) => dataset.value === draft.dataset) ?? fallbackDatasets[0];
+  const filterNames = selected.filters;
+  const isClearance = draft.dataset === "clearance";
+  const draftChanged = JSON.stringify(draft) !== JSON.stringify(applied);
+  const activeFilterCount = Object.entries(draft).filter(([key, value]) => !["dataset", "search"].includes(key) && value !== undefined && value !== "" && value !== "all").length;
+  const update = (key: string, value: string) => setDraft((current) => ({ ...current, [key]: value }));
+
+  const load = useCallback(async (filters: QueryFilters, page = 1) => {
+    const currentId = ++requestId.current;
+    setLoading(true); setError("");
+    try {
+      const next = await fetchQuery({ ...filters, page, limit: 25 });
+      if (currentId === requestId.current) setResult(next);
+    } catch (failure) {
+      if (currentId === requestId.current) { setResult(null); setError(getApiErrorMessage(failure, "Unable to load records. Check the filters and try again.")); }
+    } finally { if (currentId === requestId.current) setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    void fetchQueryMeta().then(setMeta).catch((failure) => setError(getApiErrorMessage(failure, "Filter options could not be loaded. Try refreshing the page.")));
+    void load(initialFilters(INITIAL_DATASET));
+    return () => { requestId.current += 1; };
+  }, [load]);
+  useEffect(() => {
+    const screen = window.matchMedia("(min-width: 768px)");
+    const onWidthChange = () => setShowFilters(screen.matches);
+    screen.addEventListener("change", onWidthChange);
+    return () => screen.removeEventListener("change", onWidthChange);
+  }, []);
+
+  const chooseDataset = (dataset: QueryDataset) => {
+    const next = initialFilters(dataset);
+    setDraft(next); setApplied(next); setResult(null);
+    setShowFilters(wideScreen());
+    void load(next);
+  };
+  const reset = () => {
+    const next = initialFilters(draft.dataset);
+    setDraft(next); setApplied(next);
+    void load(next);
+  };
+  const run = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!isClearance && (!validDate(String(draft.dateFrom ?? "")) || !validDate(String(draft.dateTo ?? "")))) { setError("Choose valid start and end dates."); return; }
+    if (!isClearance && draft.dateFrom && draft.dateTo && String(draft.dateFrom) > String(draft.dateTo)) { setError("The start date must be on or before the end date."); return; }
+    setApplied({ ...draft });
+    void load(draft);
+  };
+
+  const previewUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    Object.entries(applied).forEach(([key, value]) => { if (value !== undefined && value !== "" && value !== "all") params.set(key, String(value)); });
+    return `/admin/query/preview?${params.toString()}`;
+  }, [applied]);
+  const exportCsv = async () => {
+    setExporting(true); setError("");
+    try { await downloadQueryCsv(applied); }
+    catch (failure) { setError(getApiErrorMessage(failure, "Unable to download this CSV. Narrow the filters or try again.")); }
+    finally { setExporting(false); }
+  };
+
+  const selectFilter = (key: string, label: string, options: Option[]) => <FilterSelect key={key} id={`query-${key}`} label={label} value={draft[key]} options={options} onChange={(value) => update(key, value)} />;
+  const contextFilters = <>
+    {filterNames.includes("materialType") && selectFilter("materialType", "Material type", [{ value: "book", label: "Books" }, { value: "thesis", label: "Theses" }])}
+    {filterNames.includes("bookType") && selectFilter("bookType", "Book type", (meta?.bookTypes ?? []).map((item) => ({ value: String(item.id), label: item.name })))}
+    {filterNames.includes("category") && selectFilter("category", "Category", (draft.dataset === "subscriptions" ? meta?.subscriptionCategories ?? [] : meta?.categories ?? []).map((item) => ({ value: item.value, label: item.value })))}
+    {filterNames.includes("availability") && selectFilter("availability", "Availability", [{ value: "available", label: "Available" }, { value: "unavailable", label: "Unavailable" }])}
+    {filterNames.includes("condition") && selectFilter("condition", "Copy condition", choices(["good", "damaged", "lost"]))}
+    {(filterNames.includes("role") || filterNames.includes("borrowerRole")) && selectFilter(filterNames.includes("role") ? "role" : "borrowerRole", "Role", choices(meta?.roles ?? []))}
+    {filterNames.includes("accountStatus") && selectFilter("accountStatus", "Account status", [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }])}
+    {filterNames.includes("program") && selectFilter("program", "Program / course", (meta?.programs ?? []).map((item) => ({ value: String(item.id), label: item.name })))}
+    {filterNames.includes("status") && selectFilter("status", "Status", choices(draft.dataset === "borrowings" ? ["borrowed", "overdue", "returned"] : ["pending", "ready", "fulfilled", "cancelled", "expired"]))}
+    {filterNames.includes("issuedBy") && selectFilter("issuedBy", "Issued by", (meta?.issuers ?? []).map((item) => ({ value: String(item.id), label: item.name })))}
+    {filterNames.includes("purpose") && selectFilter("purpose", "Purpose", [{ value: "entry_exit", label: "Entry / exit" }, { value: "borrowing", label: "Borrowing" }])}
+    {filterNames.includes("scanType") && selectFilter("scanType", "Scan type", [{ value: "check_in", label: "Check in" }, { value: "check_out", label: "Check out" }])}
+    {filterNames.includes("audience") && selectFilter("audience", "Audience", [{ value: "public", label: "All users" }, { value: "user", label: "Individual user" }, { value: "role", label: "Role" }])}
+    {filterNames.includes("notificationStatus") && selectFilter("notificationStatus", "Notification status", choices(["active", "inactive", "expired"]))}
+    {filterNames.includes("subscriptionStatus") && selectFilter("subscriptionStatus", "Subscription status", [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }])}
+    {filterNames.includes("clearanceReason") && selectFilter("clearanceReason", "Reason", [{ value: "overdue", label: "Overdue returns" }, { value: "fines", label: "Unpaid fines" }, { value: "both", label: "Both" }])}
+  </>;
+
   return <div className="space-y-5">
-    {error ? <div role="alert" className="flex items-center justify-between gap-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{error}</span><Button type="button" variant="ghost" size="sm" onClick={() => setError("")}>Dismiss</Button></div> : null}
-    <AdminPanel title="Explore records" description="Choose a record type, refine its filters, then inspect, preview, or export the exact matching data.">
-      <div className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,2fr)]">
-          <FilterSelect id="query-dataset" label="Record type" value={filters.dataset} onChange={(value) => changeDataset(value as QueryDataset)} options={(meta?.datasets ?? []).map((dataset) => ({ value: dataset.value, label: dataset.label }))} />
-          <div className="space-y-2"><Label htmlFor="query-search" className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Search</Label><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="query-search" className="rounded-none pl-9" value={String(filters.search ?? "")} onChange={(event) => setFilter("search", event.target.value)} placeholder={`Search ${activeDataset?.label.toLowerCase() ?? "records"}`} /></div></div>
-        </div>
-        <div className="grid gap-4 border-y border-border/70 py-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2"><Label htmlFor="query-start" className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Start date</Label><Input id="query-start" type="date" className="rounded-none" value={String(filters.dateFrom ?? "")} onChange={(event) => setFilter("dateFrom", event.target.value)} /></div>
-          <div className="space-y-2"><Label htmlFor="query-end" className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">End date</Label><Input id="query-end" type="date" className="rounded-none" value={String(filters.dateTo ?? "")} onChange={(event) => setFilter("dateTo", event.target.value)} /></div>
-          {query.includes("materialType") ? <FilterSelect id="query-material" label="Material type" value={String(filters.materialType ?? "all")} onChange={(value) => setFilter("materialType", value)} options={[{ value: "book", label: "Book" }, { value: "thesis", label: "Thesis" }]} /> : null}
-          {query.includes("bookType") ? <FilterSelect id="query-book-type" label="Book type" value={String(filters.bookType ?? "all")} onChange={(value) => setFilter("bookType", value)} options={(meta?.bookTypes ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /> : null}
-          {query.includes("category") ? <FilterSelect id="query-category" label="Category" value={String(filters.category ?? "all")} onChange={(value) => setFilter("category", value)} options={(filters.dataset === "subscriptions" ? meta?.subscriptionCategories ?? [] : meta?.categories ?? []).map((item) => ({ value: item.value, label: item.value }))} /> : null}
-          {query.includes("availability") ? <FilterSelect id="query-availability" label="Availability" value={String(filters.availability ?? "all")} onChange={(value) => setFilter("availability", value)} options={[{ value: "available", label: "Available" }, { value: "unavailable", label: "Unavailable" }]} /> : null}
-          {query.includes("condition") ? <FilterSelect id="query-condition" label="Copy condition" value={String(filters.condition ?? "all")} onChange={(value) => setFilter("condition", value)} options={["good", "damaged", "lost"].map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} /> : null}
-          {query.includes("role") || query.includes("borrowerRole") ? <FilterSelect id="query-role" label="Role" value={String(filters[query.includes("role") ? "role" : "borrowerRole"] ?? "all")} onChange={(value) => setFilter(query.includes("role") ? "role" : "borrowerRole", value)} options={(meta?.roles ?? []).map((value) => ({ value, label: value.replace(/_/g, " ") }))} /> : null}
-          {query.includes("accountStatus") ? <FilterSelect id="query-account-status" label="Account status" value={String(filters.accountStatus ?? "all")} onChange={(value) => setFilter("accountStatus", value)} options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} /> : null}
-          {query.includes("program") ? <FilterSelect id="query-program" label="Program / course" value={String(filters.program ?? "all")} onChange={(value) => setFilter("program", value)} options={(meta?.programs ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /> : null}
-          {query.includes("status") ? <FilterSelect id="query-status" label="Status" value={String(filters.status ?? "all")} onChange={(value) => setFilter("status", value)} options={(filters.dataset === "borrowings" ? ["borrowed", "overdue", "returned"] : ["pending", "ready", "fulfilled", "cancelled", "expired"]).map((value) => ({ value, label: value }))} /> : null}
-          {query.includes("issuedBy") ? <FilterSelect id="query-issued-by" label="Issued by" value={String(filters.issuedBy ?? "all")} onChange={(value) => setFilter("issuedBy", value)} options={(meta?.issuers ?? []).map((item) => ({ value: String(item.id), label: item.name }))} /> : null}
-          {query.includes("purpose") ? <FilterSelect id="query-purpose" label="Purpose" value={String(filters.purpose ?? "all")} onChange={(value) => setFilter("purpose", value)} options={[{ value: "entry_exit", label: "Entry / exit" }, { value: "borrowing", label: "Borrowing" }]} /> : null}
-          {query.includes("scanType") ? <FilterSelect id="query-scan-type" label="Scan type" value={String(filters.scanType ?? "all")} onChange={(value) => setFilter("scanType", value)} options={[{ value: "check_in", label: "Check in" }, { value: "check_out", label: "Check out" }]} /> : null}
-          {query.includes("audience") ? <FilterSelect id="query-audience" label="Audience" value={String(filters.audience ?? "all")} onChange={(value) => setFilter("audience", value)} options={["all", "user", "role"].map((value) => ({ value, label: value === "all" ? "All users" : value }))} /> : null}
-          {query.includes("notificationStatus") ? <FilterSelect id="query-notification-status" label="Notification status" value={String(filters.notificationStatus ?? "all")} onChange={(value) => setFilter("notificationStatus", value)} options={["active", "inactive", "expired"].map((value) => ({ value, label: value }))} /> : null}
-          {query.includes("subscriptionStatus") ? <FilterSelect id="query-subscription-status" label="Subscription status" value={String(filters.subscriptionStatus ?? "all")} onChange={(value) => setFilter("subscriptionStatus", value)} options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} /> : null}
-        </div>
-        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="ghost" className="rounded-none" onClick={() => setFilters(initialFilters(filters.dataset))}>Reset filters</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")} disabled={loading}><ExternalLink className="mr-2 h-4 w-4" />Preview CSV</Button><Button type="button" variant="outline" className="rounded-none" onClick={() => void exportCsv()} disabled={exporting}><Download className="mr-2 h-4 w-4" />{exporting ? "Preparing…" : "Download CSV"}</Button><Button type="button" className="rounded-none" onClick={() => void load(1)} disabled={loading}><RefreshCcw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Run query</Button></div>
+    <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Search library records, review live clearance exceptions, and export the matching results.</p>
+    {error && <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div>}
+
+    <form onSubmit={run} className="border-y border-border bg-muted/20 px-3 py-4 sm:px-5">
+      <div className="grid gap-3 md:grid-cols-[minmax(12rem,0.65fr)_minmax(14rem,1fr)_auto] md:items-end">
+        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-dataset" className="text-xs font-medium text-muted-foreground">Record type</Label><Select value={draft.dataset} onValueChange={(value) => chooseDataset(value as QueryDataset)}><SelectTrigger id="query-dataset" className="h-11 rounded-none bg-background"><SelectValue /></SelectTrigger><SelectContent>{datasets.map((dataset) => <SelectItem key={dataset.value} value={dataset.value}>{dataset.label}</SelectItem>)}</SelectContent></Select></div>
+        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-search" className="text-xs font-medium text-muted-foreground">Search</Label><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="query-search" className="h-11 rounded-none bg-background pl-10" value={String(draft.search ?? "")} onChange={(event) => update("search", event.target.value)} placeholder={isClearance ? "Patron, ID, or overdue title…" : `Search ${selected.label.toLowerCase()}…`} /></div></div>
+        <Button type="submit" className="h-11 rounded-none" disabled={loading}><Search className="mr-2 h-4 w-4" />Run query</Button>
       </div>
-    </AdminPanel>
-    <AdminPanel title={`${result?.label ?? activeDataset?.label ?? "Records"} results`} description={loading ? "Loading records…" : `${result?.pagination?.total.toLocaleString() ?? 0} matching record(s).`}>
-      {result?.rows.length ? <><div className="overflow-x-auto"><table className="w-full min-w-max text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{column.label}</th>)}</tr></thead><tbody>{result.rows.map((row, index) => <tr key={`${index}-${String(row[result.columns[0]?.key])}`} className="border-b border-border/70 last:border-b-0 hover:bg-muted/20">{result.columns.map((column) => <td key={column.key} className="max-w-[26rem] whitespace-nowrap px-4 py-3 text-foreground">{display(row[column.key])}</td>)}</tr>)}</tbody></table></div>{result.pagination && result.pagination.totalPages > 1 ? <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4"><Button variant="outline" className="rounded-none" disabled={loading || result.pagination.page <= 1} onClick={() => void load(result.pagination!.page - 1)}>Previous</Button><p className="text-sm text-muted-foreground">Page {result.pagination.page} of {result.pagination.totalPages}</p><Button variant="outline" className="rounded-none" disabled={loading || result.pagination.page >= result.pagination.totalPages} onClick={() => void load(result.pagination!.page + 1)}>Next</Button></div> : null}</> : <div className="border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center text-sm text-muted-foreground">{loading ? "Loading query results…" : "No records match these filters."}</div>}
-    </AdminPanel>
+      <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3"><button type="button" className="flex min-h-9 items-center gap-2 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={showFilters} aria-controls="query-extra-filters" onClick={() => setShowFilters((open) => !open)}><SlidersHorizontal className="h-4 w-4" />Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}<ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`} /></button><Button type="button" variant="ghost" size="sm" className="rounded-none" onClick={reset}>Reset filters</Button></div>
+      <div id="query-extra-filters" className={`${showFilters ? "grid" : "hidden"} mt-3 gap-3 sm:grid-cols-2 lg:grid-cols-4`}>
+        {!isClearance && <><div className="space-y-1.5"><Label htmlFor="query-date-from" className="text-xs font-medium text-muted-foreground">Start date</Label><Input id="query-date-from" type="date" className="h-11 rounded-none bg-background" value={String(draft.dateFrom ?? "")} onChange={(event) => update("dateFrom", event.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="query-date-to" className="text-xs font-medium text-muted-foreground">End date</Label><Input id="query-date-to" type="date" className="h-11 rounded-none bg-background" value={String(draft.dateTo ?? "")} onChange={(event) => update("dateTo", event.target.value)} /></div></>}
+        {contextFilters}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{isClearance ? "Live exceptions based on current overdue returns and unpaid fines." : "Leave dates empty to include all recorded dates."}</p>
+    </form>
+
+    {result?.summary && <div className="grid border-y border-border bg-card sm:grid-cols-3"><div className="px-5 py-4"><p className="text-xs text-muted-foreground">Patrons with overdue returns</p><p className="mt-1 text-xl font-semibold tabular-nums">{number.format(result.summary.overduePatrons)}</p><p className="text-xs text-muted-foreground">{number.format(result.summary.overdueItems)} overdue items</p></div><div className="border-y border-border px-5 py-4 sm:border-x sm:border-y-0"><p className="text-xs text-muted-foreground">Patrons with unpaid fines</p><p className="mt-1 text-xl font-semibold tabular-nums">{number.format(result.summary.unpaidFinePatrons)}</p></div><div className="px-5 py-4"><p className="text-xs text-muted-foreground">Total unpaid fines</p><p className="mt-1 text-xl font-semibold tabular-nums">{money.format(result.summary.outstandingAmount)}</p></div></div>}
+
+    <section className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card" aria-busy={loading}>
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{result?.label ?? selected.label}</h2><p className="mt-1 text-xs text-muted-foreground">{loading ? "Loading records…" : `${number.format(result?.pagination?.total ?? 0)} matching records`}{draftChanged ? " · Showing the last run; run the query to apply changes" : ""}</p></div>
+        <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result} onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Preview CSV</Button><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || exporting || !result} onClick={() => void exportCsv()}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download CSV</Button></div>
+      </div>
+      {loading ? <div className="space-y-2 p-4" aria-label="Loading query results">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-12 w-full rounded-none" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={`${result.pagination?.page ?? 1}-${index}`} className="hover:bg-muted/20">{result.columns.map((column, columnIndex) => <td key={column.key} className={`max-w-[26rem] px-4 py-3 align-top text-foreground ${columnIndex === 0 ? "font-medium" : ""}`}><span className="block min-w-0 break-words">{column.key === "outstandingAmount" ? money.format(Number(row[column.key] ?? 0)) : formatQueryValue(row[column.key], column.type)}</span></td>)}</tr>)}</tbody></table></div> : <div className="px-5 py-12 text-center text-sm text-muted-foreground">No records match these filters. Adjust the search or reset the filters.</div>}
+      <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{number.format(result?.pagination?.total ?? 0)} record{result?.pagination?.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result || result.pagination?.page === 1} onClick={() => void load(applied, (result?.pagination?.page ?? 1) - 1)}>Previous</Button><span className="whitespace-nowrap tabular-nums">Page {result?.pagination?.page ?? 1} of {result?.pagination?.totalPages ?? 1}</span><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result || (result.pagination?.page ?? 1) >= (result.pagination?.totalPages ?? 1)} onClick={() => void load(applied, (result?.pagination?.page ?? 1) + 1)}>Next</Button></div></div>
+    </section>
   </div>;
 };
 

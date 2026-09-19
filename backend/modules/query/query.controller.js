@@ -1,4 +1,5 @@
 const queryService = require("./query.service");
+const { formatQueryValue } = require("./query.format");
 
 const respond = (handler) => async (req, res) => {
   try { res.json(await handler(req)); }
@@ -13,7 +14,7 @@ exports.exportCsv = async (req, res) => {
   try {
     const result = await queryService.exportQuery(req.query);
     if (req.query.format === "preview") return res.json(result);
-    const lines = [result.columns.map((column) => escapeCsv(column.label)).join(","), ...result.rows.map((row) => result.columns.map((column) => escapeCsv(row[column.key])).join(","))];
+    const lines = [result.columns.map((column) => escapeCsv(column.label)).join(","), ...result.rows.map((row) => result.columns.map((column) => escapeCsv(formatQueryValue(row[column.key], column.type))).join(","))];
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${result.dataset}-query.csv"`);
     res.send(`\uFEFF${lines.join("\r\n")}`);
