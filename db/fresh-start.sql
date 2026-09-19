@@ -38,6 +38,8 @@ DROP TABLE IF EXISTS
   `notifications`,
   `site_daily_visits`,
   `reservations`,
+  `fine_ledger_entries`,
+  `fine_accounts`,
   `clearance_transaction_items`,
   `clearance_transactions`,
   `attendance_logs`,
@@ -623,32 +625,6 @@ CREATE TABLE `users` (
   `_unique_barcode` varchar(90) GENERATED ALWAYS AS (if(`deleted_at` is null,`barcode`,concat('__deleted__',`barcode`,'_',`deleted_at`))) STORED
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `fine_accounts` (
-  `borrowing_id` int(11) NOT NULL PRIMARY KEY,
-  `charged_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `cycle_base_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `assessed_through_at` datetime DEFAULT NULL,
-  `imported_at` datetime DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  CONSTRAINT `fk_fine_account_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `fine_ledger_entries` (
-  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `borrowing_id` int(11) NOT NULL,
-  `kind` enum('charge','payment','adjustment','reversal','legacy_charge','legacy_credit') NOT NULL,
-  `amount` decimal(12,2) NOT NULL,
-  `effective_at` datetime NOT NULL,
-  `recorded_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `transaction_item_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `source_note` varchar(160) DEFAULT NULL,
-  KEY `idx_fine_entry_borrowing` (`borrowing_id`,`id`),
-  KEY `idx_fine_entry_effective` (`kind`,`effective_at`),
-  UNIQUE KEY `uq_fine_entry_transaction_item` (`transaction_item_id`),
-  CONSTRAINT `fk_fine_entry_account` FOREIGN KEY (`borrowing_id`) REFERENCES `fine_accounts` (`borrowing_id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_fine_entry_item` FOREIGN KEY (`transaction_item_id`) REFERENCES `clearance_transaction_items` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 --
 -- Table structure for table `user_guide_modules`
 -- Draft content is kept separate from the published copy so editors can save
@@ -1187,6 +1163,34 @@ ALTER TABLE `clearance_transactions`
 ALTER TABLE `clearance_transaction_items`
   ADD CONSTRAINT `fk_clearance_item_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_clearance_item_transaction` FOREIGN KEY (`transaction_id`) REFERENCES `clearance_transactions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Fine-ledger tables are created after their borrowing and transaction-item
+-- parent keys exist, so a fresh import works on MySQL and MariaDB alike.
+CREATE TABLE `fine_accounts` (
+  `borrowing_id` int(11) NOT NULL PRIMARY KEY,
+  `charged_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `cycle_base_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `assessed_through_at` datetime DEFAULT NULL,
+  `imported_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  CONSTRAINT `fk_fine_account_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `fine_ledger_entries` (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `borrowing_id` int(11) NOT NULL,
+  `kind` enum('charge','payment','adjustment','reversal','legacy_charge','legacy_credit') NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `effective_at` datetime NOT NULL,
+  `recorded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `transaction_item_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `source_note` varchar(160) DEFAULT NULL,
+  KEY `idx_fine_entry_borrowing` (`borrowing_id`,`id`),
+  KEY `idx_fine_entry_effective` (`kind`,`effective_at`),
+  UNIQUE KEY `uq_fine_entry_transaction_item` (`transaction_item_id`),
+  CONSTRAINT `fk_fine_entry_account` FOREIGN KEY (`borrowing_id`) REFERENCES `fine_accounts` (`borrowing_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fine_entry_item` FOREIGN KEY (`transaction_item_id`) REFERENCES `clearance_transaction_items` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Constraints for table `library_circulation_settings`

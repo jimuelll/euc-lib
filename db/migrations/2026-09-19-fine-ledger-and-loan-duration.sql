@@ -1,5 +1,6 @@
--- Apply this schema before running `node backend/scripts/backfill-fine-ledger.js`.
--- Deploy the application only after the backfill has completed successfully.
+-- Apply this schema to an existing database before deploying the new server.
+-- Existing borrowing records must have matching fine accounts and ledger
+-- entries before the new server handles dashboard, clearance, or fine views.
 ALTER TABLE book_types
   ADD COLUMN loan_duration_minutes INT NULL AFTER default_borrow_days,
   ADD COLUMN loan_duration_unit ENUM('day', 'hour') NOT NULL DEFAULT 'day' AFTER loan_duration_minutes,

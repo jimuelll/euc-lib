@@ -5,7 +5,12 @@
 
 START TRANSACTION;
 
-SELECT id INTO @type_id FROM book_types WHERE is_active = 1 ORDER BY id LIMIT 1;
+SELECT id, loan_duration_minutes, loan_duration_unit
+  INTO @type_id, @loan_duration_minutes, @loan_duration_unit
+  FROM book_types
+ WHERE is_active = 1
+ ORDER BY id
+ LIMIT 1;
 
 INSERT INTO users (student_employee_id, barcode, email, name, password_hash, role, is_active, must_change_password, address, contact) VALUES
 ('DEMO-REAL-001', 'DEMO-REAL-001', 'mika.santos@example.test', 'Mika Santos', '$2b$12$MadSOwDTbsmFJcnkp5qoruJvbsF1ZWJSaZ26/.MpTDCYbZyc25qD2', 'student', 1, 0, 'Candelaria, Quezon', '09170000001'),
@@ -114,17 +119,42 @@ SELECT id INTO @apothecary_copy FROM book_copies WHERE book_id = @apothecary LIM
 SELECT id INTO @ddia_copy FROM book_copies WHERE book_id = @ddia LIMIT 1;
 SELECT id INTO @clean_copy FROM book_copies WHERE book_id = @clean_code LIMIT 1;
 
-INSERT INTO borrowings (user_id, book_id, copy_id, borrowed_at, due_date, returned_at, status, fine_per_hour, fine_interval, initial_fine, notes) VALUES
-(@mika, @naruto, @naruto_copy, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_ADD(NOW(), INTERVAL 5 DAY), NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current manga loan; Paolo is waiting'),
-(@mika, @demon_slayer, @demon_copy, DATE_SUB(NOW(), INTERVAL 22 DAY), DATE_SUB(NOW(), INTERVAL 15 DAY), DATE_SUB(NOW(), INTERVAL 16 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed manga loan'),
-(@mika, @haikyu, (SELECT id FROM book_copies WHERE book_id = @haikyu LIMIT 1), DATE_SUB(NOW(), INTERVAL 38 DAY), DATE_SUB(NOW(), INTERVAL 31 DAY), DATE_SUB(NOW(), INTERVAL 31 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed sports manga loan'),
-(@paolo, @one_piece, (SELECT id FROM book_copies WHERE book_id = @one_piece LIMIT 1), DATE_SUB(NOW(), INTERVAL 31 DAY), DATE_SUB(NOW(), INTERVAL 24 DAY), DATE_SUB(NOW(), INTERVAL 25 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed manga loan'),
-(@paolo, @blue_lock, @blue_copy, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), NULL, 'overdue', 1.00, 'hour', 0.00, 'Overdue circulation scenario'),
-(@lea, @sao, @sao_copy, DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_ADD(NOW(), INTERVAL 3 DAY), NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current light novel loan'),
-(@lea, @konosuba, (SELECT id FROM book_copies WHERE book_id = @konosuba LIMIT 1), DATE_SUB(NOW(), INTERVAL 24 DAY), DATE_SUB(NOW(), INTERVAL 17 DAY), DATE_SUB(NOW(), INTERVAL 18 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed light novel loan'),
-(@andre, @apothecary, @apothecary_copy, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 6 DAY), NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current light novel loan'),
-(@andre, @ddia, @ddia_copy, DATE_SUB(NOW(), INTERVAL 20 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), DATE_SUB(NOW(), INTERVAL 14 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed computing loan'),
-(@andre, @clean_code, @clean_copy, DATE_SUB(NOW(), INTERVAL 9 DAY), DATE_ADD(NOW(), INTERVAL 2 DAY), NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current computing loan');
+INSERT INTO borrowings (user_id, book_id, copy_id, borrowed_at, due_date, loan_duration_minutes, loan_duration_unit, returned_at, status, fine_per_hour, fine_interval, initial_fine, notes) VALUES
+(@mika, @naruto, @naruto_copy, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_ADD(NOW(), INTERVAL 5 DAY), @loan_duration_minutes, @loan_duration_unit, NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current manga loan; Paolo is waiting'),
+(@mika, @demon_slayer, @demon_copy, DATE_SUB(NOW(), INTERVAL 22 DAY), DATE_SUB(NOW(), INTERVAL 15 DAY), @loan_duration_minutes, @loan_duration_unit, DATE_SUB(NOW(), INTERVAL 16 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed manga loan'),
+(@mika, @haikyu, (SELECT id FROM book_copies WHERE book_id = @haikyu LIMIT 1), DATE_SUB(NOW(), INTERVAL 38 DAY), DATE_SUB(NOW(), INTERVAL 31 DAY), @loan_duration_minutes, @loan_duration_unit, DATE_SUB(NOW(), INTERVAL 31 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed sports manga loan'),
+(@paolo, @one_piece, (SELECT id FROM book_copies WHERE book_id = @one_piece LIMIT 1), DATE_SUB(NOW(), INTERVAL 31 DAY), DATE_SUB(NOW(), INTERVAL 24 DAY), @loan_duration_minutes, @loan_duration_unit, DATE_SUB(NOW(), INTERVAL 25 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed manga loan'),
+(@paolo, @blue_lock, @blue_copy, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), @loan_duration_minutes, @loan_duration_unit, NULL, 'overdue', 1.00, 'hour', 0.00, 'Overdue circulation scenario'),
+(@lea, @sao, @sao_copy, DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_ADD(NOW(), INTERVAL 3 DAY), @loan_duration_minutes, @loan_duration_unit, NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current light novel loan'),
+(@lea, @konosuba, (SELECT id FROM book_copies WHERE book_id = @konosuba LIMIT 1), DATE_SUB(NOW(), INTERVAL 24 DAY), DATE_SUB(NOW(), INTERVAL 17 DAY), @loan_duration_minutes, @loan_duration_unit, DATE_SUB(NOW(), INTERVAL 18 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed light novel loan'),
+(@andre, @apothecary, @apothecary_copy, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 6 DAY), @loan_duration_minutes, @loan_duration_unit, NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current light novel loan'),
+(@andre, @ddia, @ddia_copy, DATE_SUB(NOW(), INTERVAL 20 DAY), DATE_SUB(NOW(), INTERVAL 13 DAY), @loan_duration_minutes, @loan_duration_unit, DATE_SUB(NOW(), INTERVAL 14 DAY), 'returned', 1.00, 'hour', 0.00, 'Completed computing loan'),
+(@andre, @clean_code, @clean_copy, DATE_SUB(NOW(), INTERVAL 9 DAY), DATE_ADD(NOW(), INTERVAL 2 DAY), @loan_duration_minutes, @loan_duration_unit, NULL, 'borrowed', 1.00, 'hour', 0.00, 'Current computing loan');
+
+-- Seed one fine account per borrowing so the demo database works immediately
+-- after import, without requiring a historical backfill job. The charge uses
+-- the same rounded-up hourly rule as the application and continues to accrue
+-- normally once the server starts.
+INSERT INTO fine_accounts (borrowing_id, charged_amount, cycle_base_amount, assessed_through_at)
+SELECT b.id,
+       CASE
+         WHEN COALESCE(b.returned_at, NOW()) > b.due_date THEN
+           ROUND(COALESCE(b.initial_fine, 0) + CEIL(TIMESTAMPDIFF(MINUTE, b.due_date, COALESCE(b.returned_at, NOW())) / 60) * COALESCE(b.fine_per_hour, 0), 2)
+         ELSE 0
+       END,
+       0,
+       COALESCE(b.returned_at, NOW())
+  FROM borrowings b
+  JOIN books bk ON bk.id = b.book_id
+ WHERE bk.created_by = 'DEMO-REAL';
+
+INSERT INTO fine_ledger_entries (borrowing_id, kind, amount, effective_at, source_note)
+SELECT fa.borrowing_id, 'charge', fa.charged_amount, fa.assessed_through_at, 'Demo seed assessed fine'
+  FROM fine_accounts fa
+  JOIN borrowings b ON b.id = fa.borrowing_id
+  JOIN books bk ON bk.id = b.book_id
+ WHERE bk.created_by = 'DEMO-REAL'
+   AND fa.charged_amount > 0;
 
 INSERT INTO reservations (user_id, book_id, reserved_copy_id, status, reserved_at, expires_at, fulfilled_at, cancelled_at, notes) VALUES
 (@paolo, @naruto, NULL, 'pending', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, NULL, NULL, 'Waiting for Mika''s Naruto copy'),

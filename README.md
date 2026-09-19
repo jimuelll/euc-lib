@@ -150,9 +150,12 @@ If the database already exists, do not rerun the destructive baseline. Apply the
 mysql -u <user> -p <database> < db/migrations/2026-09-09-add-user-guide.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-19-role-specific-user-accounts.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-19-default-book-catalog-schema.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-19-fine-ledger-and-loan-duration.sql
 ```
 
 The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata.
+
+The fine-ledger migration is for databases that already contain borrowing history; make sure existing borrowings have been reconciled into the fine ledger before deploying the new server. A fresh `fresh-start.sql` followed by `realistic-demo-data.sql` creates the fine accounts and seeded charge entries as part of the test data import.
 
 ### 2. Configure the backend
 
