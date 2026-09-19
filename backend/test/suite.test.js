@@ -3,3 +3,4 @@ require("./architecture.test");
 require("./backup.restore.test");
 require("./backup.transforms.test");
 require("./borrowing.helpers.test");
+require("./query.service.test");

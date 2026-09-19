@@ -12,6 +12,7 @@ const {
   analyticsRoutes, analyticsAdminRoutes, myLibraryRoutes, notificationsRoutes,
   librarySettingsRoutes, backupRoutes, clearanceRoutes, siteContentRoutes,
   userGuideRoutes,
+  queryRoutes,
 } = require("./modules");
 const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
@@ -68,6 +69,7 @@ app.use(forcePasswordChange);
 // --- Protected Routes ---
 app.use("/api/admin",        adminRoutes);
 app.use("/api/admin",        analyticsAdminRoutes);
+app.use("/api/admin",        queryRoutes);
 app.use("/api/admin",        catalogRoutes);
 app.use("/api/admin",        circulationRoutes);
 app.use("/api/borrowing",    borrowingRoutes);

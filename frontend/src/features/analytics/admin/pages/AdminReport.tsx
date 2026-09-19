@@ -27,6 +27,7 @@ import { getAdminReservations } from "@/features/reservations";
 import type { AdminReservation, ReservationsResult } from "@/features/reservations";
 import { fetchClearanceQueue, type ClearanceQueueEntry } from "@/features/analytics/api/adminReports.api";
 import { getApiErrorMessage } from "@/utils/apiError";
+import QueryExplorer from "@/features/query/QueryExplorer";
 
 const emptyCirculationSummary: CirculationLogSummary = {
   total_records: 0,
@@ -227,18 +228,21 @@ const AdminReport = () => {
 
   return (
     <AdminPage
-      title="Reports"
+      title="Query"
       description="Export complete, filtered operational records and move to the right report when you need trends, attendance, or system accountability."
       contentWidth="wide"
     >
       {reportError ? <div role="alert" className="flex flex-col gap-3 border border-destructive/40 bg-destructive/5 px-4 py-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"><span>{reportError}</span><Button type="button" variant="outline" size="sm" className="w-fit rounded-none border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { setReportError(null); void Promise.all([loadCirculationReport(), loadReservationReport(), loadClearanceReport()]); }}>Try again</Button></div> : null}
 
-      <Tabs defaultValue="circulation" className="space-y-4">
+      <Tabs defaultValue="explore" className="space-y-4">
         <TabsList className="h-auto flex-wrap justify-start rounded-none border border-border/70 bg-background p-1">
+          <TabsTrigger value="explore" className="rounded-none">Explore records</TabsTrigger>
           <TabsTrigger value="circulation" className="rounded-none">Circulation</TabsTrigger>
           <TabsTrigger value="reservations" className="rounded-none">Reservations</TabsTrigger>
           <TabsTrigger value="clearance" className="rounded-none">Clearance</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="explore" className="space-y-6"><QueryExplorer /></TabsContent>
 
         <TabsContent value="circulation" className="space-y-6">
           <AdminPanel title="Circulation filters" description="Search circulation activity by status and date range.">

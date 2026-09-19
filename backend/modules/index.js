@@ -23,4 +23,5 @@ module.exports = {
   clearanceRoutes: require("./clearance/clearance.routes"),
   siteContentRoutes: require("./site-content/site-content.routes"),
   userGuideRoutes: require("./user-guide/user-guide.routes"),
+  queryRoutes: require("./query/query.routes"),
 };

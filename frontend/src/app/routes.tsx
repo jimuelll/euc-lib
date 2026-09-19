@@ -26,6 +26,7 @@ const AdminCirculation = lazy(() => import("@/features/circulation/admin/Index")
 const AdminReservations = lazy(() => import("@/features/reservations/admin/AdminReservations"));
 const AdminBackup = lazy(() => import("@/features/backup/admin/AdminBackup"));
 const AdminReport = lazy(() => import("@/features/analytics/admin/pages/AdminReport"));
+const QueryPreview = lazy(() => import("@/features/query/QueryPreview"));
 const AdminClearance = lazy(() => import("@/features/clearance/admin/AdminClearance"));
 const AdminClearanceReceipt = lazy(() => import("@/features/clearance/admin/AdminClearanceReceipt"));
 const AdminAttendanceLogs = lazy(() => import("@/features/attendance/admin/Index"));
@@ -66,7 +67,9 @@ export const AppRoutes = () => (
         <Route path="circulation" element={<AdminCirculation />} />
         <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
         <Route path="backup" element={<ProtectedRoute roles={["super_admin"]}><AdminBackup /></ProtectedRoute>} />
-        <Route path="report" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminReport /></ProtectedRoute>} />
+        <Route path="query" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminReport /></ProtectedRoute>} />
+        <Route path="query/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><QueryPreview /></ProtectedRoute>} />
+        <Route path="report" element={<Navigate to="/admin/query" replace />} />
         <Route path="audit-logs" element={<ProtectedRoute roles={["super_admin"]}><AdminAuditLogs /></ProtectedRoute>} />
         <Route path="clearance" element={<AdminClearance />} />
         <Route path="clearance/receipt/:receiptNumber" element={<AdminClearanceReceipt />} />
