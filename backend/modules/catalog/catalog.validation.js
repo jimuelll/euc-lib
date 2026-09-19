@@ -16,14 +16,15 @@ function validateIsbn(value) {
   return isbn;
 }
 
-function validateBookTypeInput({ name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) {
-  const days = Number.parseInt(defaultBorrowDays, 10);
+function validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durationUnit = "day", finePerHour, fineInterval = "hour", initialFine = 0 }) {
+  const minutes = durationMinutes === undefined || durationMinutes === "" ? Number(defaultBorrowDays) * 1440 : Number(durationMinutes);
+  const days = durationUnit === "day" ? minutes / 1440 : null;
   const fine = Number(finePerHour);
   const initial = Number(initialFine);
-  if (!name?.trim() || !Number.isInteger(days) || days < 1 || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) {
+  if (!name?.trim() || !Number.isInteger(minutes) || minutes < 1 || minutes > 525600 || !["day", "hour"].includes(durationUnit) || (durationUnit === "day" && minutes % 1440 !== 0) || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) {
     throw httpError("Enter a valid policy with non-negative fines", 400);
   }
-  return { name: name.trim(), days, fine, fineInterval, initial };
+  return { name: name.trim(), days, minutes, durationUnit, fine, fineInterval, initial };
 }
 
 module.exports = { httpError, normalizeIsbn, validateBookTypeInput, validateIsbn };

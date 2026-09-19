@@ -1,9 +1,18 @@
 import { AdminPage } from "@/features/admin";
 import QueryExplorer from "@/features/query/QueryExplorer";
+import ReportWorkspace from "@/features/query/ReportWorkspace";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const AdminReport = () => (
   <AdminPage title="Query" contentWidth="wide">
-    <QueryExplorer />
+    <Tabs defaultValue="explore" className="space-y-5">
+      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+        <TabsTrigger value="explore" className="min-h-11 shrink-0 rounded-none border-b-2 border-transparent px-5 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary">Explore Records</TabsTrigger>
+        <TabsTrigger value="reports" className="min-h-11 shrink-0 rounded-none border-b-2 border-transparent px-5 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary">Reports</TabsTrigger>
+      </TabsList>
+      <TabsContent value="explore" className="mt-0"><QueryExplorer /></TabsContent>
+      <TabsContent value="reports" className="mt-0"><ReportWorkspace /></TabsContent>
+    </Tabs>
   </AdminPage>
 );
 

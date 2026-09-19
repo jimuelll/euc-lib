@@ -141,7 +141,7 @@ const getBorrowingNotificationTarget = async (borrowingId, conn = db) => {
 const findBookForBorrow = async (bookId, conn) => {
   const [[book]] = await conn.query(
     `SELECT bk.id, bk.copies, bk.material_type,
-            bt.default_borrow_days, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
+            bt.default_borrow_days, bt.loan_duration_minutes, bt.loan_duration_unit, bt.fine_per_hour, bt.fine_interval, bt.initial_fine
        FROM books bk
        LEFT JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
       WHERE bk.id = ? AND bk.deleted_at IS NULL
@@ -154,7 +154,7 @@ const findBookForBorrow = async (bookId, conn) => {
 const findCopyForBorrow = async (barcode, conn) => {
   const [[copy]] = await conn.query(
     `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active,
-            bk.copies, bk.material_type, bt.default_borrow_days,
+            bk.copies, bk.material_type, bt.default_borrow_days, bt.loan_duration_minutes, bt.loan_duration_unit,
             bt.fine_per_hour, bt.fine_interval, bt.initial_fine
        FROM book_copies bc
        JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
@@ -222,11 +222,11 @@ const findReadyReservation = async (reservationId, userId, bookId, conn) => {
   return row ?? null;
 };
 
-const createBorrowing = async ({ userId, bookId, copyId, dueDate, finePerHour, fineInterval, initialFine, issuedBy }, conn) => {
+const createBorrowing = async ({ userId, bookId, copyId, dueDate, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine, issuedBy }, conn) => {
   const [result] = await conn.query(
-    `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, fine_per_hour, fine_interval, initial_fine, status, issued_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'borrowed', ?)`,
-    [userId, bookId, copyId, dueDate, finePerHour, fineInterval, initialFine, issuedBy ?? null],
+    `INSERT INTO borrowings (user_id, book_id, copy_id, due_date, loan_duration_minutes, loan_duration_unit, fine_per_hour, fine_interval, initial_fine, status, issued_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'borrowed', ?)`,
+    [userId, bookId, copyId, dueDate, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine, issuedBy ?? null],
   );
   return result.insertId;
 };
@@ -236,7 +236,7 @@ const fulfillReservation = async (reservationId, conn) => {
 };
 
 const getBorrowingForReturn = async (borrowingId, conn) => {
-  const [[row]] = await conn.query("SELECT b.id, b.user_id, b.status FROM borrowings b WHERE b.id = ? FOR UPDATE", [borrowingId]);
+  const [[row]] = await conn.query("SELECT b.id, b.user_id, b.status, b.due_date, b.returned_at, b.fine_per_hour, b.fine_interval, b.initial_fine FROM borrowings b WHERE b.id = ? FOR UPDATE", [borrowingId]);
   return row ?? null;
 };
 

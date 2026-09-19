@@ -25,7 +25,7 @@ export async function saveCatalogSchema(fields: FormField[], baseFields: FormFie
   await axiosInstance.put("api/admin/catalog-schema", { fields, baseFields });
 }
 export async function fetchBookTypes(): Promise<BookType[]> { return (await axiosInstance.get<BookType[]>("api/admin/book-types")).data; }
-export async function createBookType(payload: { name: string; default_borrow_days: number; fine_per_hour: number; fine_interval: "hour" | "day"; initial_fine: number }): Promise<void> { await axiosInstance.post("api/admin/book-types", payload); }
+export async function createBookType(payload: { name: string; default_borrow_days?: number; loan_duration_minutes: number; loan_duration_unit: "hour" | "day"; fine_per_hour: number; fine_interval: "hour" | "day"; initial_fine: number }): Promise<void> { await axiosInstance.post("api/admin/book-types", payload); }
 export async function updateBookType(id: number, payload: BookType): Promise<void> { await axiosInstance.put(`api/admin/book-types/${id}`, payload); }
 export async function lookupBookIsbn(isbn: string): Promise<IsbnMetadata> { return (await axiosInstance.get<IsbnMetadata>(`api/admin/books/isbn/${encodeURIComponent(isbn)}`)).data; }
 export async function createCatalogBook(values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.post<MessageResponse>("api/admin/books", values)).data; }

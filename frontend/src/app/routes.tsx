@@ -27,6 +27,7 @@ const AdminReservations = lazy(() => import("@/features/reservations/admin/Admin
 const AdminBackup = lazy(() => import("@/features/backup/admin/AdminBackup"));
 const AdminReport = lazy(() => import("@/features/analytics/admin/pages/AdminReport"));
 const QueryPreview = lazy(() => import("@/features/query/QueryPreview"));
+const ReportPreview = lazy(() => import("@/features/query/ReportPreview"));
 const AdminClearance = lazy(() => import("@/features/clearance/admin/AdminClearance"));
 const AdminClearanceReceipt = lazy(() => import("@/features/clearance/admin/AdminClearanceReceipt"));
 const AdminAttendanceLogs = lazy(() => import("@/features/attendance/admin/Index"));
@@ -59,6 +60,7 @@ export const AppRoutes = () => (
       <Route path="/my-library" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
       <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
       <Route path="/admin/query/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><QueryPreview /></ProtectedRoute>} />
+      <Route path="/admin/query/reports/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><ReportPreview /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute roles={["admin", "super_admin", "staff"]}><AdminLayout /></ProtectedRoute>}>
         <Route index element={<AdminHome />} />
         <Route path="analytics" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAnalytics /></ProtectedRoute>} />

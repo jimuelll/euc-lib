@@ -1,7 +1,7 @@
 const { createHash } = require("crypto");
 const { APPLICATION_TABLES } = require("./snapshot.registry");
 
-const SNAPSHOT_VERSION = 10;
+const SNAPSHOT_VERSION = 11;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -239,6 +239,17 @@ function upgradeV9ToV10(backup) {
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   return backup;
 }
+function upgradeV10ToV11(backup) {
+  assertSnapshotIntegrity(backup);
+  // Fine ledger tables did not exist in v10 snapshots. They are populated by
+  // the post-restore migration/backfill, never fabricated during restore.
+  backup.tables.fine_accounts ??= [];
+  backup.tables.fine_ledger_entries ??= [];
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 11;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
 
 // Each supported snapshot version advances through one reviewed transformer.
 const SNAPSHOT_TRANSFORMERS = new Map([
@@ -249,6 +260,7 @@ const SNAPSHOT_TRANSFORMERS = new Map([
   [7, upgradeV7ToV8],
   [8, upgradeV8ToV9],
   [9, upgradeV9ToV10],
+  [10, upgradeV10ToV11],
 ]);
 
 function upgradeBackup(backup) {

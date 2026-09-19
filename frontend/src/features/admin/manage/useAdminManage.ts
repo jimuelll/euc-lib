@@ -115,7 +115,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
-    const { fullName, role, password, rePassword } = form;
+    const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks } = form;
     if (!fullName || !role || !password || !rePassword) {
       toast.error("All required fields must be filled");
       return false;
@@ -126,7 +126,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
     setLoading(true);
     try {
-      const response = await createUser({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId });
+      const response = await createUser({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
       toast.success(response.message);
       const identifier = form.libraryCardNumber || form.employeeNumber || form.username;
       setQrTarget({ studentId: identifier, name: fullName });
@@ -193,6 +193,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const handleUpdateUser = async () => {
     if (!selectedUser) return false;
     const { password, rePassword } = form;
+    const updates = { ...form };
     if (password) {
       if (password !== rePassword) {
         toast.error("Passwords do not match");

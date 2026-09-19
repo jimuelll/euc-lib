@@ -12,8 +12,10 @@ test("restore upgrades the previous snapshot version and adds newly registered t
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 10);
+  assert.equal(upgraded.version, 11);
   assert.deepEqual(upgraded.tables.user_guide_modules, []);
   assert.deepEqual(upgraded.tables.departments, []);
+  assert.deepEqual(upgraded.tables.fine_accounts, []);
+  assert.deepEqual(upgraded.tables.fine_ledger_entries, []);
   assert.equal(upgraded.integrity.algorithm, "sha256");
 });

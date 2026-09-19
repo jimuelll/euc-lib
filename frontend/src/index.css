@@ -206,15 +206,7 @@
 
 @layer utilities {
   .admin-shell-backdrop {
-    background-image:
-      linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 14rem),
-      repeating-linear-gradient(
-        90deg,
-        transparent 0,
-        transparent 47px,
-        hsl(var(--border) / 0.32) 47px,
-        hsl(var(--border) / 0.32) 48px
-      );
+    background-image: linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 14rem);
   }
 
   .admin-panel-surface {

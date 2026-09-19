@@ -42,6 +42,8 @@ export type BookType = {
   id: number;
   name: string;
   default_borrow_days: number;
+  loan_duration_minutes: number;
+  loan_duration_unit: "day" | "hour";
   fine_per_hour: number;
   fine_interval?: "hour" | "day";
   initial_fine?: number;

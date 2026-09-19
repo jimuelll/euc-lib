@@ -1,4 +1,5 @@
 const db = require("../../db");
+const fineLedger = require("../borrowing/fine-ledger.service");
 
 function getConnection() {
   return db.getConnection();
@@ -104,6 +105,8 @@ async function createTransaction({ userId, type, amount, method = null, reason =
       "INSERT INTO clearance_transaction_items (transaction_id, borrowing_id, amount) VALUES (?, ?, ?)",
       [id, allocation.borrowingId, allocation.amount]
     );
+    const [[item]] = await conn.query("SELECT id FROM clearance_transaction_items WHERE transaction_id = ? AND borrowing_id = ? ORDER BY id DESC LIMIT 1", [id, allocation.borrowingId]);
+    await fineLedger.postTransactionItem({ borrowingId: allocation.borrowingId, itemId: item.id, kind: type, amount: allocation.amount }, conn);
     await conn.query(
       "UPDATE borrowings SET settled_amount = GREATEST(0, settled_amount + ?), settled_at = NOW(), settled_by = ? WHERE id = ?",
       [allocation.amount, createdBy, allocation.borrowingId]

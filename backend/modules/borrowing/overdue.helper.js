@@ -1,12 +1,13 @@
 const repository = require("./borrowing.repository");
 const notificationsService = require("../notifications/notifications.service");
 const { getSettings, getHolidayDateSet } = require("../library-settings/library-settings.service");
+const fineLedger = require("./fine-ledger.service");
+const { calculateFine, roundCurrency } = require("./fine-calculation");
 
 const HOUR_MS = 60 * 60 * 1000;
 const OVERDUE_REMINDER_INTERVAL_MS = HOUR_MS;
 let ensuredBorrowingPaymentColumns = false;
 
-const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
 const ensureBorrowingPaymentColumns = async () => {
   if (ensuredBorrowingPaymentColumns) return;
@@ -34,47 +35,33 @@ const calculateDueDateWithHolidays = async (borrowedAt, daysAllowed, conn) => {
   return dueDate;
 };
 
-const getFineDetails = ({ dueDate, finePerHour, fineInterval = "hour", initialFine = 0, now = new Date(), returnedAt = null, settledAmount = 0 }) => {
-  if (!dueDate) return { isOverdue: false, hoursOverdue: 0, fineAmount: 0, settledAmount: 0, unsettledAmount: 0 };
-  const dueAt = new Date(dueDate);
-  const accrualEnd = returnedAt ? new Date(returnedAt) : now;
-  const diffMs = accrualEnd.getTime() - dueAt.getTime();
-  if (!Number.isFinite(diffMs) || diffMs <= 0) {
-    return { isOverdue: false, hoursOverdue: 0, fineAmount: 0, settledAmount: roundCurrency(settledAmount), unsettledAmount: 0 };
-  }
-  const hoursOverdue = Math.ceil(diffMs / HOUR_MS);
-  const intervalsOverdue = fineInterval === "day" ? Math.ceil(diffMs / (HOUR_MS * 24)) : hoursOverdue;
-  const fineAmount = roundCurrency(Number(initialFine || 0) + intervalsOverdue * Number(finePerHour || 0));
-  const normalisedSettledAmount = roundCurrency(settledAmount);
-  return {
-    isOverdue: true,
-    hoursOverdue,
-    fineAmount,
-    settledAmount: normalisedSettledAmount,
-    unsettledAmount: roundCurrency(Math.max(fineAmount - normalisedSettledAmount, 0)),
-  };
+const getFineDetails = ({ settledAmount = 0, ...policy }) => {
+  const calculated = calculateFine(policy);
+  return { ...calculated, settledAmount: roundCurrency(settledAmount), unsettledAmount: roundCurrency(Math.max(calculated.fineAmount - settledAmount, 0)) };
 };
 
 const mapBorrowingsWithFineDetails = async (rows, conn) => {
   await ensureBorrowingPaymentColumns();
   const settings = await getSettings(conn);
   const now = new Date();
+  const balances = await fineLedger.balancesForBorrowings(rows.map((row) => row.id), conn);
   return rows.map((row) => {
-    const { isOverdue, hoursOverdue, fineAmount, settledAmount, unsettledAmount } = getFineDetails({
+    const { isOverdue, hoursOverdue } = getFineDetails({
       dueDate: row.due_date,
       finePerHour: row.fine_per_hour ?? settings.overdue_fine_per_hour,
       fineInterval: row.fine_interval ?? "hour",
       initialFine: row.initial_fine ?? 0,
       now,
       returnedAt: row.returned_at,
-      settledAmount: row.settled_amount,
     });
+    const balance = balances.get(Number(row.id));
+    if (!balance) throw new Error(`Fine ledger is missing loan #${row.id}. Apply and backfill the fine-ledger migration.`);
     return {
       ...row,
       hours_overdue: hoursOverdue,
-      fine_amount: fineAmount,
-      settled_amount: settledAmount,
-      unsettled_amount: unsettledAmount,
+      fine_amount: balance.fineAmount,
+      settled_amount: roundCurrency(balance.paidAmount + balance.adjustedAmount),
+      unsettled_amount: balance.balance,
       fine_per_hour: settings.overdue_fine_per_hour,
       status: row.status === "returned" ? row.status : (isOverdue ? "overdue" : row.status),
     };
@@ -86,16 +73,11 @@ const syncOverdueBorrowings = async (conn) => {
   const settings = await getSettings(conn);
   const rows = await repository.findOverdueCandidates(conn);
   for (const row of rows) {
-    const { isOverdue, unsettledAmount } = getFineDetails({
-      dueDate: row.due_date,
-      finePerHour: row.fine_per_hour ?? settings.overdue_fine_per_hour,
-      fineInterval: row.fine_interval ?? "hour",
-      initialFine: row.initial_fine ?? 0,
-      returnedAt: row.returned_at,
-      settledAmount: row.settled_amount,
-    });
+    const { isOverdue } = await fineLedger.assessBorrowing({ ...row, fine_per_hour: row.fine_per_hour ?? settings.overdue_fine_per_hour }, conn);
     if (!isOverdue) continue;
     if (row.status !== "overdue") await repository.markOverdue(row.id, conn);
+    const balance = (await fineLedger.balancesForBorrowings([row.id], conn)).get(Number(row.id));
+    const unsettledAmount = balance?.balance ?? 0;
     const shouldNotifyAgain = unsettledAmount > 0 && (!row.last_overdue_notification_at || (Date.now() - new Date(row.last_overdue_notification_at).getTime()) >= OVERDUE_REMINDER_INTERVAL_MS);
     if (shouldNotifyAgain) {
       await notificationsService.createNotification({

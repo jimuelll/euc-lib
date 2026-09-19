@@ -69,9 +69,11 @@ function getAuditMetadata(path, body = {}) {
                   ? [["name", "Name"], ["student_employee_id", "Student / employee ID"], ["role", "Role"], ["is_active", "Active"], ["program_id", "Program / course"], ["academic_term_id", "Academic term"]]
                   : path.includes("/events")
                     ? [["title", "Event"], ["starts_at", "Starts"], ["ends_at", "Ends"]]
-                    : path.includes("/notifications")
+                      : path.includes("/notifications")
                       ? [["title", "Title"], ["type", "Type"], ["audience_type", "Audience"]]
-                      : path.includes("/circulation") || path.includes("/borrowing")
+                          : path.includes("/clearance")
+                            ? [["student_employee_id", "Patron ID"], ["amount", "Amount (PHP)"], ["reason", "Reason"], ["transactionId", "Transaction"]]
+                            : path.includes("/circulation") || path.includes("/borrowing")
                         ? [["userBarcode", "Borrower"], ["bookBarcode", "Copy barcode"], ["reservationId", "Reservation"]]
                         : [];
   const changes = fieldSets

@@ -2,6 +2,8 @@ const repository = require("./borrowing.repository");
 const { calculateDueDateWithHolidays, syncOverdueBorrowings } = require("./overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
 const { assertEligible } = require("../clearance/clearance.service");
+const { calculateLoanDueDate } = require("./loan-duration");
+const fineLedger = require("./fine-ledger.service");
 
 const borrowBook = async (
   userId,
@@ -27,13 +29,15 @@ const borrowBook = async (
       const book = await repository.findBookForBorrow(bookIdOrCopyBarcode, conn);
       if (!book) throw Object.assign(new Error("Book not found"), { status: 404 });
       if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
-      if (!book.default_borrow_days) throw Object.assign(new Error("This book has no active loan policy"), { status: 409 });
+      if (!book.loan_duration_minutes) throw Object.assign(new Error("This book has no active loan policy"), { status: 409 });
       const candidate = await repository.findAvailableCopyForBook(bookIdOrCopyBarcode, conn);
       if (!candidate) throw Object.assign(new Error("No copies available"), { status: 409 });
       copy = {
         ...candidate,
         book_id: bookIdOrCopyBarcode,
         default_borrow_days: book.default_borrow_days,
+        loan_duration_minutes: book.loan_duration_minutes,
+        loan_duration_unit: book.loan_duration_unit,
         fine_per_hour: book.fine_per_hour,
         fine_interval: book.fine_interval,
         initial_fine: book.initial_fine,
@@ -57,18 +61,22 @@ const borrowBook = async (
       if (reservation.reserved_copy_id !== copy.id) throw Object.assign(new Error("The selected copy is not the copy prepared for this reservation"), { status: 409 });
     }
 
-    const safeDaysAllowed = Math.max(1, Number.parseInt(copy.default_borrow_days, 10) || 7);
-    const dueDate = await calculateDueDateWithHolidays(new Date(), safeDaysAllowed, conn);
+    const durationMinutes = Number(copy.loan_duration_minutes);
+    const durationUnit = copy.loan_duration_unit;
+    const dueDate = await calculateLoanDueDate(new Date(), { minutes: durationMinutes, unit: durationUnit }, conn);
     const borrowingId = await repository.createBorrowing({
       userId,
       bookId: copy.book_id,
       copyId: copy.id,
       dueDate,
+      durationMinutes,
+      durationUnit,
       finePerHour: copy.fine_per_hour,
       fineInterval: copy.fine_interval,
       initialFine: copy.initial_fine,
       issuedBy,
     }, conn);
+    await conn.query("INSERT INTO fine_accounts (borrowing_id) VALUES (?)", [borrowingId]);
     if (reservationId !== null) await repository.fulfillReservation(reservationId, conn);
     await conn.commit();
 
@@ -106,6 +114,8 @@ const returnBook = async (borrowingId, userId) => {
     if (row.user_id !== userId) throw Object.assign(new Error("Forbidden"), { status: 403 });
     if (row.status === "returned") throw Object.assign(new Error("Book already returned"), { status: 409 });
     await repository.markReturned(borrowingId, conn);
+    const [[returned]] = await conn.query("SELECT returned_at FROM borrowings WHERE id = ?", [borrowingId]);
+    await fineLedger.assessBorrowing({ ...row, returned_at: returned.returned_at }, conn);
     await conn.commit();
 
     const target = await repository.getBorrowingNotificationTarget(borrowingId);

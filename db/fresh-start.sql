@@ -327,7 +327,9 @@ CREATE TABLE `recommendation_feedback` (
 CREATE TABLE `book_types` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(100) NOT NULL,
-  `default_borrow_days` int(11) NOT NULL,
+  `default_borrow_days` int(11) DEFAULT NULL,
+  `loan_duration_minutes` int(11) NOT NULL,
+  `loan_duration_unit` enum('day','hour') NOT NULL DEFAULT 'day',
   `fine_per_hour` decimal(10,2) NOT NULL,
   `fine_interval` enum('hour','day') NOT NULL DEFAULT 'hour',
   `initial_fine` decimal(10,2) NOT NULL DEFAULT 0.00,
@@ -349,6 +351,8 @@ CREATE TABLE `borrowings` (
   `copy_id` int(11) DEFAULT NULL,
   `borrowed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `due_date` datetime NOT NULL,
+  `loan_duration_minutes` int(11) DEFAULT NULL,
+  `loan_duration_unit` enum('day','hour') DEFAULT NULL,
   `fine_per_hour` decimal(10,2) DEFAULT NULL,
   `fine_interval` enum('hour','day') DEFAULT NULL,
   `initial_fine` decimal(10,2) DEFAULT NULL,
@@ -617,6 +621,32 @@ CREATE TABLE `users` (
   `_unique_sid` varchar(80) GENERATED ALWAYS AS (if(`deleted_at` is null,`student_employee_id`,concat('__deleted__',`student_employee_id`,'_',`deleted_at`))) STORED,
   `_unique_email` varchar(280) GENERATED ALWAYS AS (if(`deleted_at` is null,`email`,concat('__deleted__',`email`,'_',`deleted_at`))) STORED,
   `_unique_barcode` varchar(90) GENERATED ALWAYS AS (if(`deleted_at` is null,`barcode`,concat('__deleted__',`barcode`,'_',`deleted_at`))) STORED
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `fine_accounts` (
+  `borrowing_id` int(11) NOT NULL PRIMARY KEY,
+  `charged_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `cycle_base_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `assessed_through_at` datetime DEFAULT NULL,
+  `imported_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  CONSTRAINT `fk_fine_account_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `fine_ledger_entries` (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `borrowing_id` int(11) NOT NULL,
+  `kind` enum('charge','payment','adjustment','reversal','legacy_charge','legacy_credit') NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `effective_at` datetime NOT NULL,
+  `recorded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `transaction_item_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `source_note` varchar(160) DEFAULT NULL,
+  KEY `idx_fine_entry_borrowing` (`borrowing_id`,`id`),
+  KEY `idx_fine_entry_effective` (`kind`,`effective_at`),
+  UNIQUE KEY `uq_fine_entry_transaction_item` (`transaction_item_id`),
+  CONSTRAINT `fk_fine_entry_account` FOREIGN KEY (`borrowing_id`) REFERENCES `fine_accounts` (`borrowing_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fine_entry_item` FOREIGN KEY (`transaction_item_id`) REFERENCES `clearance_transaction_items` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1227,8 +1257,8 @@ INSERT INTO `about_settings` (`id`, `library_name`, `mission_title`, `mission_te
 VALUES (1, 'Enverga-Candelaria Library', 'Empowering Academic Growth', '', '', '', '[]', '[]', '[]', '[]')
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 
-INSERT INTO `book_types` (`name`, `default_borrow_days`, `fine_per_hour`, `fine_interval`, `initial_fine`, `is_active`)
-VALUES ('General collection', 7, 1.00, 'hour', 0.00, 1);
+INSERT INTO `book_types` (`name`, `default_borrow_days`, `loan_duration_minutes`, `loan_duration_unit`, `fine_per_hour`, `fine_interval`, `initial_fine`, `is_active`)
+VALUES ('General collection', 7, 10080, 'day', 1.00, 'hour', 0.00, 1);
 
 INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `locked`, `order`, `public`, `archived`, `scope`) VALUES
 ('title', 'Title', 'text', NULL, 1, 1, 0, 1, 0, 'shared'),

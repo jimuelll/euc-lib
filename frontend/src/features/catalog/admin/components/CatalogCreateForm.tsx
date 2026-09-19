@@ -87,7 +87,7 @@ export default function CatalogCreateForm({
               <SelectTrigger aria-invalid={Boolean(errors.book_type_id)} aria-describedby={errors.book_type_id ? "book-type-error" : undefined} className={errors.book_type_id ? "border-destructive" : undefined}>
                 <SelectValue placeholder="Select the loan and fine policy" />
               </SelectTrigger>
-              <SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.default_borrow_days} days, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent>
+              <SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.loan_duration_unit === "hour" ? `${Number(type.loan_duration_minutes / 60).toFixed(2)} hours` : `${Math.round(type.loan_duration_minutes / 1440)} days`}, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent>
             </Select>
             {errors.book_type_id && <p id="book-type-error" className="mt-1 text-sm text-destructive" role="alert">{errors.book_type_id}</p>}
           </div>

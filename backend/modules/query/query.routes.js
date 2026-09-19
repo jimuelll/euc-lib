@@ -7,5 +7,7 @@ router.use(authMiddleware(["admin", "super_admin"]));
 router.get("/query/meta", controller.getMeta);
 router.get("/query", controller.list);
 router.get("/query/export", controller.exportCsv);
+router.get("/query/reports", controller.listReport);
+router.get("/query/reports/export", controller.exportReport);
 
 module.exports = router;

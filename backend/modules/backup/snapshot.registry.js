@@ -10,7 +10,7 @@ const APPLICATION_TABLES = Object.freeze([
   "about_settings", "academic_programs", "academic_subscriptions", "academic_terms", "attendance_logs", "departments",
   "auth_audit_events", "auth_refresh_sessions", "book_copies", "book_embeddings", "book_enrichment", "book_types", "books", "borrowings",
   "bulletin_comments", "bulletin_likes", "bulletin_posts", "catalog_schema", "clearance_transaction_items",
-  "clearance_transactions", "library_circulation_settings", "library_events", "library_holidays", "notification_reads",
+  "clearance_transactions", "fine_accounts", "fine_ledger_entries", "library_circulation_settings", "library_events", "library_holidays", "notification_reads",
   "notifications", "recommendation_feedback", "reservations", "site_content_settings", "site_daily_visits", "users",
   "user_guide_modules",
 ]);

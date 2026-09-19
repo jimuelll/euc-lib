@@ -337,26 +337,26 @@ async function restoreBook(id, conn) {
 }
 
 async function getBookTypes() {
-  const [rows] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE is_active = 1 ORDER BY name");
+  const [rows] = await db.query("SELECT id, name, default_borrow_days, loan_duration_minutes, loan_duration_unit, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE is_active = 1 ORDER BY name");
   return rows;
 }
 
-async function createBookType({ name, days, fine, fineInterval, initial }) {
+async function createBookType({ name, days, minutes, durationUnit, fine, fineInterval, initial }) {
   const [result] = await db.query(
-    "INSERT INTO book_types (name, default_borrow_days, fine_per_hour, fine_interval, initial_fine) VALUES (?, ?, ?, ?, ?)",
-    [name, days, fine.toFixed(2), fineInterval, initial.toFixed(2)]
+    "INSERT INTO book_types (name, default_borrow_days, loan_duration_minutes, loan_duration_unit, fine_per_hour, fine_interval, initial_fine) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [name, days, minutes, durationUnit, fine.toFixed(2), fineInterval, initial.toFixed(2)]
   );
-  const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [result.insertId]);
+  const [[row]] = await db.query("SELECT id, name, default_borrow_days, loan_duration_minutes, loan_duration_unit, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [result.insertId]);
   return row;
 }
 
-async function updateBookType(id, { name, days, fine, fineInterval, initial }) {
+async function updateBookType(id, { name, days, minutes, durationUnit, fine, fineInterval, initial }) {
   const [result] = await db.query(
-    "UPDATE book_types SET name = ?, default_borrow_days = ?, fine_per_hour = ?, fine_interval = ?, initial_fine = ? WHERE id = ? AND is_active = 1",
-    [name, days, fine.toFixed(2), fineInterval, initial.toFixed(2), id]
+    "UPDATE book_types SET name = ?, default_borrow_days = ?, loan_duration_minutes = ?, loan_duration_unit = ?, fine_per_hour = ?, fine_interval = ?, initial_fine = ? WHERE id = ? AND is_active = 1",
+    [name, days, minutes, durationUnit, fine.toFixed(2), fineInterval, initial.toFixed(2), id]
   );
   if (!result.affectedRows) return null;
-  const [[row]] = await db.query("SELECT id, name, default_borrow_days, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [id]);
+  const [[row]] = await db.query("SELECT id, name, default_borrow_days, loan_duration_minutes, loan_duration_unit, fine_per_hour, fine_interval, initial_fine FROM book_types WHERE id = ?", [id]);
   return row;
 }
 

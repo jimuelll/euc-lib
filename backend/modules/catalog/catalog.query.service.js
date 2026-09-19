@@ -131,14 +131,14 @@ const getCatalogRecordForValidation = async (id) => repository.findCatalogRecord
 
 const getBookTypes = async () => repository.getBookTypes();
 
-const createBookType = async ({ name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
-  const { name: safeName, days, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, finePerHour, fineInterval, initialFine });
-  return repository.createBookType({ name: safeName, days, fine, fineInterval: safeInterval, initial });
+const createBookType = async ({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
+  const { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine });
+  return repository.createBookType({ name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial });
 };
 
-const updateBookType = async (id, { name, defaultBorrowDays, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
-  const { name: safeName, days, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, finePerHour, fineInterval, initialFine });
-  const row = await repository.updateBookType(id, { name: safeName, days, fine, fineInterval: safeInterval, initial });
+const updateBookType = async (id, { name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0 }) => {
+  const { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine });
+  const row = await repository.updateBookType(id, { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial });
   if (!row) throw httpError("Book type not found", 404);
   return row;
 };

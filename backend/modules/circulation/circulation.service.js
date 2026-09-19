@@ -1,6 +1,8 @@
 const repository = require("./circulation.repository");
 const { borrowBook } = require("../borrowing/borrowing.transaction.service");
-const { calculateDueDateWithHolidays, syncOverdueBorrowings } = require("../borrowing/overdue.helper");
+const { syncOverdueBorrowings } = require("../borrowing/overdue.helper");
+const { calculateLoanDueDate } = require("../borrowing/loan-duration");
+const fineLedger = require("../borrowing/fine-ledger.service");
 const notificationsService = require("../notifications/notifications.service");
 const { getClearanceProfile } = require("../clearance/clearance.service");
 
@@ -36,6 +38,8 @@ const processReturn = async (borrowingId) => {
     if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
     if (row.status === "returned") throw Object.assign(new Error("Book already returned"), { status: 409 });
     await repository.markReturned(borrowingId, conn);
+    const [[returned]] = await conn.query("SELECT returned_at FROM borrowings WHERE id = ?", [borrowingId]);
+    await fineLedger.assessBorrowing({ ...row, returned_at: returned.returned_at }, conn);
     await conn.commit();
 
     const target = await repository.getBorrowingNotificationTarget(borrowingId);
@@ -62,8 +66,9 @@ const processRenew = async ({ borrowingId, renewedBy = null }) => {
   const row = await repository.getBorrowingForRenewal(borrowingId);
   if (!row) throw Object.assign(new Error("Borrowing record not found"), { status: 404 });
   if (row.status === "returned") throw Object.assign(new Error("Cannot renew a returned book"), { status: 409 });
-  const policyDays = Math.max(1, Number.parseInt(row.default_borrow_days, 10) || 7);
-  const dueDate = await calculateDueDateWithHolidays(new Date(), policyDays);
+  const dueDate = await calculateLoanDueDate(new Date(), { minutes: row.loan_duration_minutes || Math.max(1, Number.parseInt(row.default_borrow_days, 10) || 7) * 1440, unit: row.loan_duration_unit || "day" });
+  const connection = await repository.getConnection();
+  try { await connection.beginTransaction(); await fineLedger.beginRenewalCycle(borrowingId, connection); await connection.commit(); } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
   await repository.renewBorrowing(borrowingId, dueDate);
 
   const target = await repository.getBorrowingNotificationTarget(borrowingId);

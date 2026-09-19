@@ -62,7 +62,7 @@ const markReturned = (borrowingId, conn) => conn.query("UPDATE borrowings SET st
 
 const getBorrowingForRenewal = async (borrowingId) => {
   const [[row]] = await db.query(
-    `SELECT b.id, b.status, bt.default_borrow_days
+    `SELECT b.id, b.status, bt.default_borrow_days, bt.loan_duration_minutes, bt.loan_duration_unit
        FROM borrowings b
        JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
        JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
