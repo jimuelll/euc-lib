@@ -26,6 +26,9 @@
     --primary: 0 100% 25.1%;
     --primary-foreground: 36 30% 97%;
 
+    /* Action text keeps the maroon identity while staying readable on dark surfaces. */
+    --action: 0 100% 25.1%;
+
     /* Warm muted clay — secondary surfaces */
     --secondary: 0 0% 96%;
     --secondary-foreground: 12 15% 14%;
@@ -83,6 +86,9 @@
     /* MSEUF maroon remains the primary brand color in dark mode. */
     --primary: 0 100% 25.1%;
     --primary-foreground: 36 25% 97%;
+
+    /* Light maroon for links and text actions against laterite surfaces. */
+    --action: 0 65% 72%;
 
     --secondary: 10 12% 22%;
     --secondary-foreground: 36 15% 90%;

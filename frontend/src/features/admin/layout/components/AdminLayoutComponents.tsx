@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/layout/NavLink";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import {
   DropdownMenu,
@@ -33,7 +33,9 @@ import { sidebarSections, getInitials, resolveCurrentItem, resolveCurrentSection
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { pathname } = useLocation();
   const { user, logout } = useAuth();
+  const currentItem = resolveCurrentItem(pathname);
   const visibleSections = sidebarSections
     .map((section) => ({
       ...section,
@@ -159,7 +161,7 @@ export function AdminSidebar() {
                     <SidebarMenu>
                       {section.items.map((item) => (
                         <SidebarMenuItem key={item.title} className="px-2">
-                          <SidebarMenuButton asChild>
+                          <SidebarMenuButton asChild isActive={currentItem?.url === item.url}>
                             <NavLink
                               to={item.url}
                               end={item.url === "/admin"}
@@ -170,11 +172,14 @@ export function AdminSidebar() {
                                   ? "hsl(var(--sidebar-primary))"
                                   : "hsl(var(--sidebar-muted-foreground))",
                                 background: isActive
-                                  ? "linear-gradient(90deg, hsl(var(--sidebar-primary) / 0.16), transparent)"
+                                  ? "linear-gradient(90deg, hsl(var(--sidebar-primary) / 0.28), hsl(var(--sidebar-primary) / 0.08))"
                                   : "transparent",
                                 borderLeft: isActive
-                                  ? "2px solid hsl(var(--sidebar-primary))"
+                                  ? "3px solid hsl(var(--sidebar-primary))"
                                   : "2px solid transparent",
+                                boxShadow: isActive
+                                  ? "inset 0 0 0 1px hsl(var(--sidebar-primary) / 0.26)"
+                                  : "none",
                               })}
                             >
                               <item.icon className="h-3.5 w-3.5 shrink-0" />
@@ -192,7 +197,7 @@ export function AdminSidebar() {
                 <SidebarMenu>
                   {section.items.map((item) => (
                     <SidebarMenuItem key={item.title} className="px-1.5">
-                      <SidebarMenuButton asChild>
+                      <SidebarMenuButton asChild isActive={currentItem?.url === item.url}>
                         <NavLink
                           to={item.url}
                           end={item.url === "/admin"}
@@ -203,8 +208,11 @@ export function AdminSidebar() {
                               ? "hsl(var(--sidebar-primary))"
                               : "hsl(var(--sidebar-muted-foreground))",
                             background: isActive
-                              ? "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.18), transparent)"
+                              ? "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.34), hsl(var(--sidebar-primary) / 0.12))"
                               : "transparent",
+                            boxShadow: isActive
+                              ? "inset 0 0 0 1px hsl(var(--sidebar-primary) / 0.34)"
+                              : "none",
                           })}
                         >
                           <item.icon className="h-4 w-4 shrink-0" />
@@ -348,7 +356,7 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
               <DropdownMenuSeparator className="m-0" />
               <DropdownMenuItem
                 onSelect={() => navigate("/admin/notifications")}
-                className="cursor-pointer rounded-none px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-primary focus:bg-muted focus:text-primary"
+                className="cursor-pointer rounded-none px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-action focus:bg-muted focus:text-action"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Manage notifications

@@ -452,7 +452,7 @@ const NotificationsDropdown = ({
       <DropdownMenuSeparator className="m-0" />
       <DropdownMenuItem
         onClick={() => onNavigate("/my-library")}
-        className="rounded-none px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-primary"
+        className="rounded-none px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-action"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         View all notifications

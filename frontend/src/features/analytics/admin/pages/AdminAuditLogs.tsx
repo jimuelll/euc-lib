@@ -32,7 +32,7 @@ const categoryOptions = [
 ];
 
 const categoryTone: Record<string, string> = {
-  auth: "border-primary/20 bg-primary/5 text-primary",
+  auth: "border-primary/20 bg-primary/5 text-action",
   users: "border-warning/20 bg-warning/10 text-warning",
   attendance: "border-success/20 bg-success/10 text-success",
   borrowing: "border-sky-500/20 bg-sky-500/10 text-sky-600",

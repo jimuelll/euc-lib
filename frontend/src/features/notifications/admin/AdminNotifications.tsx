@@ -272,7 +272,7 @@ const AdminNotifications = () => {
             ) : null}
 
             {success ? (
-              <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
+              <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-action">
                 {success}
               </div>
             ) : null}
@@ -294,7 +294,7 @@ const AdminNotifications = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                      <span className="inline-flex items-center border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-action">
                         {notification.type}
                       </span>
                       <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
