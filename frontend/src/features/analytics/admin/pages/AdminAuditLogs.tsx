@@ -29,6 +29,9 @@ const categoryOptions = [
   { value: "content", label: "Content" },
   { value: "subscriptions", label: "Subscriptions" },
   { value: "notifications", label: "Notifications" },
+  { value: "backup", label: "Backup" },
+  { value: "clearance", label: "Clearance & payments" },
+  { value: "system", label: "System" },
 ];
 
 const categoryTone: Record<string, string> = {
@@ -39,7 +42,10 @@ const categoryTone: Record<string, string> = {
   reservation: "border-amber-500/20 bg-amber-500/10 text-amber-700",
   bulletin: "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-700",
   subscriptions: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700",
-  notifications: "border-rose-500/20 bg-rose-500/10 text-rose-700",
+ notifications: "border-rose-500/20 bg-rose-500/10 text-rose-700",
+  backup: "border-slate-500/20 bg-slate-500/10 text-slate-700",
+  clearance: "border-lime-500/20 bg-lime-500/10 text-lime-700",
+  system: "border-border bg-muted/30 text-foreground",
   catalog: "border-violet-500/20 bg-violet-500/10 text-violet-700",
   academic_settings: "border-orange-500/20 bg-orange-500/10 text-orange-700",
   events: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700",
@@ -50,7 +56,7 @@ const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 const formatRole = (role: string | null) => (role ? role.replace(/_/g, " ") : "System");
-const auditChanges = (metadata: unknown): Array<{ field: string; value: string }> => {
+const auditChanges = (metadata: unknown): Array<{ field: string; value?: string; before?: string; after?: string }> => {
   if (!metadata) return [];
   try {
     const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
@@ -68,8 +74,14 @@ const auditChanges = (metadata: unknown): Array<{ field: string; value: string }
       }));
     const changedFields = Array.isArray(changes)
       ? changes
-        .filter((change): change is { field: string; value: string } =>
-          !!change && typeof change === "object" && typeof change.field === "string" && typeof change.value === "string"
+        .filter((change): change is { field: string; value?: string; before?: string; after?: string } =>
+          !!change
+          && typeof change === "object"
+          && typeof change.field === "string"
+          && (
+            typeof change.value === "string"
+            || (typeof change.before === "string" && typeof change.after === "string")
+          )
         )
       : [];
 
@@ -313,7 +325,7 @@ const AdminAuditLogs = () => {
                       </div>
 
                       <p className="text-sm font-medium leading-6 text-foreground">{item.description}</p>
-                      {auditChanges(item.metadata).length ? <dl className="grid gap-x-5 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata).map((change) => <div key={change.field} className="flex min-w-0 gap-1"><dt className="shrink-0 font-medium text-foreground">{change.field}:</dt><dd className="truncate">{change.value}</dd></div>)}</dl> : null}
+                      {auditChanges(item.metadata).length ? <dl className="grid gap-x-5 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata).map((change) => <div key={change.field} className="flex min-w-0 gap-1"><dt className="shrink-0 font-medium text-foreground">{change.field}:</dt><dd className="truncate">{change.before !== undefined ? change.before + " → " + change.after : change.value}</dd></div>)}</dl> : null}
                       {item.restore_status === "reversed" ? <p className="inline-flex w-fit border border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive">Reversed by snapshot restore{item.reversed_at ? ` · ${formatDateTime(item.reversed_at)}` : ""}</p> : null}
                       <p className="text-xs text-muted-foreground">
                         {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}
