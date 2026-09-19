@@ -67,7 +67,7 @@ const auditChanges = (metadata: unknown): Array<{ field: string; value?: string;
       [key: string]: unknown;
     };
     const directFields = Object.entries(fields)
-      .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))
+      .filter(([field, value]) => field !== "target_id" && ["string", "number", "boolean"].includes(typeof value))
       .map(([field, value]) => ({
         field: field.replace(/_/g, " "),
         value: String(value),

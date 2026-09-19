@@ -54,7 +54,10 @@ const valueFor = (value) => {
   if (value === true || value === 1 || value === "1") return "Yes";
   if (value === false || value === 0 || value === "0") return "No";
   if (typeof value === "object") {
-    try { return JSON.stringify(value).slice(0, 240); } catch { return "[object]"; }
+    try {
+      if (Array.isArray(value)) return value.map((entry) => typeof entry === "object" ? JSON.stringify(entry) : String(entry)).join(", ").slice(0, 240);
+      return Object.entries(value).map(([key, entry]) => `${humanizeFieldKey(key)}=${typeof entry === "object" ? JSON.stringify(entry) : String(entry)}`).join("; ").slice(0, 240);
+    } catch { return "[object]"; }
   }
   return String(value).slice(0, 180);
 };
@@ -74,7 +77,7 @@ function describeTarget(body = {}, path = "", snapshot = null) {
 }
 
 const fieldSets = [
-  ["catalog-schema", [["key", "Field key"], ["label", "Label"], ["type", "Field type"], ["required", "Required"], ["public", "Public"], ["scope", "Applies to"], ["archived", "Archived"]]],
+  ["catalog-schema", [["key", "Field key"], ["label", "Label"], ["type", "Field type"], ["options", "Options"], ["required", "Required"], ["locked", "Locked"], ["public", "Public"], ["order", "Display order"], ["scope", "Applies to"], ["archived", "Archived"]]],
   ["book-types", [["name", "Policy name"], ["default_borrow_days", "Borrow days"], ["loan_duration_minutes", "Loan duration"], ["loan_duration_unit", "Duration unit"], ["fine_per_hour", "Recurring fine (PHP)"], ["fine_interval", "Fine interval"], ["initial_fine", "Initial fine (PHP)"], ["is_active", "Active"]]],
   ["/books", [["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["material_type", "Material"], ["book_type_id", "Book type"], ["copies", "Copies"], ["metadata", "Catalogue details"], ["deleted_at", "Archived"]]],
   ["/copies", [["condition", "Condition"], ["notes", "Notes"], ["is_active", "Active"], ["deleted_at", "Archived"]]],
@@ -98,6 +101,15 @@ const fieldSets = [
 
 function fieldsForPath(path) {
   return fieldSets.find(([needle]) => path.includes(needle))?.[1] ?? [];
+}
+
+function humanizeFieldKey(key) {
+  return String(key).replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function catalogFieldLabels(before, after) {
+  const rows = after?.__auditSchema ?? before?.__auditSchema ?? [];
+  return new Map((Array.isArray(rows) ? rows : []).map((field) => [field.key, field.label]));
 }
 
 function parseJson(value) {
@@ -142,6 +154,26 @@ function snapshotChanges(path, before, after, body = {}) {
       return fieldsForPath(path).flatMap(([field, label]) => change(`${key}.${field}`, `${key} · ${label}`, oldField?.[field], newField?.[field]) || []);
     });
   }
+  if (path.includes("/books")) {
+    const coreChanges = fieldsForPath(path)
+      .filter(([key]) => key !== "metadata")
+      .flatMap(([key, label]) => {
+        const nextValue = after && has(after, key) ? after[key] : body[key];
+        return change(key, label, before?.[key], nextValue) || [];
+      });
+    const oldMetadata = parseJson(before?.metadata) || {};
+    const newMetadata = parseJson(after?.metadata ?? body.metadata) || {};
+    const labels = catalogFieldLabels(before, after);
+    const metadataKeys = new Set([
+      ...Object.keys(oldMetadata || {}),
+      ...Object.keys(newMetadata || {}),
+      ...Object.keys(body || {}).filter((key) => !["title", "author", "isbn", "material_type", "book_type_id", "copies", "metadata"].includes(key)),
+    ]);
+    const metadataChanges = [...metadataKeys].sort().flatMap((key) =>
+      change(`metadata.${key}`, labels.get(key) || humanizeFieldKey(key), oldMetadata?.[key], newMetadata?.[key] ?? body[key]) || []
+    );
+    return [...coreChanges, ...metadataChanges];
+  }
   if (!before && !after) return bodyChanges(path, body);
   const fields = fieldsForPath(path);
   return fields.flatMap(([key, label]) => {
@@ -169,6 +201,10 @@ async function readSnapshot(path, body = {}) {
   if (path.includes("library-settings")) { const [[row]] = await db.query("SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1 LIMIT 1"); return row || null; }
   if (path.includes("site-content")) { const [[row]] = await db.query("SELECT * FROM site_content_settings LIMIT 1"); return row || null; }
   if (path.includes("/about")) { const [[row]] = await db.query("SELECT * FROM about_settings LIMIT 1"); return row || null; }
+  if (path.endsWith("/books")) {
+    const [schemaRows] = await db.query("SELECT `key`, label FROM catalog_schema");
+    return { __auditSchema: schemaRows };
+  }
   if (!target) return null;
   if (path.includes("/circulation/") && body.borrowingId) {
     const [[row]] = await db.query("SELECT id, status, due_date, returned_at, deleted_at, user_id, book_id, copy_id FROM borrowings WHERE id = ? LIMIT 1", [body.borrowingId]);
@@ -191,7 +227,15 @@ async function readSnapshot(path, body = {}) {
     ["/clearance/transactions/", "SELECT id, transaction_type, amount, reason, reverses_transaction_id FROM clearance_transactions WHERE id = ? LIMIT 1"],
   ];
   const found = queries.find(([needle]) => path.includes(needle) && !(needle === "/borrows/" && path.includes("/borrowing/borrows/") && !path.endsWith("/return")));
-  if (found) { const [[row]] = await db.query(found[1], [target.value]); return row || null; }
+  if (found) {
+    const [[row]] = await db.query(found[1], [target.value]);
+    if (!row) return null;
+    if (found[0] === "/books/") {
+      const [schemaRows] = await db.query("SELECT `key`, label FROM catalog_schema");
+      row.__auditSchema = schemaRows;
+    }
+    return row;
+  }
   if (target.kind === "user") {
     const [[row]] = await db.query("SELECT id, student_employee_id, name, email, role, is_active, program_id, academic_term_id, department_id, address, contact, year_level, remarks, deleted_at FROM users WHERE student_employee_id = ? LIMIT 1", [target.value]);
     return row || null;
@@ -253,7 +297,7 @@ function metadataFor(path, body, before, after, details = null) {
       if (details[source] !== undefined && details[source] !== null) metadata[target] = valueFor(details[source]);
     }
   }
-  return changes.length || Object.keys(metadata).length > 1 ? metadata : null;
+  return changes.length || Object.keys(metadata).length > 1 || Boolean(before && after) ? metadata : null;
 }
 
 // Captures successful mutations without persisting request bodies, credentials,
@@ -273,13 +317,18 @@ async function auditLogger(req, res, next) {
     void (async () => {
       let after = null;
       try { after = await readSnapshot(path, req.body); } catch (error) { console.error("[audit] Failed to read post-change snapshot:", error.message); }
+      const metadata = metadataFor(path, req.body, before, after, res.locals.auditDetails);
+      const baseDescription = getDescription(req.method, path, req.body, before, after);
+      const noChange = ["PUT", "PATCH"].includes(req.method)
+        && before && after && Array.isArray(metadata?.changes) && metadata.changes.length === 0;
+      const description = noChange ? baseDescription.replace(/^(Updated|Changed) /, "Saved ") + " with no changes" : baseDescription;
       await recordAuditEvent({
         actorId: req.user?.id ?? null,
         category: getCategory(path),
         action: getAction(req.method, path),
-        description: getDescription(req.method, path, req.body, before, after),
+        description,
         route: path.slice(0, 255),
-        metadata: metadataFor(path, req.body, before, after, res.locals.auditDetails),
+        metadata,
       });
     })().catch((error) => console.error("[audit] Failed to record event:", error.message));
   });
