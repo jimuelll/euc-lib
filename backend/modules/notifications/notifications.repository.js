@@ -127,12 +127,46 @@ const getUserRole = async (userId) => {
   return row?.role ?? "student";
 };
 
+const searchNotificationRecipients = async (query) => {
+  const term = `%${query}%`;
+  const [rows] = await db.query(
+    `SELECT id, name, role, student_employee_id, library_card_number,
+            student_number, employee_number, username
+       FROM users
+      WHERE deleted_at IS NULL AND is_active = 1
+        AND (name LIKE ? OR CAST(id AS CHAR) LIKE ? OR student_employee_id LIKE ?
+          OR library_card_number LIKE ? OR student_number LIKE ?
+          OR employee_number LIKE ? OR username LIKE ?)
+      ORDER BY name ASC
+      LIMIT 10`,
+    [term, term, term, term, term, term, term],
+  );
+  return rows;
+};
+
+const findActiveNotificationRecipient = async (userId) => {
+  const [[row]] = await db.query(
+    `SELECT id, name, role, student_employee_id, library_card_number,
+            student_number, employee_number, username
+       FROM users
+      WHERE id = ? AND deleted_at IS NULL AND is_active = 1
+      LIMIT 1`,
+    [userId],
+  );
+  return row ?? null;
+};
+
 const listAdminNotifications = async ({ page, limit }) => {
   const [[{ total }]] = await db.query("SELECT COUNT(*) AS total FROM notifications");
   const [rows] = await db.query(
-    `SELECT n.*, creator.name AS creator_name
+    `SELECT n.*, creator.name AS creator_name,
+            recipient.name AS audience_user_name,
+            COALESCE(recipient.username, recipient.student_employee_id,
+                     recipient.library_card_number, recipient.employee_number,
+                     recipient.student_number) AS audience_user_identifier
        FROM notifications n
        LEFT JOIN users creator ON creator.id = n.created_by
+       LEFT JOIN users recipient ON recipient.id = n.audience_user_id
       ORDER BY n.created_at DESC
       LIMIT ? OFFSET ?`,
     [limit, (page - 1) * limit],
@@ -161,6 +195,8 @@ module.exports = {
   updateNotification,
   createNotification,
   getUserRole,
+  searchNotificationRecipients,
+  findActiveNotificationRecipient,
   listAdminNotifications,
   getAdminStats,
 };

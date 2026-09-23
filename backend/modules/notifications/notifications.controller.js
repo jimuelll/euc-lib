@@ -1,5 +1,17 @@
 const service = require("./notifications.service");
 
+const searchAdminNotificationRecipients = async (req, res) => {
+  try {
+    const query = String(req.query.q ?? "").trim();
+    if (query.length < 2) return res.json({ recipients: [] });
+    const recipients = await service.searchNotificationRecipients(query);
+    res.json({ recipients });
+  } catch (err) {
+    console.error("[notifications] searchAdminNotificationRecipients:", err);
+    res.status(500).json({ message: "Failed to search accounts" });
+  }
+};
+
 const listMyNotifications = async (req, res) => {
   try {
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
@@ -92,6 +104,11 @@ const createAdminNotification = async (req, res) => {
       return res.status(400).json({ message: "audienceUserId is required for user notifications" });
     }
 
+    if (audienceType === "user") {
+      const recipient = await service.findActiveNotificationRecipient(Number(audienceUserId));
+      if (!recipient) return res.status(400).json({ message: "Select an active account for this notification" });
+    }
+
     if (audienceType === "role" && !audienceRole) {
       return res.status(400).json({ message: "audienceRole is required for role notifications" });
     }
@@ -132,6 +149,7 @@ const listAdminNotifications = async (req, res) => {
 };
 
 module.exports = {
+  searchAdminNotificationRecipients,
   listMyNotifications,
   getUnreadCount,
   markAsRead,

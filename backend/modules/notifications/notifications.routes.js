@@ -11,6 +11,7 @@ router.get("/notifications/my", anyAuthenticatedUser, controller.listMyNotificat
 router.get("/notifications/unread-count", anyAuthenticatedUser, controller.getUnreadCount);
 router.post("/notifications/:notificationId/read", anyAuthenticatedUser, controller.markAsRead);
 router.post("/notifications/read-all", anyAuthenticatedUser, controller.markAllAsRead);
+router.get("/admin/notifications/recipients", adminOnly, controller.searchAdminNotificationRecipients);
 router.get("/admin/notifications", adminOnly, controller.listAdminNotifications);
 router.post("/admin/notifications", adminOnly, controller.createAdminNotification);
 

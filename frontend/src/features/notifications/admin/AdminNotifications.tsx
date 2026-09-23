@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { BellRing, RefreshCw, Send, User, Users, Waves } from "lucide-react";
+import { BellRing, Check, RefreshCw, Send, User, Users, Waves, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
-import { createAdminNotification, fetchAdminNotifications, type AdminNotification, type AdminNotificationStats, type AudienceType } from "./api";
+import { createAdminNotification, fetchAdminNotifications, searchNotificationRecipients, type AdminNotification, type AdminNotificationStats, type AudienceType, type NotificationRecipient } from "./api";
 
 const emptyStats: AdminNotificationStats = {
   total_notifications: 0,
@@ -27,7 +28,6 @@ const defaultForm = {
   body: "",
   href: "",
   audienceType: "all" as AudienceType,
-  audienceUserId: "",
   audienceRole: "student",
   expiresAt: "",
 };
@@ -57,6 +57,12 @@ const AdminNotifications = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const [selectedRecipient, setSelectedRecipient] = useState<NotificationRecipient | null>(null);
+  const [recipientResults, setRecipientResults] = useState<NotificationRecipient[]>([]);
+  const [recipientLoading, setRecipientLoading] = useState(false);
+  const [recipientError, setRecipientError] = useState("");
+  const debouncedRecipientQuery = useDebounce(recipientQuery.trim(), 300);
 
   const loadData = async (page = 1) => {
     setLoading(true);
@@ -77,8 +83,26 @@ const AdminNotifications = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (form.audienceType !== "user" || debouncedRecipientQuery.length < 2 || selectedRecipient) {
+      setRecipientResults([]);
+      setRecipientLoading(false);
+      setRecipientError("");
+      return;
+    }
+
+    let cancelled = false;
+    setRecipientLoading(true);
+    setRecipientError("");
+    searchNotificationRecipients(debouncedRecipientQuery)
+      .then((recipients) => { if (!cancelled) setRecipientResults(recipients); })
+      .catch((err: any) => { if (!cancelled) setRecipientError(err.response?.data?.message || "Could not search accounts. Try again."); })
+      .finally(() => { if (!cancelled) setRecipientLoading(false); });
+    return () => { cancelled = true; };
+  }, [debouncedRecipientQuery, form.audienceType, selectedRecipient]);
+
   const audienceHelp = useMemo(() => {
-    if (form.audienceType === "user") return "Send this notification to one specific user ID.";
+    if (form.audienceType === "user") return "Send this notification to one selected account.";
     if (form.audienceType === "role") return "Send this notification to every user under one role.";
     return "Broadcast this notification to all active users.";
   }, [form.audienceType]);
@@ -96,13 +120,15 @@ const AdminNotifications = () => {
         body: form.body,
         href: form.href || null,
         audienceType: form.audienceType,
-        audienceUserId: form.audienceType === "user" ? Number(form.audienceUserId) : null,
+        audienceUserId: form.audienceType === "user" ? selectedRecipient?.id ?? null : null,
         audienceRole: form.audienceType === "role" ? form.audienceRole : null,
         expiresAt: form.expiresAt || null,
       });
 
       setSuccess("Notification sent successfully.");
       setForm(defaultForm);
+      setRecipientQuery("");
+      setSelectedRecipient(null);
       await loadData();
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || "Failed to send notification");
@@ -160,7 +186,7 @@ const AdminNotifications = () => {
                 <label className="text-sm font-medium text-foreground">Audience</label>
                 <Select
                   value={form.audienceType}
-                  onValueChange={(value: AudienceType) => setForm((prev) => ({ ...prev, audienceType: value }))}
+                  onValueChange={(value: AudienceType) => { setForm((prev) => ({ ...prev, audienceType: value })); setRecipientQuery(""); setSelectedRecipient(null); }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select audience" />
@@ -249,15 +275,40 @@ const AdminNotifications = () => {
 
             {form.audienceType === "user" ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">User ID</label>
+                <label htmlFor="notification-recipient-search" className="text-sm font-medium text-foreground">Recipient</label>
+                {selectedRecipient ? (
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{selectedRecipient.name}</p>
+                      <p className="text-xs text-muted-foreground">Account ID {selectedRecipient.id} · {selectedRecipient.username || selectedRecipient.student_employee_id} · {selectedRecipient.role}</p>
+                    </div>
+                    <Button type="button" size="icon" variant="ghost" aria-label="Clear selected recipient" onClick={() => { setSelectedRecipient(null); setRecipientQuery(""); }}><X /></Button>
+                  </div>
+                ) : (
+                  <>
                 <Input
-                  type="number"
-                  min="1"
-                  value={form.audienceUserId}
-                  onChange={(e) => setForm((prev) => ({ ...prev, audienceUserId: e.target.value }))}
-                  placeholder="14"
-                  required
+                  id="notification-recipient-search"
+                  value={recipientQuery}
+                  onChange={(e) => { setRecipientQuery(e.target.value); setSelectedRecipient(null); setRecipientResults([]); setRecipientError(""); }}
+                  placeholder="Search by name, account ID, or username"
+                  autoComplete="off"
+                  aria-describedby="notification-recipient-help"
                 />
+                <p id="notification-recipient-help" className="text-xs text-muted-foreground">Enter at least 2 characters, then select the matching account.</p>
+                {recipientQuery.trim().length >= 2 ? (
+                  <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-background" aria-label="Matching accounts" aria-live="polite" aria-busy={recipientLoading}>
+                    {recipientLoading ? <p className="px-3 py-4 text-sm text-muted-foreground">Searching accounts…</p>
+                      : recipientError ? <p className="px-3 py-4 text-sm text-destructive">{recipientError}</p>
+                        : recipientResults.length ? recipientResults.map((recipient) => (
+                          <button key={recipient.id} type="button" aria-label={`Select ${recipient.name}, account ID ${recipient.id}, ${recipient.username || recipient.student_employee_id}`} className="flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left last:border-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { setSelectedRecipient(recipient); setRecipientQuery(""); setRecipientResults([]); }}>
+                            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{recipient.name}</span><span className="block truncate text-xs text-muted-foreground">ID {recipient.id} · {recipient.username || recipient.student_employee_id} · {recipient.role}</span></span>
+                            <Check className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                          </button>
+                        )) : <p className="px-3 py-4 text-sm text-muted-foreground">No active accounts matched. Try a name, ID, or username.</p>}
+                  </div>
+                ) : null}
+                  </>
+                )}
               </div>
             ) : null}
 
@@ -277,7 +328,7 @@ const AdminNotifications = () => {
               </div>
             ) : null}
 
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving || (form.audienceType === "user" && !selectedRecipient)}>
               <Send className="mr-2 h-4 w-4" />
               {saving ? "Sending..." : "Send notification"}
             </Button>
@@ -302,7 +353,7 @@ const AdminNotifications = () => {
                           ? "All users"
                           : notification.audience_type === "role"
                             ? `Role: ${notification.audience_role}`
-                            : `User ID: ${notification.audience_user_id}`}
+                            : `${notification.audience_user_name || "Account"} · ${notification.audience_user_identifier || `ID ${notification.audience_user_id}`}`}
                       </span>
                     </div>
                     <p className="text-sm font-medium text-foreground">{notification.title}</p>

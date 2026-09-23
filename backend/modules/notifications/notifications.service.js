@@ -23,6 +23,8 @@ const normaliseNotification = (row) => ({
   created_by: row.created_by,
   source_type: row.source_type ?? null,
   source_id: row.source_id ?? null,
+  audience_user_name: row.audience_user_name ?? null,
+  audience_user_identifier: row.audience_user_identifier ?? null,
   read_at: row.read_at ?? null,
   is_read: !!row.read_at,
 });
@@ -34,6 +36,9 @@ const listForUser = async ({ userId, role, limit = DEFAULT_LIMIT, unreadOnly = f
 };
 
 const getUnreadCountForUser = async ({ userId, role }) => repository.getUnreadCountForUser({ userId, role });
+
+const searchNotificationRecipients = async (query) => repository.searchNotificationRecipients(query);
+const findActiveNotificationRecipient = async (userId) => repository.findActiveNotificationRecipient(userId);
 
 const getByIdForUser = async ({ notificationId, userId, role }) => {
   const row = await repository.getByIdForUser({ notificationId, userId, role });
@@ -142,6 +147,8 @@ module.exports = {
   ensureNotificationSourceColumns,
   listForUser,
   getUnreadCountForUser,
+  searchNotificationRecipients,
+  findActiveNotificationRecipient,
   getByIdForUser,
   markAsRead,
   markAllAsRead,
