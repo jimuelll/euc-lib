@@ -71,11 +71,89 @@ async function findBookIsbn(bookId) {
   return book || null;
 }
 
+async function findEnrichment(bookId) {
+  const [[row]] = await db.query("SELECT source, enrichment_json, status, last_error FROM book_enrichment WHERE book_id = ? LIMIT 1", [bookId]);
+  return row || null;
+}
+
+function bookNeedsManualMetadataSql(alias = "enrichment") {
+  return `(${alias}.book_id IS NULL OR ${alias}.status <> 'ready' OR ${alias}.enrichment_json IS NULL OR NOT (
+    COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.description'))), ''), '') <> ''
+    OR COALESCE(JSON_LENGTH(JSON_EXTRACT(${alias}.enrichment_json, '$.subjects')), 0) > 0
+    OR COALESCE(JSON_LENGTH(JSON_EXTRACT(${alias}.enrichment_json, '$.categories')), 0) > 0
+    OR COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.publisher'))), ''), '') <> ''
+    OR COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.language'))), ''), '') <> ''
+    OR COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.pageCount'))), ''), '') <> ''
+    OR COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.publishedDate'))), ''), '') <> ''
+  ))`;
+}
+
+async function listBooksForMetadata({ query = "", needsAttention = false, page = 1, limit = 25 }) {
+  const filters = ["bk.material_type = 'book'", "bk.deleted_at IS NULL"];
+  const params = [];
+  if (query.trim()) {
+    const match = `%${query.trim()}%`;
+    filters.push("(bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)");
+    params.push(match, match, match);
+  }
+  if (needsAttention) filters.push(`((COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()}) OR embeddings.book_id IS NULL OR embeddings.status <> 'ready')`);
+  const where = filters.join(" AND ");
+  const [[count]] = await db.query(
+    `SELECT COUNT(*) AS total FROM books bk
+     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
+     WHERE ${where}`,
+    params
+  );
+  const [rows] = await db.query(
+    `SELECT bk.id, bk.title, bk.author, bk.isbn,
+       enrichment.source AS metadata_source, enrichment.status AS metadata_status, enrichment.enrichment_json,
+       embeddings.status AS embedding_status
+     FROM books bk
+     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
+     WHERE ${where}
+     ORDER BY CASE WHEN ((${bookNeedsManualMetadataSql()}) OR embeddings.book_id IS NULL OR embeddings.status <> 'ready') THEN 0 ELSE 1 END, bk.title ASC, bk.id ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, (page - 1) * limit]
+  );
+  return { rows, total: Number(count.total || 0) };
+}
+
+async function findBookMetadataRecord(bookId) {
+  const [[row]] = await db.query(
+    `SELECT bk.id, bk.title, bk.author, bk.isbn, bk.material_type,
+       enrichment.source AS metadata_source, enrichment.status AS metadata_status,
+       enrichment.enrichment_json, enrichment.last_error AS metadata_error,
+       embeddings.status AS embedding_status, embeddings.last_error AS embedding_error
+     FROM books bk
+     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
+     WHERE bk.id = ? AND bk.deleted_at IS NULL LIMIT 1`,
+    [bookId]
+  );
+  return row || null;
+}
+
+async function saveManualEnrichment(bookId, enrichment) {
+  await db.query(
+    `INSERT INTO book_enrichment (book_id, source, enrichment_json, status, enriched_at, last_error)
+     VALUES (?, 'manual', ?, 'ready', CURRENT_TIMESTAMP, NULL)
+     ON DUPLICATE KEY UPDATE source='manual', enrichment_json=VALUES(enrichment_json), status='ready', enriched_at=CURRENT_TIMESTAMP, last_error=NULL`,
+    [bookId, JSON.stringify(enrichment)]
+  );
+}
+
 async function saveEnrichment(bookId, enrichment) {
   await db.query(
     `INSERT INTO book_enrichment (book_id, source, enrichment_json, status, enriched_at, last_error)
      VALUES (?, 'openlibrary_googlebooks', ?, 'ready', CURRENT_TIMESTAMP, NULL)
-     ON DUPLICATE KEY UPDATE source=VALUES(source), enrichment_json=VALUES(enrichment_json), status='ready', enriched_at=CURRENT_TIMESTAMP, last_error=NULL`,
+     ON DUPLICATE KEY UPDATE
+       source=IF(source='manual', source, VALUES(source)),
+       enrichment_json=IF(source='manual', enrichment_json, VALUES(enrichment_json)),
+       status=IF(source='manual', status, 'ready'),
+       enriched_at=IF(source='manual', enriched_at, CURRENT_TIMESTAMP),
+       last_error=IF(source='manual', last_error, NULL)`,
     [bookId, JSON.stringify(enrichment)]
   );
 }
@@ -83,7 +161,7 @@ async function saveEnrichment(bookId, enrichment) {
 async function markEnrichmentFailed(bookId, message) {
   await db.query(
     `INSERT INTO book_enrichment (book_id, source, status, last_error) VALUES (?, 'none', 'failed', ?)
-     ON DUPLICATE KEY UPDATE status='failed', last_error=VALUES(last_error)`,
+     ON DUPLICATE KEY UPDATE status=IF(source='manual', status, 'failed'), last_error=IF(source='manual', last_error, VALUES(last_error))`,
     [bookId, message]
   );
 }
@@ -120,7 +198,8 @@ async function findBooksForBackfill() {
     `SELECT bk.id, bk.title FROM books bk
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
      WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL
-       AND (enrichment.book_id IS NULL OR enrichment.status <> 'ready' OR enrichment.enrichment_json IS NULL)
+       AND COALESCE(enrichment.source, '') <> 'manual'
+       AND ${bookNeedsManualMetadataSql()}
      ORDER BY bk.id`
   );
   return books;
@@ -132,4 +211,4 @@ async function getEmbeddingStatus() {
   return { row, errors };
 }
 
-module.exports = { getPublicFieldKeys, findActiveCandidates, findEmbedding, findEmbeddings, findBook, findHistorySeeds, findDismissedBookIds, findBookId, dismissBook, findBookIsbn, saveEnrichment, markEnrichmentFailed, findBookForEmbedding, findReadyEnrichment, saveEmbedding, markEmbeddingStale, markEmbeddingFailed, findBooksForBackfill, getEmbeddingStatus };
+module.exports = { getPublicFieldKeys, findActiveCandidates, findEmbedding, findEmbeddings, findBook, findHistorySeeds, findDismissedBookIds, findBookId, dismissBook, findBookIsbn, findEnrichment, listBooksForMetadata, findBookMetadataRecord, saveManualEnrichment, saveEnrichment, markEnrichmentFailed, findBookForEmbedding, findReadyEnrichment, saveEmbedding, markEmbeddingStale, markEmbeddingFailed, findBooksForBackfill, getEmbeddingStatus };

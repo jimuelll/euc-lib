@@ -146,6 +146,19 @@ function bodyChanges(path, body = {}, before = null) {
 }
 
 function snapshotChanges(path, before, after, body = {}) {
+  if (path.includes("/admin/recommendations/books/")) {
+    const oldMetadata = parseJson(before?.enrichment_json) || {};
+    const newMetadata = parseJson(after?.enrichment_json ?? body) || {};
+    return [
+      change("description", "AI book summary", oldMetadata.description, newMetadata.description) || [],
+      change("subjects", "AI book subjects", oldMetadata.subjects, newMetadata.subjects) || [],
+      change("publisher", "AI book publisher", oldMetadata.publisher, newMetadata.publisher) || [],
+      change("categories", "AI book categories", oldMetadata.categories, newMetadata.categories) || [],
+      change("language", "AI book language", oldMetadata.language, newMetadata.language) || [],
+      change("pageCount", "AI book page count", oldMetadata.pageCount, newMetadata.pageCount) || [],
+      change("publishedDate", "AI book publication date", oldMetadata.publishedDate, newMetadata.publishedDate) || [],
+    ].flat();
+  }
   if (path.includes("/user-guide/")) {
     const oldContent = parseJson(before?.draft_content, {});
     const newContent = after ? parseJson(after.draft_content, {}) : body;
@@ -204,6 +217,15 @@ function targetFromPath(path, body = {}) {
 
 async function readSnapshot(path, body = {}) {
   const target = targetFromPath(path, body);
+  if (path.includes("/admin/recommendations/books/") && target?.kind === "id") {
+    const [[row]] = await db.query(
+      `SELECT bk.id, bk.title, enrichment.source, enrichment.status, enrichment.enrichment_json
+       FROM books bk LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+       WHERE bk.id = ? LIMIT 1`,
+      [target.value]
+    );
+    return row || null;
+  }
   if (path.includes("catalog-schema")) {
     const [rows] = await db.query("SELECT `key`, label, type, options, required, locked, `order`, public, archived, scope FROM catalog_schema ORDER BY `order`, `key`");
     return rows;
@@ -255,6 +277,7 @@ async function readSnapshot(path, body = {}) {
 
 function getDescription(method, path, body, before, after) {
   if (path.includes("/backup/snapshots") && method === "POST") return "Saved a manual snapshot";
+  if (path.includes("/admin/recommendations/books/")) return `Updated AI recommendation details${describeTarget(body, path, after || before)}`;
   if (path.includes("/circulation") && method === "POST") return `Processed circulation${describeTarget(body, path, after || before)}`;
   const resource = path.includes("catalog-schema") ? "catalog schema"
     : path.includes("book-types") ? "book type policy"

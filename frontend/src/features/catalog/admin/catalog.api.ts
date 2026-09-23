@@ -49,3 +49,25 @@ export type EmbeddingBackfillProgress = { status: "idle" | "running" | "complete
 export async function fetchEmbeddingStatus(): Promise<EmbeddingStatus> { return (await axiosInstance.get<EmbeddingStatus>("api/admin/recommendations/embeddings/status")).data; }
 export async function backfillEmbeddings(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.post<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill")).data; }
 export async function fetchBackfillProgress(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.get<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill/progress")).data; }
+export type ManualMetadataBook = { id: number; title: string; author?: string | null; isbn?: string | null; source: string | null; metadataStatus: "missing" | "failed" | "ready" | "manual"; embeddingStatus: string };
+export type ManualMetadataBooksResponse = { rows: ManualMetadataBook[]; pagination: CatalogPagination };
+export type ManualBookMetadata = {
+  book: Pick<ManualMetadataBook, "id" | "title" | "author" | "isbn">;
+  summary: string;
+  subjects: string[];
+  additionalDetails: { publisher: string; categories: string[]; language: string; pageCount: number | string | null; publishedDate: string };
+  source: string | null;
+  metadataStatus: "missing" | "failed" | "ready" | "manual";
+  embeddingStatus: string;
+  embeddingError: string | null;
+};
+export type SaveManualBookMetadataResponse = { metadataStatus: "manual"; embeddingStatus: "ready" | "failed"; summary: string; subjects: string[]; additionalDetails: ManualBookMetadata["additionalDetails"]; embeddingError: string | null };
+export async function fetchManualMetadataBooks(params: { query?: string; needsAttention?: boolean; page?: number }): Promise<ManualMetadataBooksResponse> {
+  return (await axiosInstance.get<ManualMetadataBooksResponse>("api/admin/recommendations/books", { params: { q: params.query || "", needsAttention: params.needsAttention ? "true" : "false", page: params.page || 1, limit: 25 } })).data;
+}
+export async function fetchManualBookMetadata(bookId: number): Promise<ManualBookMetadata> {
+  return (await axiosInstance.get<ManualBookMetadata>(`api/admin/recommendations/books/${bookId}/metadata`)).data;
+}
+export async function saveManualBookMetadata(bookId: number, payload: { summary: string; subjects: string[]; additionalDetails: ManualBookMetadata["additionalDetails"] }): Promise<SaveManualBookMetadataResponse> {
+  return (await axiosInstance.put<SaveManualBookMetadataResponse>(`api/admin/recommendations/books/${bookId}/metadata`, payload)).data;
+}

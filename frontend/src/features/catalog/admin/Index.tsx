@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { AdminPage, AdminPanel, AdminStatCard } from "@/features/admin";
 import { BookOpen, CircleCheck, LoaderCircle, Sparkles } from "lucide-react";
 import { backfillEmbeddings, fetchBackfillProgress, fetchCatalogSchema, fetchEmbeddingStatus, type EmbeddingBackfillProgress, type EmbeddingStatus } from "./catalog.api";
+import ManualBookMetadata from "./ManualBookMetadata";
 
 const AdminCatalog = () => {
   const { user } = useAuth();
@@ -90,8 +91,9 @@ const AdminCatalog = () => {
               <AdminStatCard label="Embedding records" value={embeddingStatus ? String(embeddingStatus.total) : "—"} icon={<Sparkles className="h-5 w-5" />} helperText="Active operational records in the recommendation store." />
             </div>
             <AdminPanel title="Private metadata backfill" actions={<Button size="sm" disabled={backfilling} onClick={() => setBackfillDialogOpen(true)}>{backfilling ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Embedding…</> : <><Sparkles className="mr-2 h-4 w-4" />Backfill missing metadata</>}</Button>}>
-              <div className="max-w-3xl space-y-3 text-sm leading-6 text-muted-foreground"><p>Use this only when books are missing private ISBN enrichment, or when a previous lookup failed. It retrieves server-only catalogue detail from Open Library and Google Books, then recreates the corresponding Gemini embedding.</p><p>Books with ready enrichment are skipped, so a repeat run does not overwrite existing private metadata or call Gemini unnecessarily.</p>{embeddingStatus?.errors?.length ? <p className="text-destructive">Recent embedding issue: {embeddingStatus.errors[0].message}</p> : null}</div>
+              <div className="max-w-3xl space-y-3 text-sm leading-6 text-muted-foreground"><p>Use this when books are missing useful private details or an earlier lookup failed. The system checks Open Library and Google Books, then refreshes AI recommendations for the affected books.</p><p>Books with useful lookup details or details entered by staff are skipped, so a repeat run leaves them unchanged.</p>{embeddingStatus?.errors?.length ? <p className="text-destructive">Recent embedding issue: {embeddingStatus.errors[0].message}</p> : null}</div>
             </AdminPanel>
+            <ManualBookMetadata />
       </div>}
 
       <AlertDialog open={backfillDialogOpen} onOpenChange={(open) => { if (!backfilling) setBackfillDialogOpen(open); }}>
@@ -115,9 +117,9 @@ const AdminCatalog = () => {
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2"><Sparkles className="size-5 text-warning" /> Backfill missing AI metadata?</AlertDialogTitle>
-                <AlertDialogDescription className="leading-6">This checks active books that do not yet have usable private enrichment metadata. It fetches ISBN details from Open Library and Google Books, keeps them server-only, then rebuilds that book’s Gemini embedding.</AlertDialogDescription>
+                <AlertDialogDescription className="leading-6">This checks active books that do not yet have useful private details. It looks up ISBN details from Open Library and Google Books, then refreshes AI recommendations for those books.</AlertDialogDescription>
               </AlertDialogHeader>
-              <p className="rounded-md bg-muted px-3 py-2 text-sm leading-6 text-muted-foreground">Books that already have ready private metadata are skipped; their enrichment and embeddings are not overwritten.</p>
+              <p className="rounded-md bg-muted px-3 py-2 text-sm leading-6 text-muted-foreground">Books with useful details or details entered by staff are skipped. Their AI details are left unchanged.</p>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={(event) => { event.preventDefault(); void runBackfill(); }}>Start backfill</AlertDialogAction>

@@ -8,6 +8,23 @@ const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embed
 let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, skipped: 0, currentTitle: null, errors: [] };
 
 const normalized = (value) => String(value || "").toLowerCase().trim();
+const parseEnrichment = (value) => {
+  if (!value) return {};
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch { return {}; }
+};
+const hasUsefulMetadata = (enrichment) => Boolean(
+  String(enrichment?.description || "").trim()
+  || (Array.isArray(enrichment?.subjects) && enrichment.subjects.some((subject) => String(subject || "").trim()))
+  || (Array.isArray(enrichment?.categories) && enrichment.categories.some((category) => String(category || "").trim()))
+  || String(enrichment?.publisher || "").trim()
+  || String(enrichment?.language || "").trim()
+  || String(enrichment?.pageCount || "").trim()
+  || String(enrichment?.publishedDate || "").trim()
+);
+const publicEmbeddingError = (error) => String(error?.message || error || "Embedding failed").replace(/key=[^&\s]+/gi, "key=[redacted]").slice(0, 240);
 const tokens = (value) => new Set(normalized(value).split(/[^a-z0-9]+/).filter((token) => token.length > 2));
 const overlap = (a, b) => {
   const left = tokens(a); const right = tokens(b);
@@ -26,7 +43,7 @@ const embeddingText = (book, enrichment = {}) => {
   const metadata = parseMetadata(book.metadata);
   const fields = book.material_type === "thesis"
     ? [book.title, book.author, metadata.thesis_program, metadata.thesis_keywords, metadata.thesis_abstract, metadata.thesis_adviser, metadata.academic_year]
-    : [book.title, book.author, metadata.category, metadata.edition, metadata.publication_year, enrichment.description, ...(enrichment.subjects || []), ...(enrichment.categories || []), enrichment.publisher, enrichment.language];
+    : [book.title, book.author, metadata.category, metadata.edition, metadata.publication_year, enrichment.description, ...(enrichment.subjects || []), ...(enrichment.categories || []), enrichment.publisher, enrichment.language, enrichment.pageCount, enrichment.publishedDate];
   return fields.filter(Boolean).join("\n");
 };
 const contentHash = (book, enrichment) => crypto.createHash("sha256").update(embeddingText(book, enrichment)).digest("hex");
@@ -125,10 +142,110 @@ const dismiss = async (userId, bookId) => {
   await repository.dismissBook(userId, bookId);
 };
 
+const listMetadataBooks = async ({ query = "", needsAttention = false, page = 1, limit = 25 } = {}) => {
+  const result = await repository.listBooksForMetadata({ query, needsAttention, page, limit });
+  const rows = result.rows.map((row) => {
+    const enrichment = parseEnrichment(row.enrichment_json);
+    const hasMetadata = hasUsefulMetadata(enrichment);
+    const metadataStatus = row.metadata_source === "manual" ? "manual"
+      : row.metadata_status === "failed" ? "failed"
+        : row.metadata_status === "ready" && hasMetadata ? "ready" : "missing";
+    return {
+      id: row.id, title: row.title, author: row.author, isbn: row.isbn,
+      source: row.metadata_source || null, metadataStatus, embeddingStatus: row.embedding_status || "missing",
+    };
+  });
+  return { rows, pagination: { page, limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / limit)) } };
+};
+
+const getManualMetadata = async (bookId) => {
+  const record = await repository.findBookMetadataRecord(bookId);
+  if (!record) { const error = new Error("Book not found"); error.status = 404; throw error; }
+  if (record.material_type !== "book") { const error = new Error("Manual AI details are available for books only"); error.status = 400; throw error; }
+  const enrichment = parseEnrichment(record.enrichment_json);
+  return {
+    book: { id: record.id, title: record.title, author: record.author, isbn: record.isbn },
+    summary: String(enrichment.description || ""),
+    subjects: Array.isArray(enrichment.subjects) ? enrichment.subjects : [],
+    additionalDetails: {
+      publisher: enrichment.publisher || "",
+      categories: Array.isArray(enrichment.categories) ? enrichment.categories : [],
+      language: enrichment.language || "",
+      pageCount: enrichment.pageCount ?? null,
+      publishedDate: enrichment.publishedDate || "",
+    },
+    source: record.metadata_source || null,
+    metadataStatus: record.metadata_status === "failed" ? "failed" : hasUsefulMetadata(enrichment) ? (record.metadata_source === "manual" ? "manual" : "ready") : "missing",
+    embeddingStatus: record.embedding_status || "missing",
+    embeddingError: record.embedding_error ? publicEmbeddingError(record.embedding_error) : null,
+  };
+};
+
+const saveManualMetadata = async (bookId, payload = {}) => {
+  const record = await repository.findBookMetadataRecord(bookId);
+  if (!record) { const error = new Error("Book not found"); error.status = 404; throw error; }
+  if (record.material_type !== "book") { const error = new Error("Manual AI details are available for books only"); error.status = 400; throw error; }
+  const existing = parseEnrichment(record.enrichment_json);
+  if (payload.summary !== undefined && typeof payload.summary !== "string") { const error = new Error("Book summary must be text"); error.status = 400; throw error; }
+  const summary = payload.summary === undefined ? String(existing.description || "") : payload.summary.trim();
+  if (summary.length > 8000) { const error = new Error("The book summary must be 8,000 characters or fewer"); error.status = 400; throw error; }
+  if (payload.subjects !== undefined && !Array.isArray(payload.subjects)) { const error = new Error("Subjects must be sent as a list"); error.status = 400; throw error; }
+  if ((payload.subjects || []).length > 40 || (payload.subjects || []).some((subject) => typeof subject !== "string")) { const error = new Error("Enter up to 40 subjects as text"); error.status = 400; throw error; }
+  const subjects = payload.subjects === undefined
+    ? (Array.isArray(existing.subjects) ? existing.subjects : [])
+    : [...new Map(payload.subjects.map((subject) => subject.trim()).filter(Boolean).map((subject) => [normalized(subject), subject])).values()];
+  if (subjects.length > 40 || subjects.some((subject) => subject.length > 160)) { const error = new Error("Enter up to 40 subjects, each 160 characters or fewer"); error.status = 400; throw error; }
+  const additional = payload.additionalDetails ?? {};
+  if (!additional || typeof additional !== "object" || Array.isArray(additional)) { const error = new Error("Additional book details must be sent as an object"); error.status = 400; throw error; }
+  const cleanText = (key, maxLength, label) => {
+    if (additional[key] === undefined) return typeof existing[key] === "string" ? existing[key] : "";
+    if (typeof additional[key] !== "string") { const error = new Error(`${label} must be text`); error.status = 400; throw error; }
+    const value = additional[key].trim();
+    if (value.length > maxLength) { const error = new Error(`${label} must be ${maxLength} characters or fewer`); error.status = 400; throw error; }
+    return value;
+  };
+  const publisher = cleanText("publisher", 200, "Publisher");
+  const language = cleanText("language", 80, "Language");
+  const publishedDate = cleanText("publishedDate", 64, "Publication date");
+  let categories = Array.isArray(existing.categories) ? existing.categories : [];
+  if (additional.categories !== undefined) {
+    if (!Array.isArray(additional.categories) || additional.categories.length > 40 || additional.categories.some((category) => typeof category !== "string")) {
+      const error = new Error("Enter up to 40 categories as text"); error.status = 400; throw error;
+    }
+    categories = [...new Map(additional.categories.map((category) => category.trim()).filter(Boolean).map((category) => [normalized(category), category])).values()];
+    if (categories.some((category) => category.length > 160)) { const error = new Error("Each category must be 160 characters or fewer"); error.status = 400; throw error; }
+  }
+  let pageCount = existing.pageCount ?? null;
+  if (additional.pageCount !== undefined) {
+    const rawPageCount = additional.pageCount;
+    if (rawPageCount === null || rawPageCount === "") pageCount = null;
+    else {
+      const parsedPageCount = typeof rawPageCount === "number" ? rawPageCount : (typeof rawPageCount === "string" && /^\d+$/.test(rawPageCount.trim()) ? Number(rawPageCount) : NaN);
+      if (!Number.isInteger(parsedPageCount) || parsedPageCount < 1 || parsedPageCount > 100000) { const error = new Error("Page count must be a whole number from 1 to 100,000"); error.status = 400; throw error; }
+      pageCount = parsedPageCount;
+    }
+  }
+  const enrichment = { ...existing, description: summary, subjects, publisher, categories, language, pageCount, publishedDate };
+  if (!hasUsefulMetadata(enrichment)) { const error = new Error("Add at least one book detail before saving"); error.status = 400; throw error; }
+  await repository.saveManualEnrichment(bookId, enrichment);
+
+  try {
+    await markEmbeddingStale(bookId);
+    await embedBook(bookId);
+    return { metadataStatus: "manual", embeddingStatus: "ready", summary, subjects, additionalDetails: { publisher, categories, language, pageCount, publishedDate }, embeddingError: null };
+  } catch (error) {
+    const message = publicEmbeddingError(error);
+    await repository.markEmbeddingFailed(bookId, message).catch(() => {});
+    return { metadataStatus: "manual", embeddingStatus: "failed", summary, subjects, additionalDetails: { publisher, categories, language, pageCount, publishedDate }, embeddingError: message };
+  }
+};
+
 const toText = (value) => typeof value === "string" ? value : (value?.value || value?.text || "");
 const unique = (values) => [...new Set(values.filter(Boolean).map((value) => String(value).trim()))];
 const fetchJson = async (url) => { const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(`Metadata source failed (${response.status})`); return response.json(); };
 const enrichBook = async (bookId) => {
+  const existing = await repository.findEnrichment(bookId);
+  if (existing?.source === "manual") return parseEnrichment(existing.enrichment_json);
   const book = await repository.findBookIsbn(bookId);
   if (!book?.isbn) return null;
   try {
@@ -164,7 +281,7 @@ const embedBook = async (bookId) => {
   if (process.env.AI_EMBEDDING_PROVIDER !== "gemini" || !process.env.GEMINI_API_KEY) throw new Error("Gemini embedding provider is not configured");
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:embedContent`,
-    { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY }, body: JSON.stringify({ model: `models/${model}`, taskType: "SEMANTIC_SIMILARITY", content: { parts: [{ text: embeddingText(book, enrichment) }] } }) }
+    { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY }, body: JSON.stringify({ model: `models/${model}`, taskType: "SEMANTIC_SIMILARITY", content: { parts: [{ text: embeddingText(book, enrichment) }] } }), signal: AbortSignal.timeout(30000) }
   );
   if (!response.ok) {
     const providerMessage = await response.text();
@@ -229,4 +346,4 @@ const embeddingStatus = async () => {
   return { total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })) };
 };
 
-module.exports = { recommendationsForSeed, personalized, dismiss, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, backfillProgress, embeddingStatus };
+module.exports = { recommendationsForSeed, personalized, dismiss, listMetadataBooks, getManualMetadata, saveManualMetadata, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, backfillProgress, embeddingStatus };
