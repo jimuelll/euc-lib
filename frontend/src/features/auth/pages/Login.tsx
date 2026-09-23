@@ -97,7 +97,7 @@ const Login = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-px w-4 bg-warning shrink-0" />
                   <span
-                    className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+                    className="text-xs font-bold uppercase tracking-[0.3em] text-warning"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Enverga-Candelaria Library
@@ -109,7 +109,7 @@ const Login = () => {
                 >
                   Library Access
                 </h1>
-                <p className="mt-1.5 text-[12px] text-primary-foreground/45 leading-relaxed">
+                <p className="mt-1.5 text-xs text-primary-foreground/85 leading-relaxed">
                   Sign in with your library card, employee number, or username.
                 </p>
               </div>
@@ -118,7 +118,7 @@ const Login = () => {
             <form onSubmit={handleLogin} className="border border-border border-t-0 divide-y divide-border bg-card">
               <div className="px-6 pt-5 pb-4">
                 <label
-                  className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                  className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                   htmlFor="login-id"
                 >
@@ -131,14 +131,14 @@ const Login = () => {
                   onChange={(e) => setId(e.target.value)}
                   placeholder="Library card, employee no., or username"
                   autoComplete="username"
-                  className="h-10 w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary transition-colors"
+                  className="h-10 w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition-colors"
                 />
               </div>
 
               <div className="px-6 pt-4 pb-5">
                 <div className="flex items-center justify-between mb-2">
                   <label
-                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                    className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
                     style={{ fontFamily: "var(--font-heading)" }}
                     htmlFor="login-password"
                   >
@@ -149,14 +149,14 @@ const Login = () => {
                     <DialogTrigger asChild>
                       <button
                         type="button"
-                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-primary transition-colors"
+                        className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-primary hover:text-primary transition-colors"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         Forgot?
                         <HelpCircle className="h-3 w-3" />
                       </button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-sm rounded-none border-border bg-card p-0 shadow-2xl">
+                    <DialogContent className="max-w-sm rounded-md border-border bg-card p-0 shadow-2xl">
                       <div className="bg-primary relative overflow-hidden px-6 py-5">
                         <div className="absolute inset-x-0 top-0 h-[3px] bg-warning" />
                         <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
@@ -169,7 +169,7 @@ const Login = () => {
                         />
                         <DialogHeader className="relative z-10 space-y-3 text-left">
                           <span
-                            className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+                            className="text-xs font-bold uppercase tracking-[0.28em] text-primary-foreground/90"
                             style={{ fontFamily: "var(--font-heading)" }}
                           >
                             Account Help
@@ -203,7 +203,7 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    className="h-10 w-full border border-border bg-background px-3.5 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary transition-colors"
+                    className="h-10 w-full border border-border bg-background px-3.5 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition-colors"
                   />
                   <button
                     type="button"
@@ -235,7 +235,7 @@ const Login = () => {
                     </div>
                   </div>
                   <span
-                    className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
+                    className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Remember me
@@ -247,7 +247,7 @@ const Login = () => {
                 <div className="flex gap-0">
                   <div className="w-[3px] bg-destructive shrink-0" />
                   <p
-                    className="flex-1 px-4 py-3 text-[11px] text-destructive bg-destructive/[0.04] leading-relaxed"
+                    className="flex-1 px-4 py-3 text-xs text-destructive bg-destructive/[0.04] leading-relaxed"
                     style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
                   >
                     {error}
@@ -258,7 +258,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-primary-foreground text-[11px] font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {loading ? (
@@ -276,7 +276,7 @@ const Login = () => {
               <div className="flex-1 h-px bg-border" />
               <Link
                 to="/"
-                className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Back to Home

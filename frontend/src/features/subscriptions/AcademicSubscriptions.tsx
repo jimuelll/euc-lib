@@ -47,7 +47,7 @@ const AcademicSubscriptions = () => {
                   <Lock className="h-4 w-4 text-warning" />
                   <div>
                     <p
-                      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+                      className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       Requires Login

@@ -1,3 +1,5 @@
+import { useAdminFilters } from "@/features/admin";
+import { useAdminUrlState } from "@/features/admin";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,7 +52,9 @@ const formatDateTime = (value?: string | null) => {
 };
 
 const AdminAttendanceLogs = () => {
-  const [mode, setMode] = useState("today");
+  const [params, patchParams] = useAdminUrlState();
+  const mode = params.get("tab") === "history" ? "history" : "today";
+  const setMode = (tab: string) => patchParams({ tab });
 
   const {
     logs,
@@ -66,7 +70,9 @@ const AdminAttendanceLogs = () => {
   } = useAttendanceLogs();
 
   const [historyRows, setHistoryRows] = useState<AttendanceHistoryRow[]>([]);
-  const [historyFilters, setHistoryFilters] = useState(emptyHistoryFilters);
+  const { applied: appliedHistory, setApplied: applyHistory, page: historyPage, setPage: setHistoryPage } = useAdminFilters("attendance", emptyHistoryFilters);
+  const [historyFilters, setHistoryFilters] = useState(appliedHistory);
+  useEffect(() => { setHistoryFilters(appliedHistory); }, [appliedHistory]);
   const [historySummary, setHistorySummary] = useState(emptyHistorySummary);
   const [historyPagination, setHistoryPagination] = useState({
     page: 1,
@@ -112,19 +118,19 @@ const AdminAttendanceLogs = () => {
   }, []);
 
   useEffect(() => {
-    void loadHistoryLogs("initial", 1, emptyHistoryFilters);
-  }, [loadHistoryLogs]);
+    if (mode === "history") void loadHistoryLogs("initial", historyPage, appliedHistory);
+  }, [loadHistoryLogs, mode, historyPage, appliedHistory]);
 
   const isFiltered = Boolean(search || filter !== "all");
   const showLoadMore = !fetchState.loading && !fetchState.error && fetchState.hasMore && visible.length > 0 && !search && filter === "all";
 
   const applyHistoryFilters = () => {
-    void loadHistoryLogs("refresh", 1, historyFilters);
+    applyHistory({ ...historyFilters });
   };
 
   const resetHistoryFilters = () => {
     setHistoryFilters(emptyHistoryFilters);
-    void loadHistoryLogs("refresh", 1, emptyHistoryFilters);
+    applyHistory(emptyHistoryFilters);
   };
 
   const refreshActiveMode = () => {
@@ -133,20 +139,20 @@ const AdminAttendanceLogs = () => {
       return;
     }
 
-    void loadHistoryLogs("refresh", 1, historyFilters);
+    applyHistory({ ...historyFilters });
   };
 
   return (
     <AdminPage
       eyebrow="Reports"
-      title="Attendance Logs"
+      title="Attendance"
       description="Open today&apos;s visitor log by default, then switch to history when you need broader attendance reporting."
       contentWidth="wide"
       actions={(
         <Button
           type="button"
           variant="outline"
-          className="rounded-none"
+          className="rounded-md"
           onClick={refreshActiveMode}
           disabled={mode === "today" ? fetchState.loading : historyLoading || historyRefreshing}
         >
@@ -160,9 +166,9 @@ const AdminAttendanceLogs = () => {
       )}
     >
       <Tabs value={mode} onValueChange={setMode} className="space-y-4">
-        <TabsList className="h-auto flex-wrap justify-start rounded-none border border-border/70 bg-background p-1">
-          <TabsTrigger value="today" className="rounded-none">Today</TabsTrigger>
-          <TabsTrigger value="history" className="rounded-none">History</TabsTrigger>
+        <TabsList className="h-auto flex-wrap justify-start rounded-md border border-border/70 bg-background p-1">
+          <TabsTrigger value="today" className="rounded-md">Today</TabsTrigger>
+          <TabsTrigger value="history" className="rounded-md">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="today" className="space-y-6">
@@ -270,8 +276,8 @@ const AdminAttendanceLogs = () => {
               </div>
 
               <div className="flex items-end gap-2">
-                <Button type="button" variant="outline" className="rounded-none" onClick={applyHistoryFilters}>Apply</Button>
-                <Button type="button" variant="ghost" className="rounded-none" onClick={resetHistoryFilters}>Reset</Button>
+                <Button type="button" variant="outline" className="rounded-md" onClick={applyHistoryFilters}>Apply</Button>
+                <Button type="button" variant="ghost" className="rounded-md" onClick={resetHistoryFilters}>Reset</Button>
               </div>
             </div>
           </AdminPanel>
@@ -288,7 +294,7 @@ const AdminAttendanceLogs = () => {
           <AdminPanel title="Attendance history" description="Historical attendance activity ordered from newest to oldest.">
             {historyLoading ? (
               <div className="space-y-3" aria-label="Loading attendance history">
-                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-none" />)}
+                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}
               </div>
             ) : null}
             {historyError ? (
@@ -310,7 +316,7 @@ const AdminAttendanceLogs = () => {
                     <thead>
                       <tr className="border-b border-border bg-muted/20">
                         {["Person", "Role", "Type", "Purpose", "Scanned By", "Time"].map((heading) => (
-                          <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          <th key={heading} className="px-4 py-3 text-xs font-semibold  text-muted-foreground">
                             {heading}
                           </th>
                         ))}
@@ -338,9 +344,9 @@ const AdminAttendanceLogs = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-none"
+                    className="rounded-md"
                     disabled={historyRefreshing || historyPagination.page <= 1}
-                    onClick={() => void loadHistoryLogs("refresh", historyPagination.page - 1, historyFilters)}
+                    onClick={() => setHistoryPage(historyPagination.page - 1)}
                   >
                     Previous
                   </Button>
@@ -352,9 +358,9 @@ const AdminAttendanceLogs = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-none"
+                    className="rounded-md"
                     disabled={historyRefreshing || historyPagination.page >= historyPagination.totalPages}
-                    onClick={() => void loadHistoryLogs("refresh", historyPagination.page + 1, historyFilters)}
+                    onClick={() => setHistoryPage(historyPagination.page + 1)}
                   >
                     Next
                   </Button>

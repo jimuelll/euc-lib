@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/features/admin";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
@@ -19,7 +20,10 @@ interface ReservationCheckout {
 
 export const useCirculation = (reservationCheckout: ReservationCheckout | null = null, onTransactionCompleted?: () => void) => {
   const navigate = useNavigate();
-  const [type, setType]                   = useState<TransactionType>("borrow");
+  const [params, patchParams] = useAdminUrlState();
+  const type: TransactionType = reservationCheckout ? "borrow" : params.get("transaction") === "return" ? "return" : "borrow";
+  const setType = (transaction: TransactionType) => patchParams({ transaction });
+  const [completed, setCompleted] = useState("");
   const [studentId, setStudentId]         = useState("");
   const [copyBarcode, setCopyBarcode]     = useState("");
 
@@ -36,6 +40,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   // Reset copy state when type changes
   useEffect(() => {
     setFoundCopy(null);
+    setCompleted("");
     setMatchedBorrow(null);
     setCopyBarcode("");
   }, [type]);
@@ -76,7 +81,6 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   useEffect(() => {
     const lookupId = reservationCheckout?.student_employee_id;
     if (!reservationCheckout?.id || !lookupId) return;
-    setType("borrow");
     setStudentId(lookupId);
     setLookingUpUser(true);
     void apiLookupUser(lookupId)
@@ -168,6 +172,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
         await processReturn(copyBarcode.trim());
         toast.success(`"${foundCopy.title}" returned by ${foundUser.name}`);
       }
+      setCompleted(`${type === "borrow" ? "Borrow" : "Return"} completed: ${foundCopy.title} - ${foundUser.name}`);
       resetForm();
       onTransactionCompleted?.();
     } catch (err: any) {
@@ -189,6 +194,8 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
 
   return {
     type, studentId, copyBarcode,
+    completed,
+    startNextTransaction: () => { setCompleted(""); resetForm(); },
     lookingUpUser, lookingUpCopy, submitting,
     foundUser, foundCopy, activeBorrows, matchedBorrow, clearance,
     canSubmit: canSubmit && clearanceAllowsBorrow,

@@ -1,100 +1,99 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Search } from "lucide-react";
-import { motion } from "framer-motion";
-import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/context/AuthContext";
 import { getSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
 
 const HeroSection = () => {
-  const [searchActive, setSearchActive] = useState(false);
   const [query, setQuery] = useState("");
   const [content, setContent] = useState<SiteContent | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const { theme } = useTheme();
   const { isLoggedIn, loading } = useAuth();
-  const isDark = theme === "dark";
 
-  useEffect(() => { getSiteContent().then(setContent).catch(() => undefined); }, []);
+  useEffect(() => {
+    getSiteContent().then(setContent).catch(() => undefined);
+  }, []);
 
   const submitSearch = () => {
     if (query.trim()) navigate(`/catalogue?q=${encodeURIComponent(query.trim())}`);
   };
 
+  const stats = content?.hero_stats || [
+    { value: "12,000+", label: "Volumes" },
+    { value: "400+", label: "Journals" },
+    { value: "24/7", label: "Digital Access" },
+  ];
+
   return (
-    <section className="relative isolate overflow-hidden border-b border-warning/70 bg-[#180908] text-white">
-      <div className="absolute inset-0">
+    <section className="border-b border-border bg-card">
+      <div className="relative isolate overflow-hidden bg-[#180908] text-white">
         <img
           src={content?.hero_image_url || "/hero.jpg"}
           alt="Bookshelves inside the Enverga-Candelaria Library"
-          className="h-full w-full object-cover object-[63%_center]"
+          className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
         />
-        <div
-          className="absolute inset-0"
-          style={{
-            background: isDark
-              ? "linear-gradient(90deg, rgb(128 0 0 / .97) 0%, rgb(128 0 0 / .88) 42%, rgb(31 7 7 / .32) 76%, rgb(18 5 5 / .72) 100%)"
-              : "linear-gradient(90deg, rgb(128 0 0 / .94) 0%, rgb(105 5 5 / .84) 42%, rgb(30 6 5 / .27) 76%, rgb(25 5 5 / .68) 100%)",
-          }}
-        />
-      </div>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,transparent_49.9%,rgb(255_255_255_/_0.09)_50%,transparent_50.1%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(113,0,0,0.95)_0%,rgba(113,0,0,0.85)_39%,rgba(64,7,7,0.40)_72%,rgba(24,5,5,0.50)_100%)]" />
 
-      <div className="container relative z-10 flex min-h-[calc(100svh-59px)] flex-col justify-end px-5 pb-10 pt-16 sm:px-8 sm:pb-14 lg:min-h-[clamp(42rem,calc(100svh-59px),50rem)] lg:px-12 lg:pb-12 lg:pt-20 xl:px-16">
-        <div className="relative max-w-3xl">
-          <motion.p
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45 }}
-            className="homepage-kicker flex items-center gap-3 text-white/75"
-          >
-            <span className="h-px w-8 bg-warning" />
-            {content?.hero_kicker || "Manuel S. Enverga University Foundation — Candelaria Inc."}
-          </motion.p>
+        <div className="container relative z-10 flex min-h-[35rem] items-center px-5 py-14 sm:px-8 sm:py-16 lg:min-h-[37rem] lg:px-12 xl:px-16">
+          <div className="relative w-full max-w-[46rem]">
+            <p className="relative flex max-w-xl items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-white/85">
+              <span className="h-px w-7 shrink-0 bg-[#f5c66b]" aria-hidden="true" />
+              {content?.hero_kicker || "Manuel S. Enverga University Foundation — Candelaria Inc."}
+            </p>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: .14 }} transition={{ duration: .8, delay: .08 }} className="pointer-events-none absolute -left-2 top-3 select-none text-[clamp(5.5rem,16vw,14rem)] font-bold leading-none tracking-[-.07em] text-white sm:-left-5 lg:-left-10">
-            LIBRARY
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .58, delay: .1 }}
-            className="relative mt-16 max-w-2xl text-[clamp(2.9rem,5.7vw,5.6rem)] font-bold leading-[.91] tracking-[-.065em]"
-          >
-            {content?.hero_title || "Enverga-Candelaria"}
-            <span className="mt-1 block tracking-[-.035em] text-warning">{content?.hero_highlight || "Library"}</span>
-          </motion.h1>
-
-          <motion.p initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .5, delay: .19 }} className="relative mt-6 max-w-lg text-base leading-7 text-white/82 sm:text-lg">
-            {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
-          </motion.p>
-
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .48, delay: .27 }} className="relative mt-8 max-w-xl">
-            <div className={`flex h-12 items-center border px-4 transition-colors ${searchActive ? "border-warning bg-black/30" : "border-white/45 bg-black/20 hover:border-white/70"}`} onClick={() => { setSearchActive(true); setTimeout(() => inputRef.current?.focus(), 0); }}>
-              <Search className="mr-3 h-4 w-4 shrink-0 text-white/70" />
-              {searchActive ? (
-                <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); if (event.key === "Escape") setSearchActive(false); }} onBlur={() => { if (!query) setSearchActive(false); }} placeholder="Search the catalogue" className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/55" />
-              ) : <span className="text-sm text-white/65">Search the catalogue</span>}
-              <button type="button" aria-label="Search catalogue" onClick={submitSearch} className="ml-auto p-1 text-warning transition-transform hover:translate-x-0.5"><ArrowRight className="h-5 w-5" /></button>
+            <div className="pointer-events-none absolute -left-5 top-8 hidden select-none text-[clamp(5rem,12vw,10rem)] font-bold leading-none tracking-[-0.07em] text-white/10 lg:block" aria-hidden="true">
+              LIBRARY
             </div>
-          </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .48, delay: .35 }} className="relative mt-4 flex flex-col gap-3 sm:flex-row">
-            <Link to="/catalogue" className="inline-flex h-12 items-center justify-center gap-3 bg-warning px-6 text-[11px] font-bold tracking-[.16em] text-[#1a0b08] uppercase transition-colors hover:bg-[#f8c84e]">
-              Browse Catalogue <ArrowRight className="h-4 w-4" />
-            </Link>
-            {!loading && <Link to={isLoggedIn ? "/my-library" : "/login"} className="inline-flex h-12 items-center justify-center gap-3 border border-warning/80 px-6 text-[11px] font-bold tracking-[.16em] uppercase text-white transition-colors hover:bg-white/10">
-              {isLoggedIn ? "Go to My Library" : "Login for Reservation"}
-            </Link>}
-          </motion.div>
+            <h1 className="relative mt-6 max-w-[12ch] text-[clamp(3.25rem,6vw,5.25rem)] font-bold leading-[0.94] tracking-[-0.055em] sm:max-w-[10ch]">
+              {content?.hero_title || "Enverga-Candelaria"}
+              <span className="mt-1 block tracking-[-0.035em] text-[#f5c66b]">{content?.hero_highlight || "Library"}</span>
+            </h1>
+
+            <p className="relative mt-5 max-w-[35rem] text-base leading-7 text-white/90 sm:text-lg">
+              {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
+            </p>
+
+            <form
+              className="relative mt-8 flex h-12 max-w-[35rem] items-center overflow-hidden rounded-md border border-white/55 bg-black/20 text-white focus-within:ring-2 focus-within:ring-[#f5c66b] focus-within:ring-offset-2 focus-within:ring-offset-[#710000]"
+              onSubmit={(event) => { event.preventDefault(); submitSearch(); }}
+              role="search"
+            >
+              <Search className="ml-4 h-4 w-4 shrink-0 text-white/80" aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }}
+                placeholder="Search the catalogue"
+                aria-label="Search the catalogue"
+                className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-white/80"
+              />
+              <button type="submit" aria-label="Search catalogue" className="flex h-full w-12 shrink-0 items-center justify-center text-[#f5c66b] transition-colors hover:bg-white/10">
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </form>
+
+            <div className="relative mt-4 flex flex-wrap gap-3">
+              <Link to="/catalogue" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f5c66b] px-5 text-sm font-bold text-[#25180f] transition-colors hover:bg-[#ffda94]">
+                Browse Catalogue <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              {!loading && (
+                <Link to={isLoggedIn ? "/my-library" : "/login"} className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#f5c66b]/80 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10">
+                  {isLoggedIn ? "Go to My Library" : "Login for Reservation"}
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
+      </div>
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .6, delay: .45 }} className="mt-9 grid w-full max-w-xl grid-cols-3 border-t border-white/25 pt-5 lg:mt-10">
-          {(content?.hero_stats || [{ value: "12,000+", label: "Volumes" }, { value: "400+", label: "Journals" }, { value: "24/7", label: "Digital Access" }]).map((stat, index) => (
-            <div key={stat.label} className={`px-3 first:pl-0 ${index ? "border-l border-white/25" : ""}`}>
-              <p className="text-2xl font-bold tracking-[-.05em] sm:text-3xl">{stat.value}</p>
-              <p className="mt-1 text-[9px] font-bold tracking-[.19em] uppercase text-white/62">{stat.label}</p>
-            </div>
-          ))}
-        </motion.div>
+      <div className="container grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-8 lg:px-12 xl:px-16">
+        {stats.map((stat) => (
+          <div key={stat.label} className="min-w-0 px-3 first:pl-0 sm:px-6 sm:first:pl-0">
+            <p className="text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">{stat.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

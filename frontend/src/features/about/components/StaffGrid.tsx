@@ -50,7 +50,7 @@ const StaffGrid = ({ staff }: StaffGridProps) => (
                 {member.name}
               </p>
               <p
-                className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60 mt-1"
+                className="text-xs uppercase tracking-[0.18em] text-muted-foreground/60 mt-1"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {member.role}

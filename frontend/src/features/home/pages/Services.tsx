@@ -26,7 +26,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3 mb-6">
     <div className="h-px w-6 bg-warning shrink-0" />
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {children}
@@ -65,7 +65,7 @@ const Services = () => {
                         <Icon className="h-4 w-4 text-primary-foreground" />
                       </div>
                       <span
-                        className="text-[10px] font-bold tracking-[0.2em] text-border"
+                        className="text-xs font-bold tracking-[0.2em] text-border"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         {String(index + 1).padStart(2, "0")}

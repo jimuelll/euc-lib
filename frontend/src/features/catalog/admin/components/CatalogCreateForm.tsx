@@ -68,7 +68,7 @@ export default function CatalogCreateForm({
                 aria-describedby={isbnError ? "create-isbn-error" : undefined}
                 className={`min-h-11 min-w-0 flex-1 border bg-background px-3 text-base sm:text-sm ${isbnError ? "border-destructive" : "border-border"}`}
               />
-              <button type="button" onClick={onLookupIsbn} disabled={isbnLookup} className="flex min-h-11 shrink-0 items-center justify-center gap-2 bg-primary px-4 text-[11px] font-bold uppercase tracking-[0.15em] text-primary-foreground disabled:opacity-50">
+              <button type="button" onClick={onLookupIsbn} disabled={isbnLookup} className="flex min-h-11 shrink-0 items-center justify-center gap-2 bg-primary px-4 text-xs font-bold  text-primary-foreground disabled:opacity-50">
                 {isbnLookup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Look up
               </button>
             </div>
@@ -104,10 +104,10 @@ export default function CatalogCreateForm({
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2.5 border-t border-border pt-5">
-          <button onClick={onSubmit} disabled={loading} className="flex min-h-11 items-center gap-2 bg-primary px-5 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+          <button onClick={onSubmit} disabled={loading} className="flex min-h-11 items-center gap-2 bg-primary px-5 text-xs font-bold  text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : <>{materialType === "book" ? <Library className="h-4 w-4" /> : <FileText className="h-4 w-4" />} Add {materialLabel}</>}
           </button>
-          <button onClick={onClear} disabled={loading} className="flex min-h-11 items-center gap-2 border border-border px-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+          <button onClick={onClear} disabled={loading} className="flex min-h-11 items-center gap-2 border border-border px-4 text-xs font-bold  text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             <RefreshCw className="h-4 w-4" /> Clear
           </button>
         </div>

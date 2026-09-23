@@ -15,7 +15,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3">
     <div className="h-px w-6 bg-warning shrink-0" />
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {children}
@@ -110,7 +110,7 @@ const Catalogue = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by title, author, or ISBN…"
-              className="h-12 w-full border-0 border-b border-primary-foreground/20 pl-12 pr-11 text-sm outline-none transition-colors duration-200 placeholder:text-primary-foreground/45 focus:border-warning"
+              className="h-12 w-full border-0 border-b border-primary-foreground/20 pl-12 pr-11 text-sm outline-none transition-colors duration-200 placeholder:text-primary-foreground/80 focus:border-warning"
               style={{
                 backgroundColor: "hsl(var(--primary) / 0.5)",
                 color: "hsl(var(--primary-foreground))",
@@ -135,7 +135,7 @@ const Catalogue = () => {
 
           {!loading && !error && !hasSearched && (
             <div className="py-16 text-center">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
+              <p className="text-xs font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
                 Start typing to search the catalogue
               </p>
             </div>
@@ -143,7 +143,7 @@ const Catalogue = () => {
 
           {!loading && !error && hasSearched && books.length === 0 && (
             <div className="py-16 text-center">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
+              <p className="text-xs font-bold uppercase tracking-[0.28em] text-muted-foreground/40" style={{ fontFamily: "var(--font-heading)" }}>
                 No catalogue records found matching your search
               </p>
             </div>
@@ -171,7 +171,7 @@ const Catalogue = () => {
                     className={`group flex w-full items-start gap-3 border-b border-r border-border bg-background px-4 py-5 text-left transition-colors duration-200 hover:bg-secondary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning sm:gap-5 sm:px-6 ${selectedBook?.id === book.id ? "bg-secondary/50" : ""}`}
                   >
                     <span
-                      className="mt-0.5 w-5 shrink-0 text-right text-[10px] font-bold tracking-[0.15em] text-muted-foreground/55 sm:w-6"
+                      className="mt-0.5 w-5 shrink-0 text-right text-xs font-bold tracking-[0.15em] text-muted-foreground/55 sm:w-6"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {String(index + 1).padStart(2, "0")}
@@ -188,12 +188,12 @@ const Catalogue = () => {
                         {book.publication_year && <><span className="text-border text-xs">·</span><span className="text-xs text-muted-foreground">{book.publication_year}</span></>}
                       </div>
                       {book.isbn && (
-                        <p className="mt-1.5 break-all text-[10px] tracking-[0.08em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
+                        <p className="mt-1.5 break-all text-xs tracking-[0.08em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
                           ISBN {book.isbn}
                         </p>
                       )}
                       {isReferenceOnly && (
-                        <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+                        <p className="mt-1.5 text-xs font-bold uppercase tracking-[0.12em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
                           Thesis · Reference only
                         </p>
                       )}
@@ -203,7 +203,7 @@ const Catalogue = () => {
                             const val = book[field.key];
                             if (val === undefined || val === null || val === "") return null;
                             return (
-                              <span key={field.key} className="min-w-0 break-words text-[11px] leading-relaxed text-muted-foreground">
+                              <span key={field.key} className="min-w-0 break-words text-xs leading-relaxed text-muted-foreground">
                                 <span className="mr-1 font-bold uppercase tracking-[0.1em] text-muted-foreground/75" style={{ fontFamily: "var(--font-heading)" }}>
                                   {getLabelForKey(field.key)}
                                 </span>{String(val)}
@@ -217,13 +217,13 @@ const Catalogue = () => {
                     {availability && (
                       <div className="ml-2 flex shrink-0 flex-col items-end gap-1 pt-0.5 text-right sm:ml-4">
                         <span
-                          className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                          className="text-xs font-bold uppercase tracking-[0.15em]"
                           style={{ fontFamily: "var(--font-heading)", color: availability.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
                         >
                           {availability.available ? "Available" : "Checked Out"}
                         </span>
                         {book.copies !== undefined && (
-                          <span className="text-[10px] tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
+                          <span className="text-xs tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
                             {book.available ?? 0} of {book.copies} cop{book.copies === 1 ? "y" : "ies"} available
                           </span>
                         )}

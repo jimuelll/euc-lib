@@ -45,7 +45,7 @@ const PostModalActions = ({ canPin, pinned, pinBusy, handlePin, canArchive, arch
                     {archiveBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
                     {archiveConfirm && (
                       <span
-                        className="text-[9px] font-bold uppercase tracking-[0.15em]"
+                        className="text-xs font-bold uppercase tracking-[0.15em]"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         Confirm?

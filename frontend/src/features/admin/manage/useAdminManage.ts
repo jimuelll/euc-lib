@@ -1,3 +1,4 @@
+import { useAdminUrlState, queryPage } from "@/features/admin/hooks/useAdminUrlState";
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -54,6 +55,8 @@ interface UseAdminManageReturn {
 
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
+  const [params, patchParams] = useAdminUrlState();
+  const currentPage = queryPage(params.get("page"));
 
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
@@ -62,14 +65,17 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [programs,      setPrograms]      = useState<AcademicProgram[]>([]);
   const [terms,         setTerms]         = useState<AcademicTerm[]>([]);
   const [departments,   setDepartments]   = useState<Department[]>([]);
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [roleFilter,    setRoleFilter]    = useState("all");
-  const [statusFilter,  setStatusFilter]  = useState("all");
+  const searchQuery = params.get("q") ?? "";
+  const setSearchQuery = (value: string) => patchParams({ q: value, page: null }, true);
+  const roleFilter = params.get("role") ?? "all";
+  const setRoleFilter = (value: string) => patchParams({ role: value, page: null }, false);
+  const statusFilter = params.get("status") ?? "all";
+  const setStatusFilter = (value: string) => patchParams({ status: value, page: null }, false);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
-  const [showArchived,  setShowArchived]  = useState(false);
+  const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   useEffect(() => {
@@ -100,19 +106,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Toggle archived view ───────────────────────────────────────────────────
   const setArchivedView = (archived: boolean) => {
-    setShowArchived(archived);
+    patchParams({ archived, page: null });
     setSelectedUser(null);
-    void (async () => {
-      setLoading(true);
-      try {
-        const result = await searchUsers({ query: searchQuery, role: roleFilter, status: statusFilter, archived, page: 1 });
-        setSearchResults(result.rows);
-        setUserPagination(result.pagination);
-      } catch (err: any) { toast.error(err.response?.data?.message || "Failed to load users"); }
-      finally { setLoading(false); }
-    })();
   };
-
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
     const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks } = form;
@@ -142,7 +138,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
 
   // ── Search ─────────────────────────────────────────────────────────────────
-  const handleSearchUsers = async (page = 1) => {
+  const handleSearchUsers = async (page = currentPage) => {
+    if (page !== currentPage) { patchParams({ page }); return; }
     const trimmedQuery = searchQuery.trim();
 
     setLoading(true);
@@ -161,18 +158,11 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
 
   useEffect(() => {
-    if (user) void handleSearchUsers();
-    // Records are the primary task view; creation stays available as a deliberate mode.
+    const timer = window.setTimeout(() => { if (user) void handleSearchUsers(currentPage); }, 180);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, searchQuery, roleFilter, statusFilter, showArchived, currentPage]);
 
-  useEffect(() => {
-    if (user) void handleSearchUsers();
-    // Filters update the persistent records table immediately.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, statusFilter]);
-
-  // ── Select for edit ────────────────────────────────────────────────────────
   const selectUserForEdit = (u: User) => {
     setSelectedUser(u);
     setForm({

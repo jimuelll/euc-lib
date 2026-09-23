@@ -67,13 +67,13 @@ export default function CatalogEditForm({
         {barcodeStrip}
 
         <div className="mt-6 flex flex-wrap gap-2.5 border-t border-border pt-5">
-          <button onClick={onUpdate} disabled={loading} className="flex min-h-11 items-center gap-2 bg-primary px-5 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+          <button onClick={onUpdate} disabled={loading} className="flex min-h-11 items-center gap-2 bg-primary px-5 text-xs font-bold  text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Updating…</> : `Update ${materialLabel}`}
           </button>
-          <button onClick={onArchive} disabled={loading} className="flex min-h-11 items-center gap-2 border border-destructive/40 px-4 text-[11px] font-bold uppercase tracking-[0.18em] text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+          <button onClick={onArchive} disabled={loading} className="flex min-h-11 items-center gap-2 border border-destructive/40 px-4 text-xs font-bold  text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             <Trash2 className="h-4 w-4" /> {loading ? "Archiving…" : `Archive ${materialLabel}`}
           </button>
-          <button onClick={onDeselect} disabled={loading} className="ml-auto flex min-h-11 items-center gap-2 border border-border px-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
+          <button onClick={onDeselect} disabled={loading} className="ml-auto flex min-h-11 items-center gap-2 border border-border px-4 text-xs font-bold  text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             <RefreshCw className="h-4 w-4" /> {inSheet ? "Close" : "Deselect"}
           </button>
         </div>

@@ -289,15 +289,15 @@ const AdminNotifications = () => {
           description="The latest notifications stored in the database and available for live delivery."
         >
           <div className="space-y-3">
-            {loading ? <div className="space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-24 w-full rounded-none" />)}</div> : notifications.length > 0 ? notifications.map((notification) => (
+            {loading ? <div className="space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-24 w-full rounded-md" />)}</div> : notifications.length > 0 ? notifications.map((notification) => (
               <div key={notification.id} className="border border-border/80 bg-background px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-action">
+                      <span className="inline-flex items-center border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-bold  text-action">
                         {notification.type}
                       </span>
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="text-xs  text-muted-foreground">
                         {notification.audience_type === "all"
                           ? "All users"
                           : notification.audience_type === "role"

@@ -1,3 +1,4 @@
+import { useAdminUrlState, queryPage } from "@/features/admin";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
@@ -14,19 +15,23 @@ import { useAdminConfirmDialog } from "@/features/admin";
 
 export const useReservations = () => {
   const navigate = useNavigate();
+  const [params, patchParams] = useAdminUrlState();
   const [data,         setData]         = useState<ReservationsResult | null>(null);
   const [loading,      setLoading]      = useState(true);
-  const [search,       setSearch]       = useState("");
-  const [statusFilter, setStatus]       = useState("all");
-  const [page,         setPage]         = useState(1);
+  const search = params.get("q") ?? "";
+  const statusFilter = ["pending", "ready", "fulfilled", "cancelled", "expired"].includes(params.get("status") ?? "") ? params.get("status")! : "all";
+  const page = queryPage(params.get("page"));
+  const setPage = (page: number) => patchParams({ page });
   const [actionId,     setActionId]     = useState<number | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  const showArchived = params.get("archived") === "true";
+  const [error, setError] = useState("");
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const filters: Record<string, unknown> = { page, limit: PAGE_SIZE };
       if (search)                filters.search   = search;
@@ -37,7 +42,7 @@ export const useReservations = () => {
       const result = await getAdminReservations(filters);
       setData(result);
     } catch {
-      toast.error("Failed to load reservations");
+      setError("Reservations could not be loaded. Try again.");
     } finally {
       setLoading(false);
     }
@@ -45,27 +50,9 @@ export const useReservations = () => {
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
 
-  // Reset page whenever filters change
-  useEffect(() => { setPage(1); }, [search, statusFilter, showArchived]);
-
-  // ── Filter helpers ─────────────────────────────────────────────────────────
-
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    setPage(1);
-  };
-
-  const handleStatusChange = (value: string) => {
-    setStatus(value);
-    setPage(1);
-  };
-
-  const handleToggleArchived = () => {
-    setShowArchived((prev) => !prev);
-    setPage(1);
-  };
-
-  // ── Mutations ──────────────────────────────────────────────────────────────
+  const handleSearchChange = (q: string) => patchParams({ q, page: null }, true);
+  const handleStatusChange = (status: string) => patchParams({ status, page: null });
+  const handleToggleArchived = () => patchParams({ archived: !showArchived, page: null });
 
   const handleMarkReady = async (id: number, title: string) => {
     setActionId(id);
@@ -83,7 +70,7 @@ export const useReservations = () => {
   const handleFulfill = async (reservation: AdminReservation) => {
     const shouldStartCheckout = await confirm({
       title: `Fulfill "${reservation.book_title}"?`,
-      description: `Continue to Circulation to scan a physical copy for ${reservation.user_name}. The reservation stays ready until checkout succeeds.`,
+      description: `Continue to Borrow & Return to scan a physical copy for ${reservation.user_name}. The reservation stays ready until checkout succeeds.`,
       actionLabel: "Start Checkout",
     });
     if (!shouldStartCheckout) return;
@@ -154,6 +141,7 @@ export const useReservations = () => {
   return {
     // state
     data,
+    error,
     loading,
     search,
     statusFilter,

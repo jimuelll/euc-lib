@@ -30,7 +30,7 @@ export const SubscriptionCard = ({ subscription: sub, index }: SubscriptionCardP
           </h2>
           {sub.category && (
             <span
-              className="mt-1.5 inline-block border border-border bg-muted px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+              className="mt-1.5 inline-block border border-border bg-muted px-2 py-0.5 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {sub.category}
@@ -49,7 +49,7 @@ export const SubscriptionCard = ({ subscription: sub, index }: SubscriptionCardP
       <div className="mt-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="h-px w-3 bg-warning" />
         <span
-          className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary"
+          className="text-xs font-bold uppercase tracking-[0.15em] text-primary"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Visit Platform

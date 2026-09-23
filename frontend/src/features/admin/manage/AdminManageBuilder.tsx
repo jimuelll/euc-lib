@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "@/features/admin/hooks/useUnsavedChanges";
 import { useState } from "react";
 import { Archive, Users } from "lucide-react";
 import { AdminPage, AdminPanel } from "@/features/admin";
@@ -50,7 +51,9 @@ const AdminManageBuilder = ({
 }: AdminManageBuilderProps) => {
   const [sheetMode, setSheetMode] = useState<"create" | "edit" | null>(null);
 
-  const closeSheet = () => {
+  const { confirmDiscard, discardDialog } = useUnsavedChanges(form, sheetMode !== null, `${sheetMode}-${selectedUser?.student_employee_id ?? "new"}`);
+  const closeSheet = async () => {
+    if (loading || !await confirmDiscard()) return;
     setSheetMode(null);
     onResetForm();
   };
@@ -65,7 +68,8 @@ const AdminManageBuilder = ({
   const viewQr = (user: User) => onSetQrTarget({ studentId: user.student_employee_id, name: user.name });
 
   return (
-    <AdminPage eyebrow="Administration" title="User Management">
+    <AdminPage eyebrow="Administration" title="Users" description="Find library accounts, update patron details, and manage account access.">
+      {discardDialog}
       {qrTarget ? <QrModal target={qrTarget} onClose={() => onSetQrTarget(null)} /> : null}
 
       <AdminPanel title="User records" className="border-none bg-transparent shadow-none" contentClassName="p-0">
@@ -75,7 +79,7 @@ const AdminManageBuilder = ({
             roleFilter={roleFilter} statusFilter={statusFilter} allowedRoles={allowedRoles}
             onChange={onSearchQueryChange} onRoleFilterChange={onRoleFilterChange}
             onStatusFilterChange={onStatusFilterChange} onSearch={onSearch}
-            onArchivedViewChange={(archived) => { closeSheet(); onArchivedViewChange(archived); }} onCreate={openCreate}
+            onArchivedViewChange={async (archived) => { if (await confirmDiscard()) { setSheetMode(null); onResetForm(); onArchivedViewChange(archived); } }} onCreate={openCreate}
           />
 
           {showArchived ? (
@@ -88,7 +92,7 @@ const AdminManageBuilder = ({
           <div className="overflow-hidden border border-border bg-card">
             {loading ? (
               <div className="space-y-2 p-4" aria-label="Loading user records">
-                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-none" />)}
+                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}
               </div>
             ) : searchResults.length ? (
               <SearchResultsTable results={searchResults} showArchived={showArchived} onSelect={openEdit} onViewQr={viewQr} />
@@ -103,9 +107,9 @@ const AdminManageBuilder = ({
             <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
               <span>{userPagination.total} user{userPagination.total === 1 ? "" : "s"}</span>
               <div className="flex items-center justify-between gap-3">
-                <Button size="sm" variant="outline" className="rounded-none" disabled={userPagination.page <= 1 || loading} onClick={() => onSearch(userPagination.page - 1)}>Previous</Button>
+                <Button size="sm" variant="outline" className="rounded-md" disabled={userPagination.page <= 1 || loading} onClick={() => onSearch(userPagination.page - 1)}>Previous</Button>
                 <span className="tabular-nums">Page {userPagination.page} of {userPagination.totalPages}</span>
-                <Button size="sm" variant="outline" className="rounded-none" disabled={userPagination.page >= userPagination.totalPages || loading} onClick={() => onSearch(userPagination.page + 1)}>Next</Button>
+                <Button size="sm" variant="outline" className="rounded-md" disabled={userPagination.page >= userPagination.totalPages || loading} onClick={() => onSearch(userPagination.page + 1)}>Next</Button>
               </div>
             </div>
           </div>

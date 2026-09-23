@@ -51,7 +51,7 @@ const PostImageLightbox = ({ post, open, onOpenChange, imgRef, zoom, origin, han
               {zoom > 1 ? "Zoom out" : "Zoom in"}
             </button>
             <span
-              className="hidden bg-black/45 px-3 py-2 text-[10px] text-white/75 sm:block"
+              className="hidden bg-black/45 px-3 py-2 text-xs text-white/75 sm:block"
               style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
             >
               Click image to {zoom > 1 ? "reset" : "zoom"}

@@ -115,7 +115,7 @@ const ReserveTab = ({
               <div className="h-px w-6 bg-border" />
             </div>
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
+              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Search the catalogue above to find a book
@@ -127,7 +127,7 @@ const ReserveTab = ({
         {!catalogLoading && hasSearched && catalog.length === 0 && (
           <div className="flex flex-col items-center justify-center py-14 gap-2 border border-dashed border-border bg-card">
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
+              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               No books found matching your search
@@ -148,7 +148,7 @@ const ReserveTab = ({
                 meta={
                   <div className="text-right">
                     <p
-                      className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                      className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       Available
@@ -162,7 +162,7 @@ const ReserveTab = ({
                       {book.available} / {book.copies}
                     </p>
                     {book.location && (
-                      <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+                      <p className="mt-0.5 text-xs text-muted-foreground/60">
                         {book.location}
                       </p>
                     )}
@@ -170,10 +170,10 @@ const ReserveTab = ({
                 }
                 action={
                    book.canReserve === false ? (
-                     <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60" style={{ fontFamily: "var(--font-heading)" }}>Reference only</span>
+                     <span className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/60" style={{ fontFamily: "var(--font-heading)" }}>Reference only</span>
                    ) : alreadyReserved ? (
                     <span
-                      className="shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50"
+                      className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/50"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       Reserved
@@ -182,7 +182,7 @@ const ReserveTab = ({
                     <button
                       disabled={reservingId === book.id}
                       onClick={() => handleReserve(book)}
-                      className="flex h-9 shrink-0 items-center gap-1.5 bg-primary px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-9 shrink-0 items-center gap-1.5 bg-primary px-4 text-xs font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {reservingId === book.id ? (
@@ -212,7 +212,7 @@ const ReserveTab = ({
           <div className="flex items-center gap-2 py-4 text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span
-              className="text-[10px] font-bold uppercase tracking-[0.15em]"
+              className="text-xs font-bold uppercase tracking-[0.15em]"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Loading…
@@ -220,7 +220,7 @@ const ReserveTab = ({
           </div>
         ) : activeReservations.length === 0 ? (
           <p
-            className="py-4 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
+            className="py-4 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             No active reservations
@@ -239,26 +239,26 @@ const ReserveTab = ({
                 >
                   {res.title}
                 </p>
-                <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80 truncate"
+                <p className="mt-0.5 text-xs uppercase tracking-[0.12em] text-muted-foreground/80 truncate"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {res.author}
                 </p>
                 {res.location && (
-                  <p className="mt-0.5 text-[10px] text-muted-foreground/70">{res.location}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground/70">{res.location}</p>
                 )}
               </div>
 
               {/* Expiry — hidden on mobile */}
               <div className="order-3 w-full border-t border-border/60 pt-2 sm:order-none sm:w-auto sm:shrink-0 sm:border-0 sm:pt-0 sm:text-right">
                 <p
-                  className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                  className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {res.status === "ready" ? "Pick up by" : "Expires"}
                 </p>
                 <p
-                  className="mt-0.5 text-[11px] font-bold text-foreground"
+                  className="mt-0.5 text-xs font-bold text-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {res.expires_at
@@ -275,7 +275,7 @@ const ReserveTab = ({
               {/* Status badge */}
               <Badge
                 variant="outline"
-                className={`text-[10px] font-bold uppercase tracking-[0.1em] shrink-0 ${reservationStatusConfig[res.status].className}`}
+                className={`text-xs font-bold uppercase tracking-[0.1em] shrink-0 ${reservationStatusConfig[res.status].className}`}
                 style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
               >
                 {res.status === "ready"

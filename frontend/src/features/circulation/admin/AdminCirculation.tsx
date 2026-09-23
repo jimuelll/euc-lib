@@ -1,3 +1,6 @@
+import { useAdminUrlState } from "@/features/admin";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import { useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -10,10 +13,14 @@ import UserLookup from "./components/UserLookup";
 
 const AdminCirculation = () => {
   const location = useLocation();
+  const [params, patchParams] = useAdminUrlState();
+  const history = params.get("tab") === "history";
   const [logRevision, setLogRevision] = useState(0);
   const checkoutReservation = (location.state as { checkoutReservation?: Parameters<typeof useCirculation>[0] } | null)?.checkoutReservation ?? null;
   const {
     type,
+    completed,
+    startNextTransaction,
     studentId,
     copyBarcode,
     lookingUpUser,
@@ -40,9 +47,13 @@ const AdminCirculation = () => {
   return (
     <AdminPage
       eyebrow="Service Desk"
-      title="Circulation"
+      title="Borrow & Return"
+      description="Find a patron, scan a copy, and review the transaction before recording it."
       contentWidth="wide"
     >
+      <Tabs value={history ? "history" : "transaction"} onValueChange={tab => patchParams({ tab })}><TabsList><TabsTrigger value="transaction">Desk transaction</TabsTrigger><TabsTrigger value="history">Transaction history</TabsTrigger></TabsList></Tabs>
+      {history ? <CirculationLog refreshKey={logRevision} /> : <>
+      {completed && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/40 bg-success/5 p-4"><span className="text-sm font-medium">{completed}</span><Button onClick={() => { startNextTransaction(); document.getElementById("circulation-patron")?.focus(); }}>Next transaction</Button></div>}
       <AdminPanel
         title={type === "borrow" ? "Borrow a library copy" : "Return a library copy"}
       >
@@ -54,6 +65,7 @@ const AdminCirculation = () => {
           ) : null}
           <TransactionTypePicker value={type} onChange={handleTypeChange} />
 
+          <section aria-labelledby="patron-step"><h2 id="patron-step" className="mb-3 text-base font-semibold">1. Find the patron</h2>
           <UserLookup
             studentId={studentId}
             onStudentIdChange={setStudentId}
@@ -65,6 +77,8 @@ const AdminCirculation = () => {
             type={type}
           />
 
+          </section>
+          <section aria-labelledby="copy-step"><h2 id="copy-step" className="mb-3 text-base font-semibold">2. Scan or find the copy</h2>
           <BookLookup
             copyBarcode={copyBarcode}
             onCopyBarcodeChange={setCopyBarcode}
@@ -77,6 +91,10 @@ const AdminCirculation = () => {
             type={type}
           />
 
+          </section>
+          <h2 className="text-base font-semibold">3. Review and confirm</h2>
+          {foundUser && foundCopy && <p className="rounded-md bg-muted p-3 text-sm"><strong>{foundUser.name}</strong> · {foundCopy.title} · Copy {foundCopy.barcode}{matchedBorrow ? ` · Due ${new Date(matchedBorrow.due_date).toLocaleString()}` : ""}</p>}
+          {!canSubmit && <p className="text-sm text-muted-foreground">{!foundUser ? "Find a patron to continue." : !foundCopy ? "Scan or select a copy to continue." : clearance?.status === "blocked" && type === "borrow" ? "Resolve the patron’s clearance issues before borrowing." : "Review the copy and patron details above before continuing."}</p>}
           {type === "borrow" ? <p className="border-t border-border/70 pt-5 text-sm text-muted-foreground">The due date and hourly fine are applied automatically from this book’s configured type.</p> : null}
 
           <div className="border-t border-border/70 pt-5">
@@ -107,7 +125,7 @@ const AdminCirculation = () => {
         </div>
       </AdminPanel>
 
-      <CirculationLog refreshKey={logRevision} />
+      </>}
     </AdminPage>
   );
 };

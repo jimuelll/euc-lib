@@ -5,9 +5,11 @@ export interface SidebarItem {
   url:   string;
   icon:  typeof Home;
   roles?: string[];
+  aliases?: string[];
 }
 
 export interface SidebarSection {
   label: string;
+  alwaysOpen?: boolean;
   items: SidebarItem[];
 }

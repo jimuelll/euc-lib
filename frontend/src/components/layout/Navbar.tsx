@@ -27,7 +27,7 @@ const AuthSkeleton = () => (
 
 const UserAvatar = ({ initials }: { initials: string }) => (
   <div
-    className="h-8 w-8 bg-primary-foreground/15 border border-primary-foreground/30 text-primary-foreground text-[11px] font-bold tracking-widest flex items-center justify-center"
+    className="h-8 w-8 bg-primary-foreground/15 border border-primary-foreground/30 text-primary-foreground text-xs font-bold tracking-widest flex items-center justify-center"
     style={{ fontFamily: "var(--font-heading)" }}
   >
     {initials}
@@ -112,12 +112,12 @@ const Navbar = () => {
             />
             <div className="flex flex-col leading-none">
               <span
-                className="text-primary-foreground text-[13px] font-bold tracking-[0.12em] uppercase"
+                className="text-primary-foreground text-xs font-bold tracking-[0.1em] uppercase"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 EUC Library
               </span>
-              <span className="text-primary-foreground/60 text-[9px] tracking-[0.2em] uppercase hidden sm:block">
+              <span className="text-primary-foreground/80 text-[11px] tracking-[0.16em] uppercase hidden sm:block">
                 Enverga-Candelaria Library
               </span>
             </div>
@@ -184,7 +184,7 @@ const Navbar = () => {
               <div className="hidden md:block ml-2">
                 <Link to="/login">
                   <button
-                    className="px-4 py-1.5 text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                    className="px-4 py-1.5 text-xs font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Login
@@ -228,7 +228,7 @@ const Navbar = () => {
             {isLoggedIn && (
               <div className="flex items-center gap-3 px-4 py-3 border-b border-primary-foreground/10 bg-primary-foreground/5">
                 <div
-                  className="h-8 w-8 border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground text-[11px] font-bold tracking-widest flex shrink-0 items-center justify-center"
+                  className="h-8 w-8 border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground text-xs font-bold tracking-widest flex shrink-0 items-center justify-center"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {getUserInitials(user?.name)}
@@ -240,7 +240,7 @@ const Navbar = () => {
                   >
                     {user?.name}
                   </p>
-                  <p className="text-[10px] text-primary-foreground/50 tracking-[0.15em] uppercase">{role}</p>
+                  <p className="text-xs text-primary-foreground/80 tracking-[0.15em] uppercase">{role}</p>
                 </div>
               </div>
             )}
@@ -297,7 +297,7 @@ const Navbar = () => {
               <div className="px-4 pt-2 pb-3">
                 <Link to="/login" onClick={closeMobile}>
                   <button
-                    className="flex h-11 w-full items-center justify-center text-[11px] font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                    className="flex h-11 w-full items-center justify-center text-xs font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Login
@@ -328,7 +328,7 @@ const DesktopNav = ({
         <Link
           key={link.to}
           to={link.to}
-          className={`relative flex h-14 items-center border-b-2 px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors duration-200 focus-visible:ring-inset ${
+          className={`relative flex h-14 items-center border-b-2 px-4 text-[11px] font-semibold tracking-[0.1em] uppercase transition-colors duration-200 focus-visible:ring-inset ${
             active
               ? "text-primary-foreground border-warning"
               : "text-primary-foreground/60 hover:text-primary-foreground border-transparent hover:border-primary-foreground/20"
@@ -342,7 +342,7 @@ const DesktopNav = ({
     {showMyLibrary && (
       <Link
         to="/my-library"
-        className="relative px-4 h-14 flex items-center text-[11px] font-bold tracking-[0.14em] uppercase text-warning/90 hover:text-warning border-b-2 border-transparent hover:border-warning/50 transition-colors"
+        className="relative px-4 h-14 flex items-center text-[11px] font-semibold tracking-[0.1em] uppercase text-warning/90 hover:text-warning border-b-2 border-transparent hover:border-warning/50 transition-colors"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         My Library
@@ -371,13 +371,13 @@ const NotificationsDropdown = ({
       <button aria-label="Open notifications" className="relative flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[9px] font-bold text-primary">
+          <span className="absolute right-1 top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-xs font-bold text-primary">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-none border-border/60 p-0 shadow-lg">
+    <DropdownMenuContent align="end" className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-md border-border/60 p-0 shadow-lg">
       <div className="border-b border-border/30 bg-primary px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -387,14 +387,14 @@ const NotificationsDropdown = ({
             >
               Notifications
             </p>
-            <p className="mt-0.5 text-[10px] uppercase tracking-[0.15em] text-primary-foreground/55">
+            <p className="mt-0.5 text-xs uppercase tracking-[0.15em] text-primary-foreground/80">
               {unreadCount} unread
             </p>
           </div>
           {unreadCount > 0 && (
             <button
               onClick={() => { void onMarkAllAsRead(); }}
-              className="text-[10px] font-bold uppercase tracking-[0.14em] text-warning"
+              className="text-xs font-bold uppercase tracking-[0.14em] text-warning"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Mark all read
@@ -419,7 +419,7 @@ const NotificationsDropdown = ({
               }`}
             >
               <p
-                className="text-[11px] font-bold uppercase tracking-[0.12em] text-foreground"
+                className="text-xs font-bold uppercase tracking-[0.12em] text-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {notification.title}
@@ -428,12 +428,12 @@ const NotificationsDropdown = ({
                 {notification.body}
               </p>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+                <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground/70">
                   {formatNotificationTime(notification.created_at)}
                 </span>
                 {!notification.is_read && (
                   <span
-                    className="text-[10px] font-bold uppercase tracking-[0.12em] text-warning"
+                    className="text-xs font-bold uppercase tracking-[0.12em] text-warning"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     New
@@ -452,7 +452,7 @@ const NotificationsDropdown = ({
       <DropdownMenuSeparator className="m-0" />
       <DropdownMenuItem
         onClick={() => onNavigate("/my-library")}
-        className="rounded-none px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-action"
+        className="rounded-md px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-action"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         View all notifications
@@ -496,7 +496,7 @@ const UserDropdown = ({
         <ChevronDown className="h-3 w-3 text-primary-foreground/40" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="rounded-none border-border/60 shadow-lg min-w-[200px]">
+    <DropdownMenuContent align="end" className="rounded-md border-border/60 shadow-lg min-w-[200px]">
       <div className="px-3 py-2.5 bg-primary border-b border-border/30">
         <p
           className="text-[12px] font-bold tracking-[0.1em] uppercase text-primary-foreground"
@@ -504,22 +504,22 @@ const UserDropdown = ({
         >
           {name}
         </p>
-        <p className="text-[10px] text-primary-foreground/55 tracking-[0.15em] uppercase mt-0.5">{role}</p>
+        <p className="text-xs text-primary-foreground/80 tracking-[0.15em] uppercase mt-0.5">{role}</p>
       </div>
       <div className="py-1">
         {showAdminPanel && (
-          <DropdownMenuItem onClick={() => onNavigate("/admin")} className="rounded-none text-[12px] tracking-wide">
+          <DropdownMenuItem onClick={() => onNavigate("/admin")} className="rounded-md text-[12px] tracking-wide">
             <LayoutDashboard className="mr-2.5 h-3.5 w-3.5" />
             Admin Dashboard
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => onNavigate("/edit-profile")} className="rounded-none text-[12px] tracking-wide">
+        <DropdownMenuItem onClick={() => onNavigate("/edit-profile")} className="rounded-md text-[12px] tracking-wide">
           <UserCog className="mr-2.5 h-3.5 w-3.5" />
           Edit Profile
         </DropdownMenuItem>
       </div>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={onLogout} className="rounded-none text-[12px] tracking-wide text-destructive focus:text-destructive">
+      <DropdownMenuItem onClick={onLogout} className="rounded-md text-[12px] tracking-wide text-destructive focus:text-destructive">
         <LogOut className="mr-2.5 h-3.5 w-3.5" />
         Logout
       </DropdownMenuItem>
@@ -562,7 +562,7 @@ const MobileNavLink = ({
   <Link
     to={to}
     onClick={onClick}
-    className={`flex min-h-11 items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
+    className={`flex min-h-11 items-center px-4 text-xs font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
       active
         ? "border-warning text-primary-foreground bg-primary-foreground/[0.08]"
         : gold
@@ -585,7 +585,7 @@ const MobileActionButton = ({
 }) => (
   <button
     onClick={onClick}
-    className={`flex min-h-11 w-full items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase transition-colors border-l-2 border-transparent hover:bg-primary-foreground/5 ${
+    className={`flex min-h-11 w-full items-center px-4 text-xs font-bold tracking-[0.14em] uppercase transition-colors border-l-2 border-transparent hover:bg-primary-foreground/5 ${
       destructive
         ? "text-destructive-foreground/70 hover:border-destructive"
         : "text-primary-foreground/55 hover:text-primary-foreground/90"

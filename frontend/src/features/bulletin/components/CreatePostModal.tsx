@@ -36,7 +36,7 @@ function validateImage(file: File | Blob): string | null {
 // ── Shared field label ────────────────────────────────────────────────────────
 const FieldLabel = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
   <label
-    className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+    className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
     style={{ fontFamily: "var(--font-heading)" }}
   >
     {children}
@@ -174,7 +174,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               <div className="flex items-center gap-3 mb-1">
                 <div className="h-px w-4 bg-warning shrink-0" />
                 <span
-                  className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+                  className="text-xs font-bold uppercase tracking-[0.3em] text-warning"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Bulletin Board
@@ -214,7 +214,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               placeholder="e.g. Library closed on April 5"
               className={`${inputBase} h-10`}
             />
-            <p className="mt-1.5 text-right text-[10px] text-muted-foreground/50 tabular-nums"
+            <p className="mt-1.5 text-right text-xs text-muted-foreground/50 tabular-nums"
               style={{ fontFamily: "var(--font-heading)" }}>
               {form.title.length}/{MAX_TITLE}
             </p>
@@ -240,12 +240,12 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
                 <Pin className="h-3.5 w-3.5 text-warning shrink-0" />
                 <div>
                   <p
-                    className="text-[11px] font-bold uppercase tracking-[0.1em] text-foreground"
+                    className="text-xs font-bold uppercase tracking-[0.1em] text-foreground"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Pin this post
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Pinned posts appear at the top of the board.
                   </p>
                 </div>
@@ -285,7 +285,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     <div className="flex flex-col items-center gap-1.5">
                       <span
-                        className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                        className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         Uploading — {progress}%
@@ -316,11 +316,11 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
                 className="flex h-24 w-full flex-col items-center justify-center gap-2 border border-dashed border-border bg-muted/20 text-muted-foreground hover:border-primary/40 hover:bg-muted/40 transition-colors"
               >
                 <ImagePlus className="h-5 w-5" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                <span className="text-xs font-bold uppercase tracking-[0.15em]"
                   style={{ fontFamily: "var(--font-heading)" }}>
                   Click to upload or paste (Ctrl+V)
                 </span>
-                <span className="text-[10px] text-muted-foreground/50">
+                <span className="text-xs text-muted-foreground/50">
                   JPEG, PNG, WebP · max 5 MB
                 </span>
               </button>
@@ -339,7 +339,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
           {error && (
             <div className="px-5 py-3 flex items-start gap-2.5 bg-destructive/[0.04] border-t border-destructive/20">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
-              <p className="text-[11px] text-destructive leading-relaxed">{error}</p>
+              <p className="text-xs text-destructive leading-relaxed">{error}</p>
             </div>
           )}
         </div>
@@ -349,7 +349,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
           <button
             onClick={handleClose}
             disabled={isBusy}
-            className="flex-1 h-11 flex items-center justify-center text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground border-r border-border hover:bg-secondary hover:text-foreground disabled:opacity-40 transition-colors"
+            className="flex-1 h-11 flex items-center justify-center text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground border-r border-border hover:bg-secondary hover:text-foreground disabled:opacity-40 transition-colors"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Cancel
@@ -357,7 +357,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
           <button
             onClick={handleSubmit}
             disabled={isBusy}
-            className="flex-1 h-11 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 h-11 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.15em] bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             {isBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

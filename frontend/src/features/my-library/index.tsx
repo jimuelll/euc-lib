@@ -44,7 +44,7 @@ const MetricCard = ({
 }) => (
   <div className="border border-border/80 bg-card px-4 py-4">
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
+      className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {label}
@@ -85,10 +85,10 @@ const MyLibrary = () => {
                   <UserRound className="h-4 w-4 text-warning" />
                   <span className="font-medium">{profile?.name ?? user?.name ?? "Library account"}</span>
                 </div>
-                <p className="mt-2 text-[11px] uppercase tracking-[0.15em] text-primary-foreground/55">
+                <p className="mt-2 text-xs uppercase tracking-[0.15em] text-primary-foreground/80">
                   {profile?.student_employee_id ?? "Authenticated user"}
                 </p>
-                <p className="mt-3 text-xs leading-5 text-primary-foreground/45">
+                <p className="mt-3 text-xs leading-5 text-primary-foreground/85">
                   {summary?.active_borrows ?? 0} active borrows, {summary?.active_reservations ?? 0} active reservations
                 </p>
         </motion.div>
@@ -144,7 +144,7 @@ const MyLibrary = () => {
               className="mt-8"
             >
               <Tabs defaultValue="current" className="space-y-6">
-                <TabsList className="grid h-auto w-full grid-cols-1 gap-2 rounded-none border border-border/80 bg-card/70 p-2 sm:grid-cols-3">
+                <TabsList className="grid h-auto w-full grid-cols-1 gap-2 rounded-md border border-border/80 bg-card/70 p-2 sm:grid-cols-3">
                   {[
                     ["current", "Current Activity"],
                     ["history", "History"],
@@ -153,7 +153,7 @@ const MyLibrary = () => {
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="min-h-[56px] rounded-none border border-border/80 bg-background px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors data-[state=active]:border-warning/35 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                      className="min-h-[56px] rounded-md border border-border/80 bg-background px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors data-[state=active]:border-warning/35 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {label}
@@ -193,7 +193,7 @@ const MyLibrary = () => {
               {quickLinks.map(({ to, icon: Icon, label }) => (
                 <Link key={to} to={to}>
                   <button
-                    className="flex min-h-[52px] w-full items-center gap-2.5 border border-border bg-card px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground transition-colors hover:border-primary/35 hover:bg-muted/30"
+                    className="flex min-h-[52px] w-full items-center gap-2.5 border border-border bg-card px-4 text-xs font-bold uppercase tracking-[0.15em] text-foreground transition-colors hover:border-primary/35 hover:bg-muted/30"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     <Icon className="h-3.5 w-3.5 text-muted-foreground/60" />

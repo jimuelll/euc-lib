@@ -23,7 +23,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3 mb-5">
     <div className="h-px w-8 bg-warning shrink-0" />
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+      className="text-xs font-bold  text-warning"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {children}
@@ -33,7 +33,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <p
-    className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60 mb-1.5"
+    className="text-xs font-bold  text-muted-foreground mb-1.5"
     style={{ fontFamily: "var(--font-heading)" }}
   >
     {children}
@@ -56,7 +56,7 @@ const ActionButton = ({
   className?: string;
 }) => {
   const base =
-    "inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] border transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold  border transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50";
   const variants: Record<string, string> = {
     primary: "border-primary bg-primary text-primary-foreground shadow-[0_10px_24px_hsl(var(--primary)/0.18)] hover:bg-primary/90",
     ghost:   "border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -136,7 +136,7 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-full bg-primary relative">
-          <div className="h-[3px] w-full bg-warning" />
+
           <div className="px-5 py-4 flex items-start justify-between">
             <div>
               <p
@@ -145,7 +145,7 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
               >
                 {target.name}
               </p>
-              <p className="text-[10px] tracking-[0.15em] text-primary-foreground/50 mt-0.5 uppercase"
+              <p className="text-xs tracking-[0.15em] text-primary-foreground/50 mt-0.5 uppercase"
                 style={{ fontFamily: "var(--font-heading)" }}>
                 {target.studentId}
               </p>
@@ -162,14 +162,14 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         <div className="p-6 flex flex-col items-center gap-5 w-full">
           {loading ? (
             <div className="h-48 w-48 border border-border flex items-center justify-center">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40"
+              <p className="text-xs  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}>Loading…</p>
             </div>
           ) : qrUrl ? (
             <img src={qrUrl} alt={`QR code for ${target.studentId}`} className="h-48 w-48 border border-border" />
           ) : (
             <div className="h-48 w-48 border border-destructive/30 flex items-center justify-center">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-destructive"
+              <p className="text-xs  text-destructive"
                 style={{ fontFamily: "var(--font-heading)" }}>Failed to load</p>
             </div>
           )}
@@ -209,7 +209,7 @@ export const PasswordField = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-none"
+        className="rounded-md"
       />
       {onToggle && (
         <button
@@ -236,10 +236,10 @@ export const RoleSelect = ({ value, allowedRoles, onChange }: RoleSelectProps) =
   <div>
     <FieldLabel>Role</FieldLabel>
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="rounded-none"><SelectValue placeholder="Select role" /></SelectTrigger>
-      <SelectContent className="rounded-none">
+      <SelectTrigger className="rounded-md"><SelectValue placeholder="Select role" /></SelectTrigger>
+      <SelectContent className="rounded-md">
         {allowedRoles.map((r) => (
-          <SelectItem key={r} value={r} className="rounded-none">{formatRole(r)}</SelectItem>
+          <SelectItem key={r} value={r} className="rounded-md">{formatRole(r)}</SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -250,21 +250,21 @@ const ProgramSelect = ({ value, programs, onChange, disabled = false }: { value:
   <div>
     <FieldLabel>Program / Course <span className="normal-case tracking-normal">(optional)</span></FieldLabel>
     <Select value={value || "__none"} onValueChange={(next) => onChange(next === "__none" ? "" : next)} disabled={disabled}>
-      <SelectTrigger className="rounded-none"><SelectValue placeholder="No program / course selected" /></SelectTrigger>
-      <SelectContent className="rounded-none">
-        <SelectItem value="__none" className="rounded-none">No program / course</SelectItem>
-        {programs.map((program) => <SelectItem key={program.id} value={String(program.id)} className="rounded-none">{program.name}</SelectItem>)}
+      <SelectTrigger className="rounded-md"><SelectValue placeholder="No program / course selected" /></SelectTrigger>
+      <SelectContent className="rounded-md">
+        <SelectItem value="__none" className="rounded-md">No program / course</SelectItem>
+        {programs.map((program) => <SelectItem key={program.id} value={String(program.id)} className="rounded-md">{program.name}</SelectItem>)}
       </SelectContent>
     </Select>
     {!programs.length ? <p className="mt-1.5 text-xs text-muted-foreground">No choices configured yet. An administrator can add them in Academic Calendar.</p> : null}
   </div>
 );
-const TermSelect = ({ value, terms, onChange, disabled = false }: { value: string; terms: AcademicTerm[]; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>Academic term <span className="normal-case tracking-normal">(students)</span></FieldLabel><Select value={value || "__current"} onValueChange={v => onChange(v === "__current" ? "" : v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Current term" /></SelectTrigger><SelectContent className="rounded-none"><SelectItem value="__current">Current term (automatic)</SelectItem>{terms.map(term => <SelectItem key={term.id} value={String(term.id)}>{term.name}{term.is_current ? " · Current" : ""}</SelectItem>)}</SelectContent></Select></div>;
-const TextField = ({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>{label}</FieldLabel><Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-none" disabled={disabled} /></div>;
+const TermSelect = ({ value, terms, onChange, disabled = false }: { value: string; terms: AcademicTerm[]; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>Academic term <span className="normal-case tracking-normal">(students)</span></FieldLabel><Select value={value || "__current"} onValueChange={v => onChange(v === "__current" ? "" : v)} disabled={disabled}><SelectTrigger className="rounded-md"><SelectValue placeholder="Current term" /></SelectTrigger><SelectContent className="rounded-md"><SelectItem value="__current">Current term (automatic)</SelectItem>{terms.map(term => <SelectItem key={term.id} value={String(term.id)}>{term.name}{term.is_current ? " · Current" : ""}</SelectItem>)}</SelectContent></Select></div>;
+const TextField = ({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>{label}</FieldLabel><Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-md" disabled={disabled} /></div>;
 const RoleProfileFields = ({ form, programs, departments, onField, disabled = false, includeRemarks = false }: { form: UserFormState; programs: AcademicProgram[]; departments: Department[]; onField: <K extends keyof UserFormState>(key: K, value: string) => void; disabled?: boolean; includeRemarks?: boolean }) => {
   const academic = ["student", "staff", "alumni"].includes(form.role);
-  if (academic) return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Library Card Number" value={form.libraryCardNumber} onChange={(v) => onField("libraryCardNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div>{form.role !== "alumni" ? <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Student No." value={form.studentNumber} onChange={(v) => onField("studentNumber", v)} disabled={disabled} /><div><FieldLabel>Year Level</FieldLabel><Select value={form.yearLevel} onValueChange={(v) => onField("yearLevel", v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Select year level" /></SelectTrigger><SelectContent>{["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"].map((year) => <SelectItem key={year} value={year}>{year}</SelectItem>)}</SelectContent></Select></div></div><ProgramSelect value={form.programId} programs={programs} onChange={(v) => onField("programId", v)} disabled={disabled} /></> : null}<CommonProfile form={form} onField={onField} disabled={disabled} />{includeRemarks && form.role === "student" ? <div><FieldLabel>Remarks</FieldLabel><textarea value={form.remarks} onChange={(event) => onField("remarks", event.target.value)} disabled={disabled} className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm" /></div> : null}</>;
-  if (form.role === "employee") return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Employee No." value={form.employeeNumber} onChange={(v) => onField("employeeNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div><div><FieldLabel>Department</FieldLabel><Select value={form.departmentId} onValueChange={(v) => onField("departmentId", v)} disabled={disabled}><SelectTrigger className="rounded-none"><SelectValue placeholder="Select department" /></SelectTrigger><SelectContent>{departments.map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent></Select></div><CommonProfile form={form} onField={onField} disabled={disabled} /></>;
+  if (academic) return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Library Card Number" value={form.libraryCardNumber} onChange={(v) => onField("libraryCardNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div>{form.role !== "alumni" ? <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Student No." value={form.studentNumber} onChange={(v) => onField("studentNumber", v)} disabled={disabled} /><div><FieldLabel>Year Level</FieldLabel><Select value={form.yearLevel} onValueChange={(v) => onField("yearLevel", v)} disabled={disabled}><SelectTrigger className="rounded-md"><SelectValue placeholder="Select year level" /></SelectTrigger><SelectContent>{["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"].map((year) => <SelectItem key={year} value={year}>{year}</SelectItem>)}</SelectContent></Select></div></div><ProgramSelect value={form.programId} programs={programs} onChange={(v) => onField("programId", v)} disabled={disabled} /></> : null}<CommonProfile form={form} onField={onField} disabled={disabled} />{includeRemarks && form.role === "student" ? <div><FieldLabel>Remarks</FieldLabel><textarea value={form.remarks} onChange={(event) => onField("remarks", event.target.value)} disabled={disabled} className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm" /></div> : null}</>;
+  if (form.role === "employee") return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Employee No." value={form.employeeNumber} onChange={(v) => onField("employeeNumber", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div><div><FieldLabel>Department</FieldLabel><Select value={form.departmentId} onValueChange={(v) => onField("departmentId", v)} disabled={disabled}><SelectTrigger className="rounded-md"><SelectValue placeholder="Select department" /></SelectTrigger><SelectContent>{departments.map((department) => <SelectItem key={department.id} value={String(department.id)}>{department.name}</SelectItem>)}</SelectContent></Select></div><CommonProfile form={form} onField={onField} disabled={disabled} /></>;
   return <><div className="grid gap-5 sm:grid-cols-2"><TextField label="Username" value={form.username} onChange={(v) => onField("username", v)} disabled={disabled} /><TextField label="Name" value={form.fullName} onChange={(v) => onField("fullName", v)} disabled={disabled} /></div><div className="grid gap-5 sm:grid-cols-2"><TextField label="Address" value={form.address} onChange={(v) => onField("address", v)} disabled={disabled} /><TextField label="Contact" value={form.contact} onChange={(v) => onField("contact", v)} disabled={disabled} /></div></>;
 };
 const CommonProfile = ({ form, onField, disabled }: { form: UserFormState; onField: <K extends keyof UserFormState>(key: K, value: string) => void; disabled: boolean }) => <div className="grid gap-5 sm:grid-cols-2"><TextField label="Address" value={form.address} onChange={(v) => onField("address", v)} disabled={disabled} /><TextField label="Contact" value={form.contact} onChange={(v) => onField("contact", v)} disabled={disabled} /><TextField label="Email" value={form.email} onChange={(v) => onField("email", v)} disabled={disabled} /></div>;
@@ -273,7 +273,7 @@ const CommonProfile = ({ form, onField, disabled }: { form: UserFormState; onFie
 
 export const StatusBadge = ({ status }: { status: "active" | "inactive" | "archived" }) => (
   <span
-    className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] border ${
+    className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold  border ${
       status === "archived"
         ? "bg-warning/10 text-warning border-warning/30"
         : status === "active"
@@ -312,7 +312,7 @@ export const CreateForm = ({
     className={embedded ? "py-5" : "admin-panel-surface admin-etched-border mt-6 border border-border bg-background"}
     onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
   >
-    {!embedded && <div className="border-b border-border px-6 py-4 bg-[linear-gradient(180deg,hsl(var(--primary)/0.07),transparent)]">
+    {!embedded && <div className="border-b border-border px-6 py-4 bg-muted/20">
       <SectionLabel>New User Details</SectionLabel>
     </div>}
 
@@ -372,7 +372,7 @@ export const SearchBar = ({
   <div className="flex flex-col gap-2 border border-border bg-card p-3 lg:flex-row lg:items-center">
     <div className="relative min-w-0 flex-1">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input placeholder="Search by ID or name…" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSearch(); }} className="h-11 rounded-none pl-9" />
+      <Input placeholder="Search by ID or name…" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSearch(); }} className="h-11 rounded-md pl-9" />
     </div>
     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
       <select aria-label="Filter users by role" value={roleFilter} onChange={(event) => onRoleFilterChange(event.target.value)} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="all">All roles</option>{allowedRoles.map((role) => <option key={role} value={role}>{formatRole(role)}</option>)}</select>
@@ -380,8 +380,8 @@ export const SearchBar = ({
       <select aria-label="Filter archived users" value={showArchived ? "archived" : "current"} onChange={(event) => onArchivedViewChange(event.target.value === "archived")} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="current">Current users</option><option value="archived">Archived users</option></select>
     </div>
     <div className="flex gap-2">
-      <Button type="button" variant="outline" className="h-11 flex-1 rounded-none lg:flex-none" onClick={() => onSearch()} disabled={loading}><Search className="mr-2 h-4 w-4" />Search</Button>
-      <Button type="button" className="h-11 flex-1 rounded-none lg:flex-none" onClick={onCreate}><UserPlus className="mr-2 h-4 w-4" />Create user</Button>
+      <Button type="button" variant="outline" className="h-11 flex-1 rounded-md lg:flex-none" onClick={() => onSearch()} disabled={loading}><Search className="mr-2 h-4 w-4" />Search</Button>
+      <Button type="button" className="h-11 flex-1 rounded-md lg:flex-none" onClick={onCreate}><UserPlus className="mr-2 h-4 w-4" />Create user</Button>
     </div>
   </div>
 );
@@ -397,13 +397,13 @@ interface SearchResultsTableProps {
 
 export const SearchResultsTable = ({ results, showArchived, onSelect, onViewQr }: SearchResultsTableProps) => (
   <div className="overflow-x-auto">
-    <table className="w-full text-left text-sm">
+    <table className="w-full min-w-[700px] text-left text-sm">
       <thead className="border-b border-border bg-secondary/40">
         <tr>
           {["User", "Program / Course", "Role", "Account", ""].map((h) => (
             <th
               key={h}
-              className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/60"
+              className="px-4 py-2.5 text-xs font-bold  text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {h}
@@ -475,7 +475,7 @@ export const EditForm = ({
   >
     {/* Header band */}
     {!embedded && <div className="bg-primary relative overflow-hidden">
-      <div className="h-[3px] w-full bg-warning" />
+
       <div className="px-6 py-4 flex items-center justify-between">
         <div>
           <p
@@ -485,7 +485,7 @@ export const EditForm = ({
             {selectedUser.name}
           </p>
           <p
-            className="text-[10px] uppercase tracking-[0.15em] text-primary-foreground/50 mt-0.5"
+            className="text-xs  text-primary-foreground/50 mt-0.5"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             {selectedUser.student_employee_id}
@@ -547,7 +547,7 @@ export const EditForm = ({
             variant="ghost"
             onClick={onArchive}
             disabled={loading}
-            className="ml-auto border-border/50 text-muted-foreground/50 hover:border-warning/40 hover:text-warning"
+            className="ml-auto border-border/50 text-muted-foreground hover:border-warning/40 hover:text-warning"
           >
             <Archive className="h-3.5 w-3.5" />
             Archive

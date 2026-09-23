@@ -57,7 +57,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             {["", "#", "Label / Key", "Badges", ""].map((h, i) => (
               <span
                 key={i}
-                className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/40"
+                className="text-xs font-bold  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {h}
@@ -67,12 +67,12 @@ const CatalogBuilderPanels = ({ model }: Props) => {
 
           <div className="divide-y divide-border">
             <div className="flex flex-wrap gap-2 border-b border-border bg-muted/10 px-5 py-3" role="tablist" aria-label="Field scope">
-              {(["all", "shared", "book", "thesis"] as const).map((scope) => <button key={scope} type="button" role="tab" aria-selected={scopeTab === scope} onClick={() => setScopeTab(scope)} className={`min-h-9 px-3 text-[10px] font-bold uppercase tracking-[0.12em] ${scopeTab === scope ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"}`}>{scope === "all" ? "All fields" : scope === "book" ? "Books" : scope === "thesis" ? "Theses" : "Shared"}</button>)}
+              {(["all", "shared", "book", "thesis"] as const).map((scope) => <button key={scope} type="button" role="tab" aria-selected={scopeTab === scope} onClick={() => setScopeTab(scope)} className={`min-h-9 px-3 text-xs font-bold  ${scopeTab === scope ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"}`}>{scope === "all" ? "All fields" : scope === "book" ? "Books" : scope === "thesis" ? "Theses" : "Shared"}</button>)}
             </div>
             {sortedFields.length === 0 ? (
               <div className="px-5 py-10 text-center">
                 <p
-                  className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/35"
+                  className="text-xs  text-muted-foreground/35"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   No fields defined
@@ -100,7 +100,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
 
                   {/* Index */}
                   <span
-                    className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground/25 w-5 shrink-0 text-right"
+                    className="text-xs font-bold tracking-[0.12em] text-muted-foreground/25 w-5 shrink-0 text-right"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {String(idx + 1).padStart(2, "0")}
@@ -112,7 +112,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                       <Input
                         value={editingLabel}
                         onChange={(e) => setEditingLabel(e.target.value)}
-                        className="rounded-none border-border h-7 text-sm focus-visible:ring-0 focus-visible:border-primary"
+                        className="rounded-md border-border h-7 text-sm focus-visible:ring-0 focus-visible:border-primary"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === "Enter")  handleSaveLabel(f.key);
@@ -122,17 +122,17 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                     ) : (
                       <div>
                         <p className="text-sm font-medium text-foreground truncate leading-tight">{f.label}</p>
-                        <p className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">{f.key}</p>
+                        <p className="text-xs font-mono text-muted-foreground mt-0.5">{f.key}</p>
                       </div>
                     )}
                   </div>
 
                   {/* Type + flags */}
                   <div className="flex flex-wrap items-center gap-1 shrink-0 sm:ml-auto sm:justify-end">
-                    <Badge className="border-border/60 text-muted-foreground/50 bg-muted/30">{f.type}</Badge>
+                    <Badge className="border-border/60 text-muted-foreground bg-muted/30">{f.type}</Badge>
                     {f.required && <Badge className="border-destructive/25 text-destructive/70 bg-destructive/5">Req</Badge>}
                     {f.locked   && <Badge className="border-border text-muted-foreground/30">Locked</Badge>}
-                    <Badge className="border-border/60 text-muted-foreground/50 bg-muted/20">{f.scope ?? "shared"}</Badge>
+                    <Badge className="border-border/60 text-muted-foreground bg-muted/20">{f.scope ?? "shared"}</Badge>
                   </div>
 
                   <button
@@ -172,17 +172,17 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                         <button type="button" onClick={() => handleSaveLabel(f.key)} className="p-1 text-success hover:text-success/70 transition-colors" title="Save">
                           <Check className="h-3.5 w-3.5" />
                         </button>
-                        <button type="button" onClick={() => setEditingFieldKey(null)} className="p-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors" title="Cancel">
+                        <button type="button" onClick={() => setEditingFieldKey(null)} className="p-1 text-muted-foreground hover:text-muted-foreground transition-colors" title="Cancel">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                         <Select value={f.scope ?? "shared"} onValueChange={(value) => handleScopeChange(f.key, value as FieldScope)} disabled={saving}>
-                          <SelectTrigger aria-label={`Where ${f.label} appears`} className="h-7 w-[108px] rounded-none border-border px-2 text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground focus:ring-0">
+                          <SelectTrigger aria-label={`Where ${f.label} appears`} className="h-7 w-[108px] rounded-md border-border px-2 text-xs font-bold  text-muted-foreground focus:ring-0">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="rounded-none border-border">
+                          <SelectContent className="rounded-md border-border">
                             <SelectItem value="shared" className="text-sm">Shared</SelectItem>
                             <SelectItem value="book" className="text-sm">Books only</SelectItem>
                             <SelectItem value="thesis" className="text-sm">Theses only</SelectItem>
@@ -200,7 +200,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                           <button
                             type="button"
                             onClick={() => handleStartOptionsEdit(f)}
-                            className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/45 hover:text-foreground transition-colors"
+                            className="px-2 py-1 text-xs font-bold  text-muted-foreground/45 hover:text-foreground transition-colors"
                             style={{ fontFamily: "var(--font-heading)" }}
                             title="Edit dropdown options"
                           >
@@ -224,7 +224,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                     <div className="border-t border-border/60 bg-muted/10 px-5 py-3">
                       <FieldLabel>
                         Dropdown Options{" "}
-                        <span className="normal-case tracking-normal text-muted-foreground/40 font-normal ml-1">
+                        <span className="normal-case tracking-normal text-muted-foreground font-normal ml-1">
                           (comma-separated)
                         </span>
                       </FieldLabel>
@@ -243,7 +243,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                           type="button"
                           onClick={() => handleSaveOptions(f.key)}
                           disabled={saving}
-                          className="flex items-center justify-center gap-1.5 border border-success/40 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-success transition-colors hover:bg-success hover:text-success-foreground disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 border border-success/40 px-3 py-2 text-xs font-bold  text-success transition-colors hover:bg-success hover:text-success-foreground disabled:opacity-50"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                           type="button"
                           onClick={handleCancelOptionsEdit}
                           disabled={saving}
-                          className="flex items-center justify-center gap-1.5 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 border border-border px-3 py-2 text-xs font-bold  text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -270,7 +270,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
           {/* Legend */}
           <div className="border-t border-border px-5 py-2.5 flex items-center gap-2 bg-muted/10">
             <Eye className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-            <p className="text-[10px] text-muted-foreground/40 tracking-wide">
+            <p className="text-xs text-muted-foreground tracking-wide">
               Eye icon = visible on the public homepage catalogue only
             </p>
           </div>
@@ -291,14 +291,14 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             {/* Custom field usage counter */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span
-                className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/50"
+                className="text-xs font-bold  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Custom Fields
               </span>
               <span
-                className={`text-[10px] font-bold tabular-nums px-2 py-0.5 border ${
-                  "border-border text-muted-foreground/50"
+                className={`text-xs font-bold tabular-nums px-2 py-0.5 border ${
+                  "border-border text-muted-foreground"
                 }`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
@@ -318,7 +318,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                 onKeyDown={(e) => e.key === "Enter" && handleAddField()}
               />
               {newFieldLabel.trim() && (
-                <p className="mt-1 text-[10px] font-mono text-muted-foreground/40">
+                <p className="mt-1 text-xs font-mono text-muted-foreground">
                   key: <span className="text-muted-foreground/70">{toKey(newFieldLabel)}</span>
                 </p>
               )}
@@ -331,9 +331,9 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                 <SelectTrigger className={inputClass}>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="rounded-none border-border">
+                <SelectContent className="rounded-md border-border">
                   {FIELD_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value} className="rounded-none text-sm">
+                    <SelectItem key={t.value} value={t.value} className="rounded-md text-sm">
                       {t.label}
                     </SelectItem>
                   ))}
@@ -345,7 +345,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
               <FieldLabel>Appears on</FieldLabel>
               <Select value={newFieldScope} onValueChange={(v) => setNewFieldScope(v as FieldScope)}>
                 <SelectTrigger className={inputClass}><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-none border-border">
+                <SelectContent className="rounded-md border-border">
                   <SelectItem value="shared">Shared fields</SelectItem>
                   <SelectItem value="book">Books only</SelectItem>
                   <SelectItem value="thesis">Theses only</SelectItem>
@@ -358,7 +358,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
               <div>
                 <FieldLabel>
                   Options{" "}
-                  <span className="normal-case tracking-normal text-muted-foreground/40 font-normal ml-1">
+                  <span className="normal-case tracking-normal text-muted-foreground font-normal ml-1">
                     (comma-separated)
                   </span>
                 </FieldLabel>
@@ -397,7 +397,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                     </div>
                   </div>
                   <span
-                    className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
+                    className="text-xs font-bold  text-muted-foreground group-hover:text-foreground transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {label}
@@ -410,7 +410,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             <button
               type="submit"
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-primary h-10 text-xs font-bold  text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {saving
@@ -435,21 +435,21 @@ const CatalogBuilderPanels = ({ model }: Props) => {
             <div className="flex items-center gap-2.5">
               <div className="h-px w-4 bg-muted-foreground/30 shrink-0" />
               <p
-                className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground/60"
+                className="text-xs font-bold  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Archived Fields
               </p>
               <span
-                className="text-[10px] font-bold tabular-nums border border-border px-1.5 py-0.5 text-muted-foreground/40"
+                className="text-xs font-bold tabular-nums border border-border px-1.5 py-0.5 text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {archivedFields.length}
               </span>
             </div>
             {showArchivedPanel
-              ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground/40" />
-              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/40" />
+              ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground" />
+              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             }
           </button>
 
@@ -464,17 +464,17 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                   {/* Label + key */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate leading-tight">{f.label}</p>
-                    <p className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">{f.key}</p>
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5">{f.key}</p>
                   </div>
 
                   {/* Type badge */}
-                  <Badge className="border-border/60 text-muted-foreground/40 bg-muted/20 shrink-0">
+                  <Badge className="border-border/60 text-muted-foreground bg-muted/20 shrink-0">
                     {f.type}
                   </Badge>
 
                   {/* Data retained hint */}
                   <p
-                    className="text-[10px] text-muted-foreground/40 shrink-0 hidden sm:block"
+                    className="text-xs text-muted-foreground shrink-0 hidden sm:block"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Data retained
@@ -486,7 +486,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                     onClick={() => handleRestoreField(f.key)}
                     disabled={saving}
                     title={`Restore "${f.label}"`}
-                    className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                    className="flex items-center gap-1.5 border border-warning/40 px-3 py-1.5 text-xs font-bold  text-warning hover:bg-warning hover:text-warning-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     <ArchiveRestore className="h-3 w-3" />
@@ -497,7 +497,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
 
               {/* Footer note */}
               <div className="px-5 py-2.5 bg-muted/10">
-                <p className="text-[10px] text-muted-foreground/40 tracking-wide">
+                <p className="text-xs text-muted-foreground tracking-wide">
                   Restoring a field re-adds it to the form. All previously saved catalog-record data is still intact.
                 </p>
               </div>

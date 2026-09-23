@@ -95,7 +95,7 @@ const AdminAboutBuilder = () => {
           <SpacesEditor spaces={form.spaces} onChange={(v) => setField("spaces", v)} />
 
           <div className="sticky bottom-4 z-10 border border-border bg-card p-3 shadow-[0_10px_28px_hsl(var(--primary)/0.12)]">
-            <Button type="submit" disabled={saving} className="w-full rounded-none sm:w-auto">
+            <Button type="submit" disabled={saving} className="w-full rounded-md sm:w-auto">
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>

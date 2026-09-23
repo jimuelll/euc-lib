@@ -37,7 +37,7 @@ const quickLinks = [
 const QuickAccessSection = () => (
   <section className="border-b border-border bg-background text-foreground">
     <div className="container px-5 py-8 sm:px-8 lg:px-12 xl:px-16">
-      <div className="grid gap-4 lg:grid-cols-[9.5rem_repeat(5,minmax(0,1fr))] lg:items-stretch lg:gap-3">
+      <div className="grid gap-4 lg:grid-cols-[9.5rem_repeat(4,minmax(0,1fr))] lg:items-stretch lg:gap-3">
         <div className="pr-4 lg:py-2">
           <span className="mb-3 block h-px w-7 bg-warning" />
           <h2 className="text-2xl font-bold leading-none tracking-[-.045em]">
@@ -54,10 +54,10 @@ const QuickAccessSection = () => (
             className="group flex min-h-[124px] flex-col border border-border bg-card px-4 py-4 transition-colors hover:border-primary hover:bg-primary"
           >
             <Icon className="h-5 w-5 text-warning" />
-            <h3 className="mt-3 text-[11px] font-bold leading-tight tracking-[-.02em] text-foreground transition-colors group-hover:text-primary-foreground">
+            <h3 className="mt-3 text-xs font-bold leading-tight tracking-[-.02em] text-foreground transition-colors group-hover:text-primary-foreground">
               {title}
             </h3>
-            <p className="mt-2 text-[10px] leading-4 text-muted-foreground transition-colors group-hover:text-primary-foreground/75">
+            <p className="mt-2 text-xs leading-4 text-muted-foreground transition-colors group-hover:text-primary-foreground/75">
               {description}
             </p>
             <ArrowRight className="mt-auto h-3.5 w-3.5 self-end text-warning transition-transform group-hover:translate-x-1" />

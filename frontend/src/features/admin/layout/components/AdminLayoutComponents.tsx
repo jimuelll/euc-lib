@@ -1,372 +1,102 @@
-import { Library, ChevronDown, LogOut, Bell, ExternalLink } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { NavLink } from "@/components/layout/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
-import ThemeToggle from "@/components/layout/ThemeToggle";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Library, ChevronDown, ChevronRight, LogOut, Bell, ExternalLink, Search, UserRound, KeyRound, MoreHorizontal, X } from "lucide-react";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, SidebarHeader, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { cn } from "@/lib/utils";
-import { sidebarSections, getInitials, resolveCurrentItem, resolveCurrentSection } from "../AdminLayoutData";
+import { dashboardItem, helpItem, visibleSidebarSections, resolveCurrentItem, resolveCurrentSection, getInitials } from "../AdminLayoutData";
+import type { SidebarItem } from "../AdminLayout.types";
 
 export function AdminSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
-  const { pathname } = useLocation();
+  const { state, isMobile, setOpenMobile } = useSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
+  const { pathname, search } = useLocation();
   const { user, logout } = useAuth();
-  const currentItem = resolveCurrentItem(pathname);
-  const visibleSections = sidebarSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => !item.roles || item.roles.includes(user?.role ?? "")),
-    }))
-    .filter((section) => section.items.length > 0);
-
-  return (
-    <Sidebar collapsible="icon" className="border-r-0" style={{ background: "hsl(var(--sidebar-background))" }}>
-      <SidebarHeader className="p-0">
-        <div
-          className="h-[4px] w-full"
-          style={{ background: "linear-gradient(90deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / 0.45))" }}
-        />
-
-        <div className={cn("flex items-center gap-3 px-4 py-4", collapsed && "justify-center px-3")}>
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center border"
-            style={{
-              background: "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.2), hsl(var(--sidebar-primary) / 0.08))",
-              borderColor: "hsl(var(--sidebar-primary) / 0.35)",
-            }}
-          >
-            <Library className="h-4 w-4" style={{ color: "hsl(var(--sidebar-primary))" }} />
-          </div>
-
-          {!collapsed && (
-            <div className="min-w-0 flex flex-col">
-              <span
-                className="truncate text-[11px] font-bold uppercase leading-none tracking-[0.18em]"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
-              >
-                EUC Library
-              </span>
-              <span
-                className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em]"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
-              >
-                Admin Dashboard
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="mx-0 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
-
-        {!collapsed ? (
-          <div className="flex items-center gap-3 bg-[linear-gradient(180deg,hsl(var(--sidebar-primary)/0.05),transparent)] px-4 py-4">
-            <Avatar className="h-9 w-9 shrink-0 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
-              <AvatarFallback
-                className="text-[11px] font-bold"
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  background: "hsl(var(--sidebar-primary) / 0.15)",
-                  color: "hsl(var(--sidebar-primary))",
-                }}
-              >
-                {getInitials(user?.name)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p
-                className="truncate text-[12px] font-bold leading-tight"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-foreground))" }}
-              >
-                {user?.name ?? "Administrator"}
-              </p>
-              <p
-                className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] capitalize"
-                style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
-              >
-                {user?.role?.replace("_", " ") ?? "Administrator"}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center py-3">
-            <Avatar className="h-7 w-7 border" style={{ borderColor: "hsl(var(--sidebar-primary) / 0.3)" }}>
-              <AvatarFallback
-                className="text-[10px] font-bold"
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  background: "hsl(var(--sidebar-primary) / 0.15)",
-                  color: "hsl(var(--sidebar-primary))",
-                }}
-              >
-                {getInitials(user?.name)}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-
-        <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
-      </SidebarHeader>
-
-      <SidebarContent className="px-0 py-2 [scrollbar-color:hsl(var(--sidebar-border))_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:bg-sidebar-border [&::-webkit-scrollbar-thumb]:hover:bg-sidebar-primary [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5">
-        {visibleSections.map((section, sectionIndex) => (
-          <SidebarGroup key={section.label} className="p-0">
-            {sectionIndex > 0 && (
-              <div className="mx-3 my-1" style={{ height: "1px", background: "hsl(var(--sidebar-border))" }} />
-            )}
-
-            {!collapsed ? (
-              <Collapsible defaultOpen>
-                <CollapsibleTrigger
-                  className="group flex w-full items-center justify-between px-4 py-2 transition-colors"
-                  style={{ color: "hsl(var(--sidebar-muted-foreground))" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="h-px w-2 shrink-0" style={{ background: "hsl(var(--sidebar-primary) / 0.5)" }} />
-                    <span
-                      className="text-[9px] font-bold uppercase tracking-[0.25em]"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {section.label}
-                    </span>
-                  </div>
-                  <ChevronDown className="h-3 w-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </CollapsibleTrigger>
-
-                <CollapsibleContent>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {section.items.map((item) => (
-                        <SidebarMenuItem key={item.title} className="px-2">
-                          <SidebarMenuButton asChild isActive={currentItem?.url === item.url}>
-                            <NavLink
-                              to={item.url}
-                              end={item.url === "/admin"}
-                              className="flex items-center gap-2.5 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors"
-                              style={({ isActive }: { isActive: boolean }) => ({
-                                fontFamily: "var(--font-heading)",
-                                color: isActive
-                                  ? "hsl(var(--sidebar-primary))"
-                                  : "hsl(var(--sidebar-muted-foreground))",
-                                background: isActive
-                                  ? "linear-gradient(90deg, hsl(var(--sidebar-primary) / 0.28), hsl(var(--sidebar-primary) / 0.08))"
-                                  : "transparent",
-                                borderLeft: isActive
-                                  ? "3px solid hsl(var(--sidebar-primary))"
-                                  : "2px solid transparent",
-                                boxShadow: isActive
-                                  ? "inset 0 0 0 1px hsl(var(--sidebar-primary) / 0.26)"
-                                  : "none",
-                              })}
-                            >
-                              <item.icon className="h-3.5 w-3.5 shrink-0" />
-                              <span>{item.title}</span>
-                            </NavLink>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </CollapsibleContent>
-              </Collapsible>
-            ) : (
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {section.items.map((item) => (
-                    <SidebarMenuItem key={item.title} className="px-1.5">
-                      <SidebarMenuButton asChild isActive={currentItem?.url === item.url}>
-                        <NavLink
-                          to={item.url}
-                          end={item.url === "/admin"}
-                          title={item.title}
-                          className="flex items-center justify-center py-2 transition-colors"
-                          style={({ isActive }: { isActive: boolean }) => ({
-                            color: isActive
-                              ? "hsl(var(--sidebar-primary))"
-                              : "hsl(var(--sidebar-muted-foreground))",
-                            background: isActive
-                              ? "linear-gradient(180deg, hsl(var(--sidebar-primary) / 0.34), hsl(var(--sidebar-primary) / 0.12))"
-                              : "transparent",
-                            boxShadow: isActive
-                              ? "inset 0 0 0 1px hsl(var(--sidebar-primary) / 0.34)"
-                              : "none",
-                          })}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            )}
-          </SidebarGroup>
-        ))}
-      </SidebarContent>
-
-      <SidebarFooter className="p-0">
-        <div className="h-px" style={{ background: "hsl(var(--sidebar-border))" }} />
-        <div className={cn("p-3", collapsed && "flex justify-center")}>
-          <button
-            onClick={logout}
-            className={cn(
-              "flex items-center gap-2.5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.15em] transition-colors",
-              collapsed ? "justify-center" : "w-full",
-            )}
-            style={{ fontFamily: "var(--font-heading)", color: "hsl(var(--sidebar-muted-foreground))" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.color = "hsl(var(--destructive))";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.color = "hsl(var(--sidebar-muted-foreground))";
-            }}
-          >
-            <LogOut className="h-3.5 w-3.5 shrink-0" />
-            {!collapsed && <span>Logout</span>}
-          </button>
-        </div>
-      </SidebarFooter>
-    </Sidebar>
-  );
+  const current = resolveCurrentItem(pathname, search, user?.role);
+  const sections = visibleSidebarSections(user?.role);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem("admin-navigation-groups") || "{}"); } catch { return {}; }
+  });
+  const setGroup = (label: string, open: boolean) => setExpanded(previous => {
+    const next = { ...previous, [label]: open };
+    try { localStorage.setItem("admin-navigation-groups", JSON.stringify(next)); } catch { /* Storage is optional. */ }
+    return next;
+  });
+  const renderItem = (item: SidebarItem) => <SidebarMenuItem key={item.url}>
+    <SidebarMenuButton asChild tooltip={item.title} isActive={current?.url === item.url} className="h-10 text-sm font-medium data-[active=true]:bg-sidebar-accent data-[active=true]:text-white">
+      <Link to={item.url} aria-current={current?.url === item.url ? "page" : undefined} onClick={() => setOpenMobile(false)}><item.icon className="size-4" /><span>{item.title}</span></Link>
+    </SidebarMenuButton>
+  </SidebarMenuItem>;
+  return <Sidebar collapsible="icon" className="border-r-0">
+    <SidebarHeader className="gap-0 p-3">
+      <Link to="/admin" onClick={() => setOpenMobile(false)} className={cn("flex min-h-14 items-center gap-3 rounded-md px-2 text-white", collapsed && "justify-center px-0")} aria-label="EUC Library dashboard">
+        <Library className="size-6 shrink-0" />{!collapsed && <div><span className="block text-base font-semibold">EUC Library</span><span className="block text-xs text-white/80">Library administration</span></div>}
+      </Link>
+      {isMobile && <button type="button" onClick={() => setOpenMobile(false)} className="absolute right-3 top-4 rounded-md p-2 text-white hover:bg-white/10" aria-label="Close navigation"><X className="size-5" /></button>}
+    </SidebarHeader>
+    <SidebarContent className="gap-0 px-2">
+      <SidebarMenu>{renderItem(dashboardItem)}</SidebarMenu>
+      {sections.map(section => {
+        const active = section.items.some(item => item.url === current?.url);
+        return <SidebarGroup key={section.label} className="mt-2 border-t border-white/20 px-0 pb-1 pt-2">
+          {collapsed ? <SidebarMenu>{section.items.map(renderItem)}</SidebarMenu> : section.alwaysOpen ? <>
+            <p className="px-2 pb-2 pt-2 text-xs font-semibold text-white/85">{section.label}</p>
+            <SidebarMenu>{section.items.map(renderItem)}</SidebarMenu>
+          </> : <Collapsible open={active || expanded[section.label] === true} onOpenChange={open => setGroup(section.label, open)}>
+            <CollapsibleTrigger className="flex min-h-10 w-full items-center justify-between rounded-md px-2 text-xs font-semibold text-white/85 hover:bg-white/10"><span>{section.label}</span><ChevronDown className={cn("size-4 transition-transform", (active || expanded[section.label]) && "rotate-180")} /></CollapsibleTrigger>
+            <CollapsibleContent><SidebarMenu>{section.items.map(renderItem)}</SidebarMenu></CollapsibleContent>
+          </Collapsible>}
+        </SidebarGroup>;
+      })}
+    </SidebarContent>
+    <SidebarFooter className="border-t border-white/20 p-2">
+      <div className={cn("flex flex-col gap-1", collapsed && "items-center")}>
+        <DropdownMenu><DropdownMenuTrigger asChild><button className={cn("flex min-h-11 w-full min-w-0 items-center gap-3 rounded-md p-2 text-left text-white hover:bg-white/10", collapsed && "w-11 justify-center px-0")} aria-label={`Account menu for ${user?.name || "Administrator"}`}><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/15 text-xs font-semibold">{getInitials(user?.name)}</span>{!collapsed && <span className="min-w-0 flex-1"><span className="block whitespace-normal break-words text-sm font-medium leading-5">{user?.name || "Administrator"}</span><span className="block text-xs capitalize text-white/80">{user?.role?.replace(/_/g, " ")}</span></span>}</button></DropdownMenuTrigger>
+          <DropdownMenuContent side={isMobile ? "top" : "right"} align="end"><DropdownMenuLabel>My account</DropdownMenuLabel><DropdownMenuItem asChild><Link to="/edit-profile"><UserRound className="mr-2 size-4" />My account</Link></DropdownMenuItem><DropdownMenuItem asChild><Link to="/change-password"><KeyRound className="mr-2 size-4" />Change password</Link></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={logout}><LogOut className="mr-2 size-4" />Sign out</DropdownMenuItem></DropdownMenuContent>
+        </DropdownMenu>
+        {!collapsed && <button type="button" onClick={() => void logout()} aria-label="Sign out" title="Sign out" className="flex h-9 w-full items-center justify-center gap-2 rounded-md border border-white/25 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white"><LogOut className="size-4" aria-hidden="true" /><span>Sign out</span></button>}
+      </div>
+    </SidebarFooter>
+  </Sidebar>;
 }
 
 export function AdminTopbar({ pathname }: { pathname: string }) {
-  const current = resolveCurrentItem(pathname);
-  const currentSection = current ? resolveCurrentSection(current.url) : undefined;
+  const { search } = useLocation();
+  const { user } = useAuth();
+  const current = resolveCurrentItem(pathname, search, user?.role);
+  const section = current && resolveCurrentSection(current.url);
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-
-  return (
-    <header className="sticky top-0 z-50 shrink-0 border-b border-border/80 bg-background/92 backdrop-blur-md">
-      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--warning)),transparent_70%)]" />
-      <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-5">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <SidebarTrigger className="border border-border/70 bg-card text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground" />
-
-          <div className="h-5 w-px bg-border" />
-
-          {current && (
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="h-px w-5 shrink-0 bg-warning" />
-              <span
-                className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground sm:block"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {currentSection?.label}
-              </span>
-              <span className="hidden text-xs text-muted-foreground/30 sm:block">/</span>
-              <span
-                className="max-w-[10rem] truncate text-[10px] font-bold uppercase tracking-[0.14em] text-foreground sm:max-w-none sm:text-[11px] sm:tracking-[0.18em]"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {current.title}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          <a
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-9 items-center gap-1.5 border border-border/70 bg-card px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:border-warning/40 hover:text-foreground"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            <ExternalLink className="h-3 w-3" />
-            <span className="hidden sm:inline">View Site</span>
-          </a>
-
-          <div className="mx-0.5 h-4 w-px bg-border" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="relative flex h-9 w-9 items-center justify-center border border-transparent text-muted-foreground transition-colors hover:border-border/70 hover:bg-card hover:text-foreground"
-                aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}
-              >
-                <Bell className="h-3.5 w-3.5" />
-                {unreadCount > 0 ? (
-                  <span
-                    className="absolute right-2 top-2 h-1.5 w-1.5 ring-2 ring-background"
-                    style={{ background: "hsl(var(--warning))", borderRadius: 0 }}
-                  />
-                ) : null}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] rounded-none border-border p-0">
-              <DropdownMenuLabel className="flex items-center justify-between gap-3 border-b border-border bg-primary px-4 py-3 text-primary-foreground">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-heading)" }}>
-                  Notifications
-                </span>
-                {unreadCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => void markAllAsRead()}
-                    className="text-[10px] font-bold uppercase tracking-[0.12em] text-warning hover:text-warning/75"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Mark all read
-                  </button>
-                ) : null}
-              </DropdownMenuLabel>
-              <div className="max-h-[22rem] overflow-y-auto">
-                {notifications.length ? notifications.slice(0, 8).map((notification) => (
-                  <DropdownMenuItem
-                    key={notification.id}
-                    onSelect={() => {
-                      if (!notification.is_read) void markAsRead(notification.id);
-                      navigate(notification.href || "/admin/notifications");
-                    }}
-                    className="flex cursor-pointer flex-col items-start gap-1.5 rounded-none border-b border-border/70 px-4 py-3 focus:bg-muted"
-                  >
-                    <span className="w-full truncate text-[11px] font-bold uppercase tracking-[0.1em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-                      {notification.title}
-                    </span>
-                    <span className="line-clamp-2 text-xs leading-5 text-muted-foreground">{notification.body}</span>
-                    {!notification.is_read ? <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-warning">Unread</span> : null}
-                  </DropdownMenuItem>
-                )) : (
-                  <p className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications yet.</p>
-                )}
-              </div>
-              <DropdownMenuSeparator className="m-0" />
-              <DropdownMenuItem
-                onSelect={() => navigate("/admin/notifications")}
-                className="cursor-pointer rounded-none px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-action focus:bg-muted focus:text-action"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Manage notifications
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <ThemeToggle />
-        </div>
+  const [searchOpen, setSearchOpen] = useState(false);
+  const sections = visibleSidebarSections(user?.role);
+  const canManageNotifications = user?.role === "admin" || user?.role === "super_admin";
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen(open => !open); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const choose = (url: string) => { setSearchOpen(false); navigate(url); };
+  return <header className="z-30 shrink-0 border-b border-border bg-card">
+    <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3"><SidebarTrigger aria-label="Toggle navigation" /><nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm"><Link to="/admin" className="hidden text-muted-foreground hover:text-foreground md:block">Home</Link><ChevronRight className="hidden size-3 text-muted-foreground md:block" />{section && <><span className="hidden text-muted-foreground lg:block">{section.label}</span><ChevronRight className="hidden size-3 text-muted-foreground lg:block" /></>}<span aria-current="page" className="truncate font-medium">{current?.title || "Library administration"}{pathname.includes("/receipt/") ? " / Receipt" : ""}</span></nav></div>
+      <div className="flex shrink-0 items-center gap-2"><Button variant="outline" size="sm" onClick={() => setSearchOpen(true)} aria-label="Find a tool"><Search className="size-4 sm:mr-2" /><span className="hidden sm:inline">Find a tool</span><kbd className="ml-5 hidden text-xs text-muted-foreground xl:inline">Ctrl K</kbd></Button>
+        <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="relative" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}><Bell className="size-4" />{unreadCount > 0 && <span className="absolute right-1 top-1 rounded-full bg-primary px-1 text-xs text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}</Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0"><DropdownMenuLabel className="flex items-center justify-between border-b p-4">Notifications{unreadCount > 0 && <button className="text-xs text-action" onClick={() => void markAllAsRead()}>Mark all read</button>}</DropdownMenuLabel><div className="max-h-80 overflow-y-auto">{notifications.length ? notifications.slice(0, 8).map(notification => <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 px-4 py-3" onSelect={() => { if (!notification.is_read) void markAsRead(notification.id); if (notification.href) navigate(notification.href); else if (canManageNotifications) navigate("/admin/notifications"); }}><span className="font-medium">{notification.title}</span><span className="line-clamp-2 text-sm text-muted-foreground">{notification.body}</span>{!notification.is_read && <span className="text-xs text-action">Unread</span>}</DropdownMenuItem>) : <p className="p-6 text-sm text-muted-foreground">No notifications yet.</p>}</div>{canManageNotifications && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => navigate("/admin/notifications")} className="p-3 text-action">Manage notifications</DropdownMenuItem></>}</DropdownMenuContent>
+        </DropdownMenu><ThemeToggle />
+        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="px-2 sm:px-3" aria-label="More options"><MoreHorizontal className="size-4 sm:mr-2" /><span className="hidden sm:inline">More</span></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end"><DropdownMenuLabel>More</DropdownMenuLabel><DropdownMenuItem asChild><Link to={helpItem.url}><helpItem.icon className="mr-2 size-4" />{helpItem.title}</Link></DropdownMenuItem><DropdownMenuItem asChild><a href="/" target="_blank" rel="noreferrer"><ExternalLink className="mr-2 size-4" />View public website</a></DropdownMenuItem></DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </header>
-  );
+    </div>
+    <Dialog open={searchOpen} onOpenChange={setSearchOpen}><DialogContent className="overflow-hidden p-0"><DialogTitle className="sr-only">Find a tool</DialogTitle><DialogDescription className="sr-only">Search the tools available to your role. Use arrow keys to select a result.</DialogDescription><Command><CommandInput placeholder="Search tools, pages, or tasks…" /><CommandList><CommandEmpty>No tools found. Try “borrow”, “users”, or “reports”.</CommandEmpty><CommandGroup heading="Quick tasks">{[{ ...dashboardItem }, { ...sections[0]?.items[0], title: "Borrow a copy", url: "/admin/circulation?transaction=borrow" }, { ...sections[0]?.items[0], title: "Return a copy", url: "/admin/circulation?transaction=return" }, helpItem].map(item => <CommandItem key={item.url} value={item.title} onSelect={() => choose(item.url)}>{item.title}</CommandItem>)}</CommandGroup>{sections.map(group => <CommandGroup key={group.label} heading={group.label}>{group.items.map(item => <CommandItem key={item.url} value={`${item.title} ${item.aliases?.join(" ") || ""}`} onSelect={() => choose(item.url)}><item.icon className="mr-3 size-4" />{item.title}</CommandItem>)}</CommandGroup>)}</CommandList></Command></DialogContent></Dialog>
+  </header>;
 }

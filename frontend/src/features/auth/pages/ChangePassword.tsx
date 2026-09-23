@@ -2,13 +2,15 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import PasswordChangeModal from "@/features/auth/components/PasswordChangeModal";
 import { useAuth } from "@/context/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 const ChangePassword = () => {
   const { user, loading } = useAuth();
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
+
+  if (["staff", "admin", "super_admin"].includes(user.role)) return <main className="mx-auto max-w-lg px-4 py-8">{!user.must_change_password && <Link to="/admin" className="mb-6 inline-block text-sm text-action">Back to library desk</Link>}<PasswordChangeModal description={user.must_change_password ? "Update your password to unlock the rest of the system." : "Choose a new password for your library account."} /></main>;
 
   return (
     <div className="min-h-screen bg-background relative">

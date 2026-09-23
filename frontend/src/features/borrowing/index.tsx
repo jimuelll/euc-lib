@@ -91,7 +91,7 @@ const LibraryServices = () => {
 
           <Link
             to="/services"
-            className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors duration-200 hover:text-primary"
+            className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors duration-200 hover:text-primary"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -131,17 +131,17 @@ const LibraryServices = () => {
           </div>
 
           <Tabs defaultValue="reserve">
-            <TabsList className="h-auto w-full justify-start gap-0 rounded-none border border-border bg-card p-0 text-muted-foreground sm:w-auto">
-              <TabsTrigger value="reserve" className="h-11 rounded-none border-r border-border px-4 text-[11px] font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
+            <TabsList className="h-auto w-full justify-start gap-0 rounded-md border border-border bg-card p-0 text-muted-foreground sm:w-auto">
+              <TabsTrigger value="reserve" className="h-11 rounded-md border-r border-border px-4 text-xs font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
                 <BookMarked className="h-3.5 w-3.5 mr-1.5" />
                 Reserve
                 {pendingCount > 0 && (
-                  <span className="ml-1.5 bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-current">
+                  <span className="ml-1.5 bg-warning/20 px-1.5 py-0.5 text-xs font-bold text-current">
                     {pendingCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="history" className="h-11 rounded-none px-4 text-[11px] font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
+              <TabsTrigger value="history" className="h-11 rounded-md px-4 text-xs font-bold uppercase tracking-[0.13em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none">
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                 History
               </TabsTrigger>

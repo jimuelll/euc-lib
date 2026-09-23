@@ -33,7 +33,7 @@ const CollapsibleSection = ({
           <Icon className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
 
           <span
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-foreground"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             {title}
@@ -41,7 +41,7 @@ const CollapsibleSection = ({
 
           {/* Count badge — institutional pill */}
           <span
-            className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold border ${
+            className={`inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold border ${
               countVariant === "destructive"
                 ? "border-destructive/30 bg-destructive/5 text-destructive"
                 : "border-border bg-muted text-muted-foreground"

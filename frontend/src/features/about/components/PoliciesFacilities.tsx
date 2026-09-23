@@ -17,7 +17,7 @@ const NumberedList = ({
     {items.map((item, i) => (
       <div key={i} className="flex items-start gap-4 border-b border-border py-3.5">
         <span
-          className={`text-[10px] font-bold tracking-[0.15em] mt-0.5 shrink-0 ${accentClass}`}
+          className={`text-xs font-bold tracking-[0.15em] mt-0.5 shrink-0 ${accentClass}`}
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {String(i + 1).padStart(2, "0")}

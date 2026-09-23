@@ -1,3 +1,5 @@
+import { useUnsavedChanges } from "@/features/admin";
+import { useAdminUrlState, queryPage } from "@/features/admin";
 import { useState, useEffect } from "react";
 import {
   Input,
@@ -26,21 +28,29 @@ const getServerFieldErrors = (error: unknown): Record<string, string> =>
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields }: Props) => {
+  const [params, patchParams] = useAdminUrlState();
+  const currentPage = queryPage(params.get("page"));
   const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | null>(null);
   const [sheetSection,  setSheetSection]  = useState<"details" | "copies">("details");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [isbnLookup,    setIsbnLookup]    = useState(false);
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
   const [loading,       setLoading]       = useState(false);
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [catalogFilter, setCatalogFilter] = useState<"all" | "book" | "thesis">("all");
+  const searchQuery = params.get("q") ?? "";
+  const setSearchQuery = (q: string) => patchParams({ q, page: null }, true);
+  const catalogFilter = params.get("material") === "book" ? "book" : params.get("material") === "thesis" ? "thesis" : "all";
+  const setCatalogFilter = (material: string) => patchParams({ material, page: null });
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [catalogPagination, setCatalogPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [catalogStatus, setCatalogStatus] = useState<"active" | "archived" | "all">("active");
+  const catalogStatus = params.get("status") === "archived" ? "archived" : params.get("status") === "all" ? "all" : "active";
+  const setCatalogStatus = (status: string) => patchParams({ status, page: null });
   const [bookTypes, setBookTypes] = useState<BookType[]>([]);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
+
+  const { confirmDiscard, discardDialog } = useUnsavedChanges(formValues, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
+  const requestClose = async () => { if (!loading && await confirmDiscard()) closeSheet(); };
 
   const activeFields = fields.filter((f) => !f.archived);
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
@@ -113,7 +123,8 @@ const AdminCatalogData = ({ fields }: Props) => {
     } finally { setLoading(false); }
   };
 
-  const handleSearchBooks = async (statusOverride?: "active" | "archived" | "all", materialOverride?: "all" | "book" | "thesis", pageOverride = 1) => {
+  const handleSearchBooks = async (statusOverride?: "active" | "archived" | "all", materialOverride?: "all" | "book" | "thesis", pageOverride = currentPage) => {
+    if (pageOverride !== currentPage) { patchParams({ page: pageOverride }); return; }
     setLoading(true);
     const status = statusOverride ?? catalogStatus;
     try {
@@ -134,10 +145,10 @@ const AdminCatalogData = ({ fields }: Props) => {
   };
 
   useEffect(() => {
-    void handleSearchBooks("active");
-    // The records table is the primary work surface; creation is an explicit secondary action.
+    const timer = window.setTimeout(() => { void handleSearchBooks(); }, 180);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchQuery, catalogFilter, catalogStatus, currentPage]);
 
   const handleUpdateBook = async () => {
     const selectedMaterial = selectedBook?.material_type === "thesis" ? "thesis" : "book";
@@ -204,26 +215,27 @@ const AdminCatalogData = ({ fields }: Props) => {
   return (
     <>
       {confirmDialog}
+      {discardDialog}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Search catalogue records" className="h-11 rounded-none pl-10" placeholder="Search title, author, or ISBN…" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void handleSearchBooks()} />
+            <Input aria-label="Search catalogue records" className="h-11 rounded-md pl-10" placeholder="Search title, author, or ISBN…" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void handleSearchBooks()} />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-            <Select value={catalogFilter} onValueChange={(value: "all" | "book" | "thesis") => { setCatalogFilter(value); void handleSearchBooks(undefined, value); }}><SelectTrigger className="h-11 rounded-none sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All materials</SelectItem><SelectItem value="book">Books</SelectItem><SelectItem value="thesis">Theses</SelectItem></SelectContent></Select>
-            <Select value={catalogStatus} onValueChange={(value: "active" | "archived" | "all") => { setCatalogStatus(value); setSelectedBook(null); void handleSearchBooks(value); }}><SelectTrigger className="h-11 rounded-none sm:w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="archived">Archived</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select>
+            <Select value={catalogFilter} onValueChange={(value: "all" | "book" | "thesis") => { setCatalogFilter(value); }}><SelectTrigger className="h-11 rounded-md sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All materials</SelectItem><SelectItem value="book">Books</SelectItem><SelectItem value="thesis">Theses</SelectItem></SelectContent></Select>
+            <Select value={catalogStatus} onValueChange={(value: "active" | "archived" | "all") => { setCatalogStatus(value); setSelectedBook(null); }}><SelectTrigger className="h-11 rounded-md sm:w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="archived">Archived</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select>
           </div>
           <div className="flex gap-2">
-            <Button className="h-11 rounded-none" variant="outline" disabled={loading} onClick={() => void handleSearchBooks()}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
-            <Button className="h-11 rounded-none" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add record</Button>
+            <Button className="h-11 rounded-md" variant="outline" disabled={loading} onClick={() => void handleSearchBooks()}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
+            <Button className="h-11 rounded-md" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add record</Button>
           </div>
         </div>
 
         {catalogStatus === "archived" && <div className="flex items-center gap-2 border border-warning/20 bg-warning/5 px-4 py-3 text-sm text-foreground"><Archive className="h-4 w-4 text-warning" />Archived records are hidden from the public catalogue until restored.</div>}
 
         <div className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card">
-          {loading ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-none" />)}</div> : searchResults.length ? <div className="overflow-x-auto">
+          {loading ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
               <thead><tr className="border-b border-border bg-muted/30">{["Title and author", "Material", "Identifier", "Availability", ""].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold text-muted-foreground">{heading}</th>)}</tr></thead>
               <tbody className="divide-y divide-border">
@@ -235,23 +247,23 @@ const AdminCatalogData = ({ fields }: Props) => {
                     <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-medium ${book.material_type === "thesis" ? "border-warning/30 bg-warning/5" : "border-border bg-background"}`}>{book.material_type === "thesis" ? <FileText className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}{book.material_type === "thesis" ? "Thesis" : "Book"}</span>{archived && <span className="ml-2 text-xs text-muted-foreground">Archived</span>}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{identifier}</td>
                     <td className="px-4 py-3 text-sm">{book.material_type === "thesis" ? <span className="text-muted-foreground">Reference only</span> : <><span className={Number(book.available) > 0 ? "font-semibold text-success" : "font-semibold text-muted-foreground"}>{Number(book.available || 0)} available</span><span className="text-muted-foreground"> / {Number(book.total_copies ?? book.copies ?? 0)}</span></>}</td>
-                    <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>{archived ? <Button size="sm" variant="outline" className="rounded-none" onClick={() => void handleRestoreBook(book)}><ArchiveRestore className="mr-2 h-4 w-4" />Restore</Button> : <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => selectBookForEdit(book)}>Edit details</DropdownMenuItem>{book.material_type !== "thesis" && <DropdownMenuItem onClick={() => openCopies(book)}>Manage copies</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</td>
+                    <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>{archived ? <Button size="sm" variant="outline" className="rounded-md" onClick={() => void handleRestoreBook(book)}><ArchiveRestore className="mr-2 h-4 w-4" />Restore</Button> : <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => selectBookForEdit(book)}>Edit details</DropdownMenuItem>{book.material_type !== "thesis" && <DropdownMenuItem onClick={() => openCopies(book)}>Manage copies</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</td>
                   </tr>;
                 })}
               </tbody>
             </table>
           </div> : <div className="px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" /><p className="mt-3 text-sm font-medium text-foreground">No catalogue records found</p><p className="mt-1 text-sm text-muted-foreground">Adjust the search or filters, or add a new record.</p></div>}
-          <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{catalogPagination.total} record{catalogPagination.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" size="sm" variant="outline" className="rounded-none" disabled={catalogPagination.page <= 1 || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page - 1)}>Previous</Button><span className="tabular-nums">Page {catalogPagination.page} of {catalogPagination.totalPages}</span><Button type="button" size="sm" variant="outline" className="rounded-none" disabled={catalogPagination.page >= catalogPagination.totalPages || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page + 1)}>Next</Button></div></div>
+          <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{catalogPagination.total} record{catalogPagination.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page <= 1 || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page - 1)}>Previous</Button><span className="tabular-nums">Page {catalogPagination.page} of {catalogPagination.totalPages}</span><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page >= catalogPagination.totalPages || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page + 1)}>Next</Button></div></div>
         </div>
       </div>
 
-      <Sheet open={sheetMode !== null} onOpenChange={(open) => { if (!open && !loading) closeSheet(); }}>
+      <Sheet open={sheetMode !== null} onOpenChange={(open) => { if (!open && !loading) void requestClose(); }}>
         <SheetContent side="right" className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[640px]">
           <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
             <SheetTitle className="text-primary-foreground">{sheetMode === "create" ? "Add catalogue record" : selectedBook?.title || "Catalogue record"}</SheetTitle>
             <SheetDescription className="text-primary-foreground/70">{sheetMode === "create" ? "Create a book or reference-only thesis using the configured catalogue fields." : `${selectedBook?.material_type === "thesis" ? "Thesis" : "Book"} record and operational details.`}</SheetDescription>
           </SheetHeader>
-          {sheetMode === "edit" && selectedBook?.material_type !== "thesis" ? <Tabs value={sheetSection} onValueChange={(value) => setSheetSection(value as "details" | "copies")} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]"><TabsList className="h-auto shrink-0 justify-start rounded-none border-b border-border bg-muted/20 px-5 py-2"><TabsTrigger value="details" className="rounded-sm px-3 py-2 text-xs">Details</TabsTrigger><TabsTrigger value="copies" className="rounded-sm px-3 py-2 text-xs">Copies</TabsTrigger></TabsList><TabsContent value="details" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={closeSheet} /></TabsContent><TabsContent value="copies" className="mt-0 flex min-h-0 overflow-hidden p-5"><BookCopiesModal embedded bookId={selectedBook.id} bookTitle={selectedBook.title} onClose={closeSheet} /></TabsContent></Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} onMaterialChange={(value) => { setMaterialType(value); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={closeSheet} /> : null}</div>}
+          {sheetMode === "edit" && selectedBook?.material_type !== "thesis" ? <Tabs value={sheetSection} onValueChange={(value) => setSheetSection(value as "details" | "copies")} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]"><TabsList className="h-auto shrink-0 justify-start rounded-md border-b border-border bg-muted/20 px-5 py-2"><TabsTrigger value="details" className="rounded-sm px-3 py-2 text-xs">Details</TabsTrigger><TabsTrigger value="copies" className="rounded-sm px-3 py-2 text-xs">Copies</TabsTrigger></TabsList><TabsContent value="details" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /></TabsContent><TabsContent value="copies" className="mt-0 flex min-h-0 overflow-hidden p-5"><BookCopiesModal embedded bookId={selectedBook.id} bookTitle={selectedBook.title} onClose={() => void requestClose()} /></TabsContent></Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} onMaterialChange={(value) => { setMaterialType(value); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /> : null}</div>}
         </SheetContent>
       </Sheet>
     </>

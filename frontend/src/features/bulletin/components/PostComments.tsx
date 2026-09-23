@@ -14,7 +14,7 @@ const PostComments = ({ comments, commentsLoading, canDeleteComment, handleDelet
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px w-4 bg-border shrink-0" />
                 <span
-                  className="text-[9px] font-bold uppercase tracking-[0.28em] text-muted-foreground"
+                  className="text-xs font-bold uppercase tracking-[0.28em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Comments
@@ -26,7 +26,7 @@ const PostComments = ({ comments, commentsLoading, canDeleteComment, handleDelet
                 <div className="flex items-center gap-2 py-3 text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   <span
-                    className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                    className="text-xs font-bold uppercase tracking-[0.15em]"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Loading...
@@ -35,7 +35,7 @@ const PostComments = ({ comments, commentsLoading, canDeleteComment, handleDelet
               )}
 
               {!commentsLoading && comments.length === 0 && (
-                <p className="py-2 text-[11px] text-muted-foreground/60">
+                <p className="py-2 text-xs text-muted-foreground/60">
                   No comments yet. Be the first to leave one.
                 </p>
               )}
@@ -55,12 +55,12 @@ const PostComments = ({ comments, commentsLoading, canDeleteComment, handleDelet
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-baseline gap-2">
                           <span
-                            className="text-[11px] font-bold uppercase tracking-[0.08em] text-foreground"
+                            className="text-xs font-bold uppercase tracking-[0.08em] text-foreground"
                             style={{ fontFamily: "var(--font-heading)" }}
                           >
                             {c.author}
                           </span>
-                          <span className="text-[10px] text-muted-foreground">{c.date}</span>
+                          <span className="text-xs text-muted-foreground">{c.date}</span>
                         </div>
                         {canDeleteComment(c) && (
                           <button

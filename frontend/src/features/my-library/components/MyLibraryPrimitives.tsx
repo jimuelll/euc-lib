@@ -42,7 +42,7 @@ const MetricCard = ({
 }) => (
   <div className="border border-border/80 bg-card px-4 py-4">
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground"
+      className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {label}
@@ -68,7 +68,7 @@ const PanelList = ({ children }: { children: ReactNode }) => (
 const SnapshotRow = ({ label, value }: { label: string; value: string }) => (
   <div className="flex items-center justify-between gap-4 px-5 py-3.5">
     <span
-      className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+      className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {label}
@@ -90,7 +90,7 @@ const QuickAccessRow = ({
     <div className="flex items-center gap-3">
       <Icon className="h-4 w-4 text-muted-foreground/60" />
       <span
-        className="text-[11px] font-bold uppercase tracking-[0.12em] text-foreground"
+        className="text-xs font-bold uppercase tracking-[0.12em] text-foreground"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         {label}
@@ -139,12 +139,12 @@ const HistoryItem = ({
       >
         {title}
       </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{subtitle}</p>
-      <p className="mt-1.5 text-[11px] text-muted-foreground/70">{meta}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground/70">{meta}</p>
     </div>
     <Badge
       variant="outline"
-      className="text-[10px] font-bold uppercase tracking-[0.08em]"
+      className="text-xs font-bold uppercase tracking-[0.08em]"
       style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
     >
       {badgeLabel}
@@ -180,7 +180,7 @@ const SubscriptionItem = ({ subscription }: { subscription: DashboardSubscriptio
         {subscription.description || "Academic resource for online research and study."}
       </p>
       {subscription.category ? (
-        <p className="mt-1.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+        <p className="mt-1.5 text-xs uppercase tracking-[0.12em] text-muted-foreground/70">
           {subscription.category}
         </p>
       ) : null}

@@ -39,7 +39,7 @@ const BarcodeInput = ({
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSubmit())}
           placeholder={placeholder}
           disabled={disabled || scanning}
-          className={`h-10 min-w-0 basis-full bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 transition-colors disabled:opacity-50 sm:basis-auto sm:flex-1 ${
+          className={`h-10 min-w-0 basis-full bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground transition-colors disabled:opacity-50 sm:basis-auto sm:flex-1 ${
             success ? "bg-success/5" : ""
           }`}
         />
@@ -53,7 +53,7 @@ const BarcodeInput = ({
           className={`flex h-10 flex-1 items-center justify-center border-t border-border transition-colors sm:w-10 sm:flex-none sm:border-l sm:border-t-0 ${
             scanning
               ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
-              : "text-muted-foreground/50 hover:text-foreground hover:bg-muted/40"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
           } disabled:opacity-40`}
         >
           {scanning ? <X className="h-3.5 w-3.5" /> : <QrCode className="h-3.5 w-3.5" />}
@@ -78,7 +78,7 @@ const BarcodeInput = ({
         <div className="flex items-start gap-2 text-success">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
           <span
-            className="break-words text-[10px] font-bold uppercase tracking-[0.15em]"
+            className="break-words text-xs font-bold "
             style={{ fontFamily: "var(--font-heading)" }}
           >
             QR code scanned successfully
@@ -118,7 +118,7 @@ const BarcodeInput = ({
             {/* Label */}
             <div className="absolute bottom-3 inset-x-0 flex justify-center">
               <span
-                className="text-[9px] text-white/50 tracking-[0.25em] uppercase"
+                className="text-xs text-white/50 tracking-[0.25em] uppercase"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Align QR code
@@ -138,7 +138,7 @@ const BarcodeInput = ({
 
       {error && (
         <p
-          className="text-[11px] text-destructive"
+          className="text-xs text-destructive"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {error}

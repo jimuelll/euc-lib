@@ -30,7 +30,7 @@ const MyLibraryUpdatesPanel = ({ data, notifications, unreadCount, markAsRead, m
                       notifications.length > 0 && unreadCount > 0 ? (
                         <button
                           onClick={() => void markAllAsRead()}
-                          className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary"
+                          className="text-xs font-bold uppercase tracking-[0.12em] text-primary"
                           style={{ fontFamily: "var(--font-heading)" }}
                         >
                           Mark all as read
@@ -61,7 +61,7 @@ const MyLibraryUpdatesPanel = ({ data, notifications, unreadCount, markAsRead, m
                                   >
                                     {notification.title}
                                   </p>
-                                  <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                                  <span className="shrink-0 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                                     {relativeTime(notification.created_at)}
                                   </span>
                                 </div>
@@ -94,7 +94,7 @@ const MyLibraryUpdatesPanel = ({ data, notifications, unreadCount, markAsRead, m
                         <div className="border-t border-border/70 px-5 py-4">
                           <Link
                             to="/services/subscriptions"
-                            className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-primary"
+                            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-primary"
                             style={{ fontFamily: "var(--font-heading)" }}
                           >
                             View all resources

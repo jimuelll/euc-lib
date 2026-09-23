@@ -49,7 +49,7 @@ export const StringListEditor = ({
         {items.map((item, i) => (
           <div key={i} className="flex items-center gap-2">
             <span
-              className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground/40 w-6 shrink-0 text-right"
+              className="text-xs font-bold tracking-[0.15em] text-muted-foreground w-6 shrink-0 text-right"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {String(i + 1).padStart(2, "0")}
@@ -63,7 +63,7 @@ export const StringListEditor = ({
             <button
               type="button"
               onClick={() => remove(i)}
-              className="text-muted-foreground/40 hover:text-destructive transition-colors"
+              className="text-muted-foreground hover:text-destructive transition-colors"
               aria-label="Remove item"
             >
               <Trash2 className="h-4 w-4" />
@@ -144,7 +144,7 @@ const ImageUploader = ({
             disabled:pointer-events-none disabled:opacity-60
           "
         >
-          <UploadCloud className="h-6 w-6 text-muted-foreground/50" />
+          <UploadCloud className="h-6 w-6 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">
             {uploading ? `Uploading… ${progress}%` : "Click to upload image"}
           </span>
@@ -195,7 +195,7 @@ export const StaffEditor = ({
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="text-muted-foreground/40 hover:text-destructive transition-colors"
+                className="text-muted-foreground hover:text-destructive transition-colors"
                 aria-label="Remove staff member"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -251,7 +251,7 @@ export const SpacesEditor = ({
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="text-muted-foreground/40 hover:text-destructive transition-colors"
+                className="text-muted-foreground hover:text-destructive transition-colors"
                 aria-label="Remove space"
               >
                 <Trash2 className="h-3.5 w-3.5" />

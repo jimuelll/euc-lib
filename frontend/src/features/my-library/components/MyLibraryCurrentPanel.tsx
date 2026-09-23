@@ -38,20 +38,20 @@ const MyLibraryCurrentPanel = ({ data, summary, unreadCount }: Props) => (
                                   >
                                     {book.title}
                                   </p>
-                                  <p className="mt-1 text-[11px] text-muted-foreground">
+                                  <p className="mt-1 text-xs text-muted-foreground">
                                     {book.author || "Unknown author"}
                                   </p>
                                 </div>
                                 <Badge
                                   variant="outline"
-                                  className={`text-[10px] font-bold uppercase tracking-[0.08em] ${borrowStatusConfig[book.status].className}`}
+                                  className={`text-xs font-bold uppercase tracking-[0.08em] ${borrowStatusConfig[book.status].className}`}
                                   style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
                                 >
                                   {borrowStatusConfig[book.status].label}
                                 </Badge>
                               </div>
 
-                              <div className="mt-3 grid gap-1 text-[11px] text-muted-foreground sm:grid-cols-2">
+                              <div className="mt-3 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                                 <span>Due {formatDate(book.due_date, "MMM d, yyyy h:mm a")}</span>
                                 <span>{dueLabel(book.due_date)}</span>
                                 <span>Borrowed {formatDate(book.borrowed_at, "MMM d, yyyy h:mm a")}</span>
@@ -88,20 +88,20 @@ const MyLibraryCurrentPanel = ({ data, summary, unreadCount }: Props) => (
                                     >
                                       {reservation.title}
                                     </p>
-                                    <p className="mt-1 text-[11px] text-muted-foreground">
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                       {reservation.author || "Unknown author"}
                                     </p>
                                   </div>
                                   <Badge
                                     variant="outline"
-                                    className={`text-[10px] font-bold uppercase tracking-[0.08em] ${reservationStatusConfig[reservation.status].className}`}
+                                    className={`text-xs font-bold uppercase tracking-[0.08em] ${reservationStatusConfig[reservation.status].className}`}
                                     style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
                                   >
                                     {reservationStatusConfig[reservation.status].label}
                                   </Badge>
                                 </div>
 
-                                <div className="mt-3 grid gap-1 text-[11px] text-muted-foreground">
+                                <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
                                   <span>Reserved {formatDate(reservation.reserved_at)}</span>
                                   {reservation.expires_at ? (
                                     <span>Pickup by {formatDate(reservation.expires_at, "MMM d, yyyy h:mm a")}</span>

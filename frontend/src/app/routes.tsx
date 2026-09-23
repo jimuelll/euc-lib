@@ -1,3 +1,4 @@
+import { useAdminTheme } from "@/features/admin/hooks/useAdminTheme";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
@@ -42,9 +43,11 @@ const RouteFallback = () => (
   <div className="fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden bg-primary/15" aria-label="Loading page" aria-busy="true">
     <div className="h-full w-1/3 bg-warning animate-[route-progress_1.15s_ease-in-out_infinite]" />
   </div>
-);
+ );
 
-export const AppRoutes = () => (
+export const AppRoutes = () => {
+  useAdminTheme();
+  return (
   <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/" element={<Home />} />
@@ -90,3 +93,4 @@ export const AppRoutes = () => (
     </Routes>
   </Suspense>
 );
+};

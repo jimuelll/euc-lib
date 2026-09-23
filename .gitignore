@@ -61,3 +61,9 @@ frontend/.env
 PRODUCT.md
 SKILL.md
 
+# Generated UML documentation (editable PlantUML, rendered figures, and PDF)
+/docs/generated/uml/
+
+# Local synthetic-data admin preview
+/frontend/scripts/admin-preview.mjs
+

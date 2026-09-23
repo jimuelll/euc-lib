@@ -90,7 +90,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
               style={{ fontFamily: "var(--font-heading)" }}
             >
               <Pin className="h-2.5 w-2.5 text-warning" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80">
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-foreground/80">
                 Pinned
               </span>
             </div>
@@ -105,7 +105,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         {/* Content panel */}
         <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6 lg:w-[45%] lg:justify-center" : "p-4 sm:p-5"} ${canArchive ? "pr-16 sm:pr-[4.5rem]" : ""}`}>
           {!hasImage && post.is_pinned ? (
-            <div className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+            <div className="mb-3 flex items-center gap-1 text-xs font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
               <Pin className="h-3 w-3" /> Pinned
             </div>
           ) : null}
@@ -113,19 +113,19 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           {/* Author row */}
           <div className={`flex items-center gap-2.5 ${isHomepage ? "mb-2" : "mb-3"}`}>
             <div
-              className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary text-primary-foreground text-[9px] font-bold"
+              className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary text-primary-foreground text-xs font-bold"
               style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.04em" }}
             >
               {getInitials(post.author_name)}
             </div>
             <div className={`min-w-0 ${isHomepage || isFeatured ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
               <span
-                className={`text-[11px] font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage || isFeatured ? "break-words" : "truncate"}`}
+                className={`text-xs font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage || isFeatured ? "break-words" : "truncate"}`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {post.author_name}
               </span>
-              <span className="text-[10px] text-muted-foreground shrink-0">{post.date}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{post.date}</span>
             </div>
           </div>
 
@@ -146,7 +146,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           {/* Footer — stats */}
           <div className={`mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
             <span
-              className={`flex items-center gap-1.5 text-[11px] font-bold transition-colors ${
+              className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
                 post.liked_by_me ? "text-primary" : "text-muted-foreground"
               }`}
               style={{ fontFamily: "var(--font-heading)" }}
@@ -156,7 +156,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             </span>
 
             <span
-              className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground"
+              className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               <MessageCircle className="h-3 w-3" />
@@ -164,7 +164,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             </span>
 
             <span
-              className="ml-auto text-[10px] font-bold uppercase tracking-[0.15em] text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+              className="ml-auto text-xs font-bold uppercase tracking-[0.15em] text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Read →

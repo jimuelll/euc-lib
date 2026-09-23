@@ -30,6 +30,7 @@ interface AdminStatCardProps {
 
 export function AdminPage({
   title,
+  description,
   actions,
   children,
   className,
@@ -45,12 +46,12 @@ export function AdminPage({
   return (
     <div className={cn("flex w-full flex-col gap-6", widthClass, className)}>
       <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <h1
+        <div className="min-w-0"><h1
           className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {title}
-        </h1>
+        </h1>{description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}</div>
         {actions ? <div className="flex flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
       </header>
 
@@ -61,18 +62,18 @@ export function AdminPage({
 
 export function AdminPanel({
   title,
+  description,
   actions,
   children,
   className,
   contentClassName,
 }: AdminPanelProps) {
-  const hasHeader = title || actions;
+  const hasHeader = title || description || actions;
 
   return (
-    <Card className={cn("admin-panel-surface admin-etched-border min-w-0 rounded-sm border-border bg-card shadow-none", className)}>
-      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--warning)),transparent_72%)]" />
+    <Card className={cn("admin-panel-surface admin-etched-border min-w-0 rounded-lg border-border bg-card shadow-none", className)}>
       {hasHeader ? (
-        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-[linear-gradient(180deg,hsl(var(--primary)/0.06),transparent)] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-card px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             {title ? (
               <CardTitle
@@ -82,6 +83,7 @@ export function AdminPanel({
                 {title}
               </CardTitle>
             ) : null}
+            {description ? <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
           </div>
 
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
@@ -101,13 +103,12 @@ export function AdminStatGrid({ children }: { children: ReactNode }) {
 
 export function AdminStatCard({ label, value, icon, helperText }: AdminStatCardProps) {
   return (
-    <Card className="admin-panel-surface admin-etched-border rounded-sm border-border bg-card shadow-none">
-      <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--warning)),transparent_78%)]" />
+    <Card className="admin-panel-surface admin-etched-border rounded-lg border-border bg-card shadow-none">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2.5">
             <p
-              className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
+              className="text-sm font-medium text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {label}
@@ -120,7 +121,7 @@ export function AdminStatCard({ label, value, icon, helperText }: AdminStatCardP
             </p>
           </div>
           {icon ? (
-            <div className="mt-0.5 flex h-10 w-10 items-center justify-center border border-warning/25 bg-warning/10 text-warning">
+            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-md bg-muted text-action">
               {icon}
             </div>
           ) : null}

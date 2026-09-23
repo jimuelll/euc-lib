@@ -33,7 +33,7 @@ const HistoryTab = ({ history, loading, pagination, onPageChange }: HistoryTabPr
           <div className="h-px w-6 bg-border" />
         </div>
         <p
-          className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+          className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           No reservation history yet
@@ -69,7 +69,7 @@ const HistoryTab = ({ history, loading, pagination, onPageChange }: HistoryTabPr
             meta={
               <div className="text-right">
                 <p
-                  className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground"
+                  className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {label}
@@ -89,7 +89,7 @@ const HistoryTab = ({ history, loading, pagination, onPageChange }: HistoryTabPr
             badge={
               <Badge
                 variant="outline"
-                className={`text-[10px] font-bold uppercase tracking-[0.1em] ${cfg.className}`}
+                className={`text-xs font-bold uppercase tracking-[0.1em] ${cfg.className}`}
                 style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
               >
                 {cfg.label}

@@ -36,7 +36,7 @@ export const ImagePicker = ({
     <div className="flex flex-col gap-1.5">
       <label className={`${LABEL_CLS} text-muted-foreground`} style={FONT}>
         Thumbnail Image
-        <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground/40">
+        <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground">
           (optional)
         </span>
       </label>
@@ -48,7 +48,7 @@ export const ImagePicker = ({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className={`flex items-center gap-1.5 px-3 py-1.5 bg-background/90 hover:bg-background text-foreground border border-border transition-colors ${LABEL_CLS} text-[9px]`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 bg-background/90 hover:bg-background text-foreground border border-border transition-colors ${LABEL_CLS} text-xs`}
               style={FONT}
             >
               <Upload className="h-3 w-3" />
@@ -57,7 +57,7 @@ export const ImagePicker = ({
             <button
               type="button"
               onClick={onRemove}
-              className={`flex items-center gap-1.5 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground border border-destructive/50 transition-colors ${LABEL_CLS} text-[9px]`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground border border-destructive/50 transition-colors ${LABEL_CLS} text-xs`}
               style={FONT}
             >
               <X className="h-3 w-3" />
@@ -66,7 +66,7 @@ export const ImagePicker = ({
           </div>
           {preview && (
             <span
-              className={`absolute top-2 right-2 bg-warning text-warning-foreground px-2 py-0.5 ${LABEL_CLS} text-[9px]`}
+              className={`absolute top-2 right-2 bg-warning text-warning-foreground px-2 py-0.5 ${LABEL_CLS} text-xs`}
               style={FONT}
             >
               New
@@ -76,13 +76,13 @@ export const ImagePicker = ({
       ) : removeImage ? (
         <div className="border border-dashed border-destructive/40 bg-destructive/5 flex flex-col items-center justify-center gap-2 py-6">
           <X className="h-6 w-6 text-destructive/40" />
-          <p className={`${LABEL_CLS} text-[9px] text-destructive/60`} style={FONT}>
+          <p className={`${LABEL_CLS} text-xs text-destructive/60`} style={FONT}>
             Image will be removed
           </p>
           <button
             type="button"
             onClick={onUndo}
-            className={`${LABEL_CLS} text-[9px] underline text-muted-foreground hover:text-foreground`}
+            className={`${LABEL_CLS} text-xs underline text-muted-foreground hover:text-foreground`}
             style={FONT}
           >
             Undo
@@ -97,10 +97,10 @@ export const ImagePicker = ({
         >
           <ImageIcon className="h-7 w-7 text-muted-foreground/25" />
           <div className="text-center">
-            <p className={`${LABEL_CLS} text-[9px] text-muted-foreground/60`} style={FONT}>
+            <p className={`${LABEL_CLS} text-xs text-muted-foreground`} style={FONT}>
               Click or drag & drop
             </p>
-            <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               JPG, PNG, WEBP · max 5 MB
             </p>
           </div>

@@ -1,80 +1,45 @@
-import {
-  LayoutDashboard, ShieldCheck, BookCopy, ArrowLeftRight, DatabaseBackup,
-  FileBarChart, ClipboardCheck,
-  CalendarDays, FileText, CalendarOff, ShieldAlert, Clock, BellRing, ScrollText, Settings2, BookOpenCheck,
-} from "lucide-react";
-import type { SidebarSection } from "./AdminLayout.types";
+import { LayoutDashboard, Users, BookCopy, ArrowLeftRight, DatabaseBackup, FileBarChart, ClipboardCheck, CalendarDays, FileText, CalendarOff, Clock, BellRing, ScrollText, Settings2, BookOpenCheck, FilePenLine, Sparkles } from "lucide-react";
+import type { SidebarItem, SidebarSection } from "./AdminLayout.types";
 
-
-const ROLES_WITH_ABOUT_SECTION = new Set(["admin", "super_admin"]);
-
+const administrators = ["admin", "super_admin"];
+const superAdministrators = ["super_admin"];
+export const dashboardItem: SidebarItem = { title: "Dashboard", url: "/admin", icon: LayoutDashboard };
+export const helpItem: SidebarItem = { title: "Help & user guide", url: "/admin/user-guide", icon: BookOpenCheck, aliases: ["instructions", "help"] };
 export const sidebarSections: SidebarSection[] = [
-  {
-    label: "Library Management",
-    items: [
-      { title: "Dashboard",    url: "/admin",              icon: LayoutDashboard },
-      { title: "Catalog",      url: "/admin/catalog",      icon: BookCopy       },
-      { title: "Circulation",  url: "/admin/circulation",  icon: ArrowLeftRight },
-      { title: "Reservations", url: "/admin/reservations", icon: CalendarDays   },
-      { title: "Clearance",    url: "/admin/clearance",    icon: ClipboardCheck },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      { title: "User Management", url: "/admin/manage",       icon: ShieldCheck    },
-      { title: "Academic Settings", url: "/admin/holidays",   icon: CalendarOff, roles: ["admin", "super_admin"] },
-      { title: "Restrictions",    url: "/admin/restrictions", icon: ShieldAlert    },
-      { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: ["super_admin"] },
-    ],
-  },
-  {
-    label: "Content Management",
-    items: [
-      { title: "Content Management", url: "/admin/content", icon: FileText, roles: [...ROLES_WITH_ABOUT_SECTION] },
-      { title: "Notifications",       url: "/admin/notifications", icon: BellRing, roles: ["admin", "super_admin"] },
-    ],
-  },
-  {
-    label: "Reports",
-    items: [
-      { title: "Analytics",        url: "/admin/analytics",     icon: FileBarChart, roles: ["admin", "super_admin"] },
-      { title: "Audit Logs",       url: "/admin/audit-logs",    icon: ScrollText, roles: ["super_admin"]  },
-      { title: "Query",   url: "/admin/query",       icon: FileBarChart, roles: ["admin", "super_admin"] },
-      { title: "Attendance Logs",  url: "/admin/attendance-logs", icon: Clock, roles: ["admin", "super_admin"] },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { title: "Backup",          url: "/admin/backup",   icon: DatabaseBackup, roles: ["super_admin"] },
-    ],
-  },
-  {
-    label: "Help",
-    items: [
-      { title: "User Guide", url: "/admin/user-guide", icon: BookOpenCheck },
-    ],
-  },
+  { label: "Library desk", alwaysOpen: true, items: [
+    { title: "Borrow & Return", url: "/admin/circulation", icon: ArrowLeftRight, aliases: ["circulation", "checkout", "scan"] },
+    { title: "Reservations", url: "/admin/reservations", icon: CalendarDays, aliases: ["holds", "pickup"] },
+    { title: "Clearance & Fines", url: "/admin/clearance", icon: ClipboardCheck, aliases: ["payment", "overdue", "receipt"] },
+    { title: "Users", url: "/admin/manage", icon: Users, aliases: ["patron", "student", "employee", "restrictions", "accounts"] },
+    { title: "Catalog", url: "/admin/catalog", icon: BookCopy, aliases: ["books", "copies", "thesis", "catalogue"] },
+    { title: "Attendance", url: "/admin/attendance-logs", icon: Clock, roles: administrators },
+  ] },
+  { label: "Publishing", items: [
+    { title: "Website Content", url: "/admin/content", icon: FileText, roles: administrators, aliases: ["homepage", "about", "bulletin", "events", "subscriptions", "edit guide"] },
+    { title: "Notifications", url: "/admin/notifications", icon: BellRing, roles: administrators },
+  ] },
+  { label: "Reports", items: [
+    { title: "Analytics", url: "/admin/analytics", icon: FileBarChart, roles: administrators },
+    { title: "Reports & Records", url: "/admin/query", icon: FileText, roles: administrators, aliases: ["query", "export", "csv", "explore"] },
+  ] },
+  { label: "Settings & System", items: [
+    { title: "Academic Settings", url: "/admin/holidays", icon: CalendarOff, roles: administrators, aliases: ["terms", "programs", "departments", "holidays"] },
+    { title: "Book Type Policies", url: "/admin/book-types", icon: Settings2, roles: superAdministrators, aliases: ["loan duration", "fine rates"] },
+    { title: "Catalog Configuration", url: "/admin/catalog?tab=builder", icon: FilePenLine, roles: superAdministrators, aliases: ["form builder", "fields"] },
+    { title: "AI Recommendations", url: "/admin/catalog?tab=ai", icon: Sparkles, roles: superAdministrators, aliases: ["embeddings", "metadata"] },
+    { title: "Audit Logs", url: "/admin/audit-logs", icon: ScrollText, roles: superAdministrators },
+    { title: "Backup & Restore", url: "/admin/backup", icon: DatabaseBackup, roles: superAdministrators },
+  ] },
 ];
-
-export const allSidebarItems = sidebarSections.flatMap((s) => s.items);
-
-export function getInitials(name?: string): string {
-  if (!name) return "?";
-  const parts = name.trim().split(" ").filter(Boolean);
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+export const allSidebarItems = [dashboardItem, ...sidebarSections.flatMap(section => section.items), helpItem];
+export const canAccessItem = (item: SidebarItem, role?: string) => !item.roles || item.roles.includes(role ?? "");
+export const visibleSidebarSections = (role?: string) => sidebarSections.map(section => ({ ...section, items: section.items.filter(item => canAccessItem(item, role)) })).filter(section => section.items.length);
+export function getInitials(name?: string) { return name?.trim().split(/\s+/).filter(Boolean).map(part => part[0]).filter((_, index, parts) => index === 0 || index === parts.length - 1).join("").toUpperCase() || "?"; }
+export function resolveCurrentItem(pathname: string, search = "", role?: string) {
+  const candidates = role ? allSidebarItems.filter(item => canAccessItem(item, role)) : allSidebarItems;
+  if (pathname === "/admin/restrictions") return candidates.find(item => item.url === "/admin/manage");
+  const tab = new URLSearchParams(search).get("tab");
+  return candidates.find(item => item.url.includes("?") && item.url.split("?")[0] === pathname && new URLSearchParams(item.url.split("?")[1]).get("tab") === tab)
+    ?? candidates.find(item => !item.url.includes("?") && (pathname === item.url || (item.url !== "/admin" && pathname.startsWith(item.url + "/"))));
 }
-
-export function resolveCurrentItem(pathname: string) {
-  return allSidebarItems.find((i) =>
-    i.url === "/admin"
-      ? pathname === "/admin"
-      : pathname.startsWith(i.url)
-  );
-}
-
-export function resolveCurrentSection(itemUrl: string) {
-  return sidebarSections.find((s) => s.items.some((i) => i.url === itemUrl));
-}
+export function resolveCurrentSection(itemUrl: string) { return sidebarSections.find(section => section.items.some(item => item.url === itemUrl)); }

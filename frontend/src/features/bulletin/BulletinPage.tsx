@@ -113,7 +113,7 @@ export function BulletinPage() {
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-bold uppercase tracking-[0.15em]">New Post</span>
+                <span className="text-xs font-bold uppercase tracking-[0.15em]">New Post</span>
               </button>
             )}
           </div>
@@ -126,7 +126,7 @@ export function BulletinPage() {
               <div className="mb-5 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-xl">
                   <p
-                    className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                    className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Search Posts
@@ -156,7 +156,7 @@ export function BulletinPage() {
                   <div className="flex gap-0">
                     <div className="w-[3px] bg-destructive shrink-0" />
                     <p
-                      className="px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-destructive"
+                      className="px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-destructive"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {error}
@@ -164,7 +164,7 @@ export function BulletinPage() {
                   </div>
                   <button
                     onClick={() => fetchPosts(currentPage, debouncedSearch)}
-                    className="px-5 py-2.5 border border-border text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                    className="px-5 py-2.5 border border-border text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Retry
@@ -175,7 +175,7 @@ export function BulletinPage() {
               {!loading && !error && posts.length === 0 && (
                 <div className="flex flex-col items-center py-20 border border-dashed border-border gap-5">
                   <p
-                    className="text-[10px] font-bold uppercase tracking-[0.25em] text-muted-foreground"
+                    className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {search.trim() ? "No matching posts" : "No posts yet"}
@@ -187,7 +187,7 @@ export function BulletinPage() {
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.15em]">
+                      <span className="text-xs font-bold uppercase tracking-[0.15em]">
                         Create the first post
                       </span>
                     </button>
@@ -199,7 +199,7 @@ export function BulletinPage() {
                 <>
                   <div className="flex items-center justify-between pb-4 mb-0 border-b border-border">
                     <span
-                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+                      className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       {posts.length} post{posts.length !== 1 ? "s" : ""} - Page {currentPage} of {totalPages}
@@ -242,7 +242,7 @@ export function BulletinPage() {
                           <button
                             key={item}
                             onClick={() => setCurrentPage(item)}
-                            className={`h-10 min-w-[2.5rem] flex-1 flex items-center justify-center border-r border-border text-[11px] font-bold tracking-[0.1em] transition-colors ${
+                            className={`h-10 min-w-[2.5rem] flex-1 flex items-center justify-center border-r border-border text-xs font-bold tracking-[0.1em] transition-colors ${
                               currentPage === item
                                 ? "bg-primary text-primary-foreground"
                                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -308,7 +308,7 @@ export function BulletinPage() {
               <Lock className="mt-0.5 h-4 w-4 text-warning" />
               <DialogHeader className="text-left">
                 <p
-                  className="text-[10px] font-bold uppercase tracking-[0.28em] text-warning"
+                  className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Requires Login
@@ -334,7 +334,7 @@ export function BulletinPage() {
               <button
                 type="button"
                 onClick={() => setShowLoginPrompt(false)}
-                className="border border-border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground"
+                className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Maybe later
@@ -342,7 +342,7 @@ export function BulletinPage() {
               <Link
                 to="/login"
                 onClick={() => setShowLoginPrompt(false)}
-                className="inline-flex items-center justify-center gap-2 bg-primary px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center justify-center gap-2 bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Login now

@@ -12,6 +12,7 @@ const EMPTY_ROWS: AdminReservation[] = [];
 const AdminReservations = () => {
   const {
     data,
+    error,
     loading,
     search,
     statusFilter,
@@ -34,74 +35,31 @@ const AdminReservations = () => {
     <AdminPage
       eyebrow="Service Desk"
       title="Reservations"
+      description="Prepare pending holds, mark copies ready, and complete pickup through Borrow & Return."
       actions={
         <Button
           onClick={handleToggleArchived}
           variant={showArchived ? "default" : "outline"}
-          className="min-w-[110px] rounded-none"
+          className="min-w-[110px] rounded-md"
         >
           <Archive className="mr-2 h-4 w-4" />
-          {showArchived ? "Archived" : "Active"}
+          {showArchived ? "View active reservations" : "View archive"}
         </Button>
       }
     >
       {confirmDialog}
+      {error && <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4 text-sm"><span>{error}</span><Button variant="outline" onClick={fetchReservations}>Try again</Button></div>}
       {showArchived ? (
         <div className="border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-foreground">
           Showing archived records. Restore an item to return it to the active reservation list.
         </div>
       ) : null}
 
-      <AdminPanel
-        title={showArchived ? "Archived records" : "Active reservations"}
-      >
-        <ReservationsToolbar
-          search={search}
-          statusFilter={statusFilter}
-          loading={loading}
-          showArchived={showArchived}
-          onSearchChange={handleSearchChange}
-          onStatusChange={handleStatusChange}
-          onRefresh={fetchReservations}
-        />
+      <AdminPanel contentClassName="p-0">
+        <div className="border-b border-border p-4"><ReservationsToolbar search={search} statusFilter={statusFilter} loading={loading} showArchived={showArchived} onSearchChange={handleSearchChange} onStatusChange={handleStatusChange} onRefresh={fetchReservations} /></div>
+        <ReservationsTable rows={data?.rows ?? EMPTY_ROWS} loading={loading} actionId={actionId} showArchived={showArchived} onMarkReady={handleMarkReady} onFulfill={handleFulfill} onCancel={handleCancel} onArchive={handleArchive} onRestore={handleRestore} />
+        {data && <ReservationsPagination page={data.page} totalPages={data.totalPages} total={data.total} loading={loading} onPageChange={setPage} />}
       </AdminPanel>
-
-      {data ? (
-        <ReservationsPagination
-          page={data.page}
-          totalPages={data.totalPages}
-          total={data.total}
-          loading={loading}
-          onPageChange={setPage}
-        />
-      ) : null}
-
-      <AdminPanel
-        title="Reservation table"
-        contentClassName="p-0"
-      >
-        <ReservationsTable
-          rows={data?.rows ?? EMPTY_ROWS}
-          loading={loading}
-          actionId={actionId}
-          showArchived={showArchived}
-          onMarkReady={handleMarkReady}
-          onFulfill={handleFulfill}
-          onCancel={handleCancel}
-          onArchive={handleArchive}
-          onRestore={handleRestore}
-        />
-      </AdminPanel>
-
-      {data && data.totalPages > 1 ? (
-        <ReservationsPagination
-          page={data.page}
-          totalPages={data.totalPages}
-          total={data.total}
-          loading={loading}
-          onPageChange={setPage}
-        />
-      ) : null}
     </AdminPage>
   );
 };

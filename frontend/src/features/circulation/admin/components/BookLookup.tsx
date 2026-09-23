@@ -70,12 +70,12 @@ const BookLookup = ({
     <div className="border-t border-border/70 pt-3">
       <label className="mb-2 block text-sm font-medium text-muted-foreground">Can’t scan? Search catalog</label>
       <div className="flex items-center gap-2 border border-border bg-background px-3 focus-within:border-primary">
-        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
-        <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60" />
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
         {searching && <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />}
       </div>
-      {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-[11px] text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
-      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="font-mono text-xs text-foreground">{copy.barcode}</span><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-success">Available copy</span></button>)}</div>}
+      {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-xs  text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
+      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="font-mono text-xs text-foreground">{copy.barcode}</span><span className="text-xs font-bold  text-success">Available copy</span></button>)}</div>}
     </div>
 
     {/* Found copy card */}
@@ -94,14 +94,14 @@ const BookLookup = ({
               >
                 {foundCopy.title}
               </p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/60 truncate"
+              <p className="mt-0.5 text-xs  text-muted-foreground truncate"
                 style={{ fontFamily: "var(--font-heading)" }}>
                 {foundCopy.author}
               </p>
             </div>
             <div className="min-w-0 text-left sm:shrink-0 sm:text-right">
-              <p className="break-all font-mono text-[11px] text-muted-foreground/60">{foundCopy.barcode}</p>
-              <p className={`mt-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${
+              <p className="break-all font-mono text-xs text-muted-foreground">{foundCopy.barcode}</p>
+              <p className={`mt-0.5 text-xs font-bold  ${
                 foundCopy.is_active ? "text-success" : "text-destructive"
               }`} style={{ fontFamily: "var(--font-heading)" }}>
                 {foundCopy.condition} · {foundCopy.is_active ? "Active" : "Inactive"}
@@ -114,7 +114,7 @@ const BookLookup = ({
             matchedBorrow ? (
               <div className="flex items-center gap-2 text-success">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[11px] font-medium">
+                <span className="text-xs font-medium">
                   Matched — due {new Date(matchedBorrow.due_date).toLocaleDateString()}
                   {matchedBorrow.status === "overdue" && (
                     <span className="ml-2 font-bold text-destructive">(Overdue)</span>
@@ -124,7 +124,7 @@ const BookLookup = ({
             ) : (
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[11px] font-medium">
+                <span className="text-xs font-medium">
                   No active borrow for this user &amp; copy
                 </span>
               </div>
@@ -134,7 +134,7 @@ const BookLookup = ({
           {type === "borrow" && !foundCopy.is_active && (
             <div className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-[11px] font-medium">
+              <span className="text-xs font-medium">
                 This copy is not available for borrowing
               </span>
             </div>

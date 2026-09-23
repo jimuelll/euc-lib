@@ -152,8 +152,8 @@ export default function UserGuideEditor() {
               <button type="button" onClick={() => choose(item)} className="w-full px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <span className="block truncate text-sm font-medium">{item.title}</span>
                 <span className="mt-1 flex flex-wrap gap-1.5">
-                  <Badge variant={item.is_published ? "default" : "outline"} className="rounded-sm text-[10px]">{item.is_published ? "Published" : "Draft"}</Badge>
-                  {item.has_unpublished_changes ? <Badge variant="secondary" className="rounded-sm text-[10px]">New edits</Badge> : null}
+                  <Badge variant={item.is_published ? "default" : "outline"} className="rounded-sm text-xs">{item.is_published ? "Published" : "Draft"}</Badge>
+                  {item.has_unpublished_changes ? <Badge variant="secondary" className="rounded-sm text-xs">New edits</Badge> : null}
                 </span>
               </button>
               <div className="flex justify-end gap-1 px-3 pb-2">

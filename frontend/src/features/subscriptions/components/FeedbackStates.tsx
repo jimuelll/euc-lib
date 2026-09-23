@@ -26,7 +26,7 @@ export const EmptyState = () => (
   <div className="border border-border border-t-0 flex flex-col items-center justify-center gap-2 py-20 bg-background">
     <BookOpen className="h-8 w-8 text-muted-foreground/20" />
     <p
-      className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/30"
+      className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground/30"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       No subscriptions available
@@ -39,7 +39,7 @@ export const EmptyState = () => (
 export const FooterNotice = () => (
   <div className="border border-border border-t-0 border-dashed bg-card px-6 py-4 flex items-center gap-3">
     <div className="h-px w-4 bg-border shrink-0" />
-    <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+    <p className="text-xs text-muted-foreground/60 leading-relaxed">
       This list is managed by the library administration and will be updated as new
       subscriptions are added.
     </p>

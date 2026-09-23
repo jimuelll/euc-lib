@@ -195,7 +195,7 @@ const AdminAuditLogs = () => {
         <Button
           type="button"
           variant="outline"
-          className="rounded-none"
+          className="rounded-md"
           onClick={() => void loadAuditLogs("refresh", page, filters)}
           disabled={loading || refreshing}
         >
@@ -211,11 +211,11 @@ const AdminAuditLogs = () => {
         }}>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
             <div className="space-y-2">
-              <Label htmlFor="audit-category" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <Label htmlFor="audit-category" className="text-xs font-semibold  text-muted-foreground">
                 Category
               </Label>
               <Select value={filters.category} onValueChange={handleCategoryChange}>
-                <SelectTrigger id="audit-category" className="rounded-none">
+                <SelectTrigger id="audit-category" className="rounded-md">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
@@ -229,11 +229,11 @@ const AdminAuditLogs = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="audit-action" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <Label htmlFor="audit-action" className="text-xs font-semibold  text-muted-foreground">
                 Action
               </Label>
               <Select value={filters.action || "all"} onValueChange={(value) => setFilters((current) => ({ ...current, action: value === "all" ? "" : value }))}>
-                <SelectTrigger id="audit-action" className="rounded-none">
+                <SelectTrigger id="audit-action" className="rounded-md">
                   <SelectValue placeholder="All actions" />
                 </SelectTrigger>
                 <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
@@ -248,24 +248,24 @@ const AdminAuditLogs = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="audit-start-date" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <Label htmlFor="audit-start-date" className="text-xs font-semibold  text-muted-foreground">
                 Start date
               </Label>
-              <Input id="audit-start-date" type="date" className="rounded-none" value={filters.dateFrom} onChange={handleFilterChange("dateFrom")} />
+              <Input id="audit-start-date" type="date" className="rounded-md" value={filters.dateFrom} onChange={handleFilterChange("dateFrom")} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="audit-end-date" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <Label htmlFor="audit-end-date" className="text-xs font-semibold  text-muted-foreground">
                 End date
               </Label>
-              <Input id="audit-end-date" type="date" className="rounded-none" value={filters.dateTo} onChange={handleFilterChange("dateTo")} />
+              <Input id="audit-end-date" type="date" className="rounded-md" value={filters.dateTo} onChange={handleFilterChange("dateTo")} />
             </div>
 
             <div className="flex items-end gap-2">
-              <Button type="submit" className="rounded-none" variant="outline">
+              <Button type="submit" className="rounded-md" variant="outline">
                 Apply
               </Button>
-              <Button type="button" variant="ghost" className="rounded-none" onClick={resetFilters}>
+              <Button type="button" variant="ghost" className="rounded-md" onClick={resetFilters}>
                 Reset
               </Button>
             </div>
@@ -277,7 +277,7 @@ const AdminAuditLogs = () => {
         title="Audit Feed"
         description="Each item records the completed action, its category, time, and responsible account when one is available."
       >
-        {loading ? <div className="space-y-3" aria-label="Loading audit records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-20 w-full rounded-none" />)}</div> : null}
+        {loading ? <div className="space-y-3" aria-label="Loading audit records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-20 w-full rounded-md" />)}</div> : null}
         {error ? (
           <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -311,7 +311,7 @@ const AdminAuditLogs = () => {
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`inline-flex items-center border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${
+                          className={`inline-flex items-center border px-2.5 py-1 text-xs font-bold  ${
                             categoryTone[item.category] ?? "border-border bg-muted/30 text-foreground"
                           }`}
                           style={{ fontFamily: "var(--font-heading)" }}
@@ -319,7 +319,7 @@ const AdminAuditLogs = () => {
                           <Activity className="mr-1.5 h-3 w-3" />
                           {item.category}
                         </span>
-                        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                        <span className="text-xs  text-muted-foreground">
                           {item.action.replace(/_/g, " ")}
                         </span>
                       </div>
@@ -342,7 +342,7 @@ const AdminAuditLogs = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-none"
+                className="rounded-md"
                 disabled={refreshing || pagination.page <= 1}
                 onClick={() => goToPage(pagination.page - 1)}
               >
@@ -356,7 +356,7 @@ const AdminAuditLogs = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-none"
+                className="rounded-md"
                 disabled={refreshing || pagination.page >= pagination.totalPages}
                 onClick={() => goToPage(pagination.page + 1)}
               >

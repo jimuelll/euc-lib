@@ -43,7 +43,7 @@ export const SubscriptionTable = ({
 
     {/* States */}
     {loading && (
-      <div className="space-y-2 bg-background p-4">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-16 w-full rounded-none" />)}</div>
+      <div className="space-y-2 bg-background p-4">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-16 w-full rounded-md" />)}</div>
     )}
 
     {!loading && error && (
@@ -82,7 +82,7 @@ export const SubscriptionTable = ({
     {!loading && !error && subs.length > 0 && (
       <div className="border-t border-border bg-muted/10 px-4 sm:px-6 py-3">
         <p
-          className="text-[10px] text-muted-foreground/40 uppercase tracking-[0.12em]"
+          className="text-xs text-muted-foreground "
           style={FONT}
         >
           {subs.length} {subs.length === 1 ? "record" : "records"} · {activeCount} active

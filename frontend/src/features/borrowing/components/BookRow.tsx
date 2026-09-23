@@ -29,7 +29,7 @@ const BookRow = ({ icon: Icon, title, author, meta, badge, action }: BookRowProp
         {title}
       </p>
       <p
-        className="mt-1 text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80"
+        className="mt-1 text-xs uppercase tracking-[0.15em] text-muted-foreground/80"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         {author}

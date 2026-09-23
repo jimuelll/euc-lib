@@ -28,7 +28,7 @@ const IdleView = ({ onStart }: IdleViewProps) => (
         />
         <div className="relative z-10">
           <p
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/50 mb-1"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground/50 mb-1"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Select Action
@@ -50,12 +50,12 @@ const IdleView = ({ onStart }: IdleViewProps) => (
         >
           <LogIn className="h-6 w-6 text-muted-foreground group-hover:text-primary-foreground transition-colors" />
           <span
-            className="text-[11px] font-bold tracking-[0.18em] uppercase text-foreground group-hover:text-primary-foreground transition-colors"
+            className="text-xs font-bold tracking-[0.18em] uppercase text-foreground group-hover:text-primary-foreground transition-colors"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Time In
           </span>
-          <span className="text-[10px] text-muted-foreground group-hover:text-primary-foreground/60 transition-colors">
+          <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/60 transition-colors">
             Arrival
           </span>
         </button>
@@ -65,19 +65,19 @@ const IdleView = ({ onStart }: IdleViewProps) => (
         >
           <LogOut className="h-6 w-6 text-muted-foreground transition-colors" />
           <span
-            className="text-[11px] font-bold tracking-[0.18em] uppercase text-foreground transition-colors"
+            className="text-xs font-bold tracking-[0.18em] uppercase text-foreground transition-colors"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Time Out
           </span>
-          <span className="text-[10px] text-muted-foreground">Departure</span>
+          <span className="text-xs text-muted-foreground">Departure</span>
         </button>
       </div>
 
       {/* Footer hint */}
       <div className="px-8 py-4 border-b border-border bg-muted/20">
         <p
-          className="text-[10px] text-center text-muted-foreground/50 uppercase tracking-[0.12em]"
+          className="text-xs text-center text-muted-foreground/50 uppercase tracking-[0.12em]"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Scan your student / employee ID barcode

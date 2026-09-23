@@ -187,7 +187,7 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/35 pointer-events-none" />
           <input
             placeholder="Search user, book, ISBN…"
-            className="h-10 w-full border-r border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-r-primary"
+            className="h-10 w-full border-r border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-r-primary"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -197,12 +197,12 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
         {!showArchived && (
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger
-              className="h-10 w-36 shrink-0 rounded-none border-0 border-l-0 bg-background px-3 text-sm font-semibold focus:ring-0"
+              className="h-10 w-36 shrink-0 rounded-md border-0 border-l-0 bg-background px-3 text-sm font-semibold focus:ring-0"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="rounded-none border-border">
+            <SelectContent className="rounded-md border-border">
               {[
                 { value: "all",      label: "All"      },
                 { value: "borrowed", label: "Active"   },
@@ -212,7 +212,7 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
                 <SelectItem
                   key={value}
                   value={value}
-                  className="rounded-none text-sm font-semibold"
+                  className="rounded-md text-sm font-semibold"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   {label}
@@ -274,14 +274,14 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
                   {/* User */}
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-foreground leading-tight">{row.user_name}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/50">{row.student_employee_id}</p>
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">{row.student_employee_id}</p>
                   </td>
 
                   {/* Book */}
                   <td className="px-4 py-3 max-w-[180px]">
                     <p className="text-sm font-medium text-foreground truncate leading-tight">{row.book_title}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/50 truncate">{row.isbn ?? "—"}</p>
-                    {row.is_legacy ? <span className="mt-1 inline-block border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-warning">Legacy loan</span> : null}
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground truncate">{row.isbn ?? "—"}</p>
+                    {row.is_legacy ? <span className="mt-1 inline-block border border-warning/30 bg-warning/5 px-1.5 py-0.5 text-xs font-bold  text-warning">Legacy loan</span> : null}
                   </td>
 
                   {/* Borrowed */}
@@ -344,7 +344,7 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
                           Archive record
                         </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground/40">—</span>
+                        <span className="text-sm text-muted-foreground">—</span>
                       )
                     )}
                   </td>

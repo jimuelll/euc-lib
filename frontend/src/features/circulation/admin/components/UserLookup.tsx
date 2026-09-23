@@ -37,7 +37,7 @@ const UserLookup = ({
 
   return <div className="space-y-2">
 
-    <label
+    <label htmlFor="circulation-patron"
       className="block text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
@@ -46,15 +46,16 @@ const UserLookup = ({
 
     {/* Input + search button fused */}
     <div className="flex gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors">
-      <input
+      <input id="circulation-patron"
         value={studentId}
         onChange={(e) => onStudentIdChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onLookup())}
         placeholder="Type a name, student ID, or employee ID"
-        className="h-10 flex-1 bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+        className="h-10 flex-1 bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
       <button
         type="button"
+        aria-label="Find patron"
         onClick={() => onLookup()}
         disabled={lookingUp || !studentId.trim()}
         className="flex h-10 w-10 shrink-0 items-center justify-center border-l border-border bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
@@ -70,8 +71,8 @@ const UserLookup = ({
       <div className="divide-y divide-border border border-border bg-card shadow-sm">
         {suggestions.map((user) => (
           <button key={user.student_employee_id} type="button" onClick={() => { setSuggestions([]); onLookup(user.student_employee_id); }} className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40">
-            <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-[10px] text-muted-foreground">{user.student_employee_id}</span></span>
-            <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{user.role}</span>
+            <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-xs text-muted-foreground">{user.student_employee_id}</span></span>
+            <span className="text-xs  text-muted-foreground">{user.role}</span>
           </button>
         ))}
       </div>
@@ -92,7 +93,7 @@ const UserLookup = ({
             >
               {foundUser.name}
             </p>
-            <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/60">
+            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
               {foundUser.student_employee_id}
             </p>
           </div>
@@ -101,7 +102,7 @@ const UserLookup = ({
             {type === "return" && activeBorrows.length > 0 && (
               <div className="text-right">
                 <p
-                  className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
+                  className="text-xs font-bold  text-muted-foreground"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Active Borrows
@@ -116,7 +117,7 @@ const UserLookup = ({
             )}
             {/* Role badge */}
             <span
-              className="border border-border bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground capitalize"
+              className="border border-border bg-muted px-2 py-0.5 text-xs font-bold  text-muted-foreground capitalize"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               {foundUser.role}

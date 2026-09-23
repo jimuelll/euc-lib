@@ -1,3 +1,4 @@
+import { useAdminFilters } from "@/features/admin";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ChevronDown, Download, ExternalLink, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,13 +36,14 @@ const validDate = (value: string) => {
 };
 
 function FilterSelect({ id, label, value, options, onChange }: { id: string; label: string; value?: string | number; options: Option[]; onChange: (next: string) => void }) {
-  return <div className="min-w-0 space-y-1.5"><Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label><Select value={String(value || "all")} onValueChange={onChange}><SelectTrigger id={id} className="h-11 w-full rounded-none bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>;
+  return <div className="min-w-0 space-y-1.5"><Label htmlFor={id} className="text-xs font-medium text-muted-foreground">{label}</Label><Select value={String(value || "all")} onValueChange={onChange}><SelectTrigger id={id} className="h-11 w-full rounded-md bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select></div>;
 }
 
 const QueryExplorer = () => {
   const [meta, setMeta] = useState<QueryMeta | null>(null);
-  const [draft, setDraft] = useState<QueryFilters>(initialFilters(INITIAL_DATASET));
-  const [applied, setApplied] = useState<QueryFilters>(initialFilters(INITIAL_DATASET));
+  const { applied, setApplied, page, setPage } = useAdminFilters<QueryFilters>("records", initialFilters(INITIAL_DATASET));
+  const [draft, setDraft] = useState<QueryFilters>(applied);
+  useEffect(() => { setDraft(applied); }, [applied]);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -70,7 +72,7 @@ const QueryExplorer = () => {
 
   useEffect(() => {
     void fetchQueryMeta().then(setMeta).catch((failure) => setError(getApiErrorMessage(failure, "Filter options could not be loaded. Try refreshing the page.")));
-    void load(initialFilters(INITIAL_DATASET));
+
     return () => { requestId.current += 1; };
   }, [load]);
   useEffect(() => {
@@ -80,23 +82,25 @@ const QueryExplorer = () => {
     return () => screen.removeEventListener("change", onWidthChange);
   }, []);
 
+  useEffect(() => { void load(applied, page); }, [applied, page, load]);
+
   const chooseDataset = (dataset: QueryDataset) => {
     const next = initialFilters(dataset);
     setDraft(next); setApplied(next); setResult(null);
     setShowFilters(wideScreen());
-    void load(next);
+
   };
   const reset = () => {
     const next = initialFilters(draft.dataset);
     setDraft(next); setApplied(next);
-    void load(next);
+
   };
   const run = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!isClearance && (!validDate(String(draft.dateFrom ?? "")) || !validDate(String(draft.dateTo ?? "")))) { setError("Choose valid start and end dates."); return; }
     if (!isClearance && draft.dateFrom && draft.dateTo && String(draft.dateFrom) > String(draft.dateTo)) { setError("The start date must be on or before the end date."); return; }
     setApplied({ ...draft });
-    void load(draft);
+
   };
 
   const previewUrl = useMemo(() => {
@@ -137,13 +141,13 @@ const QueryExplorer = () => {
 
     <form onSubmit={run} className="border-y border-border bg-muted/20 px-3 py-4 sm:px-5">
       <div className="grid gap-3 md:grid-cols-[minmax(12rem,0.65fr)_minmax(14rem,1fr)_auto] md:items-end">
-        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-dataset" className="text-xs font-medium text-muted-foreground">Record type</Label><Select value={draft.dataset} onValueChange={(value) => chooseDataset(value as QueryDataset)}><SelectTrigger id="query-dataset" className="h-11 rounded-none bg-background"><SelectValue /></SelectTrigger><SelectContent>{datasets.map((dataset) => <SelectItem key={dataset.value} value={dataset.value}>{dataset.label}</SelectItem>)}</SelectContent></Select></div>
-        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-search" className="text-xs font-medium text-muted-foreground">Search</Label><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="query-search" className="h-11 rounded-none bg-background pl-10" value={String(draft.search ?? "")} onChange={(event) => update("search", event.target.value)} placeholder={isClearance ? "Patron, ID, or overdue title…" : `Search ${selected.label.toLowerCase()}…`} /></div></div>
-        <Button type="submit" className="h-11 rounded-none" disabled={loading}><Search className="mr-2 h-4 w-4" />Run query</Button>
+        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-dataset" className="text-xs font-medium text-muted-foreground">Record type</Label><Select value={draft.dataset} onValueChange={(value) => chooseDataset(value as QueryDataset)}><SelectTrigger id="query-dataset" className="h-11 rounded-md bg-background"><SelectValue /></SelectTrigger><SelectContent>{datasets.map((dataset) => <SelectItem key={dataset.value} value={dataset.value}>{dataset.label}</SelectItem>)}</SelectContent></Select></div>
+        <div className="min-w-0 space-y-1.5"><Label htmlFor="query-search" className="text-xs font-medium text-muted-foreground">Search</Label><div className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="query-search" className="h-11 rounded-md bg-background pl-10" value={String(draft.search ?? "")} onChange={(event) => update("search", event.target.value)} placeholder={isClearance ? "Patron, ID, or overdue title…" : `Search ${selected.label.toLowerCase()}…`} /></div></div>
+        <Button type="submit" className="h-11 rounded-md" disabled={loading}><Search className="mr-2 h-4 w-4" />Run query</Button>
       </div>
-      <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3"><button type="button" className="flex min-h-9 items-center gap-2 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={showFilters} aria-controls="query-extra-filters" onClick={() => setShowFilters((open) => !open)}><SlidersHorizontal className="h-4 w-4" />Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}<ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`} /></button><Button type="button" variant="ghost" size="sm" className="rounded-none" onClick={reset}>Reset filters</Button></div>
+      <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3"><button type="button" className="flex min-h-9 items-center gap-2 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-expanded={showFilters} aria-controls="query-extra-filters" onClick={() => setShowFilters((open) => !open)}><SlidersHorizontal className="h-4 w-4" />Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}<ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`} /></button><Button type="button" variant="ghost" size="sm" className="rounded-md" onClick={reset}>Reset filters</Button></div>
       <div id="query-extra-filters" className={`${showFilters ? "grid" : "hidden"} mt-3 gap-3 sm:grid-cols-2 lg:grid-cols-4`}>
-        {!isClearance && <><div className="space-y-1.5"><Label htmlFor="query-date-from" className="text-xs font-medium text-muted-foreground">Start date</Label><Input id="query-date-from" type="date" className="h-11 rounded-none bg-background" value={String(draft.dateFrom ?? "")} onChange={(event) => update("dateFrom", event.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="query-date-to" className="text-xs font-medium text-muted-foreground">End date</Label><Input id="query-date-to" type="date" className="h-11 rounded-none bg-background" value={String(draft.dateTo ?? "")} onChange={(event) => update("dateTo", event.target.value)} /></div></>}
+        {!isClearance && <><div className="space-y-1.5"><Label htmlFor="query-date-from" className="text-xs font-medium text-muted-foreground">Start date</Label><Input id="query-date-from" type="date" className="h-11 rounded-md bg-background" value={String(draft.dateFrom ?? "")} onChange={(event) => update("dateFrom", event.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="query-date-to" className="text-xs font-medium text-muted-foreground">End date</Label><Input id="query-date-to" type="date" className="h-11 rounded-md bg-background" value={String(draft.dateTo ?? "")} onChange={(event) => update("dateTo", event.target.value)} /></div></>}
         {contextFilters}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">{isClearance ? "Live exceptions based on current overdue returns and unpaid fines." : "Leave dates empty to include all recorded dates."}</p>
@@ -154,10 +158,10 @@ const QueryExplorer = () => {
     <section className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card" aria-busy={loading}>
       <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div><h2 className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{result?.label ?? selected.label}</h2><p className="mt-1 text-xs text-muted-foreground">{loading ? "Loading records…" : `${number.format(result?.pagination?.total ?? 0)} matching records`}{draftChanged ? " · Showing the last run; run the query to apply changes" : ""}</p></div>
-        <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result} onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Preview CSV</Button><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || exporting || !result} onClick={() => void exportCsv()}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download CSV</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result} onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Preview CSV</Button><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || exporting || !result} onClick={() => void exportCsv()}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download CSV</Button></div>
       </div>
-      {loading ? <div className="space-y-2 p-4" aria-label="Loading query results">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-12 w-full rounded-none" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={`${result.pagination?.page ?? 1}-${index}`} className="hover:bg-muted/20">{result.columns.map((column, columnIndex) => <td key={column.key} className={`max-w-[26rem] px-4 py-3 align-top text-foreground ${columnIndex === 0 ? "font-medium" : ""}`}><span className="block min-w-0 break-words">{column.key === "outstandingAmount" ? money.format(Number(row[column.key] ?? 0)) : formatQueryValue(row[column.key], column.type)}</span></td>)}</tr>)}</tbody></table></div> : <div className="px-5 py-12 text-center text-sm text-muted-foreground">No records match these filters. Adjust the search or reset the filters.</div>}
-      <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{number.format(result?.pagination?.total ?? 0)} record{result?.pagination?.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result || result.pagination?.page === 1} onClick={() => void load(applied, (result?.pagination?.page ?? 1) - 1)}>Previous</Button><span className="whitespace-nowrap tabular-nums">Page {result?.pagination?.page ?? 1} of {result?.pagination?.totalPages ?? 1}</span><Button type="button" variant="outline" size="sm" className="rounded-none" disabled={loading || !result || (result.pagination?.page ?? 1) >= (result.pagination?.totalPages ?? 1)} onClick={() => void load(applied, (result?.pagination?.page ?? 1) + 1)}>Next</Button></div></div>
+      {loading ? <div className="space-y-2 p-4" aria-label="Loading query results">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-12 w-full rounded-md" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={`${result.pagination?.page ?? 1}-${index}`} className="hover:bg-muted/20">{result.columns.map((column, columnIndex) => <td key={column.key} className={`max-w-[26rem] px-4 py-3 align-top text-foreground ${columnIndex === 0 ? "font-medium" : ""}`}><span className="block min-w-0 break-words">{column.key === "outstandingAmount" ? money.format(Number(row[column.key] ?? 0)) : formatQueryValue(row[column.key], column.type)}</span></td>)}</tr>)}</tbody></table></div> : <div className="px-5 py-12 text-center text-sm text-muted-foreground">No records match these filters. Adjust the search or reset the filters.</div>}
+      <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{number.format(result?.pagination?.total ?? 0)} record{result?.pagination?.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result || result.pagination?.page === 1} onClick={() => setPage((result?.pagination?.page ?? 1) - 1)}>Previous</Button><span className="whitespace-nowrap tabular-nums">Page {result?.pagination?.page ?? 1} of {result?.pagination?.totalPages ?? 1}</span><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result || (result.pagination?.page ?? 1) >= (result.pagination?.totalPages ?? 1)} onClick={() => setPage((result?.pagination?.page ?? 1) + 1)}>Next</Button></div></div>
     </section>
   </div>;
 };

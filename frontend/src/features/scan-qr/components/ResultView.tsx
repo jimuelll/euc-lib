@@ -66,7 +66,7 @@ export const SuccessView = ({ result, onReset }: SuccessViewProps) => {
             </motion.div>
             <div>
               <p
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/50"
+                className="text-xs font-bold uppercase tracking-[0.2em] text-primary-foreground/50"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {result.type === "check_in" ? "Time In" : "Time Out"}
@@ -91,7 +91,7 @@ export const SuccessView = ({ result, onReset }: SuccessViewProps) => {
               }`}
             >
               <span
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {label}
@@ -111,12 +111,12 @@ export const SuccessView = ({ result, onReset }: SuccessViewProps) => {
         {/* Reset */}
         <button
           onClick={onReset}
-          className="w-full border-t border-border bg-background py-3.5 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+          className="w-full border-t border-border bg-background py-3.5 text-xs font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Scan Again
-          <span className="text-[9px] text-muted-foreground/40 font-normal normal-case tracking-normal ml-1">
+          <span className="text-xs text-muted-foreground/40 font-normal normal-case tracking-normal ml-1">
             (auto-resets in {AUTO_RESET_DELAY / 1000}s)
           </span>
         </button>
@@ -150,7 +150,7 @@ export const NoticeView = ({ notice, onReset }: NoticeViewProps) => (
         </motion.div>
         <div>
           <p
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning/70"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-warning/70"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Attendance Status
@@ -167,7 +167,7 @@ export const NoticeView = ({ notice, onReset }: NoticeViewProps) => (
       <div className="bg-background divide-y divide-border">
         <div className="flex items-center justify-between px-8 py-4">
           <span
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Name
@@ -176,7 +176,7 @@ export const NoticeView = ({ notice, onReset }: NoticeViewProps) => (
         </div>
         <div className="flex items-center justify-between px-8 py-4">
           <span
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             ID
@@ -190,7 +190,7 @@ export const NoticeView = ({ notice, onReset }: NoticeViewProps) => (
 
       <button
         onClick={onReset}
-        className="w-full border-t border-border bg-background py-3.5 text-[11px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+        className="w-full border-t border-border bg-background py-3.5 text-xs font-bold tracking-[0.18em] uppercase text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         <RefreshCw className="h-3.5 w-3.5" />
@@ -230,7 +230,7 @@ export const ErrorView = ({ errorMsg, attendanceType, onRetry, onBack }: ErrorVi
         </motion.div>
         <div>
           <p
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60"
+            className="text-xs font-bold uppercase tracking-[0.2em] text-destructive/60"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Scan Failed
@@ -253,7 +253,7 @@ export const ErrorView = ({ errorMsg, attendanceType, onRetry, onBack }: ErrorVi
       <div className="grid grid-cols-2 bg-background">
         <button
           onClick={() => onRetry(attendanceType)}
-          className="flex items-center justify-center gap-2 border-r border-border py-3.5 text-[10px] font-bold tracking-[0.18em] uppercase text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+          className="flex items-center justify-center gap-2 border-r border-border py-3.5 text-xs font-bold tracking-[0.18em] uppercase text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           <RefreshCw className="h-3.5 w-3.5" />
@@ -261,7 +261,7 @@ export const ErrorView = ({ errorMsg, attendanceType, onRetry, onBack }: ErrorVi
         </button>
         <button
           onClick={onBack}
-          className="flex items-center justify-center gap-2 py-3.5 text-[10px] font-bold tracking-[0.18em] uppercase text-muted-foreground hover:bg-muted transition-colors"
+          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold tracking-[0.18em] uppercase text-muted-foreground hover:bg-muted transition-colors"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Back

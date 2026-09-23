@@ -12,33 +12,31 @@
     --font-heading: "DM Sans", system-ui, sans-serif;
     --font-body: "DM Sans", system-ui, sans-serif;
 
-    /* Clean paper white: light mode stays crisp around the MSEUF maroon. */
-    --background: 0 0% 100%;
-    --foreground: 12 15% 10%;
+    /* Shared library workspace: neutral surfaces with the same maroon identity. */
+    --background: 220 14% 97%;
+    --foreground: 222 18% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 12 15% 10%;
+    --card-foreground: 222 18% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 12 15% 10%;
+    --popover-foreground: 222 18% 14%;
 
-    /* MSEUF maroon (#800000) — the dominant structural field */
-    --primary: 0 100% 25.1%;
-    --primary-foreground: 36 30% 97%;
+    /* MSEUF maroon #710000, with #8f0000 reserved for emphasis. */
+    --primary: 0 100% 22.1569%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: #8f0000;
 
-    /* Action text keeps the maroon identity while staying readable on dark surfaces. */
-    --action: 0 100% 25.1%;
+    --action: 0 100% 28.0392%;
 
-    /* Warm muted clay — secondary surfaces */
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 12 15% 14%;
+    --secondary: 220 12% 94%;
+    --secondary-foreground: 222 18% 18%;
 
-    --muted: 0 0% 95%;
-    --muted-foreground: 12 7% 42%;
+    --muted: 220 12% 94%;
+    --muted-foreground: 220 9% 40%;
 
-    /* Subtle warm tone for accents */
-    --accent: 42 40% 94%;
-    --accent-foreground: 12 15% 12%;
+    --accent: 220 12% 94%;
+    --accent-foreground: 222 18% 14%;
 
     --destructive: 4 70% 45%;
     --destructive-foreground: 0 0% 100%;
@@ -53,79 +51,71 @@
     --info: 214 52% 32%;
     --info-foreground: 0 0% 100%;
 
-    /* Clear enough for structural rules on white surfaces without competing with maroon. */
-    --border: 12 12% 76%;
-    --input: 12 12% 76%;
-    --ring: 0 100% 25.1%;
+    --border: 220 11% 84%;
+    --input: 220 9% 65%;
+    --ring: 0 100% 28.0392%;
 
-    /* Slightly tighter radius — rectilinear authority */
-    --radius: 0.25rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 0 100% 25.1%;
-    --sidebar-foreground: 36 25% 88%;
-    --sidebar-muted-foreground: 36 20% 80%;
-    --sidebar-primary: 42 78% 48%;
-    --sidebar-primary-foreground: 10 30% 10%;
-    --sidebar-accent: 0 100% 25.1%;
-    --sidebar-accent-foreground: 36 20% 92%;
-    --sidebar-border: 0 100% 25.1%;
-    --sidebar-ring: 42 78% 48%;
+    --sidebar-background: 0 100% 22.1569%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted-foreground: 0 20% 88%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 100% 22.1569%;
+    --sidebar-accent: 0 100% 28.0392%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 45% 42%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
-    /* Deep laterite — not black, but earthen dark */
-    --background: 10 18% 8%;
-    --foreground: 36 20% 93%;
+    --background: 220 12% 9%;
+    --foreground: 220 12% 94%;
 
-    --card: 10 15% 13%;
-    --card-foreground: 36 20% 93%;
+    --card: 220 11% 13%;
+    --card-foreground: 220 12% 94%;
 
-    --popover: 10 15% 13%;
-    --popover-foreground: 36 20% 93%;
+    --popover: 220 11% 16%;
+    --popover-foreground: 220 12% 94%;
 
-    /* MSEUF maroon remains the primary brand color in dark mode. */
-    --primary: 0 100% 25.1%;
-    --primary-foreground: 36 25% 97%;
+    --primary: 0 100% 22.1569%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Light maroon for links and text actions against laterite surfaces. */
-    --action: 0 65% 72%;
+    --action: 0 65% 80%;
 
-    --secondary: 10 12% 22%;
-    --secondary-foreground: 36 15% 90%;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 220 12% 94%;
 
-    --muted: 10 10% 17%;
-    --muted-foreground: 24 8% 54%;
+    --muted: 220 10% 20%;
+    --muted-foreground: 220 9% 70%;
 
-    --accent: 10 12% 22%;
-    --accent-foreground: 36 15% 90%;
+    --accent: 220 10% 23%;
+    --accent-foreground: 220 12% 96%;
 
-    --destructive: 4 60% 40%;
-    --destructive-foreground: 0 0% 98%;
+    --warning: 39 85% 67%;
+    --warning-foreground: 220 12% 9%;
+    --destructive: 0 75% 72%;
+    --destructive-foreground: 220 12% 9%;
 
-    --success: 158 45% 44%;
-    --success-foreground: 0 0% 100%;
-
-    /* Gold glows warmer against dark laterite */
-    --warning: 42 72% 52%;
-    --warning-foreground: 10 30% 10%;
-
-    --info: 214 48% 50%;
+    --info: 212 80% 73%;
     --info-foreground: 0 0% 100%;
 
-    --border: 10 12% 22%;
-    --input: 10 12% 22%;
-    --ring: 0 100% 25.1%;
+    --success: 153 52% 64%;
+    --success-foreground: 220 12% 9%;
 
-    /* Darker maroon surfaces preserve separation around the #800000 primary. */
-    --sidebar-background: 0 100% 15%;
-    --sidebar-foreground: 36 20% 93%;
-    --sidebar-muted-foreground: 36 18% 82%;
-    --sidebar-primary: 42 72% 52%;
-    --sidebar-primary-foreground: 10 30% 10%;
-    --sidebar-accent: 0 75% 21%;
-    --sidebar-accent-foreground: 36 15% 90%;
-    --sidebar-border: 0 55% 38%;
-    --sidebar-ring: 42 72% 52%;
+    --border: 220 9% 28%;
+    --input: 220 9% 47%;
+    --ring: 0 65% 80%;
+
+    --sidebar-background: 0 100% 22.1569%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-muted-foreground: 0 20% 88%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 100% 22.1569%;
+    --sidebar-accent: 0 100% 28.0392%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 45% 42%;
+    --sidebar-ring: 0 0% 100%;
   }
 }
 
@@ -169,11 +159,11 @@
   }
 
   ::selection {
-    @apply bg-warning/40 text-foreground;
+    @apply bg-primary/20 text-foreground;
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-warning ring-offset-2 ring-offset-background;
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -196,7 +186,7 @@
   .dark input[type="date"],
   .dark input[type="datetime-local"] {
     color-scheme: dark;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23D4A017' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffadad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1rem 1rem;
@@ -211,6 +201,14 @@
 }
 
 @layer utilities {
+  :is(button, a).bg-primary:hover {
+    background-color: var(--primary-hover);
+  }
+
+  :is(a, button).text-primary {
+    color: hsl(var(--action));
+  }
+
   .admin-shell-backdrop {
     background-image: linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 14rem);
   }

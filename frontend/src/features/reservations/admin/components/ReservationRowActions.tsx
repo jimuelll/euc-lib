@@ -26,7 +26,7 @@ const ActionBtn = ({
     primary: "bg-primary text-primary-foreground hover:bg-primary/90",
     success: "bg-success text-success-foreground hover:bg-success/90",
     danger:  "border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-    ghost:   "border border-border text-muted-foreground/50 hover:border-destructive/40 hover:text-destructive",
+    ghost:   "border border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive",
     warning: "border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground",
   };
   return (

@@ -9,7 +9,7 @@ import {
 
 // ─── Shared style token ───────────────────────────────────────────────────────
 
-const LABEL_CLS = "text-[10px] font-bold uppercase tracking-[0.18em]";
+const LABEL_CLS = "text-xs font-bold ";
 const FONT      = { fontFamily: "var(--font-heading)" };
 
 // ─── Stats Strip ─────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ export const StatsStrip = ({ stats, loading }: StatsStripProps) => (
             {loading ? "—" : card.value}
           </span>
           <span
-            className={`${LABEL_CLS} text-muted-foreground/50`}
+            className={`${LABEL_CLS} text-muted-foreground`}
             style={FONT}
           >
             {card.label}
@@ -80,7 +80,7 @@ export const FilterBar = ({ filter, search, onFilterChange, onSearchChange }: Fi
 
     {/* Search */}
     <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
       <input
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
@@ -130,14 +130,14 @@ export const TableRow = ({ log, index }: TableRowProps) => {
       {/* Name / ID */}
       <div className="min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{log.name}</p>
-        <p className="text-[11px] font-mono text-muted-foreground/50 truncate">
+        <p className="text-xs font-mono text-muted-foreground truncate">
           {log.student_employee_id}
         </p>
       </div>
 
       {/* Role */}
       <span
-        className={`${LABEL_CLS} tracking-[0.12em] text-muted-foreground/50 hidden sm:block`}
+        className={`${LABEL_CLS} tracking-[0.12em] text-muted-foreground hidden sm:block`}
         style={FONT}
       >
         {log.role}
@@ -148,11 +148,11 @@ export const TableRow = ({ log, index }: TableRowProps) => {
         {isIn ? (
           <LogIn className="h-3.5 w-3.5 text-foreground/60 shrink-0" />
         ) : (
-          <LogOut className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+          <LogOut className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         )}
         <span
-          className={`text-[10px] font-bold uppercase tracking-[0.12em] hidden sm:block ${
-            isIn ? "text-foreground/70" : "text-muted-foreground/40"
+          className={`text-xs font-bold  hidden sm:block ${
+            isIn ? "text-foreground/70" : "text-muted-foreground"
           }`}
           style={FONT}
         >
@@ -165,7 +165,7 @@ export const TableRow = ({ log, index }: TableRowProps) => {
         <p className="text-sm font-bold text-foreground tabular-nums" style={FONT}>
           {time}
         </p>
-        <p className="text-[10px] text-muted-foreground/40 hidden sm:block">{date}</p>
+        <p className="text-xs text-muted-foreground hidden sm:block">{date}</p>
       </div>
     </div>
   );
@@ -233,7 +233,7 @@ interface TableFooterProps {
 
 export const TableFooter = ({ visibleCount, totalCount, isFiltered }: TableFooterProps) => (
   <div className="border-t border-border bg-muted/10 px-4 sm:px-6 py-3">
-    <p className="text-[10px] text-muted-foreground/40 uppercase tracking-[0.12em]" style={FONT}>
+    <p className="text-xs text-muted-foreground " style={FONT}>
       Showing {visibleCount} {visibleCount === 1 ? "record" : "records"}
       {isFiltered && ` · filtered from ${totalCount} total`}
     </p>

@@ -19,7 +19,7 @@ import { getInitials } from "../utils";
 const ModalSectionLabel = ({ children }: { children: React.ReactNode }) => (
   <div className="flex items-center gap-3">
     <div className="h-px w-4 bg-warning shrink-0" />
-    <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
+    <span className="text-xs font-bold uppercase tracking-[0.3em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
       {children}
     </span>
   </div>
@@ -72,22 +72,22 @@ export function PostModal(props: PostModalProps) {
 
                 <div className="mt-3 flex items-center gap-2.5 flex-wrap">
                   <div
-                    className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary-foreground/15 border border-primary-foreground/25 text-primary-foreground text-[9px] font-bold"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary-foreground/15 border border-primary-foreground/25 text-primary-foreground text-xs font-bold"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {getInitials(post.author_name)}
                   </div>
                   <span
-                    className="text-[11px] font-bold uppercase tracking-[0.08em] text-primary-foreground/70"
+                    className="text-xs font-bold uppercase tracking-[0.08em] text-primary-foreground/70"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {post.author_name}
                   </span>
-                  <span className="text-[10px] text-primary-foreground/40">{post.date}</span>
+                  <span className="text-xs text-primary-foreground/40">{post.date}</span>
 
                   {pinned && (
                     <span
-                      className="flex items-center gap-1 bg-warning px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-foreground/80"
+                      className="flex items-center gap-1 bg-warning px-2 py-0.5 text-xs font-bold uppercase tracking-[0.18em] text-foreground/80"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
                       <Pin className="h-2.5 w-2.5" /> Pinned
@@ -125,7 +125,7 @@ export function PostModal(props: PostModalProps) {
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 pointer-events-none" />
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <span
-                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white"
+                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   <ZoomIn className="h-3 w-3" /> Expand
@@ -135,7 +135,7 @@ export function PostModal(props: PostModalProps) {
                     e.stopPropagation();
                     handleDownload();
                   }}
-                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white hover:bg-black/80 transition-colors"
+                  className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-black/80 transition-colors"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   <Download className="h-3 w-3" /> Download
@@ -167,7 +167,7 @@ export function PostModal(props: PostModalProps) {
               <button
                 onClick={handleLike}
                 disabled={likeBusy}
-                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2.5 px-2 py-3 text-xs font-bold uppercase tracking-[0.12em] transition-colors ${
                   liked
                     ? "bg-primary/[0.04] text-primary"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -190,14 +190,14 @@ export function PostModal(props: PostModalProps) {
               {commentError && (
                 <div className="flex gap-0">
                   <div className="w-[3px] bg-destructive shrink-0" />
-                  <p className="px-3 py-2 text-[11px] text-destructive bg-destructive/[0.04]">{commentError}</p>
+                  <p className="px-3 py-2 text-xs text-destructive bg-destructive/[0.04]">{commentError}</p>
                 </div>
               )}
 
               <div className="flex gap-0 border border-warning/30 bg-warning/10">
                 <div className="w-[3px] bg-warning shrink-0" />
                 <p
-                  className="px-3 py-2 text-[11px] leading-relaxed text-foreground/80"
+                  className="px-3 py-2 text-xs leading-relaxed text-foreground/80"
                   style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
                 >
                   Please comment responsibly. All interactions are subject to school rules and policies.
@@ -248,7 +248,7 @@ export function PostModal(props: PostModalProps) {
                   </p>
                   <Link
                     to="/login"
-                    className="shrink-0 text-[10px] font-bold uppercase tracking-[0.15em] text-primary"
+                    className="shrink-0 text-xs font-bold uppercase tracking-[0.15em] text-primary"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     Login

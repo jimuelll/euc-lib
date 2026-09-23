@@ -31,7 +31,7 @@ const Footer = () => {
                 </span>
               </div>
               <p
-                className="text-[9px] tracking-[0.2em] uppercase text-primary-foreground/60 ml-9"
+                className="text-xs tracking-[0.2em] uppercase text-primary-foreground/80 ml-9"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Enverga-Candelaria Library
@@ -72,13 +72,13 @@ const Footer = () => {
         {/* ── Bottom bar ── */}
         <div className="flex flex-col items-center justify-between gap-3 border-x border-b border-primary-foreground/15 px-7 py-4 sm:flex-row sm:px-8">
           <p
-            className="text-[10px] tracking-[0.15em] uppercase text-primary-foreground/55"
+            className="text-xs tracking-[0.15em] uppercase text-primary-foreground/80"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             © {new Date().getFullYear()} EUC Library Management System
           </p>
           <p
-            className="text-[10px] tracking-[0.15em] uppercase text-warning/85"
+            className="text-xs tracking-[0.15em] uppercase text-warning/85"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             All rights reserved
@@ -102,7 +102,7 @@ const FooterColumn = ({
   <div className="flex flex-col gap-0 border-r border-b border-primary-foreground/15 p-7 md:p-8">
     {/* Column header — like a brass nameplate */}
     <h4
-      className="text-[10px] font-bold uppercase tracking-[0.25em] text-warning mb-5"
+      className="text-xs font-bold uppercase tracking-[0.25em] text-warning mb-5"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {title}

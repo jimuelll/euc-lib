@@ -16,7 +16,7 @@ export function AnnouncementsSection() {
     <section aria-labelledby="bulletin-heading" className="min-w-0 overflow-hidden border-t border-border bg-card lg:border-t-0">
       <div className="flex items-end justify-between gap-4 border-b border-border px-5 py-6 sm:px-7 sm:py-7">
         <div className="min-w-0">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-[.16em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>Bulletin board</p>
+          <p className="mb-3 text-xs font-bold uppercase tracking-[.16em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>Bulletin board</p>
           <h2 id="bulletin-heading" className="max-w-[15rem] text-[1.65rem] font-bold leading-[1.05] tracking-[-.04em] text-foreground sm:max-w-none sm:text-3xl">Latest from the Bulletin</h2>
         </div>
         <Link to="/bulletin" className="inline-flex min-h-11 shrink-0 items-center gap-2 border-b border-primary px-1 text-xs font-bold uppercase tracking-[.12em] text-primary transition-colors hover:border-warning hover:text-warning focus-visible:ring-2 focus-visible:ring-warning">

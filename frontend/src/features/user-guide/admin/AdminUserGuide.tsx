@@ -1,3 +1,5 @@
+import { useAuth } from "@/context/AuthContext";
+import { visibleSidebarSections } from "@/features/admin";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, BookOpenCheck, CircleHelp, Search } from "lucide-react";
@@ -9,6 +11,7 @@ import { AdminPage, AdminPanel } from "@/features/admin";
 import { getPublishedGuide, type GuideModule } from "@/features/user-guide/api/user-guide.service";
 
 export default function AdminUserGuide() {
+  const { user } = useAuth();
   const [modules, setModules] = useState<GuideModule[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All topics");
@@ -44,10 +47,11 @@ export default function AdminUserGuide() {
   }, [category, modules, query]);
 
   return (
-    <AdminPage title="User guide" contentWidth="wide">
+    <AdminPage title="Help & user guide" description="Find instructions for the tools available to your role." contentWidth="wide">
+      <AdminPanel title="Find your way around"><p className="mb-4 text-sm leading-6 text-muted-foreground">Library desk tools stay visible in the sidebar. Expand a group for less frequent work, or use Find a tool (Ctrl K) to jump directly to a page. Borrow & Return separates desk transactions from history. Website Content is where administrators edit published help.</p><div className="grid gap-5 sm:grid-cols-2">{visibleSidebarSections(user?.role).map(group => <div key={group.label}><h2 className="mb-2 text-sm font-semibold">{group.label}</h2><ul className="space-y-2">{group.items.map(item => <li key={item.url}><Link className="text-sm text-action underline-offset-4 hover:underline" to={item.url}>{item.title}</Link></li>)}</ul></div>)}</div></AdminPanel>
       <section className="grid gap-5 border-b border-border pb-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
         <div className="max-w-2xl">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-warning">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold  text-warning">
             <BookOpenCheck className="h-4 w-4" /> Help for your role
           </div>
           <p className="text-base leading-7 text-muted-foreground">

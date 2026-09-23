@@ -50,7 +50,7 @@ const MyLibraryHistoryPanel = ({ data, historyLoading, historyPage, attendanceLo
                               {["Date", "Time In", "Time Out"].map((heading) => (
                                 <th
                                   key={heading}
-                                  className="px-5 py-3 text-left text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60"
+                                  className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/60"
                                   style={{ fontFamily: "var(--font-heading)" }}
                                 >
                                   {heading}

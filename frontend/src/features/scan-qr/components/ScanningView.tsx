@@ -56,14 +56,14 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
       {/* Top bar */}
       <div className="flex items-center justify-between mb-3">
         <span
-          className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+          className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {attendanceType === "check_in" ? "Time In" : "Time Out"}
         </span>
         <button
           onClick={onCancel}
-          className="text-[10px] uppercase tracking-wider text-muted-foreground/60 hover:text-foreground transition-colors"
+          className="text-xs uppercase tracking-wider text-muted-foreground/60 hover:text-foreground transition-colors"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           Cancel
@@ -118,7 +118,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
           <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center gap-3 z-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground"
+              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Logging…
@@ -133,7 +133,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
             <p className="text-xs text-center text-muted-foreground">{cameraError}</p>
             <button
               onClick={() => setManualMode(true)}
-              className="text-[10px] uppercase tracking-wider text-primary hover:underline"
+              className="text-xs uppercase tracking-wider text-primary hover:underline"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Enter ID manually
@@ -146,7 +146,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
           <div className="absolute inset-0 bg-background flex flex-col items-center justify-center gap-4 px-6">
             <Camera className="h-8 w-8 text-muted-foreground/25" />
             <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 text-center"
+              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/40 text-center"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Manual ID Entry
@@ -162,7 +162,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
               <button
                 type="submit"
                 disabled={!manualInput.trim()}
-                className="mt-2 w-full border border-primary bg-primary text-primary-foreground py-2 text-[10px] font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                className="mt-2 w-full border border-primary bg-primary text-primary-foreground py-2 text-xs font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-40 transition-colors"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Submit
@@ -184,7 +184,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
             key={label}
             onClick={onClick}
             disabled={isProcessing}
-            className={`flex items-center justify-center gap-2 py-3.5 text-[10px] font-bold tracking-[0.18em] uppercase transition-colors duration-200 disabled:opacity-40 ${
+            className={`flex items-center justify-center gap-2 py-3.5 text-xs font-bold tracking-[0.18em] uppercase transition-colors duration-200 disabled:opacity-40 ${
               i === 0 ? "border-r border-border" : ""
             } ${
               active

@@ -170,7 +170,7 @@ const AdminBulletin = () => {
         <div className="grid gap-4 xl:grid-cols-[240px_1fr]">
           <div className="space-y-5">
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-xs font-bold  text-muted-foreground">
                 Status
               </p>
               {STATUS_FILTERS.map((filter) => (
@@ -190,7 +190,7 @@ const AdminBulletin = () => {
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-xs font-bold  text-muted-foreground">
                 Month and year
               </p>
               <button
@@ -264,16 +264,16 @@ const AdminBulletin = () => {
                               <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
                                   {!post.image_url ? (
-                                    <span className="inline-flex items-center gap-1 border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                                    <span className="inline-flex items-center gap-1 border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-bold  text-primary">
                                       <FileText className="h-3 w-3" /> Text-only
                                     </span>
                                   ) : null}
                                   {post.post_type === "event" ? (
-                                    <span className="inline-flex items-center gap-1 border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-warning">
+                                    <span className="inline-flex items-center gap-1 border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-bold  text-warning">
                                       <CalendarRange className="h-3 w-3" /> Event
                                     </span>
                                   ) : null}
-                                  <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                                  <span className={`inline-flex items-center border px-2 py-1 text-xs font-bold  ${
                                     isArchived
                                       ? "border-border bg-muted/20 text-muted-foreground"
                                       : "border-primary/30 bg-primary/5 text-primary"
@@ -281,11 +281,11 @@ const AdminBulletin = () => {
                                     {isArchived ? "Archived" : "Published"}
                                   </span>
                                   {Boolean(post.is_pinned) && !isArchived ? (
-                                    <span className="inline-flex items-center border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-warning">
+                                    <span className="inline-flex items-center border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-bold  text-warning">
                                       Pinned
                                     </span>
                                   ) : null}
-                                  <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  <span className="text-xs  text-muted-foreground">
                                     {post.author_name} - {post.author_role.replace("_", " ")}
                                   </span>
                                 </div>

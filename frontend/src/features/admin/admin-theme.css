@@ -1,0 +1,106 @@
+/* Admin-only tokens, including portalled editors and report previews. */
+body.admin-workspace {
+  --background: 220 14% 97%;
+  --foreground: 222 18% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 18% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 18% 14%;
+  --primary: 0 100% 22.1569%; /* #710000 */
+  --primary-foreground: 0 0% 100%;
+  --admin-primary-hover: #8f0000;
+  --action: 0 100% 28.0392%;
+  --secondary: 220 12% 94%;
+  --secondary-foreground: 222 18% 18%;
+  --muted: 220 12% 94%;
+  --muted-foreground: 220 9% 40%;
+  --accent: 220 12% 94%;
+  --accent-foreground: 222 18% 14%;
+  --border: 220 11% 84%;
+  --input: 220 9% 65%;
+  --ring: 0 100% 28.0392%;
+  --warning: 35 88% 30%;
+  --warning-foreground: 0 0% 100%;
+  --success: 153 65% 27%;
+  --success-foreground: 0 0% 100%;
+  --radius: 0.5rem;
+  --sidebar-background: 0 100% 22.1569%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-muted-foreground: 0 20% 88%;
+  --sidebar-accent: 0 100% 28.0392%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-primary: 0 0% 100%;
+  --sidebar-primary-foreground: 0 100% 22.1569%;
+  --sidebar-border: 0 45% 42%;
+  --sidebar-ring: 0 0% 100%;
+  caret-color: hsl(var(--action));
+}
+.dark body.admin-workspace {
+  --background: 220 12% 9%;
+  --foreground: 220 12% 94%;
+  --card: 220 11% 13%;
+  --card-foreground: 220 12% 94%;
+  --popover: 220 11% 16%;
+  --popover-foreground: 220 12% 94%;
+  --secondary: 220 10% 20%;
+  --secondary-foreground: 220 12% 94%;
+  --muted: 220 10% 20%;
+  --muted-foreground: 220 9% 70%;
+  --accent: 220 10% 23%;
+  --accent-foreground: 220 12% 96%;
+  --border: 220 9% 28%;
+  --input: 220 9% 47%;
+  --action: 0 65% 80%;
+  --ring: 0 65% 80%;
+  --warning: 39 85% 67%;
+  --warning-foreground: 220 12% 9%;
+  --success: 153 52% 64%;
+  --success-foreground: 220 12% 9%;
+  --destructive: 0 75% 72%;
+  --destructive-foreground: 220 12% 9%;
+  --info: 212 80% 73%;
+  --info-foreground: 220 12% 9%;
+}
+.admin-workspace .admin-shell-backdrop,
+.admin-workspace .admin-panel-surface,
+.admin-workspace .admin-etched-border { background-image: none; }
+.admin-workspace .admin-etched-border::before,
+.admin-workspace .admin-etched-border::after { display: none; }
+.admin-workspace :is(button, a).bg-primary:hover { background-color: var(--admin-primary-hover); }
+.admin-workspace :is(a, button).text-primary { color: hsl(var(--action)); }
+.admin-workspace :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.admin-workspace [data-sidebar] :focus-visible { outline-color: white; }
+.admin-workspace [data-sidebar="content"] {
+  scrollbar-color: hsl(var(--sidebar-foreground) / 0.48) hsl(var(--sidebar-background));
+  scrollbar-width: thin;
+}
+.admin-workspace [data-sidebar="content"]::-webkit-scrollbar { width: 0.5rem; }
+.admin-workspace [data-sidebar="content"]::-webkit-scrollbar-track { background: hsl(var(--sidebar-background)); }
+.admin-workspace [data-sidebar="content"]::-webkit-scrollbar-thumb {
+  border: 2px solid hsl(var(--sidebar-background));
+  border-radius: 999px;
+  background: hsl(var(--sidebar-foreground) / 0.48);
+}
+.admin-workspace [data-sidebar="content"]::-webkit-scrollbar-thumb:hover { background: hsl(var(--sidebar-foreground) / 0.72); }
+.admin-workspace ::selection { background: #8f0000; color: white; }
+.admin-workspace table { font-variant-numeric: tabular-nums; }
+.admin-workspace th { font-weight: 600; }
+.admin-workspace :is(input, textarea)::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+.admin-workspace [role="tablist"] { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.admin-workspace [role="tab"] { flex-shrink: 0; min-height: 40px; }
+.admin-workspace [role="tab"][data-state="active"] { background: hsl(var(--primary)); color: white; border-color: hsl(var(--primary)); }
+@media (max-width: 639px) {
+  .admin-workspace .admin-action-table th:last-child,
+  .admin-workspace .admin-action-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: hsl(var(--card));
+    box-shadow: -1px 0 hsl(var(--border));
+  }
+}
+@media print {
+  body.admin-workspace { --background: 0 0% 100%; --foreground: 0 0% 0%; --card: 0 0% 100%; --muted-foreground: 0 0% 25%; --border: 0 0% 75%; }
+  .admin-workspace [data-sidebar="sidebar"], .admin-workspace .admin-shell-backdrop > div > header { display: none !important; }
+  .admin-workspace .admin-shell-backdrop, .admin-workspace #admin-main { height: auto; overflow: visible; }
+}

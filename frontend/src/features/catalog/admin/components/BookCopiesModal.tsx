@@ -43,7 +43,7 @@ const fetchBarcodeObjectUrl = async (barcode: string): Promise<string> => {
 
 const Badge = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <span
-    className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${className ?? ""}`}
+    className={`inline-flex items-center border px-2 py-0.5 text-xs font-bold  ${className ?? ""}`}
     style={{ fontFamily: "var(--font-heading)" }}
   >
     {children}
@@ -55,7 +55,7 @@ const Badge = ({ children, className }: { children: React.ReactNode; className?:
 const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <>
     <dt
-      className="py-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground border-b border-border/50"
+      className="py-2 text-xs font-bold  text-muted-foreground border-b border-border/50"
       style={{ fontFamily: "var(--font-heading)" }}
     >
       {label}
@@ -169,7 +169,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               <BookOpen className="h-4 w-4 text-primary-foreground/40 shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p
-                  className="text-[9px] font-bold uppercase tracking-[0.25em] text-primary-foreground/45 mb-0.5"
+                  className="text-xs font-bold  text-primary-foreground/45 mb-0.5"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Book Copies
@@ -186,7 +186,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={scanning ? stopScanner : startScanner}
-                className="flex items-center gap-1.5 border border-primary-foreground/30 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-primary-foreground/70 hover:border-warning hover:text-warning transition-colors"
+                className="flex items-center gap-1.5 border border-primary-foreground/30 px-3 py-1.5 text-xs font-bold  text-primary-foreground/70 hover:border-warning hover:text-warning transition-colors"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 <ScanLine className="h-3.5 w-3.5" />
@@ -212,7 +212,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               ].map(({ label, value }) => (
                 <div key={label} className="flex-1 px-5 py-2.5 text-center">
                   <p
-                    className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary-foreground/40"
+                    className="text-xs font-bold  text-primary-foreground/40"
                     style={{ fontFamily: "var(--font-heading)" }}
                   >
                     {label}
@@ -237,7 +237,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
             <div className="border-b border-border bg-black">
               <video ref={videoRef} className="w-full max-h-56 object-cover" />
               <p
-                className="py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50"
+                className="py-2 text-center text-xs font-bold  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Point camera at a book barcode
@@ -251,7 +251,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               <div className="flex items-center gap-2.5 px-5 py-2.5 bg-primary/5 border-b border-primary/15">
                 <div className="h-px w-4 bg-warning shrink-0" />
                 <p
-                  className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary"
+                  className="text-xs font-bold  text-primary"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Scan Result
@@ -282,7 +282,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
             <div className="flex flex-col items-center justify-center gap-3 py-16">
               <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
               <p
-                className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50"
+                className="text-xs  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 Loading copies…
@@ -292,7 +292,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
             <div className="flex flex-col items-center py-16 gap-3">
               <BookOpen className="h-8 w-8 text-muted-foreground/15" />
               <p
-                className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/40"
+                className="text-xs  text-muted-foreground"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 No copies found
@@ -309,7 +309,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                       className="px-4 py-2.5 text-left"
                     >
                       <span
-                        className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60"
+                        className="text-xs font-bold  text-muted-foreground"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         {h}
@@ -327,7 +327,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                     {/* Index */}
                     <td className="px-4 py-3 w-8">
                       <span
-                        className="text-[10px] font-bold tracking-[0.1em] text-muted-foreground/30"
+                        className="text-xs font-bold tracking-[0.1em] text-muted-foreground/30"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         {String(i + 1).padStart(2, "0")}
@@ -345,7 +345,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                           />
                         ) : (
                           <div className="h-10 w-20 shrink-0 border border-border bg-muted flex items-center justify-center">
-                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground/40" />
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                           </div>
                         )}
                         <span className="font-mono text-xs text-foreground">{copy.barcode}</span>
@@ -358,7 +358,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                         {STATUS_CONFIG[copy.status].label}
                       </Badge>
                       {!copy.is_active && (
-                        <Badge className="ml-1 border-border text-muted-foreground/50">Inactive</Badge>
+                        <Badge className="ml-1 border-border text-muted-foreground">Inactive</Badge>
                       )}
                     </td>
 
@@ -379,7 +379,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                           )}
                         </div>
                       ) : copy.notes ? (
-                        <p className="text-xs text-muted-foreground/60 italic truncate">{copy.notes}</p>
+                        <p className="text-xs text-muted-foreground italic truncate">{copy.notes}</p>
                       ) : (
                         <span className="text-muted-foreground/25">—</span>
                       )}
@@ -390,13 +390,13 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                       <button
                         onClick={() => handleDownload(copy.barcode)}
                         disabled={!copy.is_active || !barcodeUrls[copy.barcode]}
-                        className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
+                        className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-xs font-bold  text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
                         style={{ fontFamily: "var(--font-heading)" }}
                       >
                         <Download className="h-3 w-3" />
                         Export
                       </button>
-                      <button onClick={() => handlePrint(copy.barcode)} disabled={!copy.is_active || !barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
+                      <button onClick={() => handlePrint(copy.barcode)} disabled={!copy.is_active || !barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-xs font-bold  text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
                         <Printer className="h-3 w-3" /> Print
                       </button>
                     </td>

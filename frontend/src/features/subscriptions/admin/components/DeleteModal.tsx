@@ -46,7 +46,7 @@ export const DeleteModal = ({ sub, onClose, onConfirm }: DeleteModalProps) => {
             Are you sure you want to delete{" "}
             <span className="font-semibold text-foreground">{sub.title}</span>?
             {sub.image_url && (
-              <span className="block mt-1 text-[11px] text-muted-foreground/50">
+              <span className="block mt-1 text-xs text-muted-foreground">
                 Its Cloudinary thumbnail will also be deleted.
               </span>
             )}

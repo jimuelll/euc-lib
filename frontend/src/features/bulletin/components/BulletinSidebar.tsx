@@ -48,12 +48,12 @@ export function BulletinSidebar() {
         <div className="bg-primary px-4 py-3 flex items-center gap-3 border-b border-primary-foreground/10">
           <div className="h-px w-4 bg-warning shrink-0" />
           <span
-            className="text-[9px] font-bold uppercase tracking-[0.3em] text-warning"
+            className="text-xs font-bold uppercase tracking-[0.3em] text-warning"
             style={{ fontFamily: "var(--font-heading)" }}
           >
             Upcoming Events
           </span>
-          {canManage ? <button onClick={() => setOpen(true)} className="ml-auto text-[9px] font-bold uppercase tracking-[0.14em] text-primary-foreground/70 hover:text-warning">Update</button> : null}
+          {canManage ? <button onClick={() => setOpen(true)} className="ml-auto text-xs font-bold uppercase tracking-[0.14em] text-primary-foreground/70 hover:text-warning">Update</button> : null}
         </div>
 
         {/* Event list — flush rows separated by ruled lines */}
@@ -68,7 +68,7 @@ export function BulletinSidebar() {
                 className="w-8 shrink-0 flex items-start justify-center pt-4 border-r border-border"
                 style={{ fontFamily: "var(--font-heading)" }}
               >
-                <span className="text-[9px] font-bold text-warning/60 tabular-nums">
+                <span className="text-xs font-bold text-warning/60 tabular-nums">
                   {String(i + 1).padStart(2, "0")}
                 </span>
               </div>
@@ -81,10 +81,10 @@ export function BulletinSidebar() {
                 >
                   {event.title}
                 </p>
-                <p className="mt-1 text-[10px] leading-tight text-muted-foreground">
+                <p className="mt-1 text-xs leading-tight text-muted-foreground">
                   {event.date}
                 </p>
-                <p className="text-[10px] leading-tight text-muted-foreground/80">
+                <p className="text-xs leading-tight text-muted-foreground/80">
                   {event.time}
                 </p>
               </div>

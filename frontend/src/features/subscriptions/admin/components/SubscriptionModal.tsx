@@ -112,7 +112,7 @@ export const SubscriptionModal = ({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="h-px w-3 bg-warning" />
-              <span className={`${LABEL_CLS} text-warning text-[9px]`} style={FONT}>
+              <span className={`${LABEL_CLS} text-warning text-xs`} style={FONT}>
                 {mode === "create" ? "New Entry" : "Edit Entry"}
               </span>
             </div>
@@ -177,7 +177,7 @@ export const SubscriptionModal = ({
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className={`${LABEL_CLS} text-[9px] text-muted-foreground/50`} style={FONT}>
+              <p className={`${LABEL_CLS} text-xs text-muted-foreground`} style={FONT}>
                 Uploading image… {progress}%
               </p>
             </div>
@@ -187,7 +187,7 @@ export const SubscriptionModal = ({
           <div className="flex items-center justify-between border border-border px-4 py-3">
             <div>
               <p className={`${LABEL_CLS} text-foreground`} style={FONT}>Visibility</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {form.is_active ? "Visible on public page" : "Hidden from public page"}
               </p>
             </div>
@@ -203,7 +203,7 @@ export const SubscriptionModal = ({
               {form.is_active
                 ? <Eye className="h-3.5 w-3.5" />
                 : <EyeOff className="h-3.5 w-3.5" />}
-              <span className={`${LABEL_CLS} text-[9px]`} style={FONT}>
+              <span className={`${LABEL_CLS} text-xs`} style={FONT}>
                 {form.is_active ? "Active" : "Hidden"}
               </span>
             </button>

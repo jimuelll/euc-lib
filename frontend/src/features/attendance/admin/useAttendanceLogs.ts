@@ -1,3 +1,4 @@
+import { useAdminUrlState } from "@/features/admin";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttendanceLog, FetchState, FilterType } from "./AdminAttendanceLogs.types";
 import { PAGE_SIZE, applyFilters, deriveStats } from "./AdminAttendanceLogs.data";
@@ -22,8 +23,11 @@ export const useAttendanceLogs = (): UseAttendanceLogsReturn => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const [hasMore,     setHasMore]     = useState(true);
-  const [search,      setSearch]      = useState("");
-  const [filter,      setFilter]      = useState<FilterType>("all");
+  const [params, patchParams] = useAdminUrlState();
+  const search = params.get("q") ?? "";
+  const filter: FilterType = params.get("type") === "check_in" ? "check_in" : params.get("type") === "check_out" ? "check_out" : "all";
+  const setSearch = (q: string) => patchParams({ q }, true);
+  const setFilter = (type: FilterType) => patchParams({ type });
 
   const lastIdRef = useRef<number | null>(null);
 

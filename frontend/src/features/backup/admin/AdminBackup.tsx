@@ -188,15 +188,15 @@ const AdminBackup = () => {
   return (
     <AdminPage
       eyebrow="System"
-      title="Backup"
+      title="Backup & Restore"
       description="Save secure recovery points, download a portable copy, or restore the complete library database to a previous point in time."
       contentWidth="wide"
     >
       <AdminPanel
         title="Create a recovery point"
         description="Saved snapshots are retained in secure cloud storage. The latest 30 are kept automatically."
-        actions={
-          <>
+      >
+        <div className="mb-4 flex flex-wrap gap-2">
             <Button type="button" onClick={handleCreateSnapshot} disabled={exporting || savingSnapshot || restoring}>
               {savingSnapshot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
               {savingSnapshot ? "Saving snapshot..." : "Save Snapshot"}
@@ -212,9 +212,7 @@ const AdminBackup = () => {
                 <input ref={inputRef} id="restore-input" type="file" className="hidden" accept="application/json,application/gzip,.json,.gz" onChange={handleRestore} />
               </label>
             </Button>
-          </>
-        }
-      >
+        </div>
         <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
         <p className="text-sm leading-6 text-muted-foreground">
           Snapshot data uses the current metadata catalog model. Compatibility is verified before restoration; restoring never changes database structure and signs out every user.
@@ -227,7 +225,6 @@ const AdminBackup = () => {
       <AdminPanel
         title="Saved snapshots"
         description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point, then signs out all users; incompatible snapshots remain available to download."
-        className="max-w-4xl"
       >
         {loadingSnapshots ? (
           <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading saved snapshots...</div>
@@ -261,7 +258,6 @@ const AdminBackup = () => {
       <AdminPanel
         title="Latest export"
         description="The browser saves each backup directly to your downloads folder."
-        className="max-w-4xl"
       >
         {lastBackup ? (
           <div className="flex flex-col gap-3 rounded-md border border-border/70 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between">

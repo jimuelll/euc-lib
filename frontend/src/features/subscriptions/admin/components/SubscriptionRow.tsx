@@ -52,7 +52,7 @@ export const SubscriptionRow = ({
         href={sub.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-primary transition-colors truncate max-w-xs"
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors truncate max-w-xs"
         onClick={(e) => e.stopPropagation()}
       >
         <ExternalLink className="h-2.5 w-2.5 shrink-0" />
@@ -61,17 +61,17 @@ export const SubscriptionRow = ({
     </div>
 
     <span
-      className="hidden sm:inline-block border border-border bg-muted px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground whitespace-nowrap"
+      className="hidden sm:inline-block border border-border bg-muted px-2 py-0.5 text-xs font-bold  text-muted-foreground whitespace-nowrap"
       style={FONT}
     >
       {sub.category || "—"}
     </span>
 
     <span
-      className={`text-[9px] font-bold uppercase tracking-[0.15em] px-2 py-1 border whitespace-nowrap ${
+      className={`text-xs font-bold  px-2 py-1 border whitespace-nowrap ${
         sub.is_active
           ? "border-primary/30 bg-primary/10 text-primary"
-          : "border-border bg-muted text-muted-foreground/50"
+          : "border-border bg-muted text-muted-foreground"
       }`}
       style={FONT}
     >
