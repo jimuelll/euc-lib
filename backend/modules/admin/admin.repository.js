@@ -140,9 +140,12 @@ async function queryToolsSearch(term, allowedRoles) {
       [...allowedRoles, like, like, like]
     ),
     db.query(
-      `SELECT id, title, author, isbn, copies,
+       `SELECT id, title, author, isbn, copies,
               JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) AS category,
-              JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.location')) AS location
+              (SELECT GROUP_CONCAT(DISTINCT h.location ORDER BY h.location SEPARATOR ', ')
+                 FROM book_copies bc
+                 JOIN copy_holdings h ON h.copy_id = bc.id
+                WHERE bc.book_id = books.id AND bc.deleted_at IS NULL) AS location
        FROM books WHERE deleted_at IS NULL AND (title LIKE ? OR author LIKE ? OR isbn LIKE ?)
        ORDER BY title ASC LIMIT 10`,
       [like, like, like]

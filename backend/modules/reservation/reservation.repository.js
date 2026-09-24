@@ -77,10 +77,11 @@ async function syncExpired() {
 
 async function findActiveReservations(userId) {
   const [rows] = await db.query(
-    `SELECT r.id, bk.title, bk.author, ${metadataValue("bk", "location")},
+    `SELECT r.id, bk.title, bk.author, h.location,
             r.status, r.reserved_at, r.expires_at, r.notes
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
+     LEFT JOIN copy_holdings h ON h.copy_id = r.reserved_copy_id
      WHERE r.user_id = ? AND r.status IN ('pending', 'ready')
        AND r.deleted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > NOW())
      ORDER BY r.reserved_at DESC`,
@@ -152,7 +153,7 @@ async function searchCatalogue(query, { page, limit, showUnheldInOpac = true } =
        ${metadataValue("bk", "category")},
        bk.isbn,
        bk.copies,
-       ${metadataValue("bk", "location")},
+       GROUP_CONCAT(DISTINCT NULLIF(TRIM(ch.location), '') ORDER BY ch.location SEPARATOR ', ') AS location,
        bk.material_type,
        COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
        COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
@@ -300,6 +301,7 @@ async function getAdminReservations({
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
      JOIN users u ON u.id = r.user_id AND u.deleted_at IS NULL
+     LEFT JOIN copy_holdings h ON h.copy_id = r.reserved_copy_id
      ${where}
   `;
 
@@ -331,7 +333,7 @@ async function getAdminReservations({
        r.notes,
        bk.title AS book_title,
        bk.author AS book_author,
-       ${metadataValue("bk", "location", "book_location")},
+       h.location AS book_location,
        u.name AS user_name,
        u.student_employee_id
      ${baseFromClause}

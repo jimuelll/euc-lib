@@ -100,6 +100,21 @@ INSERT INTO books (title, material_type, metadata, book_type_id, author, isbn, c
 ('Goblin Slayer, Vol. 1', 'book', JSON_OBJECT('category','Literature','format','Light novel','location','LN-10'), @type_id, 'Kumo Kagyu', '9780316553230', 1, 'DEMO-REAL'),
 ('My Happy Marriage, Vol. 1', 'book', JSON_OBJECT('category','Literature','format','Light novel','location','LN-10'), @type_id, 'Akumi Agitogi', '9781975367411', 1, 'DEMO-REAL');
 
+-- Move the former demo classifications to the current Category dropdown and
+-- remove title-level locations. Physical locations are seeded on holdings below.
+UPDATE books
+SET metadata = JSON_SET(
+      JSON_REMOVE(metadata, '$.location'),
+      '$.category',
+      CASE
+        WHEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.format')) IN ('Manga', 'Light novel')
+          OR JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) = 'Literature'
+          THEN 'Fiction'
+        ELSE 'General Reference'
+      END
+    )
+WHERE created_by = 'DEMO-REAL';
+
 INSERT INTO book_copies (book_id, barcode, `condition`, is_active)
 SELECT id, CONCAT('LIB-', LPAD(id, 6, '0'), '-001'), 'good', 1 FROM books WHERE created_by = 'DEMO-REAL';
 
@@ -132,7 +147,10 @@ SELECT CONCAT('DEMO-ACC-', LPAD(bc.id, 8, '0')), bc.barcode, bc.id, bk.id, bk.ti
 
 INSERT INTO copy_holdings (copy_id, accession_number, location)
 SELECT bc.id, CONCAT('DEMO-ACC-', LPAD(bc.id, 8, '0')),
-       JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.location'))
+       CASE JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))
+         WHEN 'Fiction' THEN 'Fiction collection'
+         ELSE 'General reference collection'
+       END
   FROM book_copies bc JOIN books bk ON bk.id = bc.book_id
  WHERE bk.created_by = 'DEMO-REAL'
    AND NOT (bk.isbn = '9780679732242' AND RIGHT(bc.barcode, 3) IN ('002', '003'));

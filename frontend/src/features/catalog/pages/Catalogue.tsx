@@ -13,7 +13,7 @@ const CORE_KEYS = new Set(["id", "title", "author", "isbn", "category", "edition
 const EMPTY_FACETS: PublicCatalogFacets = {
   format: { all: 0, book: 0, thesis: 0 },
   availability: { all: 0, available: 0, unavailable: 0 },
-  subjects: [],
+  categories: [],
 };
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -58,7 +58,7 @@ const Catalogue = () => {
   const queryParam = params.get("q") || "";
   const materialType = params.get("format") || "all";
   const availability = params.get("availability") || "all";
-  const selectedSubject = params.get("subject") || "";
+  const selectedCategory = params.get("category") || "";
   const sort = params.get("sort") || "relevance";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const debouncedQuery = useDebounce(query, 350);
@@ -119,7 +119,7 @@ const Catalogue = () => {
       isbn: params.get("isbn") || "",
       format: params.get("format") || "all",
       availability: params.get("availability") || "all",
-      subject: params.get("subject") || "",
+      category: params.get("category") || "",
       sort: params.get("sort") || "relevance",
       page,
     }).then((result) => {
@@ -143,7 +143,7 @@ const Catalogue = () => {
   const getLabelForKey = (key: string) => schema.find((field) => field.key === key)?.label ?? key;
   const clearFilters = () => {
     const next = new URLSearchParams(searchParams);
-    for (const key of ["format", "availability", "subject", "sort", "title", "author", "isbn", "page"]) next.delete(key);
+    for (const key of ["format", "availability", "category", "sort", "title", "author", "isbn", "page"]) next.delete(key);
     setSearchParams(next, { replace: true });
   };
 
@@ -169,14 +169,14 @@ const Catalogue = () => {
       </fieldset>
       <div className="h-px bg-border" />
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-foreground">Subject</legend>
-        {facets.subjects.length ? (
+        <legend className="mb-2 text-sm font-semibold text-foreground">Category</legend>
+        {facets.categories.length ? (
           <div className="max-h-64 space-y-0.5 overflow-y-auto pr-1">
-            {facets.subjects.map((subject) => (
-              <FilterChoice key={subject.value} label={subject.value} count={subject.count} active={selectedSubject.toLocaleLowerCase() === subject.value.toLocaleLowerCase()} onClick={() => updateParam("subject", selectedSubject.toLocaleLowerCase() === subject.value.toLocaleLowerCase() ? "" : subject.value)} />
+            {facets.categories.map((category) => (
+              <FilterChoice key={category.value} label={category.value} count={category.count} active={selectedCategory.toLocaleLowerCase() === category.value.toLocaleLowerCase()} onClick={() => updateParam("category", selectedCategory.toLocaleLowerCase() === category.value.toLocaleLowerCase() ? "" : category.value)} />
             ))}
           </div>
-        ) : <p className="text-xs leading-5 text-muted-foreground">No subjects in this result set.</p>}
+        ) : <p className="text-xs leading-5 text-muted-foreground">No categories in this result set.</p>}
       </fieldset>
     </div>
   );

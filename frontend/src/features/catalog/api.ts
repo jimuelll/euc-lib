@@ -10,7 +10,7 @@ export interface PublicCatalogSchemaField { key: string; label: string; type: st
 export interface PublicCatalogFacets {
   format: { all: number; book: number; thesis: number };
   availability: { all: number; available: number; unavailable: number };
-  subjects: { value: string; count: number }[];
+  categories: { value: string; count: number }[];
 }
 export interface PublicCatalogSearchResponse {
   rows: PublicCatalogBook[];
@@ -20,7 +20,7 @@ export interface PublicCatalogSearchResponse {
 export const fetchPublicCatalogSchema = async (): Promise<PublicCatalogSchemaField[]> => (await axiosInstance.get<PublicCatalogSchemaField[]>("/api/catalogue/schema")).data;
 export interface PublicCatalogSearchParams {
   query?: string; title?: string; author?: string; isbn?: string; format?: string;
-  availability?: string; subject?: string; sort?: string; page?: number;
+  availability?: string; category?: string; sort?: string; page?: number;
 }
 export const searchPublicCatalogue = async (params: PublicCatalogSearchParams): Promise<PublicCatalogSearchResponse> =>
   (await axiosInstance.get<PublicCatalogSearchResponse>("/api/catalogue/search", {

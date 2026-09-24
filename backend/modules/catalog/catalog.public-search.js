@@ -10,7 +10,7 @@ function normalizePublicCatalogFilters(options = {}) {
     isbn: cleanText(options.isbn),
     materialType: ["book", "thesis"].includes(options.format ?? options.materialType) ? (options.format ?? options.materialType) : "all",
     availability: ["available", "unavailable"].includes(options.availability) ? options.availability : "all",
-    subject: cleanText(options.subject),
+    category: cleanText(options.category),
     sort: ["title_asc", "title_desc", "newest"].includes(options.sort) ? options.sort : "relevance",
     page: Math.max(1, Number.parseInt(options.page, 10) || 1),
     limit: Math.min(50, Math.max(1, Number.parseInt(options.limit, 10) || 20)),
@@ -51,12 +51,9 @@ function buildPublicCatalogWhere(filters, { showUnheldInOpac = true, omitFacets 
     const available = `EXISTS (SELECT 1 FROM book_copies filter_copy WHERE filter_copy.book_id = bk.id AND ${availableToBorrow("filter_copy")})`;
     conditions.push(`bk.material_type = 'book' AND ${filters.availability === "available" ? available : `NOT ${available}`}`);
   }
-  if (!omitFacets && filters.subject) {
-    conditions.push(`(
-      LOWER(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))) = LOWER(?)
-      OR JSON_SEARCH(bk.metadata, 'one', ?, CHAR(92), '$.subjects[*]') IS NOT NULL
-    )`);
-    params.push(filters.subject, filters.subject);
+  if (!omitFacets && filters.category) {
+    conditions.push("LOWER(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))) = LOWER(?)");
+    params.push(filters.category);
   }
 
   return { clause: `WHERE ${conditions.join(" AND ")}`, params };
@@ -70,29 +67,24 @@ function publicCatalogOrder(filters) {
   return "CASE WHEN bk.title = ? THEN 0 WHEN bk.title LIKE ? THEN 1 WHEN bk.author LIKE ? THEN 2 WHEN bk.isbn LIKE ? THEN 3 ELSE 4 END, bk.title ASC, bk.id ASC";
 }
 
-function extractPublicSubjects(rows) {
-  const subjects = new Map();
+function extractPublicCategories(rows) {
+  const categories = new Map();
   for (const row of rows) {
     let metadata = row.metadata;
     if (typeof metadata === "string") {
       try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
     }
     if (!metadata || typeof metadata !== "object") continue;
-    const values = [metadata.category, ...(Array.isArray(metadata.subjects) ? metadata.subjects : typeof metadata.subjects === "string" ? [metadata.subjects] : [])];
-    const seen = new Set();
-    for (const rawValue of values) {
-      const value = String(rawValue ?? "").trim();
-      const key = value.toLocaleLowerCase();
-      if (!value || seen.has(key)) continue;
-      seen.add(key);
-      const current = subjects.get(key) ?? { value, count: 0 };
-      current.count += 1;
-      subjects.set(key, current);
-    }
+    const value = String(metadata.category ?? "").trim();
+    const key = value.toLocaleLowerCase();
+    if (!value) continue;
+    const current = categories.get(key) ?? { value, count: 0 };
+    current.count += 1;
+    categories.set(key, current);
   }
-  return [...subjects.values()]
+  return [...categories.values()]
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
     .slice(0, 50);
 }
 
-module.exports = { normalizePublicCatalogFilters, buildPublicCatalogWhere, publicCatalogOrder, extractPublicSubjects };
+module.exports = { normalizePublicCatalogFilters, buildPublicCatalogWhere, publicCatalogOrder, extractPublicCategories };

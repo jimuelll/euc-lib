@@ -73,7 +73,7 @@ const getBooks = async (req, res) => {
         isbn: String(req.query.isbn ?? "").trim(),
         format: String(req.query.format ?? req.query.materialType ?? "all"),
         availability: String(req.query.availability ?? "all"),
-        subject: String(req.query.subject ?? ""),
+        category: String(req.query.category ?? ""),
         sort: String(req.query.sort ?? "relevance"),
         page: Number(req.query.page) || 1,
         limit: Number(req.query.limit) || 20,

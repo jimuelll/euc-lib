@@ -30,7 +30,7 @@ const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catal
   searchPublicCatalogue.mockResolvedValue({
     rows: [{ id: 14, title: "Sample catalogue title", author: "Test Author", material_type: materialType, available: 1, registered_copies: 1 }],
     pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
-    facets: { format: { all: 1, book: materialType === "book" ? 1 : 0, thesis: materialType === "thesis" ? 1 : 0 }, availability: { all: 1, available: 1, unavailable: 0 }, subjects: [] },
+    facets: { format: { all: 1, book: materialType === "book" ? 1 : 0, thesis: materialType === "thesis" ? 1 : 0 }, availability: { all: 1, available: 1, unavailable: 0 }, categories: [] },
   });
   render(<MemoryRouter initialEntries={[initialEntry]}><Catalogue />{includeRecommendationLink ? <Link to="/catalogue?q=Recommended%20title">Recommended book</Link> : null}</MemoryRouter>);
 };

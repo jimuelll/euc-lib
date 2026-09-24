@@ -1,7 +1,7 @@
 const db = require("../../db");
 const { availableToBorrow, hasAccession, hasActiveBookPolicy } = require("./copyEligibility");
 const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
-const { buildPublicCatalogWhere, extractPublicSubjects, normalizePublicCatalogFilters, publicCatalogOrder } = require("./catalog.public-search");
+const { buildPublicCatalogWhere, extractPublicCategories, normalizePublicCatalogFilters, publicCatalogOrder } = require("./catalog.public-search");
 
 function getConnection() {
   return db.getConnection();
@@ -425,7 +425,7 @@ async function searchPublicCatalogue(options = {}) {
       total: Number(total),
       totalPages: Math.max(1, Math.ceil(Number(total) / filters.limit)),
     },
-    facets: { format, availability, subjects: extractPublicSubjects(subjectRows) },
+    facets: { format, availability, categories: extractPublicCategories(subjectRows) },
   };
 }
 

@@ -19,7 +19,7 @@ async function findActiveBorrows(userId) {
        bk.title,
        bk.author,
        ${metadataValue("bk", "category")},
-       ${metadataValue("bk", "location")},
+       h.location,
        b.borrowed_at,
        b.due_date,
        b.status,
@@ -28,6 +28,7 @@ async function findActiveBorrows(userId) {
      FROM borrowings b
      JOIN books bk ON bk.id = b.book_id
      LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
+     LEFT JOIN copy_holdings h ON h.copy_id = bc.id
      WHERE b.user_id = ?
        AND b.status IN ('borrowed', 'overdue')
        AND b.deleted_at IS NULL
@@ -70,13 +71,14 @@ async function findActiveReservations(userId) {
        r.id,
        bk.title,
        bk.author,
-       ${metadataValue("bk", "location")},
+       h.location,
        r.status,
        r.reserved_at,
        r.expires_at,
        r.notes
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id
+     LEFT JOIN copy_holdings h ON h.copy_id = r.reserved_copy_id
      WHERE r.user_id = ?
        AND r.status IN ('pending', 'ready')
        AND r.deleted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > NOW())

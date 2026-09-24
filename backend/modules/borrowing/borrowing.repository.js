@@ -56,7 +56,8 @@ const searchCatalogueWithAvailability = async (query, { showUnheldInOpac = true 
   const [rows] = await db.query(
     `SELECT
        bk.id, bk.title, bk.author,
-       ${catalogDisplayColumns("bk", ["category", "location"])},
+       ${catalogDisplayColumns("bk", ["category"])},
+       GROUP_CONCAT(DISTINCT NULLIF(TRIM(ch.location), '') ORDER BY ch.location SEPARATOR ', ') AS location,
        bk.isbn, bk.copies, bk.material_type,
        COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
        COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,

@@ -6,7 +6,7 @@
 const metadataValue = (alias, key, output = key) =>
   `JSON_UNQUOTE(JSON_EXTRACT(${alias}.metadata, '$.${key}')) AS \`${output}\``;
 
-const catalogDisplayColumns = (alias = "bk", keys = ["category", "location"]) =>
+const catalogDisplayColumns = (alias = "bk", keys = ["category"]) =>
   keys.map((key) => metadataValue(alias, key)).join(", ");
 
 const parseMetadata = (value) => {
