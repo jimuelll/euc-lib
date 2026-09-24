@@ -20,6 +20,7 @@ require("./holdings.accession.test");
 require("./policy.removal.test");
 require("./query.service.test");
 require("./recommendations.images.test");
+require("./recommendations.backfill.test");
 require("./recommendations.paging.test");
 require("./report.service.test");
 require("./reservation.visibility.test");

@@ -83,8 +83,8 @@ export async function saveCopyHolding(copyId: number, payload: { accession_numbe
 export async function voidCopyAccession(copyId: number, payload: { reason: string }): Promise<{ accessionNumber: string }> {
   return (await axiosInstance.post<{ accessionNumber: string }>(`api/admin/copies/${copyId}/holding/void-accession`, payload)).data;
 }
-export type EmbeddingStatus = { total: number; ready: number; stale: number; failed: number; errors?: Array<{ bookId: number; message: string }> };
-export type EmbeddingBackfillProgress = { status: "idle" | "running" | "completed" | "completed_with_errors"; total: number; completed: number; embedded: number; failed: number; skipped: number; currentTitle: string | null; errors: string[]; alreadyRunning?: boolean };
+export type EmbeddingStatus = { total: number; ready: number; stale: number; failed: number; missing: number; errors?: Array<{ bookId: number; message: string }> };
+export type EmbeddingBackfillProgress = { status: "idle" | "running" | "completed" | "completed_with_errors"; total: number; completed: number; embedded: number; failed: number; lookupFailed: number; skipped: number; currentTitle: string | null; errors: string[]; alreadyRunning?: boolean };
 export async function fetchEmbeddingStatus(): Promise<EmbeddingStatus> { return (await axiosInstance.get<EmbeddingStatus>("api/admin/recommendations/embeddings/status")).data; }
 export async function backfillEmbeddings(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.post<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill")).data; }
 export async function fetchBackfillProgress(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.get<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill/progress")).data; }
@@ -97,6 +97,7 @@ export type ManualBookMetadata = {
   additionalDetails: { publisher: string; categories: string[]; language: string; pageCount: number | string | null; publishedDate: string };
   source: string | null;
   metadataStatus: "missing" | "failed" | "ready" | "manual";
+  metadataError: string | null;
   embeddingStatus: string;
   embeddingError: string | null;
 };

@@ -205,16 +205,29 @@ async function findBooksForBackfill() {
   const [books] = await db.query(
     `SELECT bk.id, bk.title FROM books bk
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
      WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL
-       AND COALESCE(enrichment.source, '') <> 'manual'
-       AND ${bookNeedsManualMetadataSql()}
+       AND (
+         (COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()})
+         OR embeddings.book_id IS NULL
+         OR embeddings.status <> 'ready'
+       )
      ORDER BY bk.id`
   );
   return books;
 }
 
 async function getEmbeddingStatus() {
-  const [[row]] = await db.query("SELECT COUNT(*) AS total, SUM(status = 'ready') AS ready, SUM(status = 'stale') AS stale, SUM(status = 'failed') AS failed FROM book_embeddings");
+  const [[row]] = await db.query(
+    `SELECT COUNT(embeddings.book_id) AS total,
+       COALESCE(SUM(embeddings.status = 'ready'), 0) AS ready,
+       COALESCE(SUM(embeddings.status = 'stale'), 0) AS stale,
+       COALESCE(SUM(embeddings.status = 'failed'), 0) AS failed,
+       COALESCE(SUM(embeddings.book_id IS NULL), 0) AS missing
+     FROM books bk
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
+     WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL`
+  );
   const [errors] = await db.query("SELECT book_id, last_error FROM book_embeddings WHERE status = 'failed' AND last_error IS NOT NULL ORDER BY updated_at DESC LIMIT 3");
   return { row, errors };
 }

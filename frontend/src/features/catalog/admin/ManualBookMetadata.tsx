@@ -23,7 +23,7 @@ const statusClass: Record<ManualMetadataBook["metadataStatus"], string> = {
   manual: "border-success/25 bg-success/5 text-success",
 };
 
-const ManualBookMetadata = () => {
+const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: number }) => {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -62,7 +62,7 @@ const ManualBookMetadata = () => {
       }).finally(() => { if (active) setLoadingBooks(false); });
     }, query.trim() ? 220 : 0);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [query, page, refreshKey]);
+  }, [query, page, refreshKey, backfillRevision]);
 
   const openBook = async (book: ManualMetadataBook) => {
     setSelectedBook(book);
@@ -147,7 +147,7 @@ const ManualBookMetadata = () => {
         <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 id="manual-ai-details-heading" className="text-base font-semibold text-foreground">Add book details for recommendations</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">When the online lookup misses or gets a detail wrong, add or correct the book information here. These details help the system suggest similar books.</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Add or correct book details here. Saved details help the system suggest similar books.</p>
           </div>
           <span className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground"><Sparkles className="size-4" />Private AI details</span>
         </div>
@@ -158,14 +158,14 @@ const ManualBookMetadata = () => {
             <Input aria-label="Search books by title, author, or ISBN" className="pl-9" placeholder="Search any book by title, author, or ISBN" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} />
           </div>
           <p className="text-xs leading-5 text-muted-foreground" aria-live="polite">
-            {searchingAllBooks ? `Search results include books with and without AI details.` : "Showing books that need useful AI details. Search above to open any active book."}
+            {searchingAllBooks ? "Search results include books with and without AI details." : "Showing active books missing useful details or a ready AI embedding. Search above to open any active book."}
           </p>
 
           {loadingBooks ? <div className="space-y-2" aria-label="Loading books">{[0, 1, 2].map((item) => <div key={item} className="h-[68px] animate-pulse rounded-md bg-muted/60" />)}</div> : listError ? (
             <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription className="flex flex-wrap items-center justify-between gap-3">{listError}<Button size="sm" variant="outline" onClick={() => setRefreshKey((value) => value + 1)}>Try again</Button></AlertDescription></Alert>
           ) : books.length ? (
             <>
-              <ul className="divide-y divide-border rounded-md border border-border" aria-label={searchingAllBooks ? "Book search results" : "Books needing AI details"}>
+              <ul className="divide-y divide-border rounded-md border border-border" aria-label={searchingAllBooks ? "Book search results" : "Books needing an AI update"}>
                 {books.map((book) => <li key={book.id}>
                   <button type="button" onClick={() => void openBook(book)} className="flex w-full flex-col gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between">
                     <span className="min-w-0">
@@ -191,8 +191,8 @@ const ManualBookMetadata = () => {
           ) : (
             <div className="rounded-md border border-dashed border-border px-5 py-8 text-center">
               <Check className="mx-auto size-5 text-success" />
-              <p className="mt-2 text-sm font-medium text-foreground">{searchingAllBooks ? "No books found" : "All books have useful AI details"}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{searchingAllBooks ? "Try another title, author, or ISBN." : "Search for a book above if you need to review or update its details."}</p>
+              <p className="mt-2 text-sm font-medium text-foreground">{searchingAllBooks ? "No books found" : "No books need an AI update"}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{searchingAllBooks ? "Try another title, author, or ISBN." : "All active books have useful details and a ready AI embedding. Search above to review a book."}</p>
             </div>
           )}
         </div>
@@ -208,7 +208,7 @@ const ManualBookMetadata = () => {
             <div className="flex min-h-0 flex-col overflow-y-auto">
               <div className="flex-1 space-y-5 px-6 py-5">
                 {selectedBook?.isbn ? <p className="text-xs text-muted-foreground">ISBN {selectedBook.isbn}</p> : <p className="text-xs text-muted-foreground">No ISBN is recorded. You can still add details below.</p>}
-                {metadataStatus === "failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The online lookup failed. You can enter the details from the book’s cover or inside pages.</AlertDescription></Alert> : null}
+                {metadataStatus === "failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The online details lookup failed{details?.metadataError ? `: ${details.metadataError}` : "."} This is separate from its AI embedding status. You can still add details below.</AlertDescription></Alert> : null}
                 {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Some details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
                 {metadataStatus === "manual" ? <Alert><Check className="size-4" /><AlertDescription>These details were added by library staff. You can update them here.</AlertDescription></Alert> : null}
 

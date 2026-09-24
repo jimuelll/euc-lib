@@ -8,7 +8,7 @@ const THESIS_LIMIT = 5;
 const BOOK_RULE_LIMIT = 3;
 const BOOK_AI_LIMIT = BOOK_LIMIT - BOOK_RULE_LIMIT;
 const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
-let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, skipped: 0, currentTitle: null, errors: [] };
+let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [] };
 
 const normalized = (value) => String(value || "").toLowerCase().trim();
 const parseEnrichment = (value) => {
@@ -28,6 +28,10 @@ const hasUsefulMetadata = (enrichment) => Boolean(
   || String(enrichment?.publishedDate || "").trim()
 );
 const publicEmbeddingError = (error) => String(error?.message || error || "Embedding failed").replace(/key=[^&\s]+/gi, "key=[redacted]").slice(0, 240);
+const publicMetadataError = (error) => String(error?.message || error || "Metadata lookup failed")
+  .replace(/key=[^&\s]+/gi, "key=[redacted]")
+  .replace(/https?:\/\/\S+/gi, "[metadata provider]")
+  .slice(0, 240);
 const tokens = (value) => new Set(normalized(value).split(/[^a-z0-9]+/).filter((token) => token.length > 2));
 const overlap = (a, b) => {
   const left = tokens(a); const right = tokens(b);
@@ -208,6 +212,7 @@ const getManualMetadata = async (bookId) => {
     },
     source: record.metadata_source || null,
     metadataStatus: record.metadata_status === "failed" ? "failed" : hasUsefulMetadata(enrichment) ? (record.metadata_source === "manual" ? "manual" : "ready") : "missing",
+    metadataError: record.metadata_status === "failed" && record.metadata_error ? publicMetadataError(record.metadata_error) : null,
     embeddingStatus: record.embedding_status || "missing",
     embeddingError: record.embedding_error ? publicEmbeddingError(record.embedding_error) : null,
   };
@@ -277,7 +282,9 @@ const unique = (values) => [...new Set(values.filter(Boolean).map((value) => Str
 const fetchJson = async (url) => { const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(`Metadata source failed (${response.status})`); return response.json(); };
 const enrichBook = async (bookId) => {
   const existing = await repository.findEnrichment(bookId);
-  if (existing?.source === "manual") return parseEnrichment(existing.enrichment_json);
+  const savedEnrichment = parseEnrichment(existing?.enrichment_json);
+  if (existing?.source === "manual") return savedEnrichment;
+  if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) return savedEnrichment;
   const book = await repository.findBookIsbn(bookId);
   if (!book?.isbn) return null;
   try {
@@ -300,7 +307,7 @@ const enrichBook = async (bookId) => {
     return enrichment;
   } catch (error) {
     await repository.markEnrichmentFailed(book.id, String(error.message || error).slice(0, 500));
-    return {};
+    return { __lookupFailed: true };
   }
 };
 
@@ -347,12 +354,13 @@ const runBackfill = async (books) => {
   for (const book of books) {
     activeBackfill.currentTitle = book.title;
     try {
-      await enrichBook(book.id);
+      const enrichment = await enrichBook(book.id);
+      if (enrichment?.__lookupFailed) activeBackfill.lookupFailed += 1;
       await embedBook(book.id);
       activeBackfill.embedded += 1;
     } catch (error) {
       activeBackfill.failed += 1;
-      const message = String(error?.message || error || "Embedding failed").replace(/key=[^&\s]+/gi, "key=[redacted]").slice(0, 180);
+      const message = `${book.title}: ${publicEmbeddingError(error)}`.slice(0, 240);
       if (!activeBackfill.errors.includes(message)) activeBackfill.errors.push(message);
     } finally {
       activeBackfill.completed += 1;
@@ -364,7 +372,7 @@ const runBackfill = async (books) => {
 const startBackfill = async () => {
   if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
   const books = await repository.findBooksForBackfill();
-  activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, failed: 0, skipped: 0, currentTitle: null, errors: [] };
+  activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [] };
   if (!books.length) { activeBackfill.status = "completed"; return { ...activeBackfill }; }
   setImmediate(() => runBackfill(books).catch((error) => {
     activeBackfill.status = "completed_with_errors";
@@ -375,7 +383,7 @@ const startBackfill = async () => {
 const backfillProgress = () => ({ ...activeBackfill, errors: [...activeBackfill.errors] });
 const embeddingStatus = async () => {
   const { row, errors } = await repository.getEmbeddingStatus();
-  return { total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })) };
+  return { total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), missing: Number(row.missing || 0), errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })) };
 };
 
 module.exports = { recommendationsForSeed, personalized, dismiss, listMetadataBooks, getManualMetadata, saveManualMetadata, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, backfillProgress, embeddingStatus };
