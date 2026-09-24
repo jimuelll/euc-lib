@@ -51,7 +51,7 @@ async function recordAuditEvent({ actorId = null, actorName = null, actorRole = 
   );
 }
 
-function auditFilters({ category = "all", action = "", dateFrom = "", dateTo = "" } = {}) {
+function auditFilters({ category = "all", action = "", query = "", dateFrom = "", dateTo = "" } = {}) {
   const filters = ["occurred_at IS NOT NULL"];
   const params = [];
   if (category && category !== "all") {
@@ -61,6 +61,12 @@ function auditFilters({ category = "all", action = "", dateFrom = "", dateTo = "
   if (action && action.trim()) {
     filters.push("action = ?");
     params.push(action.trim());
+  }
+  const normalizedQuery = String(query ?? "").trim().slice(0, 120);
+  if (normalizedQuery) {
+    const searchableColumns = ["category", "action", "actor_name", "actor_role", "description", "route", "CAST(metadata AS CHAR)"];
+    filters.push(`(${searchableColumns.map((column) => `LOCATE(LOWER(?), LOWER(COALESCE(${column}, ''))) > 0`).join(" OR ")})`);
+    params.push(...searchableColumns.map(() => normalizedQuery));
   }
   if (dateFrom) {
     filters.push("DATE(occurred_at) >= ?");
@@ -73,11 +79,11 @@ function auditFilters({ category = "all", action = "", dateFrom = "", dateTo = "
   return { whereClause: `WHERE ${filters.join(" AND ")}`, params };
 }
 
-async function getAuditLog({ limit = 20, page = 1, category = "all", action = "", dateFrom = "", dateTo = "" } = {}) {
+async function getAuditLog({ limit = 20, page = 1, category = "all", action = "", query = "", dateFrom = "", dateTo = "" } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safeLimit;
-  const { whereClause, params } = auditFilters({ category, action, dateFrom, dateTo });
+  const { whereClause, params } = auditFilters({ category, action, query, dateFrom, dateTo });
   const [[{ total }]] = await db.query(
     `SELECT COUNT(*) AS total
      FROM audit_events
@@ -108,7 +114,7 @@ async function getAuditLog({ limit = 20, page = 1, category = "all", action = ""
       total,
       totalPages: Math.max(Math.ceil(total / safeLimit), 1),
     },
-    filters: { category, action, dateFrom, dateTo },
+    filters: { category, action, query: String(query ?? "").trim().slice(0, 120), dateFrom, dateTo },
   };
 }
 

@@ -1,6 +1,8 @@
-import { Library, Loader2, Search, FileText, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Library, Loader2, Search, FileText, RefreshCw, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { SegmentedNavigation } from "@/features/admin";
+import { toast } from "@/components/ui/sonner";
 import type { BookType, CatalogFormValue, CatalogFormValues, FormField } from "../AdminCatalog.types";
 import FieldInput from "./FieldInput";
 
@@ -19,8 +21,13 @@ type Props = {
   onLookupIsbn: () => void;
   onSubmit: () => void;
   onClear: () => void;
+  coverFile?: File | null;
+  onCoverFileChange?: (file: File | null) => void;
   inSheet?: boolean;
 };
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const FormLabel = ({ children, htmlFor, required = false }: { children: React.ReactNode; htmlFor?: string; required?: boolean }) => (
   <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
@@ -30,8 +37,39 @@ const FormLabel = ({ children, htmlFor, required = false }: { children: React.Re
 
 export default function CatalogCreateForm({
   fields, materialType, values, errors, bookTypes, loading, isbnLookup,
-  onMaterialChange, onFieldChange, onLookupIsbn, onSubmit, onClear, inSheet = false,
+  onMaterialChange, onFieldChange, onLookupIsbn, onSubmit, onClear, coverFile = null, onCoverFileChange, inSheet = false,
 }: Props) {
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverPreviewFailed, setCoverPreviewFailed] = useState(false);
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      setCoverPreviewFailed(false);
+      return;
+    }
+    const preview = URL.createObjectURL(coverFile);
+    setCoverPreview(preview);
+    setCoverPreviewFailed(false);
+    return () => URL.revokeObjectURL(preview);
+  }, [coverFile]);
+
+  const selectCover = (file?: File) => {
+    if (!file) return;
+    if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+      toast.error("Choose a JPG, PNG, or WebP image.");
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("Images must be 5 MB or smaller.");
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      return;
+    }
+    onCoverFileChange?.(file);
+    if (coverInputRef.current) coverInputRef.current.value = "";
+  };
+
   const fieldsForMaterial = fields
     .filter((field) => !field.archived)
     .sort((a, b) => a.order - b.order)
@@ -78,6 +116,38 @@ export default function CatalogCreateForm({
           <div className="mb-5 border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-foreground">
             Theses are reference-only. They appear in the catalogue but cannot be borrowed or reserved.
           </div>
+        )}
+
+        {materialType === "book" && (
+          <section aria-labelledby="create-book-cover-heading" className="mb-5 border border-border bg-muted/15 p-4">
+            <h3 id="create-book-cover-heading" className="text-sm font-semibold text-foreground">Cover image <span className="font-normal text-muted-foreground">(optional)</span></h3>
+            <p className="mt-1 text-sm text-muted-foreground">Add one image for this book in the public catalogue. JPG, PNG, or WebP up to 5 MB.</p>
+            <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex h-36 w-24 shrink-0 items-center justify-center overflow-hidden border border-border bg-background p-1">
+                <img
+                  src={coverPreview && !coverPreviewFailed ? coverPreview : "/book-cover-fallback.svg"}
+                  alt={coverPreview && !coverPreviewFailed ? `Selected cover for ${String(values.title || "new book")}` : "Generic book cover preview"}
+                  className="h-full w-full object-contain"
+                  onError={() => setCoverPreviewFailed(true)}
+                />
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  aria-label="Choose a cover image for the new book"
+                  disabled={loading}
+                  onChange={(event) => selectCover(event.target.files?.[0])}
+                />
+                <button type="button" disabled={loading} onClick={() => coverInputRef.current?.click()} className="flex min-h-10 w-full items-center justify-center gap-2 border border-border px-3 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 sm:w-auto">
+                  <ImagePlus className="h-4 w-4" />{coverFile ? "Choose a different image" : "Choose cover image"}
+                </button>
+                {coverFile && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="max-w-full truncate">{coverFile.name}</span><button type="button" disabled={loading} onClick={() => { onCoverFileChange?.(null); if (coverInputRef.current) coverInputRef.current.value = ""; }} className="inline-flex items-center gap-1 text-destructive hover:underline disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" />Remove</button></div>}
+              </div>
+            </div>
+          </section>
         )}
 
         {materialType === "book" && (

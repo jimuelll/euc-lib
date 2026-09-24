@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { Activity, RefreshCcw } from "lucide-react";
+import { Activity, RefreshCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fetchAuditLogs, fetchAuditMeta, type AuditItem } from "@/features/analytics/api/adminAnalytics.api";
 
 const emptyFilters = {
+  query: "",
   category: "all",
   action: "",
   dateFrom: "",
@@ -141,6 +142,7 @@ const AdminAuditLogs = () => {
         limit: 10,
         category: nextFilters.category,
         action: nextFilters.action || undefined,
+        query: nextFilters.query || undefined,
         dateFrom: nextFilters.dateFrom || undefined,
         dateTo: nextFilters.dateTo || undefined,
       });
@@ -225,12 +227,22 @@ const AdminAuditLogs = () => {
         </Button>
       }
     >
-      <AdminPanel title="Filters" description="Narrow the audit feed by category, action, or date range.">
+      <AdminPanel title="Filters" description="Search actors, actions, descriptions, and record details, or narrow the feed by category and date.">
         <form className="space-y-4" onSubmit={(event) => {
           event.preventDefault();
           applyFilters();
         }}>
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="audit-search" className="text-xs font-semibold text-muted-foreground">
+                Search audit logs
+              </Label>
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="audit-search" type="search" autoComplete="off" className="rounded-md pl-9" value={filters.query} onChange={handleFilterChange("query")} placeholder="Actor, action, description…" />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="audit-category" className="text-xs font-semibold  text-muted-foreground">
                 Category
@@ -317,9 +329,10 @@ const AdminAuditLogs = () => {
               <p>
                 Showing page {pagination.page} of {pagination.totalPages} with {pagination.total} audit item(s).
               </p>
-              <p>
-                Date filter: {filters.dateFrom || filters.dateTo ? `${filters.dateFrom || "Any"} to ${filters.dateTo || "Any"}` : "All dates"}
-              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {filters.query.trim() && <p className="max-w-full truncate">Search: {filters.query.trim()}</p>}
+                <p>Date filter: {filters.dateFrom || filters.dateTo ? `${filters.dateFrom || "Any"} to ${filters.dateTo || "Any"}` : "All dates"}</p>
+              </div>
             </div>
 
             <div className="space-y-3">

@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const cloudinary = require("cloudinary").v2;
 const repository = require("../modules/catalog/catalog.repository");
+const snapshotRepository = require("../modules/backup/backup.repository");
 const transactionalAudit = require("../modules/analytics/transactional-audit");
 const { requireCatalogRole } = require("../modules/catalog/catalog.middleware");
 const catalogRoutes = require("../modules/catalog/catalog.routes");
@@ -34,6 +35,7 @@ test("book image routes require catalog staff authorization before upload handli
 
 test("cover replacement saves the new Cloudinary image before deleting the old image", async () => {
   const savedGetConnection = repository.getConnection;
+  const savedImageReferenceCheck = snapshotRepository.isBookImageReferenced;
   const savedAudit = transactionalAudit.enqueueTransactionalAudit;
   const savedUploadStream = cloudinary.uploader.upload_stream;
   const savedDestroy = cloudinary.uploader.destroy;
@@ -42,6 +44,7 @@ test("cover replacement saves the new Cloudinary image before deleting the old i
   process.env.CLOUDINARY_API_KEY = "test-key";
   process.env.CLOUDINARY_API_SECRET = "test-secret";
   const events = [];
+  let snapshotReferencesOldImage = false;
   const book = { id: 12, title: "Atlas", material_type: "book", image_url: "https://old/cover.jpg", image_public_id: "library/catalog/books/old" };
   const connection = {
     async beginTransaction() { events.push("begin"); },
@@ -56,6 +59,7 @@ test("cover replacement saves the new Cloudinary image before deleting the old i
     },
   };
   repository.getConnection = async () => connection;
+  snapshotRepository.isBookImageReferenced = async () => snapshotReferencesOldImage;
   transactionalAudit.enqueueTransactionalAudit = async () => {};
   cloudinary.uploader.upload_stream = (options, callback) => ({ end() { events.push("upload"); callback(null, { secure_url: "https://new/cover.jpg", public_id: "library/catalog/books/new" }); } });
   cloudinary.uploader.destroy = async (publicId) => { events.push(`destroy:${publicId}`); return { result: "ok" }; };
@@ -64,8 +68,17 @@ test("cover replacement saves the new Cloudinary image before deleting the old i
     assert.deepEqual(image, { image_url: "https://new/cover.jpg", image_public_id: "library/catalog/books/new" });
     assert.ok(events.indexOf("commit") < events.indexOf("destroy:library/catalog/books/old"));
     assert.ok(events.includes("update"));
+
+    snapshotReferencesOldImage = true;
+    book.image_url = "https://old/cover.jpg";
+    book.image_public_id = "library/catalog/books/old";
+    events.length = 0;
+    await uploadBookImage(12, validPng(), 4);
+    assert.ok(events.includes("commit"));
+    assert.ok(!events.includes("destroy:library/catalog/books/old"), "a cover referenced by a saved snapshot must remain in Cloudinary");
   } finally {
     repository.getConnection = savedGetConnection;
+    snapshotRepository.isBookImageReferenced = savedImageReferenceCheck;
     transactionalAudit.enqueueTransactionalAudit = savedAudit;
     cloudinary.uploader.upload_stream = savedUploadStream;
     cloudinary.uploader.destroy = savedDestroy;
@@ -75,6 +88,7 @@ test("cover replacement saves the new Cloudinary image before deleting the old i
 
 test("thesis image upload is rejected and removing a book image clears storage and Cloudinary", async () => {
   const savedGetConnection = repository.getConnection;
+  const savedImageReferenceCheck = snapshotRepository.isBookImageReferenced;
   const savedAudit = transactionalAudit.enqueueTransactionalAudit;
   const savedUploadStream = cloudinary.uploader.upload_stream;
   const savedDestroy = cloudinary.uploader.destroy;
@@ -84,6 +98,7 @@ test("thesis image upload is rejected and removing a book image clears storage a
   process.env.CLOUDINARY_API_SECRET = "test-secret";
   let materialType = "thesis";
   const events = [];
+  let snapshotReferencesImage = false;
   const connection = {
     async beginTransaction() {}, async commit() { events.push("commit"); }, async rollback() { events.push("rollback"); }, release() {},
     async query(sql) {
@@ -93,6 +108,7 @@ test("thesis image upload is rejected and removing a book image clears storage a
     },
   };
   repository.getConnection = async () => connection;
+  snapshotRepository.isBookImageReferenced = async () => snapshotReferencesImage;
   transactionalAudit.enqueueTransactionalAudit = async () => {};
   let uploadCalled = false;
   cloudinary.uploader.upload_stream = () => { uploadCalled = true; return { end() {} }; };
@@ -111,8 +127,15 @@ test("thesis image upload is rejected and removing a book image clears storage a
     assert.ok(events.includes("commit"));
     assert.ok(events.includes("destroy:library/catalog/books/to-remove"));
     assert.ok(events.indexOf("commit") < events.indexOf("destroy:library/catalog/books/to-remove"));
+
+    snapshotReferencesImage = true;
+    events.length = 0;
+    await removeBookImage(13, 4);
+    assert.ok(events.includes("commit"));
+    assert.ok(!events.includes("destroy:library/catalog/books/to-remove"), "a cover referenced by a saved snapshot must remain in Cloudinary");
   } finally {
     repository.getConnection = savedGetConnection;
+    snapshotRepository.isBookImageReferenced = savedImageReferenceCheck;
     transactionalAudit.enqueueTransactionalAudit = savedAudit;
     cloudinary.uploader.upload_stream = savedUploadStream;
     cloudinary.uploader.destroy = savedDestroy;

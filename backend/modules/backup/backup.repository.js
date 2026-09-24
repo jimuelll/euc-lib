@@ -41,25 +41,58 @@ async function readTable(table, connection = db) {
   return rows;
 }
 
-async function createSnapshotRecord({ publicId, filename, sizeBytes, kind, createdBy }) {
+async function createSnapshotRecord({ publicId, filename, sizeBytes, bookImagePublicIds = [], kind, createdBy }) {
   const [result] = await db.query(
-    `INSERT INTO ${SNAPSHOT_TABLE} (cloudinary_public_id, filename, size_bytes, kind, created_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    [publicId, filename, sizeBytes, kind, createdBy || null]
+    `INSERT INTO ${SNAPSHOT_TABLE} (cloudinary_public_id, filename, size_bytes, book_image_public_ids, kind, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [publicId, filename, sizeBytes, JSON.stringify(bookImagePublicIds), kind, createdBy || null]
   );
   return result;
 }
 
-async function pruneSnapshots(maxSnapshots) {
-  const [expired] = await db.query(
-    `SELECT id, cloudinary_public_id FROM ${SNAPSHOT_TABLE}
+async function getSnapshotsToPrune(maxSnapshots) {
+  const [snapshots] = await db.query(
+    `SELECT id, cloudinary_public_id, book_image_public_ids
+     FROM ${SNAPSHOT_TABLE}
      ORDER BY created_at DESC, id DESC LIMIT 18446744073709551615 OFFSET ?`,
     [maxSnapshots]
   );
+  return snapshots;
+}
+
+async function getSnapshotsMissingBookImagePublicIds() {
+  const [snapshots] = await db.query(
+    `SELECT id, cloudinary_public_id, book_image_public_ids
+     FROM ${SNAPSHOT_TABLE}
+     WHERE book_image_public_ids IS NULL
+     ORDER BY created_at DESC, id DESC`
+  );
+  return snapshots;
+}
+
+async function setSnapshotBookImagePublicIds(id, publicIds) {
+  await db.query(`UPDATE ${SNAPSHOT_TABLE} SET book_image_public_ids = ? WHERE id = ?`, [JSON.stringify(publicIds), id]);
+}
+
+async function pruneSnapshots(maxSnapshots, excludedIds = []) {
+  const excluded = new Set(excludedIds.map(Number));
+  const expired = (await getSnapshotsToPrune(maxSnapshots)).filter((snapshot) => !excluded.has(Number(snapshot.id)));
   if (expired.length) {
     await db.query(`DELETE FROM ${SNAPSHOT_TABLE} WHERE id IN (?)`, [expired.map((snapshot) => snapshot.id)]);
   }
   return expired;
+}
+
+async function isBookImageReferenced(publicId) {
+  const [[references]] = await db.query(
+    `SELECT
+       EXISTS(SELECT 1 FROM books WHERE image_public_id = ?) AS used_by_book,
+       EXISTS(SELECT 1 FROM ${SNAPSHOT_TABLE}
+               WHERE book_image_public_ids IS NULL
+                  OR JSON_CONTAINS(book_image_public_ids, JSON_QUOTE(?), '$')) AS used_by_snapshot`,
+    [publicId, publicId]
+  );
+  return Boolean(references?.used_by_book || references?.used_by_snapshot);
 }
 
 async function findSnapshot(id) {
@@ -88,7 +121,11 @@ module.exports = {
   getSchemaManifest,
   readTable,
   createSnapshotRecord,
+  getSnapshotsToPrune,
+  getSnapshotsMissingBookImagePublicIds,
+  setSnapshotBookImagePublicIds,
   pruneSnapshots,
+  isBookImageReferenced,
   findSnapshot,
   listSnapshots,
   getMaintenanceStatus,

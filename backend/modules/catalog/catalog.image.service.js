@@ -1,6 +1,7 @@
 const { randomUUID } = require("node:crypto");
 const { v2: cloudinary } = require("cloudinary");
 const repository = require("./catalog.repository");
+const snapshotRepository = require("../backup/backup.repository");
 const transactionalAudit = require("../analytics/transactional-audit");
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -57,6 +58,17 @@ async function destroyImage(publicId) {
   }
 }
 
+async function destroyImageIfUnreferenced(publicId) {
+  if (!publicId) return;
+  try {
+    if (await snapshotRepository.isBookImageReferenced(publicId)) return;
+    await destroyImage(publicId);
+  } catch (error) {
+    // A failed reference check must never make a restorable snapshot lose its image.
+    console.warn("[catalog] Could not check snapshot references; preserving Cloudinary image:", error.message);
+  }
+}
+
 async function uploadBookImage(bookId, file, actorId = null) {
   validateCatalogImage(file);
   const conn = await repository.getConnection();
@@ -90,7 +102,7 @@ async function uploadBookImage(bookId, file, actorId = null) {
   } finally {
     conn.release();
   }
-  if (oldPublicId && oldPublicId !== uploaded.image_public_id) await destroyImage(oldPublicId);
+  if (oldPublicId && oldPublicId !== uploaded.image_public_id) await destroyImageIfUnreferenced(oldPublicId);
   return uploaded;
 }
 
@@ -125,7 +137,7 @@ async function removeBookImage(bookId, actorId = null) {
   } finally {
     conn.release();
   }
-  await destroyImage(oldPublicId);
+  await destroyImageIfUnreferenced(oldPublicId);
 }
 
 module.exports = { MAX_IMAGE_BYTES, validateCatalogImage, uploadBookImage, removeBookImage };

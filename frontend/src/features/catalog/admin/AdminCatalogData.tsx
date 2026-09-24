@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { FormField, Book, type BookType, type CatalogFormValue, type CatalogFormValues } from "./AdminCatalog.types";
-import { archiveCatalogBook, createCatalogBook, fetchBookTypes, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook } from "./catalog.api";
+import { archiveCatalogBook, createCatalogBook, fetchBookTypes, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook, uploadCatalogBookImage } from "./catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import CatalogCreateForm from "./components/CatalogCreateForm";
 import CatalogEditForm from "./components/CatalogEditForm";
@@ -30,6 +30,25 @@ type ApiFieldError = { response?: { data?: { fields?: Record<string, string> } }
 const getServerFieldErrors = (error: unknown): Record<string, string> =>
   (error as ApiFieldError)?.response?.data?.fields ?? {};
 
+function CatalogBookThumbnail({ book }: { book: Book }) {
+  const isThesis = book.material_type === "thesis";
+  const fallback = isThesis ? "/thesis-cover-fallback.svg" : "/book-cover-fallback.svg";
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [book.image_url, book.material_type]);
+
+  return (
+    <span aria-hidden="true" className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted/20 p-0.5">
+      <img
+        src={isThesis || failed || !book.image_url ? fallback : book.image_url}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-full w-full object-contain"
+      />
+    </span>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
@@ -40,6 +59,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [isbnLookup,    setIsbnLookup]    = useState(false);
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
+  const [coverFile,     setCoverFile]     = useState<File | null>(null);
   const [loading,       setLoading]       = useState(false);
   const searchQuery = params.get("q") ?? "";
   const setSearchQuery = (q: string) => patchParams({ q, page: null }, true);
@@ -59,7 +79,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const holdingGuardRef = useRef<(() => Promise<boolean>) | null>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
-  const { confirmDiscard, discardDialog } = useUnsavedChanges(formValues, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
+  const { confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
   const requestClose = async () => {
     if (loading || !await confirmDiscard()) return;
     if (holdingGuardRef.current && !await holdingGuardRef.current()) return;
@@ -70,7 +90,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
   const fieldsForMaterial = (type: "book" | "thesis") => sortedFields.filter((field) => (field.scope ?? "shared") === "shared" || field.scope === type);
   const setField     = (key: string, value: CatalogFormValue) => { setFormValues((p) => ({ ...p, [key]: value })); setFieldErrors((errors) => { const next = { ...errors }; delete next[key]; return next; }); };
-  const clearForm = () => { setFormValues({}); setFieldErrors({}); };
+  const clearForm = () => { setFormValues({}); setFieldErrors({}); setCoverFile(null); };
   const closeSheet = () => { setSheetMode(null); setSelectedBook(null); setSheetSection("details"); setInitialHoldingCopyId(null); clearForm(); };
 
   useEffect(() => { fetchBookTypes().then((types) => setBookTypes(types.filter((type) => Number(type.is_active ?? 1) === 1))).catch(() => toast.error("Failed to load book types")); }, []);
@@ -129,7 +149,21 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     setLoading(true);
     try {
       const result = await createCatalogBook({ ...formValues, material_type: materialType });
-      toast.success(result.message); closeSheet(); await handleSearchBooks();
+      let coverUploadError: string | null = null;
+      if (materialType === "book" && coverFile) {
+        try {
+          await uploadCatalogBookImage(result.id, coverFile);
+        } catch (error: unknown) {
+          coverUploadError = getApiErrorMessage(error, "Could not upload the cover image.");
+        }
+      }
+      closeSheet();
+      await handleSearchBooks();
+      if (coverUploadError) {
+        toast.error(`Book created, but its cover image could not be uploaded: ${coverUploadError} Open the book's Image tab to retry.`);
+      } else {
+        toast.success(materialType === "book" && coverFile ? `${result.message} Cover image uploaded.` : result.message);
+      }
     } catch (error: unknown) {
       setFieldErrors(getServerFieldErrors(error));
       toast.error(getApiErrorMessage(error, "Failed to add book"));
@@ -232,7 +266,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const openCopies = (book: Book) => { selectBookForEdit(book); setSheetSection("copies"); };
   const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("holdings"); };
   const handleOpenHolding = (holding: CatalogHolding) => openHoldings({ id: holding.book_id, title: holding.title, author: holding.author ?? undefined, isbn: holding.isbn ?? undefined, material_type: "book", needs_policy: holding.needs_policy }, holding.copy_id);
-  const openCreate = () => { setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
+  const openCreate = () => { setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setCoverFile(null); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
   const changeSheetSection = async (section: "details" | "image" | "copies" | "holdings") => {
     if (sheetSection === "holdings" && section !== "holdings" && holdingGuardRef.current && !await holdingGuardRef.current()) return;
     setSheetSection(section);
@@ -271,7 +305,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
                   const archived = Boolean(book.deleted_at);
                   const identifier = book.material_type === "thesis" ? String(book.accession_number || book.metadata?.accession_number || "—") : (book.isbn || "—");
                   return <tr key={book.id} tabIndex={archived ? -1 : 0} onClick={() => !archived && selectBookForEdit(book)} onKeyDown={(event) => { if (!archived && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); selectBookForEdit(book); } }} className={`group transition-colors ${archived ? "bg-muted/20 text-muted-foreground" : "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"}`}>
-                    <td className="max-w-[330px] px-4 py-3"><p className="truncate text-sm font-semibold text-foreground">{book.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</p></td>
+                    <td className="max-w-[330px] px-4 py-2"><div className="flex min-w-0 items-center gap-3"><CatalogBookThumbnail book={book} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{book.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</p></div></div></td>
                     <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-medium ${book.material_type === "thesis" ? "border-warning/30 bg-warning/5" : "border-border bg-background"}`}>{book.material_type === "thesis" ? <FileText className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}{book.material_type === "thesis" ? "Thesis" : "Book"}</span>{archived && <span className="ml-2 text-xs text-muted-foreground">Archived</span>}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{identifier}</td>
                     <td className="px-4 py-3 text-sm"><CatalogLendingStatusCell book={book} archived={archived} onAddHoldings={(selectedBook) => openHoldings(selectedBook)} onAssignPolicy={selectBookForEdit} /></td>
@@ -298,7 +332,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
             <TabsContent value="image" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage} /></TabsContent>
             <TabsContent value="copies" className="mt-0 flex min-h-0 overflow-hidden p-5"><BookCopiesModal embedded bookId={selectedBook.id} bookTitle={selectedBook.title} onClose={() => void requestClose()} /></TabsContent>
             <TabsContent value="holdings" className="mt-0 flex min-h-0 overflow-hidden"><BookHoldingsEditor key={`${selectedBook.id}-${initialHoldingCopyId ?? "first-missing"}`} bookId={selectedBook.id} bookTitle={selectedBook.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} onManageCopies={() => setSheetSection("copies")} isSuperAdmin={isSuperAdmin} /></TabsContent>
-          </Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} onMaterialChange={(value) => { setMaterialType(value); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /> : null}</div>}
+          </Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} coverFile={coverFile} onCoverFileChange={setCoverFile} onMaterialChange={(value) => { setMaterialType(value); if (value !== "book") setCoverFile(null); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setCoverFile(null); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /> : null}</div>}
         </SheetContent>
       </Sheet>
     </>

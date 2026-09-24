@@ -241,6 +241,7 @@ CREATE TABLE `backup_snapshots` (
   `cloudinary_public_id` varchar(255) NOT NULL,
   `filename` varchar(255) NOT NULL,
   `size_bytes` bigint(20) UNSIGNED NOT NULL,
+  `book_image_public_ids` json DEFAULT NULL,
   `kind` enum('manual','pre_restore') NOT NULL DEFAULT 'manual',
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()

@@ -30,7 +30,7 @@ export async function updateBookType(id: number, payload: BookType): Promise<voi
 export type DeleteBookTypeResult = { id: number; name: string; active_books: number; archived_books: number; affected_books: number; message: string };
 export async function deleteBookType(id: number): Promise<DeleteBookTypeResult> { return (await axiosInstance.delete<DeleteBookTypeResult>(`api/admin/book-types/${id}`)).data; }
 export async function lookupBookIsbn(isbn: string): Promise<IsbnMetadata> { return (await axiosInstance.get<IsbnMetadata>(`api/admin/books/isbn/${encodeURIComponent(isbn)}`)).data; }
-export async function createCatalogBook(values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.post<MessageResponse>("api/admin/books", values)).data; }
+export async function createCatalogBook(values: CatalogFormValues): Promise<MessageResponse & { id: number }> { return (await axiosInstance.post<MessageResponse & { id: number }>("api/admin/books", values)).data; }
 export async function updateCatalogBook(id: number, values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.put<MessageResponse>(`api/admin/books/${id}`, values)).data; }
 export type CatalogBookImage = { image_url: string; image_public_id: string };
 export async function uploadCatalogBookImage(id: number, file: File, onProgress?: (progress: number) => void): Promise<CatalogBookImage> {

@@ -75,6 +75,7 @@ async function handleGetAuditLog(req, res) {
       page: req.query.page,
       category: req.query.category,
       action: req.query.action,
+      query: req.query.query,
       dateFrom: req.query.dateFrom,
       dateTo: req.query.dateTo,
     });

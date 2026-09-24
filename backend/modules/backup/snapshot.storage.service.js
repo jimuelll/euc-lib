@@ -87,22 +87,65 @@ async function uploadSnapshot(payload, createdBy, kind = "manual") {
   const snapshotId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const { contents, sizeBytes } = serializeSnapshot(payload);
   const { result: upload, compressedSizeBytes } = await uploadToCloudinary(contents, snapshotId);
+  const bookImagePublicIds = getBookImagePublicIds(payload);
 
   const filename = `euc-library-snapshot-${payload.createdAt.replace(/[:.]/g, "-")}.json`;
   const result = await repository.createSnapshotRecord({
     publicId: upload.public_id,
     filename,
     sizeBytes: compressedSizeBytes,
+    bookImagePublicIds,
     kind,
     createdBy,
   });
 
-  const expired = await repository.pruneSnapshots(MAX_SNAPSHOTS);
+  const preserveSnapshotIds = [];
+  const snapshotsWithoutImageRefs = await repository.getSnapshotsMissingBookImagePublicIds();
+  for (const snapshot of snapshotsWithoutImageRefs) {
+    try {
+      const oldPayload = await getSnapshotPayload(snapshot);
+      const publicIds = getBookImagePublicIds(oldPayload);
+      await repository.setSnapshotBookImagePublicIds(snapshot.id, publicIds);
+      snapshot.book_image_public_ids = publicIds;
+    } catch (error) {
+      preserveSnapshotIds.push(snapshot.id);
+      console.warn("[backup] Could not index catalog image references in a saved snapshot; retaining snapshots and images until a later cleanup attempt:", error.message);
+    }
+  }
+
+  const pruneCandidates = await repository.getSnapshotsToPrune(MAX_SNAPSHOTS);
+  const excludedSnapshotIds = preserveSnapshotIds.length
+    ? pruneCandidates.map((snapshot) => snapshot.id)
+    : [];
+  const expired = await repository.pruneSnapshots(MAX_SNAPSHOTS, excludedSnapshotIds);
   if (expired.length) {
     await Promise.allSettled(expired.map((snapshot) => cloudinary.uploader.destroy(snapshot.cloudinary_public_id, { resource_type: "raw", type: "authenticated" })));
+    const expiredImageIds = new Set(expired.flatMap((snapshot) => parseBookImagePublicIds(snapshot.book_image_public_ids)));
+    await Promise.allSettled([...expiredImageIds].map(async (publicId) => {
+      try {
+        if (await repository.isBookImageReferenced(publicId)) return;
+        await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+      } catch (error) {
+        console.warn("[backup] Cloudinary catalog image cleanup failed:", error.message);
+      }
+    }));
   }
 
   return { id: result.insertId, filename, sizeBytes: compressedSizeBytes, uncompressedSizeBytes: sizeBytes, createdAt: payload.createdAt, kind };
+}
+
+function parseBookImagePublicIds(value) {
+  if (Array.isArray(value)) return value.filter((id) => typeof id === "string" && id.trim());
+  if (typeof value === "string") {
+    try { return parseBookImagePublicIds(JSON.parse(value)); } catch { return []; }
+  }
+  return [];
+}
+
+function getBookImagePublicIds(payload) {
+  return [...new Set((payload?.tables?.books ?? [])
+    .map((book) => book?.image_public_id)
+    .filter((id) => typeof id === "string" && id.trim()))];
 }
 
 async function getSnapshotPayload(snapshot) {
@@ -122,4 +165,4 @@ async function getSnapshotPayload(snapshot) {
   return JSON.parse(contents.toString("utf8"));
 }
 
-module.exports = { uploadSnapshot, getSnapshotPayload, serializeSnapshot };
+module.exports = { uploadSnapshot, getSnapshotPayload, serializeSnapshot, getBookImagePublicIds, parseBookImagePublicIds };

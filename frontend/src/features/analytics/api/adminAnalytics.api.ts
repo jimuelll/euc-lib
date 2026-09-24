@@ -50,7 +50,7 @@ export interface AuditItem {
 export interface AuditResponse {
   rows: AuditItem[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
-  filters: { category: string; action: string; dateFrom: string; dateTo: string };
+  filters: { category: string; action: string; query?: string; dateFrom: string; dateTo: string };
 }
 
 export interface AuditMetaResponse {
@@ -68,7 +68,7 @@ export async function createAiAnalyticsReport(input: { dateFrom?: string; dateTo
   return (await axiosInstance.post<AiAnalyticsReportResponse>("/api/admin/dashboard/ai-report", input)).data;
 }
 
-export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; dateFrom?: string; dateTo?: string }): Promise<AuditResponse> {
+export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string }): Promise<AuditResponse> {
   return (await axiosInstance.get<AuditResponse>("/api/admin/dashboard/audit", { params })).data;
 }
 
