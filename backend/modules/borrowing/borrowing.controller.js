@@ -1,4 +1,5 @@
 const service = require("./borrowing.service");
+const { logError } = require("../../logger");
 
 // ─── Existing endpoints ───────────────────────────────────────────────────────
 
@@ -7,7 +8,7 @@ const getActiveBorrows = async (req, res) => {
     const rows = await service.getActiveBorrows(req.user.id);
     res.json(rows);
   } catch (err) {
-    console.error("[borrowing] getActiveBorrows:", err);
+    logError("[borrowing] getActiveBorrows:", err);
     res.status(500).json({ message: "Failed to fetch borrows" });
   }
 };
@@ -17,7 +18,7 @@ const getBorrowHistory = async (req, res) => {
     const rows = await service.getBorrowHistory(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
-    console.error("[borrowing] getBorrowHistory:", err);
+    logError("[borrowing] getBorrowHistory:", err);
     res.status(500).json({ message: "Failed to fetch history" });
   }
 };
@@ -31,7 +32,7 @@ const searchCatalogue = async (req, res) => {
     const books = await service.searchCatalogueWithAvailability(query.trim());
     res.json(books);
   } catch (err) {
-    console.error("[borrowing] searchCatalogue:", err);
+    logError("[borrowing] searchCatalogue:", err);
     res.status(500).json({ message: "Failed to search catalogue" });
   }
 };
@@ -56,7 +57,7 @@ const borrowBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book borrowed successfully", ...result });
   } catch (err) {
-    console.error("[borrowing] borrowBook:", err);
+    logError("[borrowing] borrowBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to borrow book" });
   }
 };
@@ -71,7 +72,7 @@ const returnBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully" });
   } catch (err) {
-    console.error("[borrowing] returnBook:", err);
+    logError("[borrowing] returnBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to return book" });
   }
 };
@@ -117,7 +118,7 @@ const scanBorrow = async (req, res) => {
       ...result,
     });
   } catch (err) {
-    console.error("[borrowing] scanBorrow:", err);
+    logError("[borrowing] scanBorrow:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to borrow book" });
   }
 };
@@ -143,7 +144,7 @@ const scanReturn = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully", borrowingId: row.id });
   } catch (err) {
-    console.error("[borrowing] scanReturn:", err);
+    logError("[borrowing] scanReturn:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to return book" });
   }
 };
@@ -158,7 +159,7 @@ const getCopyByBarcode = async (req, res) => {
     if (!copy) return res.status(404).json({ message: "Copy not found" });
     res.json(copy);
   } catch (err) {
-    console.error("[borrowing] getCopyByBarcode:", err);
+    logError("[borrowing] getCopyByBarcode:", err);
     res.status(500).json({ message: "Failed to resolve barcode" });
   }
 };
@@ -173,7 +174,7 @@ const lookupUser = async (req, res) => {
     if (!result) return res.status(404).json({ message: "User not found" });
     res.json(result);
   } catch (err) {
-    console.error("[borrowing] lookupUser:", err);
+    logError("[borrowing] lookupUser:", err);
     res.status(500).json({ message: "Failed to look up user" });
   }
 };
@@ -201,7 +202,7 @@ const adminGetBorrowings = async (req, res) => {
     });
     res.json(result);
   } catch (err) {
-    console.error("[borrowing] adminGetBorrowings:", err);
+    logError("[borrowing] adminGetBorrowings:", err);
     res.status(500).json({ message: "Failed to fetch borrowings" });
   }
 };
@@ -216,7 +217,7 @@ const adminDeleteBorrowing = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Borrowing record archived successfully" });
   } catch (err) {
-    console.error("[borrowing] adminDeleteBorrowing:", err);
+    logError("[borrowing] adminDeleteBorrowing:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to archive borrowing", ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 };
@@ -231,7 +232,7 @@ const adminRestoreBorrowing = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Borrowing record restored successfully" });
   } catch (err) {
-    console.error("[borrowing] adminRestoreBorrowing:", err);
+    logError("[borrowing] adminRestoreBorrowing:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to restore borrowing" });
   }
 };
@@ -243,7 +244,7 @@ const getAdminPaymentOverview = async (req, res) => {
     const result = await service.getAdminPaymentOverview({ page, limit });
     res.json(result);
   } catch (err) {
-    console.error("[borrowing] getAdminPaymentOverview:", err);
+    logError("[borrowing] getAdminPaymentOverview:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch payment overview" });
   }
 };
@@ -259,7 +260,7 @@ const getUserPaymentOverview = async (req, res) => {
     const result = await service.getUserPaymentOverview(studentEmployeeId);
     res.json(result);
   } catch (err) {
-    console.error("[borrowing] getUserPaymentOverview:", err);
+    logError("[borrowing] getUserPaymentOverview:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch user payment overview" });
   }
 };

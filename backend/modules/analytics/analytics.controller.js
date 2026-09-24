@@ -6,6 +6,7 @@ const {
   newVisitorId,
 } = require("./analytics.service");
 const { createAiAnalyticsReport } = require("./aiReport.service");
+const { logError } = require("../../logger");
 
 const VISITOR_COOKIE = "siteVisitorId";
 
@@ -40,7 +41,7 @@ async function handleTrackVisit(req, res) {
 
     res.status(204).send();
   } catch (err) {
-    console.error("[analytics] trackVisit:", err);
+    logError("[analytics] trackVisit:", err);
     res.status(500).json({ message: "Failed to track visit" });
   }
 }
@@ -50,7 +51,7 @@ async function handleGetDashboardOverview(req, res) {
     const result = await getDashboardOverview({ range: req.query.range });
     res.json(result);
   } catch (err) {
-    console.error("[analytics] getDashboardOverview:", err);
+    logError("[analytics] getDashboardOverview:", err);
     res.status(500).json({ message: "Failed to load dashboard data" });
   }
 }
@@ -62,7 +63,7 @@ async function handleCreateAiAnalyticsReport(req, res) {
   } catch (err) {
     if (err.status && err.status < 500) return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}) });
     if (err.status === 503) return res.status(503).json({ message: err.message });
-    console.error("[analytics] create AI report:", err);
+    logError("[analytics] create AI report:", err);
     res.status(500).json({ message: "Failed to generate the AI report" });
   }
 }
@@ -79,7 +80,7 @@ async function handleGetAuditLog(req, res) {
     });
     res.json(result);
   } catch (err) {
-    console.error("[analytics] getAuditLog:", err);
+    logError("[analytics] getAuditLog:", err);
     res.status(500).json({ message: "Failed to load audit log" });
   }
 }
@@ -89,7 +90,7 @@ async function handleGetAuditLogMeta(req, res) {
     const result = await getAuditLogMeta();
     res.json(result);
   } catch (err) {
-    console.error("[analytics] getAuditLogMeta:", err);
+    logError("[analytics] getAuditLogMeta:", err);
     res.status(500).json({ message: "Failed to load audit metadata" });
   }
 }

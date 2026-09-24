@@ -4,6 +4,7 @@ const { SNAPSHOT_VERSION, validateBackup } = require("./snapshot.transforms");
 const { createBackupPayload, compatibilityFor } = require("./snapshot.service");
 const { uploadSnapshot, getSnapshotPayload, serializeSnapshot } = require("./snapshot.storage.service");
 const { performRestore } = require("./snapshot.restore.service");
+const { logError } = require("../../logger");
 
 const importLimit = () => Number(process.env.BACKUP_MAX_BYTES || 50 * 1024 * 1024);
 
@@ -12,7 +13,7 @@ function requireRestoreSignOutAcknowledgement(req) {
 }
 
 function sendError(res, error, fallback) {
-  console.error("[backup]", error);
+  logError("[backup]", error);
   res.status(error.status || 500).json({ message: error.message || fallback });
 }
 

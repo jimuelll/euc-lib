@@ -1,4 +1,5 @@
 const service = require("./about.service");
+const { logError } = require("../../logger");
 
 // ── GET /api/about ────────────────────────────────────────────────────────────
 const getAbout = async (req, res) => {
@@ -9,7 +10,7 @@ const getAbout = async (req, res) => {
     }
     res.json(data);
   } catch (err) {
-    console.error("[about] getAbout:", err);
+    logError("[about] getAbout:", err);
     res.status(500).json({ message: "Failed to fetch about settings" });
   }
 };
@@ -49,7 +50,7 @@ const updateAbout = async (req, res) => {
     const updated = await service.updateAboutSettings(req.body, req.user.id);
     res.json({ message: "About page updated successfully", data: updated });
   } catch (err) {
-    console.error("[about] updateAbout:", err);
+    logError("[about] updateAbout:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update about settings" });
   }
 };

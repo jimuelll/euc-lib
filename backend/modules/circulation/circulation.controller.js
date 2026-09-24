@@ -1,4 +1,5 @@
 const service = require("./circulation.service");
+const { logError } = require("../../logger");
 
 const lookupUser = async (req, res) => {
   try {
@@ -10,7 +11,7 @@ const lookupUser = async (req, res) => {
     const result = await service.lookupUser(student_employee_id);
     res.json(result);
   } catch (err) {
-    console.error("[circulation] lookupUser:", err);
+    logError("[circulation] lookupUser:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to look up user" });
   }
 };
@@ -25,7 +26,7 @@ const lookupBook = async (req, res) => {
     const book = await service.lookupBook(isbn);
     res.json(book);
   } catch (err) {
-    console.error("[circulation] lookupBook:", err);
+    logError("[circulation] lookupBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to look up book" });
   }
 };
@@ -45,7 +46,7 @@ const processBorrow = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json(result);
   } catch (err) {
-    console.error("[circulation] processBorrow:", err);
+    logError("[circulation] processBorrow:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to process borrow" });
   }
 };
@@ -61,7 +62,7 @@ const processReturn = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully" });
   } catch (err) {
-    console.error("[circulation] processReturn:", err);
+    logError("[circulation] processReturn:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to process return" });
   }
 };
@@ -77,7 +78,7 @@ const processRenew = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
-    console.error("[circulation] processRenew:", err);
+    logError("[circulation] processRenew:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to process renewal" });
   }
 };
@@ -92,7 +93,7 @@ const getCirculationLog = async (req, res) => {
     const result = await service.getCirculationLog({ status, search, page, limit });
     res.json(result);
   } catch (err) {
-    console.error("[circulation] getCirculationLog:", err);
+    logError("[circulation] getCirculationLog:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to fetch circulation log" });
   }
 };

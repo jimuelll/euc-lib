@@ -68,7 +68,7 @@ const createBook = async (data, createdBy, actorId = null) => {
       isCreation: true,
     });
     await conn.commit();
-    void recommendations.queueEnrichmentAndEmbedding(bookId).catch((err) => console.error("[recommendations] enrichment queue:", err));
+    void recommendations.queueEnrichmentAndEmbedding(bookId);
     return bookId;
   } catch (err) {
     await conn.rollback();
@@ -128,7 +128,7 @@ const updateBook = async (id, data, actorId = null) => {
       } : {},
     });
     await conn.commit();
-    void recommendations.queueEnrichmentAndEmbedding(id).catch((err) => console.error("[recommendations] enrichment queue:", err));
+    void recommendations.queueEnrichmentAndEmbedding(id);
     return { auditEnqueued: true };
   } catch (err) {
     await conn.rollback();

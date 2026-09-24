@@ -1,11 +1,12 @@
 const service = require("./user-guide.service");
+const { logError } = require("../../logger");
 
 const respond = (handler) => async (req, res) => {
   try {
     const result = await handler(req, res);
     if (!res.headersSent) res.json({ success: true, data: result });
   } catch (error) {
-    console.error("[user-guide]", error);
+    logError("[user-guide]", error);
     res.status(error.status || 500).json({ success: false, message: error.message || "User guide request failed." });
   }
 };

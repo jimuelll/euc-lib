@@ -96,7 +96,6 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
           copyright_year: metadata.copyright_year,
           publication_place: metadata.publication_place,
           physical_description: metadata.physical_description,
-          subjects: metadata.subjects,
         };
         for (const [key, value] of Object.entries(metadataFields)) {
           if (visibleKeys.has(key) && value) next[key] = value as CatalogFormValue;

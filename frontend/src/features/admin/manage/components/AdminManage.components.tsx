@@ -95,8 +95,7 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
         const blob = await fetchUserBarcode(target.studentId);
         objectUrl = URL.createObjectURL(blob);
         setQrUrl(objectUrl);
-      } catch (err) {
-        console.error("Failed to load QR", err);
+      } catch {
         toast.error("Failed to load QR code");
       } finally {
         setLoading(false);
@@ -115,8 +114,7 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
       a.download = `qr-${target.studentId}.png`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Download failed", err);
+    } catch {
       toast.error("Failed to download QR code");
     }
   };

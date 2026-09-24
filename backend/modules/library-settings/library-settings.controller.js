@@ -1,4 +1,5 @@
 const service = require("./library-settings.service");
+const { logError } = require("../../logger");
 
 const getLibrarySettings = async (req, res) => {
   try {
@@ -9,7 +10,7 @@ const getLibrarySettings = async (req, res) => {
 
     res.json({ settings, holidays });
   } catch (error) {
-    console.error("[library-settings] getLibrarySettings:", error);
+    logError("[library-settings] getLibrarySettings:", error);
     res.status(500).json({ message: "Failed to fetch library settings" });
   }
 };
@@ -24,7 +25,7 @@ const updateLibrarySettings = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Library settings updated successfully", settings });
   } catch (error) {
-    console.error("[library-settings] updateLibrarySettings:", error);
+    logError("[library-settings] updateLibrarySettings:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update settings" });
   }
 };
@@ -43,7 +44,7 @@ const createHoliday = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Holiday added successfully", holiday });
   } catch (error) {
-    console.error("[library-settings] createHoliday:", error);
+    logError("[library-settings] createHoliday:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to create holiday" });
   }
 };
@@ -64,7 +65,7 @@ const updateHoliday = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Holiday updated successfully", holiday });
   } catch (error) {
-    console.error("[library-settings] updateHoliday:", error);
+    logError("[library-settings] updateHoliday:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update holiday" });
   }
 };
@@ -76,7 +77,7 @@ const deleteHoliday = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ ...result, message: "Holiday archived. Its saved due dates remain unchanged." });
   } catch (error) {
-    console.error("[library-settings] deleteHoliday:", error);
+    logError("[library-settings] deleteHoliday:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove holiday" });
   }
 };
@@ -97,7 +98,7 @@ const listAcademicPrograms = async (req, res) => {
     const programs = await service.listAcademicPrograms({ status });
     res.json({ programs });
   } catch (error) {
-    console.error("[library-settings] listAcademicPrograms:", error);
+    logError("[library-settings] listAcademicPrograms:", error);
     res.status(500).json({ message: "Failed to fetch programs / courses" });
   }
 };
@@ -108,7 +109,7 @@ const createAcademicProgram = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Program / course added", program });
   } catch (error) {
-    console.error("[library-settings] createAcademicProgram:", error);
+    logError("[library-settings] createAcademicProgram:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add program / course" });
   }
 };
@@ -119,7 +120,7 @@ const updateAcademicProgram = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Program / course updated", program });
   } catch (error) {
-    console.error("[library-settings] updateAcademicProgram:", error);
+    logError("[library-settings] updateAcademicProgram:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update program / course" });
   }
 };
@@ -131,7 +132,7 @@ const deleteAcademicProgram = async (req, res) => {
     res.locals.auditDetails = { affectedCount: result.reference_count, action: result.action };
     res.json({ ...result, message: result.action === "deleted" ? "Unused program / course permanently deleted" : "Program / course archived because records still reference it" });
   } catch (error) {
-    console.error("[library-settings] deleteAcademicProgram:", error);
+    logError("[library-settings] deleteAcademicProgram:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove program / course" });
   }
 };

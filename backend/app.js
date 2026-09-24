@@ -40,7 +40,10 @@ app.use(cors({
   credentials: true,
 }));
 app.use(helmet());
-app.use(morgan("dev"));
+app.use(morgan("dev", {
+  // Keep successful traffic out of production logs; 5xx requests remain visible.
+  skip: (_req, res) => process.env.NODE_ENV === "production" && res.statusCode < 500,
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: `${backupBodyLimit}b` }));
 app.use(express.urlencoded({ extended: true }));

@@ -1,4 +1,5 @@
 const service = require("./reservation.service");
+const { logError } = require("../../logger");
 
 const searchCatalogue = async (req, res) => {
   try {
@@ -9,7 +10,7 @@ const searchCatalogue = async (req, res) => {
     const books = await service.searchCatalogue(query.trim(), { page: req.query.page, limit: req.query.limit });
     res.json(books);
   } catch (err) {
-    console.error("[reservation] searchCatalogue:", err);
+    logError("[reservation] searchCatalogue:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to search catalogue" });
   }
 };
@@ -19,7 +20,7 @@ const getActiveReservations = async (req, res) => {
     const rows = await service.getActiveReservations(req.user.id);
     res.json(rows);
   } catch (err) {
-    console.error("[reservation] getActiveReservations:", err);
+    logError("[reservation] getActiveReservations:", err);
     res.status(500).json({ message: "Failed to fetch reservations" });
   }
 };
@@ -29,7 +30,7 @@ const getReservationHistory = async (req, res) => {
     const rows = await service.getReservationHistory(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
-    console.error("[reservation] getReservationHistory:", err);
+    logError("[reservation] getReservationHistory:", err);
     res.status(500).json({ message: "Failed to fetch reservation history" });
   }
 };
@@ -44,7 +45,7 @@ const reserveBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book reserved successfully", ...result });
   } catch (err) {
-    console.error("[reservation] reserveBook:", err);
+    logError("[reservation] reserveBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to reserve book" });
   }
 };
@@ -59,7 +60,7 @@ const cancelReservation = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation cancelled" });
   } catch (err) {
-    console.error("[reservation] cancelReservation:", err);
+    logError("[reservation] cancelReservation:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to cancel reservation" });
   }
 };

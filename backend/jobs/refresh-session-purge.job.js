@@ -1,4 +1,5 @@
 const { purgeStaleRefreshSessions } = require("../modules/auth/authSession.service");
+const { logDevelopment } = require("../logger");
 
 const DEFAULT_INTERVAL_MS = 60 * 60 * 1000;
 const configuredInterval = Number(process.env.REFRESH_SESSION_PURGE_INTERVAL_MS);
@@ -7,7 +8,7 @@ const INTERVAL_MS = Number.isFinite(configuredInterval) && configuredInterval > 
 async function runRefreshSessionPurge() {
   try {
     const purged = await purgeStaleRefreshSessions();
-    if (purged > 0) console.log(`[auth-session-purge] Removed ${purged} stale refresh session${purged === 1 ? "" : "s"}`);
+    if (purged > 0) logDevelopment(`[auth-session-purge] Removed ${purged} stale refresh session${purged === 1 ? "" : "s"}`);
   } catch (error) {
     console.error("[auth-session-purge] Failed to purge stale refresh sessions:", error);
   }

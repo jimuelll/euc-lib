@@ -1,4 +1,5 @@
 const service = require("./notifications.service");
+const { logError } = require("../../logger");
 
 const searchAdminNotificationRecipients = async (req, res) => {
   try {
@@ -7,7 +8,7 @@ const searchAdminNotificationRecipients = async (req, res) => {
     const recipients = await service.searchNotificationRecipients(query);
     res.json({ recipients });
   } catch (err) {
-    console.error("[notifications] searchAdminNotificationRecipients:", err);
+    logError("[notifications] searchAdminNotificationRecipients:", err);
     res.status(500).json({ message: "Failed to search accounts" });
   }
 };
@@ -26,7 +27,7 @@ const listMyNotifications = async (req, res) => {
 
     res.json(rows);
   } catch (err) {
-    console.error("[notifications] listMyNotifications:", err);
+    logError("[notifications] listMyNotifications:", err);
     res.status(500).json({ message: "Failed to fetch notifications" });
   }
 };
@@ -40,7 +41,7 @@ const getUnreadCount = async (req, res) => {
 
     res.json({ unreadCount });
   } catch (err) {
-    console.error("[notifications] getUnreadCount:", err);
+    logError("[notifications] getUnreadCount:", err);
     res.status(500).json({ message: "Failed to fetch unread count" });
   }
 };
@@ -60,7 +61,7 @@ const markAsRead = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error("[notifications] markAsRead:", err);
+    logError("[notifications] markAsRead:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to mark notification as read" });
   }
 };
@@ -74,7 +75,7 @@ const markAllAsRead = async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error("[notifications] markAllAsRead:", err);
+    logError("[notifications] markAllAsRead:", err);
     res.status(500).json({ message: "Failed to mark notifications as read" });
   }
 };
@@ -127,7 +128,7 @@ const createAdminNotification = async (req, res) => {
 
     res.status(201).json(notification);
   } catch (err) {
-    console.error("[notifications] createAdminNotification:", err);
+    logError("[notifications] createAdminNotification:", err);
     res.status(500).json({ message: "Failed to create notification" });
   }
 };
@@ -143,7 +144,7 @@ const listAdminNotifications = async (req, res) => {
 
     res.json({ stats, notifications: notificationPage.rows, pagination: notificationPage.pagination });
   } catch (err) {
-    console.error("[notifications] listAdminNotifications:", err);
+    logError("[notifications] listAdminNotifications:", err);
     res.status(500).json({ message: "Failed to fetch admin notifications" });
   }
 };

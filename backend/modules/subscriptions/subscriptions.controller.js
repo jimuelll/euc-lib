@@ -1,5 +1,6 @@
 // subscriptions/subscriptions.controller.js
 const SubscriptionService = require("./subscriptions.service");
+const { logError } = require("../../logger");
 
 // ─── Public ───────────────────────────────────────────────────────────────────
 
@@ -9,7 +10,7 @@ const getPublicSubscriptions = async (_req, res) => {
     const data = await SubscriptionService.getActiveSubscriptions();
     return res.json({ success: true, data });
   } catch (err) {
-    console.error("[subscriptions] getPublicSubscriptions:", err);
+    logError("[subscriptions] getPublicSubscriptions:", err);
     return res.status(500).json({ success: false, message: "Failed to fetch subscriptions" });
   }
 };
@@ -22,7 +23,7 @@ const getAllSubscriptions = async (req, res) => {
     const data = await SubscriptionService.getAllSubscriptions(false, { page: req.query.page, limit: req.query.limit });
     return res.json({ success: true, data });
   } catch (err) {
-    console.error("[subscriptions] getAllSubscriptions:", err);
+    logError("[subscriptions] getAllSubscriptions:", err);
     return res.status(500).json({ success: false, message: "Failed to fetch subscriptions" });
   }
 };
@@ -37,7 +38,7 @@ const getSubscriptionById = async (req, res) => {
     if (!sub) return res.status(404).json({ success: false, message: "Subscription not found" });
     return res.json({ success: true, data: sub });
   } catch (err) {
-    console.error("[subscriptions] getSubscriptionById:", err);
+    logError("[subscriptions] getSubscriptionById:", err);
     return res.status(500).json({ success: false, message: "Failed to fetch subscription" });
   }
 };
@@ -67,7 +68,7 @@ const createSubscription = async (req, res) => {
 
     return res.status(201).json({ success: true, data: sub });
   } catch (err) {
-    console.error("[subscriptions] createSubscription:", err);
+    logError("[subscriptions] createSubscription:", err);
     return res.status(500).json({ success: false, message: "Failed to create subscription" });
   }
 };
@@ -122,7 +123,7 @@ const updateSubscription = async (req, res) => {
 
     return res.json({ success: true, data: sub });
   } catch (err) {
-    console.error("[subscriptions] updateSubscription:", err);
+    logError("[subscriptions] updateSubscription:", err);
     return res.status(500).json({ success: false, message: "Failed to update subscription" });
   }
 };
@@ -139,7 +140,7 @@ const deleteSubscription = async (req, res) => {
     await SubscriptionService.deleteSubscription(id);
     return res.json({ success: true, message: "Subscription deleted" });
   } catch (err) {
-    console.error("[subscriptions] deleteSubscription:", err);
+    logError("[subscriptions] deleteSubscription:", err);
     return res.status(500).json({ success: false, message: "Failed to delete subscription" });
   }
 };
@@ -154,7 +155,7 @@ const reorderSubscriptions = async (req, res) => {
     await SubscriptionService.reorderSubscriptions(ids, req.user?.id ?? undefined);
     return res.json({ success: true, message: "Order updated" });
   } catch (err) {
-    console.error("[subscriptions] reorderSubscriptions:", err);
+    logError("[subscriptions] reorderSubscriptions:", err);
     return res.status(500).json({ success: false, message: "Failed to reorder" });
   }
 };

@@ -6,6 +6,7 @@ const {
   searchUsers,
   queryToolsSearch,
 } = require("./admin.service");
+const { logError } = require("../../logger");
 const qr = require("qrcode");
 const repository = require("./admin.repository");
 const { bulkDeactivateStudentLikeUsers } = require("./admin.service");
@@ -103,7 +104,7 @@ async function handleGetBarcodePng(req, res) {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.send(png);
   } catch (err) {
-    console.error("[admin] getBarcodePng:", err);
+    logError("[admin] getBarcodePng:", err);
     res.status(500).json({ message: "Failed to generate QR code" });
   }
 }

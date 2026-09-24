@@ -130,7 +130,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
             }
           } catch { toast.error(`Copy not found: ${barcode}`); }
         }
-        if (err && err.name !== "NotFoundException") console.warn("[ZXing]", err.message);
+        if (import.meta.env.DEV && err && err.name !== "NotFoundException") console.warn("[ZXing]", err.message);
       })
       .then((controls) => { controlsRef.current = controls; })
       .catch((e) => { toast.error("Camera error: " + e.message); stopScanner(); });

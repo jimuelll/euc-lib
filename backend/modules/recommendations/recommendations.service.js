@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const repository = require("./recommendations.repository");
+const { logDevelopment } = require("../../logger");
 const { hydrateCatalogRecord, parseMetadata } = require("../catalog/catalog.projection");
 const catalogSettings = require("../catalog/catalog.settings.service");
 
@@ -362,7 +363,7 @@ const queueEmbedding = async (bookId) => {
     try { await embedBook(bookId); }
     catch (error) {
       await repository.markEmbeddingFailed(bookId, String(error.message || error).slice(0, 500)).catch(() => {});
-      console.error("[recommendations] embedding failed:", error.message);
+      logDevelopment("[recommendations] embedding failed:", error.message);
     }
   });
 };
@@ -370,7 +371,7 @@ const queueEnrichmentAndEmbedding = (bookId) => new Promise((resolve) => {
   setImmediate(() => {
     enrichBook(bookId)
       .then(() => queueEmbedding(bookId))
-      .catch((error) => console.error("[recommendations] enrichment/embedding refresh:", error))
+      .catch((error) => logDevelopment("[recommendations] enrichment/embedding refresh:", error))
       .finally(resolve);
   });
 });

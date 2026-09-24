@@ -1,4 +1,5 @@
 const service = require("./attendance.service");
+const { logError } = require("../../logger");
 
 const scan = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ const scan = async (req, res) => {
 
     res.status(201).json(result);
   } catch (err) {
-    console.error("[attendance] scan:", err);
+    logError("[attendance] scan:", err);
     res.status(err.status ?? 500).json({
       message: err.message ?? "Failed to record attendance",
       code: err.code,
@@ -40,7 +41,7 @@ const getToday = async (req, res) => {
     const rows = await service.getTodayLogs({ limit, lastId });
     res.json(rows);
   } catch (err) {
-    console.error("[attendance] getToday:", err);
+    logError("[attendance] getToday:", err);
     res.status(500).json({ message: "Failed to fetch today's logs" });
   }
 };
@@ -65,7 +66,7 @@ const getLogs = async (req, res) => {
     }
     res.json(result);
   } catch (err) {
-    console.error("[attendance] getLogs:", err);
+    logError("[attendance] getLogs:", err);
     res.status(500).json({ message: "Failed to fetch attendance logs" });
   }
 };
@@ -75,7 +76,7 @@ const getMy = async (req, res) => {
     const rows = await service.getMyLogs(req.user.id, { page: req.query.page, limit: req.query.limit });
     res.json(rows);
   } catch (err) {
-    console.error("[attendance] getMy:", err);
+    logError("[attendance] getMy:", err);
     res.status(500).json({ message: "Failed to fetch your logs" });
   }
 };

@@ -3,6 +3,7 @@ const service = require("./catalog.service");
 const holdingsService = require("./catalog.holdings.service");
 const catalogSettingsService = require("./catalog.settings.service");
 const copyStateService = require("./catalog.copy-state.service");
+const { logError } = require("../../logger");
 
 const comparableSchema = (fields) => fields
   .map((field) => ({
@@ -26,7 +27,7 @@ const getSchema = async (req, res) => {
     const fields = await service.getSchema({ includeArchived });
     res.json(fields);
   } catch (err) {
-    console.error("[catalog] getSchema:", err);
+    logError("[catalog] getSchema:", err);
     res.status(500).json({ message: "Failed to fetch schema" });
   }
 };
@@ -57,7 +58,7 @@ const updateSchema = async (req, res) => {
     await service.upsertSchema(fields);
     res.json({ message: "Schema updated successfully" });
   } catch (err) {
-    console.error("[catalog] updateSchema:", err);
+    logError("[catalog] updateSchema:", err);
     res.status(500).json({ message: "Failed to update schema" });
   }
 };
@@ -101,7 +102,7 @@ const getBooks = async (req, res) => {
     );
     res.json(books);
   } catch (err) {
-    console.error("[catalog] getBooks:", err);
+    logError("[catalog] getBooks:", err);
     res.status(500).json({ message: "Failed to fetch books" });
   }
 };
@@ -116,7 +117,7 @@ const getPublicSchema = async (_req, res) => {
     const fields = await service.getSchema();
     res.json(fields.filter((field) => field.public));
   } catch (err) {
-    console.error("[catalog] getPublicSchema:", err);
+    logError("[catalog] getPublicSchema:", err);
     res.status(500).json({ message: "Failed to fetch public catalogue schema" });
   }
 };
@@ -127,7 +128,7 @@ const createBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book added successfully", id });
   } catch (err) {
-    console.error("[catalog] createBook:", err);
+    logError("[catalog] createBook:", err);
     const duplicateIsbn = err?.code === "ER_DUP_ENTRY" && String(err.message).includes("uq_books_isbn");
     const isbnError = duplicateIsbn || (err?.status === 400 && /isbn/i.test(String(err.message)));
     const message = duplicateIsbn ? "This ISBN is already assigned to another book" : (err.message ?? "Failed to create book");
@@ -141,7 +142,7 @@ const updateBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Book updated successfully" });
   } catch (err) {
-    console.error("[catalog] updateBook:", err);
+    logError("[catalog] updateBook:", err);
     const duplicateIsbn = err?.code === "ER_DUP_ENTRY" && String(err.message).includes("uq_books_isbn");
     const isbnError = duplicateIsbn || (err?.status === 400 && /isbn/i.test(String(err.message)));
     const message = duplicateIsbn ? "This ISBN is already assigned to another book" : (err.message ?? "Failed to update book");
@@ -155,7 +156,7 @@ const deleteBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Book deleted successfully" });
   } catch (err) {
-    console.error("[catalog] deleteBook:", err);
+    logError("[catalog] deleteBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book", ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 };
@@ -165,7 +166,7 @@ const getBookCopies = async (req, res) => {
     const copies = await service.getBookCopies(req.params.id);
     res.json(copies);
   } catch (err) {
-    console.error("[catalog] getBookCopies:", err);
+    logError("[catalog] getBookCopies:", err);
     res.status(500).json({ message: "Failed to fetch book copies" });
   }
 };
@@ -177,7 +178,7 @@ const uploadBookImage = async (req, res) => {
     res.locals.auditEnqueued = true;
     return res.json({ message: "Book image saved", ...result });
   } catch (err) {
-    console.error("[catalog] uploadBookImage:", err);
+    logError("[catalog] uploadBookImage:", err);
     return res.status(err.status ?? 500).json({ message: err.message ?? "Failed to upload book image" });
   }
 };
@@ -188,14 +189,14 @@ const removeBookImage = async (req, res) => {
     res.locals.auditEnqueued = true;
     return res.json({ message: "Book image removed", image_url: null, image_public_id: null });
   } catch (err) {
-    console.error("[catalog] removeBookImage:", err);
+    logError("[catalog] removeBookImage:", err);
     return res.status(err.status ?? 500).json({ message: err.message ?? "Failed to remove book image" });
   }
 };
 
 const getBookHoldings = async (req, res) => {
   try { res.json(await holdingsService.getBookHoldings(Number(req.params.id))); }
-  catch (err) { console.error("[catalog] getBookHoldings:", err); res.status(500).json({ message: "Failed to fetch book holdings" }); }
+  catch (err) { logError("[catalog] getBookHoldings:", err); res.status(500).json({ message: "Failed to fetch book holdings" }); }
 };
 
 const getHoldings = async (req, res) => {
@@ -209,7 +210,7 @@ const getHoldings = async (req, res) => {
       limit: Number(req.query.limit) || 25,
     });
     res.json({ ...result, pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.limit)) } });
-  } catch (err) { console.error("[catalog] getHoldings:", err); res.status(500).json({ message: "Failed to fetch holdings" }); }
+  } catch (err) { logError("[catalog] getHoldings:", err); res.status(500).json({ message: "Failed to fetch holdings" }); }
 };
 
 const updateHolding = async (req, res) => {
@@ -218,7 +219,7 @@ const updateHolding = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Holding saved successfully" });
   } catch (err) {
-    console.error("[catalog] updateHolding:", err);
+    logError("[catalog] updateHolding:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to save holding" });
   }
 };
@@ -249,7 +250,7 @@ const restoreCopy = async (req, res) => {
 
 const getCatalogSettings = async (_req, res) => {
   try { res.json(await catalogSettingsService.getCatalogSettings()); }
-  catch (err) { console.error("[catalog] getCatalogSettings:", err); res.status(500).json({ message: "Failed to fetch catalog settings" }); }
+  catch (err) { logError("[catalog] getCatalogSettings:", err); res.status(500).json({ message: "Failed to fetch catalog settings" }); }
 };
 
 const updateCatalogSettings = async (req, res) => {
@@ -277,7 +278,7 @@ const getBarcodePng = async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.send(png);
   } catch (err) {
-    console.error("[catalog] getBarcodePng:", err);
+    logError("[catalog] getBarcodePng:", err);
     res.status(500).json({ message: "Failed to generate QR code" });
   }
 };
@@ -293,7 +294,7 @@ const getCopyByBarcode = async (req, res) => {
     if (!copy) return res.status(404).json({ message: "Copy not found" });
     res.json(copy);
   } catch (err) {
-    console.error("[catalog] getCopyByBarcode:", err);
+    logError("[catalog] getCopyByBarcode:", err);
     res.status(500).json({ message: "Failed to look up copy" });
   }
 };
@@ -304,7 +305,7 @@ const restoreBook = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
-    console.error("[catalog] restoreBook:", err);
+    logError("[catalog] restoreBook:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to restore book" });
   }
 };

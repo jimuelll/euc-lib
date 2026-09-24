@@ -1,4 +1,5 @@
 const service = require("./adminReservation.service");
+const { logError } = require("../../logger");
 
 const getAdminReservations = async (req, res) => {
   try {
@@ -13,7 +14,7 @@ const getAdminReservations = async (req, res) => {
     const result = await service.getAdminReservations({ search, status, dateFrom, dateTo, archived, page, limit });
     res.json(result);
   } catch (err) {
-    console.error("[admin/reservations] getAdminReservations:", err);
+    logError("[admin/reservations] getAdminReservations:", err);
     res.status(500).json({ message: "Failed to fetch reservations" });
   }
 };
@@ -28,7 +29,7 @@ const markReservationReady = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation marked as ready" });
   } catch (err) {
-    console.error("[admin/reservations] markReservationReady:", err);
+    logError("[admin/reservations] markReservationReady:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
   }
 };
@@ -49,7 +50,7 @@ const cancelReservationAdmin = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation cancelled" });
   } catch (err) {
-    console.error("[admin/reservations] cancelReservationAdmin:", err);
+    logError("[admin/reservations] cancelReservationAdmin:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
   }
 };
@@ -65,7 +66,7 @@ const deleteReservationAdmin = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation archived successfully" });
   } catch (err) {
-    console.error("[admin/reservations] deleteReservationAdmin:", err);
+    logError("[admin/reservations] deleteReservationAdmin:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
   }
 };
@@ -80,7 +81,7 @@ const restoreReservationAdmin = async (req, res) => {
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation restored successfully" });
   } catch (err) {
-    console.error("[admin/reservations] restoreReservationAdmin:", err);
+    logError("[admin/reservations] restoreReservationAdmin:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Action failed" });
   }
 };
