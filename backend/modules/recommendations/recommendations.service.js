@@ -302,26 +302,29 @@ const enrichBook = async (bookId) => {
   const book = await repository.findBookIsbn(bookId);
   if (!book?.isbn) return null;
   const isbn = encodeURIComponent(book.isbn);
-  const key = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${encodeURIComponent(process.env.GOOGLE_BOOKS_API_KEY)}` : "";
-  const [openResult, googleResult] = await Promise.allSettled([
-    fetchOpenLibraryJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`),
-    fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${key}`),
-  ]);
+  const googleKey = String(process.env.GOOGLE_BOOKS_API_KEY || "").trim();
+  const requests = [
+    fetchOpenLibraryJson(`https://openlibrary.org/search.json?isbn=${isbn}&fields=title,author_name,subject,publisher,language,number_of_pages_median,publish_year,first_publish_year&limit=1`),
+  ];
+  if (googleKey) requests.push(fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${encodeURIComponent(googleKey)}`));
+  const results = await Promise.allSettled(requests);
+  const openResult = results[0];
+  const googleResult = results[1];
   const errors = [];
   let open = {};
   let google = {};
   if (openResult.status === "fulfilled") open = openResult.value;
   else errors.push(`Open Library: ${String(openResult.reason?.message || openResult.reason)}`);
-  if (googleResult.status === "fulfilled") google = googleResult.value;
-  else errors.push(`Google Books: ${String(googleResult.reason?.message || googleResult.reason)}`);
-  const openRecord = open[`ISBN:${book.isbn}`] || {};
+  if (googleResult?.status === "fulfilled") google = googleResult.value;
+  else if (googleResult?.status === "rejected") errors.push(`Google Books: ${String(googleResult.reason?.message || googleResult.reason)}`);
+  const openRecord = open.docs?.[0] || {};
   const googleRecord = google.items?.[0]?.volumeInfo || {};
   const enrichment = {
-    description: toText(googleRecord.description) || toText(openRecord.description),
-    subjects: unique([...(Array.isArray(openRecord.subjects) ? openRecord.subjects : []).map((item) => item.name || item), ...(Array.isArray(googleRecord.categories) ? googleRecord.categories : [])]),
-    categories: unique(Array.isArray(googleRecord.categories) ? googleRecord.categories : []), publisher: googleRecord.publisher || openRecord.publishers?.[0]?.name || "",
-    language: googleRecord.language || "", pageCount: googleRecord.pageCount || openRecord.number_of_pages || null,
-    publishedDate: googleRecord.publishedDate || openRecord.publish_date || "",
+    description: toText(googleRecord.description),
+    subjects: unique([...(Array.isArray(openRecord.subject) ? openRecord.subject : []), ...(Array.isArray(googleRecord.categories) ? googleRecord.categories : [])]),
+    categories: unique(Array.isArray(googleRecord.categories) ? googleRecord.categories : []), publisher: googleRecord.publisher || openRecord.publisher?.[0] || "",
+    language: googleRecord.language || openRecord.language?.[0] || "", pageCount: googleRecord.pageCount || openRecord.number_of_pages_median || null,
+    publishedDate: googleRecord.publishedDate || openRecord.publish_year?.[0] || openRecord.first_publish_year || "",
   };
   if (!hasUsefulMetadata(enrichment) && errors.length) {
     const lookupError = errors.join("; ").slice(0, 500);

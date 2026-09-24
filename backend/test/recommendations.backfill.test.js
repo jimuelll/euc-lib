@@ -52,26 +52,30 @@ test("online metadata lookup failures are tracked separately from embedding fail
     findBookIsbn: repository.findBookIsbn,
     markEnrichmentFailed: repository.markEnrichmentFailed,
     fetch: global.fetch,
+    googleKey: process.env.GOOGLE_BOOKS_API_KEY,
   };
   let savedFailure = null;
   try {
     repository.findEnrichment = async () => null;
     repository.findBookIsbn = async () => ({ id: 124, isbn: "9781234567890" });
     repository.markEnrichmentFailed = async (_bookId, message) => { savedFailure = message; };
+    delete process.env.GOOGLE_BOOKS_API_KEY;
     global.fetch = async () => ({ ok: false, status: 503 });
 
     const result = await service.enrichBook(124);
 
     assert.deepEqual(result, {
       __lookupFailed: true,
-      __lookupError: "Open Library: Metadata source failed (503); Google Books: Metadata source failed (503)",
+      __lookupError: "Open Library: Metadata source failed (503)",
     });
-    assert.equal(savedFailure, "Open Library: Metadata source failed (503); Google Books: Metadata source failed (503)");
+    assert.equal(savedFailure, "Open Library: Metadata source failed (503)");
   } finally {
     repository.findEnrichment = originals.findEnrichment;
     repository.findBookIsbn = originals.findBookIsbn;
     repository.markEnrichmentFailed = originals.markEnrichmentFailed;
     global.fetch = originals.fetch;
+    if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
+    else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
   }
 });
 
@@ -82,6 +86,7 @@ test("Google Books can enrich a book when Open Library is unavailable", async ()
     saveEnrichment: repository.saveEnrichment,
     fetch: global.fetch,
     contact: process.env.OPEN_LIBRARY_CONTACT_EMAIL,
+    googleKey: process.env.GOOGLE_BOOKS_API_KEY,
   };
   let savedMetadata = null;
   let openLibraryUserAgent = "";
@@ -90,6 +95,7 @@ test("Google Books can enrich a book when Open Library is unavailable", async ()
     repository.findBookIsbn = async () => ({ id: 126, isbn: "9781234567890" });
     repository.saveEnrichment = async (_bookId, metadata) => { savedMetadata = metadata; };
     process.env.OPEN_LIBRARY_CONTACT_EMAIL = "catalog@example.test";
+    process.env.GOOGLE_BOOKS_API_KEY = "books-test-key";
     global.fetch = async (url, options) => {
       if (String(url).startsWith("https://openlibrary.org/")) {
         openLibraryUserAgent = options.headers["User-Agent"];
@@ -114,6 +120,44 @@ test("Google Books can enrich a book when Open Library is unavailable", async ()
     global.fetch = originals.fetch;
     if (originals.contact === undefined) delete process.env.OPEN_LIBRARY_CONTACT_EMAIL;
     else process.env.OPEN_LIBRARY_CONTACT_EMAIL = originals.contact;
+    if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
+    else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
+  }
+});
+
+test("Open Library ISBN search enriches books without a Google Books key", async () => {
+  const originals = {
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    saveEnrichment: repository.saveEnrichment,
+    fetch: global.fetch,
+    googleKey: process.env.GOOGLE_BOOKS_API_KEY,
+  };
+  let savedMetadata = null;
+  try {
+    repository.findEnrichment = async () => null;
+    repository.findBookIsbn = async () => ({ id: 127, isbn: "9781234567890" });
+    repository.saveEnrichment = async (_bookId, metadata) => { savedMetadata = metadata; };
+    delete process.env.GOOGLE_BOOKS_API_KEY;
+    global.fetch = async (url) => {
+      assert.match(String(url), /search\.json\?isbn=9781234567890/);
+      return { ok: true, json: async () => ({ docs: [{ subject: ["Library science"], publisher: ["Example Press"], language: ["eng"], number_of_pages_median: 248, publish_year: [2024] }] }) };
+    };
+
+    const result = await service.enrichBook(127);
+
+    assert.deepEqual(result.subjects, ["Library science"]);
+    assert.equal(result.publisher, "Example Press");
+    assert.equal(result.pageCount, 248);
+    assert.equal(result.publishedDate, 2024);
+    assert.deepEqual(savedMetadata, result);
+  } finally {
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.saveEnrichment = originals.saveEnrichment;
+    global.fetch = originals.fetch;
+    if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
+    else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
   }
 });
 

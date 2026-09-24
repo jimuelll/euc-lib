@@ -194,6 +194,9 @@ GEMINI_API_KEY=your_gemini_api_key
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 # Optional: contact email included in Open Library's User-Agent for catalog lookups
 OPEN_LIBRARY_CONTACT_EMAIL=library@example.edu
+# Optional: enables Google Books enrichment in addition to Open Library. Add this
+# on the deployed server to avoid shared unauthenticated-request rate limits.
+GOOGLE_BOOKS_API_KEY=your_google_books_api_key
 
 # Aggregate analytics reports; Gemini is the default
 AI_REPORT_PROVIDER=gemini
