@@ -183,35 +183,35 @@ async function getDashboardOverviewData(daysAgo) {
     ),
     db.query(
       `SELECT DATE_FORMAT(visit_date, '%Y-%m-%d') AS label, COUNT(*) AS unique_visitors, COALESCE(SUM(hit_count), 0) AS visit_hits
-       FROM site_daily_visits WHERE visit_date >= CURDATE() - INTERVAL ? DAY GROUP BY visit_date ORDER BY visit_date ASC`,
+       FROM site_daily_visits WHERE visit_date >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(visit_date, '%Y-%m-%d') ORDER BY label ASC`,
       [daysAgo]
     ),
     db.query(
       `SELECT label, SUM(borrowed_count) AS borrowed_count, SUM(returned_count) AS returned_count
        FROM (
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count FROM borrowings WHERE created_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE(created_at)
+         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count FROM borrowings WHERE created_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(returned_at, '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE(returned_at)
+         SELECT DATE_FORMAT(returned_at, '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(returned_at, '%Y-%m-%d')
        ) circulation GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT label, SUM(entry_exit_count) AS entry_exit_count, SUM(borrowing_count) AS borrowing_count
        FROM (
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS entry_exit_count, 0 AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'entry_exit' GROUP BY DATE(created_at)
+         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS entry_exit_count, 0 AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'entry_exit' GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, 0 AS entry_exit_count, COUNT(*) AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'borrowing' GROUP BY DATE(created_at)
+         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, 0 AS entry_exit_count, COUNT(*) AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'borrowing' GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
        ) attendance GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT label, SUM(created_count) AS created_count, SUM(fulfilled_count) AS fulfilled_count, SUM(cancelled_count) AS cancelled_count
        FROM (
-         SELECT DATE_FORMAT(reserved_at, '%Y-%m-%d') AS label, COUNT(*) AS created_count, 0 AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE reserved_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE(reserved_at)
+         SELECT DATE_FORMAT(reserved_at, '%Y-%m-%d') AS label, COUNT(*) AS created_count, 0 AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE reserved_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(reserved_at, '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(fulfilled_at, '%Y-%m-%d') AS label, 0 AS created_count, COUNT(*) AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE fulfilled_at IS NOT NULL AND fulfilled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE(fulfilled_at)
+         SELECT DATE_FORMAT(fulfilled_at, '%Y-%m-%d') AS label, 0 AS created_count, COUNT(*) AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE fulfilled_at IS NOT NULL AND fulfilled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(fulfilled_at, '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(cancelled_at, '%Y-%m-%d') AS label, 0 AS created_count, 0 AS fulfilled_count, COUNT(*) AS cancelled_count FROM reservations WHERE cancelled_at IS NOT NULL AND cancelled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE(cancelled_at)
+         SELECT DATE_FORMAT(cancelled_at, '%Y-%m-%d') AS label, 0 AS created_count, 0 AS fulfilled_count, COUNT(*) AS cancelled_count FROM reservations WHERE cancelled_at IS NOT NULL AND cancelled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(cancelled_at, '%Y-%m-%d')
        ) reservations_flow GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo, daysAgo]
     ),
