@@ -169,10 +169,14 @@ PORT=4000
 NODE_ENV=development
 
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=your_mysql_user
 DB_PASS=your_mysql_password
 DB_NAME=library
-DB_CONNECTION_LIMIT=76
+DB_CONNECTION_LIMIT=10
+# For Layerbase MariaDB, set DB_SSL=true. If using its pooled endpoint,
+# set DB_SSL_REJECT_UNAUTHORIZED=false; for its direct endpoint, leave it unset.
+# DB_CONNECT_TIMEOUT_MS=30000
 
 JWT_SECRET=replace_with_a_long_random_access_secret
 JWT_EXPIRES_IN=15m
