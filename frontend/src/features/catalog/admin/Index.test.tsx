@@ -63,14 +63,15 @@ describe("AI recommendation backfill dialog", () => {
   it("explains embedding failures and separates online lookup failures", async () => {
     vi.mocked(catalogApi.fetchBackfillProgress).mockResolvedValue({
       ...running(), status: "completed_with_errors", total: 3, completed: 3, embedded: 1, failed: 2, lookupFailed: 1, currentTitle: null,
-      errors: ["Atlas: Gemini embedding request failed (503)"],
+      errors: ["Atlas: Gemini embedding request failed (503)"], lookupErrors: ["Open Library: Metadata source failed (503); Google Books: fetch failed"],
     });
     await startBackfill();
 
     const dialog = await screen.findByRole("alertdialog");
     expect(await within(dialog).findByRole("heading", { name: "Backfill finished with errors" })).toBeInTheDocument();
     expect(within(dialog).getByText(/1 embeddings are ready and 2 could not be created/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/online details lookup failed for 1 book/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/online details lookup failed for 1 book/).closest("div")).toHaveClass("text-foreground");
+    expect(within(dialog).getByText(/Open Library: Metadata source failed \(503\); Google Books: fetch failed/)).toBeInTheDocument();
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Atlas: Gemini embedding request failed (503)");
   });
 

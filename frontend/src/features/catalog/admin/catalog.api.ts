@@ -84,7 +84,7 @@ export async function voidCopyAccession(copyId: number, payload: { reason: strin
   return (await axiosInstance.post<{ accessionNumber: string }>(`api/admin/copies/${copyId}/holding/void-accession`, payload)).data;
 }
 export type EmbeddingStatus = { total: number; ready: number; stale: number; failed: number; missing: number; errors?: Array<{ bookId: number; message: string }> };
-export type EmbeddingBackfillProgress = { status: "idle" | "running" | "completed" | "completed_with_errors"; total: number; completed: number; embedded: number; failed: number; lookupFailed: number; skipped: number; currentTitle: string | null; errors: string[]; alreadyRunning?: boolean };
+export type EmbeddingBackfillProgress = { status: "idle" | "running" | "completed" | "completed_with_errors"; total: number; completed: number; embedded: number; failed: number; lookupFailed: number; skipped: number; currentTitle: string | null; errors: string[]; lookupErrors?: string[]; alreadyRunning?: boolean };
 export async function fetchEmbeddingStatus(): Promise<EmbeddingStatus> { return (await axiosInstance.get<EmbeddingStatus>("api/admin/recommendations/embeddings/status")).data; }
 export async function backfillEmbeddings(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.post<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill")).data; }
 export async function fetchBackfillProgress(): Promise<EmbeddingBackfillProgress> { return (await axiosInstance.get<EmbeddingBackfillProgress>("api/admin/recommendations/embeddings/backfill/progress")).data; }

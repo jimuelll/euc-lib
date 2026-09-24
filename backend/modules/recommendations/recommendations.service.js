@@ -8,7 +8,9 @@ const THESIS_LIMIT = 5;
 const BOOK_RULE_LIMIT = 3;
 const BOOK_AI_LIMIT = BOOK_LIMIT - BOOK_RULE_LIMIT;
 const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
-let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [] };
+let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [], lookupErrors: [] };
+let openLibraryQueue = Promise.resolve();
+let openLibraryLastRequestAt = 0;
 
 const normalized = (value) => String(value || "").toLowerCase().trim();
 const parseEnrichment = (value) => {
@@ -279,7 +281,19 @@ const saveManualMetadata = async (bookId, payload = {}) => {
 
 const toText = (value) => typeof value === "string" ? value : (value?.value || value?.text || "");
 const unique = (values) => [...new Set(values.filter(Boolean).map((value) => String(value).trim()))];
-const fetchJson = async (url) => { const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(`Metadata source failed (${response.status})`); return response.json(); };
+const fetchJson = async (url, headers = {}) => { const response = await fetch(url, { headers: { Accept: "application/json", ...headers }, signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(`Metadata source failed (${response.status})`); return response.json(); };
+const fetchOpenLibraryJson = (url) => {
+  const request = openLibraryQueue.then(async () => {
+    const waitMs = Math.max(0, 1000 - (Date.now() - openLibraryLastRequestAt));
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    openLibraryLastRequestAt = Date.now();
+    const contact = String(process.env.OPEN_LIBRARY_CONTACT_EMAIL || "").replace(/[\r\n()]/g, "").trim();
+    const userAgent = `ECULibraryCatalogue/1.0${contact ? ` (${contact})` : ""}`;
+    return fetchJson(url, { "User-Agent": userAgent });
+  });
+  openLibraryQueue = request.then(() => undefined, () => undefined);
+  return request;
+};
 const enrichBook = async (bookId) => {
   const existing = await repository.findEnrichment(bookId);
   const savedEnrichment = parseEnrichment(existing?.enrichment_json);
@@ -287,28 +301,35 @@ const enrichBook = async (bookId) => {
   if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) return savedEnrichment;
   const book = await repository.findBookIsbn(bookId);
   if (!book?.isbn) return null;
-  try {
-    const open = await fetchJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(book.isbn)}&format=json&jscmd=data`);
-    const openRecord = open[`ISBN:${book.isbn}`] || {};
-    let googleRecord = {};
-    try {
-      const key = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${encodeURIComponent(process.env.GOOGLE_BOOKS_API_KEY)}` : "";
-      const google = await fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(book.isbn)}${key}`);
-      googleRecord = google.items?.[0]?.volumeInfo || {};
-    } catch { /* Open Library data remains useful when Google Books is unavailable. */ }
-    const enrichment = {
-      description: toText(googleRecord.description) || toText(openRecord.description),
-      subjects: unique([...(openRecord.subjects || []).map((item) => item.name || item), ...(googleRecord.categories || [])]),
-      categories: unique(googleRecord.categories || []), publisher: googleRecord.publisher || openRecord.publishers?.[0]?.name || "",
-      language: googleRecord.language || "", pageCount: googleRecord.pageCount || openRecord.number_of_pages || null,
-      publishedDate: googleRecord.publishedDate || openRecord.publish_date || "",
-    };
-    await repository.saveEnrichment(book.id, enrichment);
-    return enrichment;
-  } catch (error) {
-    await repository.markEnrichmentFailed(book.id, String(error.message || error).slice(0, 500));
-    return { __lookupFailed: true };
+  const isbn = encodeURIComponent(book.isbn);
+  const key = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${encodeURIComponent(process.env.GOOGLE_BOOKS_API_KEY)}` : "";
+  const [openResult, googleResult] = await Promise.allSettled([
+    fetchOpenLibraryJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`),
+    fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${key}`),
+  ]);
+  const errors = [];
+  let open = {};
+  let google = {};
+  if (openResult.status === "fulfilled") open = openResult.value;
+  else errors.push(`Open Library: ${String(openResult.reason?.message || openResult.reason)}`);
+  if (googleResult.status === "fulfilled") google = googleResult.value;
+  else errors.push(`Google Books: ${String(googleResult.reason?.message || googleResult.reason)}`);
+  const openRecord = open[`ISBN:${book.isbn}`] || {};
+  const googleRecord = google.items?.[0]?.volumeInfo || {};
+  const enrichment = {
+    description: toText(googleRecord.description) || toText(openRecord.description),
+    subjects: unique([...(Array.isArray(openRecord.subjects) ? openRecord.subjects : []).map((item) => item.name || item), ...(Array.isArray(googleRecord.categories) ? googleRecord.categories : [])]),
+    categories: unique(Array.isArray(googleRecord.categories) ? googleRecord.categories : []), publisher: googleRecord.publisher || openRecord.publishers?.[0]?.name || "",
+    language: googleRecord.language || "", pageCount: googleRecord.pageCount || openRecord.number_of_pages || null,
+    publishedDate: googleRecord.publishedDate || openRecord.publish_date || "",
+  };
+  if (!hasUsefulMetadata(enrichment) && errors.length) {
+    const lookupError = errors.join("; ").slice(0, 500);
+    await repository.markEnrichmentFailed(book.id, lookupError);
+    return { __lookupFailed: true, __lookupError: lookupError };
   }
+  await repository.saveEnrichment(book.id, enrichment);
+  return enrichment;
 };
 
 const embedBook = async (bookId) => {
@@ -355,7 +376,11 @@ const runBackfill = async (books) => {
     activeBackfill.currentTitle = book.title;
     try {
       const enrichment = await enrichBook(book.id);
-      if (enrichment?.__lookupFailed) activeBackfill.lookupFailed += 1;
+      if (enrichment?.__lookupFailed) {
+        activeBackfill.lookupFailed += 1;
+        const lookupError = publicMetadataError(enrichment.__lookupError);
+        if (lookupError && !activeBackfill.lookupErrors.includes(lookupError) && activeBackfill.lookupErrors.length < 4) activeBackfill.lookupErrors.push(lookupError);
+      }
       await embedBook(book.id);
       activeBackfill.embedded += 1;
     } catch (error) {
@@ -372,7 +397,7 @@ const runBackfill = async (books) => {
 const startBackfill = async () => {
   if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
   const books = await repository.findBooksForBackfill();
-  activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [] };
+  activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [], lookupErrors: [] };
   if (!books.length) { activeBackfill.status = "completed"; return { ...activeBackfill }; }
   setImmediate(() => runBackfill(books).catch((error) => {
     activeBackfill.status = "completed_with_errors";

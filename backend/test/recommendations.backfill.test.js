@@ -62,13 +62,58 @@ test("online metadata lookup failures are tracked separately from embedding fail
 
     const result = await service.enrichBook(124);
 
-    assert.deepEqual(result, { __lookupFailed: true });
-    assert.equal(savedFailure, "Metadata source failed (503)");
+    assert.deepEqual(result, {
+      __lookupFailed: true,
+      __lookupError: "Open Library: Metadata source failed (503); Google Books: Metadata source failed (503)",
+    });
+    assert.equal(savedFailure, "Open Library: Metadata source failed (503); Google Books: Metadata source failed (503)");
   } finally {
     repository.findEnrichment = originals.findEnrichment;
     repository.findBookIsbn = originals.findBookIsbn;
     repository.markEnrichmentFailed = originals.markEnrichmentFailed;
     global.fetch = originals.fetch;
+  }
+});
+
+test("Google Books can enrich a book when Open Library is unavailable", async () => {
+  const originals = {
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    saveEnrichment: repository.saveEnrichment,
+    fetch: global.fetch,
+    contact: process.env.OPEN_LIBRARY_CONTACT_EMAIL,
+  };
+  let savedMetadata = null;
+  let openLibraryUserAgent = "";
+  try {
+    repository.findEnrichment = async () => null;
+    repository.findBookIsbn = async () => ({ id: 126, isbn: "9781234567890" });
+    repository.saveEnrichment = async (_bookId, metadata) => { savedMetadata = metadata; };
+    process.env.OPEN_LIBRARY_CONTACT_EMAIL = "catalog@example.test";
+    global.fetch = async (url, options) => {
+      if (String(url).startsWith("https://openlibrary.org/")) {
+        openLibraryUserAgent = options.headers["User-Agent"];
+        return { ok: false, status: 503 };
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: [{ volumeInfo: { description: "A recovered summary", categories: ["History"], publisher: "Example Press" } }] }),
+      };
+    };
+
+    const result = await service.enrichBook(126);
+
+    assert.equal(result.description, "A recovered summary");
+    assert.deepEqual(result.categories, ["History"]);
+    assert.deepEqual(savedMetadata, result);
+    assert.match(openLibraryUserAgent, /^ECULibraryCatalogue\/1\.0 \(catalog@example\.test\)$/);
+  } finally {
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.saveEnrichment = originals.saveEnrichment;
+    global.fetch = originals.fetch;
+    if (originals.contact === undefined) delete process.env.OPEN_LIBRARY_CONTACT_EMAIL;
+    else process.env.OPEN_LIBRARY_CONTACT_EMAIL = originals.contact;
   }
 });
 
