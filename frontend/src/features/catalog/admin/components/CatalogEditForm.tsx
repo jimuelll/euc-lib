@@ -46,7 +46,7 @@ export default function CatalogEditForm({
           {materialType === "book" && (
             <div className="sm:col-span-2">
               <FormLabel required={!book.needs_policy}>Loan policy</FormLabel>
-              {book.needs_policy && <div role="status" className="mb-3 flex items-start gap-2 border border-warning/25 bg-warning/10 px-3 py-2.5 text-sm text-foreground"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" /><p>This book has no active loan policy, so it cannot be borrowed or reserved. Choose an active policy to restore lending.</p></div>}
+              {Boolean(book.needs_policy) && <div role="status" className="mb-3 flex items-start gap-2 border border-warning/25 bg-warning/10 px-3 py-2.5 text-sm text-foreground"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" /><p>This book has no active loan policy, so it cannot be borrowed or reserved. Choose an active policy to restore lending.</p></div>}
               <Select value={String(values.book_type_id ?? "")} onValueChange={(value) => onFieldChange("book_type_id", value)}>
                 <SelectTrigger aria-invalid={Boolean(errors.book_type_id)} aria-describedby={errors.book_type_id ? "edit-book-type-error" : undefined} className={errors.book_type_id ? "border-destructive" : undefined}>
                   <SelectValue placeholder="Select the loan and fine policy" />

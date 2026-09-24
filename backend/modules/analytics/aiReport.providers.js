@@ -140,3 +140,4 @@ async function generateReportText(evidence, question) {
   return text;
 }
 
+module.exports = { classifyAmbiguousQuestion, generateReportText };
