@@ -301,6 +301,21 @@ const metadataFromGoogleBooks = (isbn, record) => {
   };
 };
 
+const metadataFromOpenLibrarySearch = (isbn, record) => {
+  const pages = Number(record.number_of_pages_median);
+  const publishedDate = record.publish_year?.[0] || record.first_publish_year || "";
+  return {
+    isbn,
+    title: record.title || "",
+    author: Array.isArray(record.author_name) ? record.author_name.filter(Boolean).join(", ") : "",
+    copyright_year: String(publishedDate).match(/\d{4}/)?.[0] || "",
+    publisher: Array.isArray(record.publisher) ? record.publisher.find(Boolean) || "" : "",
+    publication_place: "",
+    physical_description: Number.isFinite(pages) && pages > 0 ? `${pages} pages` : "",
+    subjects: Array.isArray(record.subject) ? record.subject.filter(Boolean).slice(0, 10) : [],
+  };
+};
+
 const lookupIsbn = async (value) => {
   const isbn = validateIsbn(value);
   let openLibraryResponded = false;
@@ -312,7 +327,18 @@ const lookupIsbn = async (value) => {
       if (record) return metadataFromOpenLibrary(isbn, record);
     }
   } catch {
-    // Google Books below is the fallback for unavailable Open Library requests.
+    // The ISBN-search endpoint below is the fallback for unavailable Open Library requests.
+  }
+
+  try {
+    const response = await fetch(`https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}&fields=title,author_name,subject,publisher,number_of_pages_median,publish_year,first_publish_year&limit=1`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
+    openLibraryResponded ||= response.ok;
+    if (response.ok) {
+      const record = (await response.json()).docs?.[0];
+      if (record) return metadataFromOpenLibrarySearch(isbn, record);
+    }
+  } catch {
+    // Google Books below is the final fallback for unavailable Open Library requests.
   }
 
   try {
