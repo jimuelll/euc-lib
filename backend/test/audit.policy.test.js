@@ -89,6 +89,16 @@ test("batch audit entries summarize the affected record type and count", () => {
   assert.equal(snapshot.affected_record_count, 1);
 });
 
+test("body-less embedding backfill requests produce audit metadata safely", () => {
+  const path = "/api/admin/recommendations/embeddings/backfill";
+  const policy = audit.getAuditPolicy("POST", path);
+  const metadata = audit.metadataFor(path, undefined, null, null, { affectedCount: 3 }, false, policy, {});
+  assert.equal(metadata.affected_record_count, 3);
+  assert.equal(metadata.affected_record_type, "book embeddings");
+  assert.equal(metadata.detail_status, "affected_record_summary");
+  assert.doesNotThrow(() => audit.metadataFor(path, null, null, null, null, false, policy, {}));
+});
+
 test("audit values keep numeric one separate from boolean Yes", () => {
   const bookPolicy = audit.getAuditPolicy("PUT", "/api/admin/books/9");
   const bookMetadata = audit.metadataFor(

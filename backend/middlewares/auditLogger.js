@@ -512,6 +512,7 @@ function affectedRecordType(path) {
 }
 
 function metadataFor(path, body, before, after, details = null, isCreation = false, policy = null, capture = {}) {
+  body = body && typeof body === "object" ? body : {};
   let changes = capture.failed ? [] : (isCreation ? addedChanges(snapshotChanges(path, before, after, body)) : snapshotChanges(path, before, after, body));
   if (policy?.type === "state_transition" && !capture.comparable && !(details?.stateFrom !== undefined && details?.stateTo !== undefined)) changes = [];
   if (policy?.type === "field_changes" && (capture.failed || !capture.comparable && !isCreation)) changes = [];
