@@ -1,6 +1,7 @@
 const db = require("../../db");
 const { availableToBorrow, hasAccession, hasActiveBookPolicy } = require("./copyEligibility");
 const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
+const { buildPublicCatalogWhere, extractPublicSubjects, normalizePublicCatalogFilters, publicCatalogOrder } = require("./catalog.public-search");
 
 function getConnection() {
   return db.getConnection();
@@ -318,7 +319,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
       )
       : [[{ total: 0 }]];
     const [rows] = await db.query(
-      `SELECT bk.id, bk.title, bk.author, bk.isbn, bk.copies, bk.material_type, bk.metadata,
+      `SELECT bk.id, bk.title, bk.author, bk.isbn, bk.copies, bk.material_type, bk.metadata, bk.image_url,
               COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS total_copies,
               COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
               COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
@@ -358,6 +359,74 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
     baseParams
   );
   return { rows, total: 0, paged: false, page: safePage, limit: safeLimit };
+}
+
+async function searchPublicCatalogue(options = {}) {
+  const filters = normalizePublicCatalogFilters(options);
+  const showUnheldInOpac = options.showUnheldInOpac !== false;
+  const where = buildPublicCatalogWhere(filters, { showUnheldInOpac });
+  const facetWhere = buildPublicCatalogWhere(filters, { showUnheldInOpac, omitFacets: true });
+  const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where.clause}`, where.params);
+  const order = publicCatalogOrder(filters);
+  const orderParams = order.startsWith("CASE WHEN")
+    ? [filters.query, `%${filters.query}%`, `%${filters.query}%`, `%${filters.query}%`]
+    : [];
+  const [rows] = await db.query(
+    `SELECT bk.id, bk.title, bk.author, bk.isbn, bk.copies, bk.material_type, bk.metadata, bk.image_url,
+            COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS total_copies,
+            COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
+            COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
+            (COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > 0) AS canBorrow,
+            (bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) > 0) AS canReserve
+       FROM books bk
+       LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
+       LEFT JOIN copy_holdings ch ON ch.copy_id = bc.id
+       LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.deleted_at IS NULL AND br.status IN ('borrowed','overdue')
+       LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL AND (rr.expires_at IS NULL OR rr.expires_at > NOW())
+       ${where.clause}
+       GROUP BY bk.id
+       ORDER BY ${order}
+       LIMIT ? OFFSET ?`,
+    [...where.params, ...orderParams, filters.limit, (filters.page - 1) * filters.limit],
+  );
+
+  const [[formatRows], [subjectRows]] = await Promise.all([
+    db.query(
+      `SELECT bk.material_type, COUNT(*) AS total,
+              SUM(CASE WHEN bk.material_type = 'book' AND EXISTS (
+                SELECT 1 FROM book_copies facet_copy
+                 WHERE facet_copy.book_id = bk.id AND ${availableToBorrow("facet_copy")}
+              ) THEN 1 ELSE 0 END) AS available
+         FROM books bk ${facetWhere.clause} GROUP BY bk.material_type`,
+      facetWhere.params,
+    ),
+    db.query(`SELECT bk.metadata FROM books bk ${facetWhere.clause}`, facetWhere.params),
+  ]);
+  const format = { all: 0, book: 0, thesis: 0 };
+  const availability = { all: 0, available: 0, unavailable: 0 };
+  for (const row of formatRows) {
+    const count = Number(row.total);
+    const availableCount = Number(row.available);
+    format[row.material_type] = count;
+    format.all += count;
+    if (row.material_type === "book") {
+      availability.all += count;
+      availability.available += availableCount;
+      availability.unavailable += count - availableCount;
+    }
+  }
+  availability.all = format.all;
+
+  return {
+    rows,
+    pagination: {
+      page: filters.page,
+      limit: filters.limit,
+      total: Number(total),
+      totalPages: Math.max(1, Math.ceil(Number(total) / filters.limit)),
+    },
+    facets: { format, availability, subjects: extractPublicSubjects(subjectRows) },
+  };
 }
 
 async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", page = 1, limit = 25 } = {}) {
@@ -588,6 +657,7 @@ module.exports = {
   getBookCopies,
   getCopyByBarcode,
   searchBooks,
+  searchPublicCatalogue,
   searchBooksPage,
   createBookRecord,
   findBookForUpdate,

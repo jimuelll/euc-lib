@@ -32,6 +32,18 @@ export async function deleteBookType(id: number): Promise<DeleteBookTypeResult> 
 export async function lookupBookIsbn(isbn: string): Promise<IsbnMetadata> { return (await axiosInstance.get<IsbnMetadata>(`api/admin/books/isbn/${encodeURIComponent(isbn)}`)).data; }
 export async function createCatalogBook(values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.post<MessageResponse>("api/admin/books", values)).data; }
 export async function updateCatalogBook(id: number, values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.put<MessageResponse>(`api/admin/books/${id}`, values)).data; }
+export type CatalogBookImage = { image_url: string; image_public_id: string };
+export async function uploadCatalogBookImage(id: number, file: File, onProgress?: (progress: number) => void): Promise<CatalogBookImage> {
+  const formData = new FormData();
+  formData.append("image", file);
+  return (await axiosInstance.post<CatalogBookImage>(`api/admin/books/${id}/image`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (event) => { if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100)); },
+  })).data;
+}
+export async function removeCatalogBookImage(id: number): Promise<void> {
+  await axiosInstance.delete(`api/admin/books/${id}/image`);
+}
 export async function archiveCatalogBook(id: number): Promise<MessageResponse> { return (await axiosInstance.delete<MessageResponse>(`api/admin/books/${id}`)).data; }
 export async function restoreCatalogBook(id: number): Promise<MessageResponse> { return (await axiosInstance.post<MessageResponse>(`api/admin/books/${id}/restore`)).data; }
 export async function searchCatalogBooks(params: { query: string; materialType: "all" | "book" | "thesis"; page: number; status: "active" | "archived" | "all"; policyStatus?: "all" | "needs_policy" }): Promise<CatalogSearchResponse> {

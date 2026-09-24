@@ -3,8 +3,10 @@ const repository = require("./recommendations.repository");
 const { hydrateCatalogRecord, parseMetadata } = require("../catalog/catalog.projection");
 const catalogSettings = require("../catalog/catalog.settings.service");
 
-const BOOK_LIMIT = 5;
+const BOOK_LIMIT = 8;
 const THESIS_LIMIT = 5;
+const BOOK_RULE_LIMIT = 3;
+const BOOK_AI_LIMIT = BOOK_LIMIT - BOOK_RULE_LIMIT;
 const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 let activeBackfill = { status: "idle", total: 0, completed: 0, embedded: 0, failed: 0, skipped: 0, currentTitle: null, errors: [] };
 
@@ -62,14 +64,22 @@ const serialize = async (records) => {
     const hydrated = hydrateCatalogRecord(record, { publicKeys: fields });
     const isBook = record.material_type === "book";
     const hasActivePolicy = Boolean(record.has_active_policy);
+    const available = Number(record.available || 0);
+    const checkedOut = Number(record.checked_out || 0);
+    const reserved = Number(record.reserved_copies || 0);
+    const availabilityStatus = !isBook ? "reference_only"
+      : available > 0 ? "available"
+        : checkedOut > 0 ? "checked_out"
+          : reserved > 0 ? "reserved" : "unavailable";
     return {
       id: hydrated.id, title: hydrated.title, author: hydrated.author, isbn: hydrated.isbn,
+      image_url: hydrated.image_url ?? null,
       copies: hydrated.copies, material_type: hydrated.material_type, metadata: hydrated.metadata,
       ...hydrated.metadata,
       canBorrow: isBook && Number(record.available || 0) > 0,
       canReserve: isBook && hasActivePolicy && Number(record.total_copies || 0) > 0,
       needs_policy: isBook && !hasActivePolicy,
-      available: Number(record.available || 0), total_copies: Number(record.total_copies || 0),
+      available, total_copies: Number(record.total_copies || 0), availability_status: availabilityStatus,
       reason: record.reason, source: record.source,
     };
   });
@@ -114,15 +124,29 @@ const semanticMatches = async (seed, candidates, limit, excluded = new Set()) =>
     .filter((candidate) => candidate.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
 };
 
+const semanticMatchesForPage = (semantic, excluded, limit) => semantic
+  .filter((item) => !excluded.has(item.id))
+  .slice(0, limit);
+
+const selectBookRecommendations = (rankedRules, semantic) => {
+  const rules = rankedRules.slice(0, BOOK_RULE_LIMIT);
+  const selectedIds = new Set(rules.map((item) => item.id));
+  const ai = semanticMatchesForPage(semantic, selectedIds, BOOK_AI_LIMIT);
+  for (const item of ai) selectedIds.add(item.id);
+  const fill = rankedRules.slice(BOOK_RULE_LIMIT).filter((item) => !selectedIds.has(item.id));
+  return [...ai, ...rules, ...fill.slice(0, BOOK_LIMIT - rules.length - ai.length)];
+};
+
 const recommendationsForSeed = async (bookId) => {
   const seed = await repository.findBook(bookId);
   if (!seed) { const error = new Error("Catalogue record not found"); error.status = 404; throw error; }
   const candidates = await activeCandidates(seed.material_type, [seed.id]);
-  const ruleLimit = seed.material_type === "book" ? 3 : THESIS_LIMIT;
   const rules = candidates.map((candidate) => ({ ...candidate, score: ruleScore(seed, candidate), source: "rule", reason: ruleReason(seed, candidate) }))
-    .sort((a, b) => b.score - a.score || b.popularity - a.popularity).slice(0, ruleLimit);
-  const semantic = seed.material_type === "book" ? await semanticMatches(seed, candidates, 2, new Set(rules.map((item) => item.id))) : [];
-  return { material_type: seed.material_type, rows: await serialize([...rules, ...semantic]) };
+    .sort((a, b) => b.score - a.score || b.popularity - a.popularity);
+  const rows = seed.material_type === "book"
+    ? selectBookRecommendations(rules, await semanticMatches(seed, candidates, BOOK_AI_LIMIT, new Set(rules.slice(0, BOOK_RULE_LIMIT).map((item) => item.id))))
+    : rules.slice(0, THESIS_LIMIT);
+  return { material_type: seed.material_type, rows: await serialize(rows) };
 };
 
 const historySeeds = async (userId, materialType) => {
@@ -135,11 +159,12 @@ const personalized = async (userId, materialType) => {
   const dismissIds = await repository.findDismissedBookIds(userId);
   const candidates = await activeCandidates(materialType, [...seeds.map((seed) => seed.id), ...dismissIds]);
   const anchor = seeds[0];
-  const ruleLimit = materialType === "book" ? 3 : THESIS_LIMIT;
   const rules = candidates.map((candidate) => ({ ...candidate, score: seeds.reduce((total, seed, index) => total + ruleScore(seed, candidate) / (index + 1), 0), source: "rule", reason: `Based on your recent ${materialType === "book" ? "library activity" : "thesis activity"}` }))
-    .sort((a, b) => b.score - a.score).slice(0, ruleLimit);
-  const semantic = materialType === "book" ? await semanticMatches(anchor, candidates, 2, new Set(rules.map((item) => item.id))) : [];
-  const rows = await serialize([...rules, ...semantic].map((row) => ({ ...row, reason: row.source === "ai" ? "Similar to your recent reading" : row.reason })));
+    .sort((a, b) => b.score - a.score);
+  const selected = materialType === "book"
+    ? selectBookRecommendations(rules, await semanticMatches(anchor, candidates, BOOK_AI_LIMIT, new Set(rules.slice(0, BOOK_RULE_LIMIT).map((item) => item.id))))
+    : rules.slice(0, THESIS_LIMIT);
+  const rows = await serialize(selected.map((row) => ({ ...row, reason: row.source === "ai" ? "Similar to your recent reading" : row.reason })));
   return { material_type: materialType, rows, has_history: true };
 };
 

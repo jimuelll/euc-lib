@@ -150,6 +150,7 @@ mysql -u <user> -p <database> < db/migrations/2026-09-23-copy-holdings-and-catal
 mysql -u <user> -p <database> < db/migrations/2026-09-23-cross-system-invariants.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-24-accession-lifecycle.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-24-permanent-accession-voids.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-24-catalog-book-images.sql
 ```
 
 The fine-ledger migration must reconcile existing borrowing charges before the new backend is deployed. The accession migration backfills a permanent claim for each existing holding. The permanent-accession migration creates the append-only void registry and makes accession changes fail at the database level. After all migrations finish, take a second full backup and verify its restore includes `accession_claims`, `accession_claim_corrections`, `accession_claim_voids`, and the accession triggers. The release order is verified pre-migration backup, unapplied migrations, verified post-migration backup, backend, then frontend. Skip migrations already applied; do not rerun them. The accession migrations require permission to create triggers. Application snapshots are version 15 and include permanent accession claims and void events; full disaster-recovery backups must also include both registries and triggers.

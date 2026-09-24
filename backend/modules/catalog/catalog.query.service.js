@@ -23,6 +23,16 @@ const searchBooks = async (query, publicOnly = false, showArchived = false, mate
   return result.rows.map(hydrateCatalogRecord);
 };
 
+const searchPublicCatalogue = async (options = {}) => {
+  const settings = await catalogSettings.getCatalogSettings();
+  const result = await repository.searchPublicCatalogue({
+    ...options,
+    showUnheldInOpac: settings?.show_unheld_in_opac ?? true,
+  });
+  const publicFields = (await getSchema()).filter((field) => field.public);
+  return { ...result, rows: result.rows.map((row) => hydrateCatalogRecord(row, { publicFields })) };
+};
+
 const createBook = async (data, createdBy, actorId = null) => {
   const conn = await repository.getConnection();
   try {
@@ -287,4 +297,4 @@ const lookupIsbn = async (value) => {
   };
 };
 
-module.exports = { searchBooks, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };
+module.exports = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };

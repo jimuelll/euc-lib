@@ -1,5 +1,5 @@
 const db = require("../../db");
-const { activeLendableCopy, hasAccession, availableToBorrow, hasActiveBookPolicy } = require("../catalog/copyEligibility");
+const { activeLendableCopy, hasAccession, availableToBorrow, hasActiveLoan, hasPreparedReservation, hasActiveBookPolicy } = require("../catalog/copyEligibility");
 
 async function getPublicFieldKeys() {
   const [fields] = await db.query("SELECT `key` FROM catalog_schema WHERE `public` = 1 AND archived = 0");
@@ -18,6 +18,8 @@ async function findActiveCandidates(materialType, excludedIds = [], { showUnheld
     `SELECT bk.*, ${hasActiveBookPolicy("bk")} AS has_active_policy,
        COUNT(DISTINCT CASE WHEN ${activeLendableCopy("bc")} AND ${hasAccession("bc", "held")} THEN bc.id END) AS total_copies,
        COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
+       COUNT(DISTINCT CASE WHEN ${activeLendableCopy("bc")} AND ${hasAccession("bc", "loaned")} AND ${hasActiveLoan("bc")} THEN bc.id END) AS checked_out,
+       COUNT(DISTINCT CASE WHEN ${activeLendableCopy("bc")} AND ${hasAccession("bc", "reserved_copy")} AND ${hasPreparedReservation("bc")} THEN bc.id END) AS reserved_copies,
        COUNT(DISTINCT completed.id) AS popularity
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bc.deleted_at IS NULL

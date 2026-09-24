@@ -1,6 +1,7 @@
 const express    = require("express");
 const router     = express.Router();
 const controller = require("./catalog.controller");
+const { parseCatalogImage } = require("./catalog.image.middleware");
 const {
   requireSuperAdminRole,
   requireCatalogRole,
@@ -31,6 +32,8 @@ router.put   ("/catalog-schema", requireSuperAdminRole, validateSchemaPayload, c
 router.get   ("/books",          requireCatalogRole,                       controller.getBooks);
 router.get   ("/books/isbn/:isbn", requireCatalogRole, controller.lookupIsbn);
 router.post  ("/books",          requireCatalogRole, validateCreateBookPayload,           controller.createBook);
+router.post  ("/books/:id/image", requireCatalogRole, validateBookId, parseCatalogImage, controller.uploadBookImage);
+router.delete("/books/:id/image", requireCatalogRole, validateBookId, controller.removeBookImage);
 router.put   ("/books/:id",      requireCatalogRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireCatalogRole, validateBookId,        controller.deleteBook);
 

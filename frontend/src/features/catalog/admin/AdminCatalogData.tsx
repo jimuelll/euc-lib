@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import BookHoldingsEditor from "./components/BookHoldingsEditor";
+import CatalogImageEditor from "./components/CatalogImageEditor";
 import CatalogHoldingsView from "./components/CatalogHoldingsView";
 import CatalogLendingStatusCell from "./components/CatalogLendingStatusCell";
 import type { CatalogHolding } from "./catalog.api";
@@ -35,7 +36,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const [params, patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
   const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | null>(null);
-  const [sheetSection,  setSheetSection]  = useState<"details" | "copies" | "holdings">("details");
+  const [sheetSection,  setSheetSection]  = useState<"details" | "image" | "copies" | "holdings">("details");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [isbnLookup,    setIsbnLookup]    = useState(false);
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
@@ -224,11 +225,16 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     setSheetMode("edit");
     setSheetSection("details");
   };
+  const updateSelectedBookImage = (imageUrl: string | null, publicId: string | null) => {
+    const selectedId = selectedBook?.id;
+    setSelectedBook((current) => current ? { ...current, image_url: imageUrl, image_public_id: publicId } : current);
+    setSearchResults((current) => current.map((book) => book.id === selectedId ? { ...book, image_url: imageUrl, image_public_id: publicId } : book));
+  };
   const openCopies = (book: Book) => { selectBookForEdit(book); setSheetSection("copies"); };
   const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("holdings"); };
   const handleOpenHolding = (holding: CatalogHolding) => openHoldings({ id: holding.book_id, title: holding.title, author: holding.author ?? undefined, isbn: holding.isbn ?? undefined, material_type: "book", needs_policy: holding.needs_policy }, holding.copy_id);
   const openCreate = () => { setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
-  const changeSheetSection = async (section: "details" | "copies" | "holdings") => {
+  const changeSheetSection = async (section: "details" | "image" | "copies" | "holdings") => {
     if (sheetSection === "holdings" && section !== "holdings" && holdingGuardRef.current && !await holdingGuardRef.current()) return;
     setSheetSection(section);
   };
@@ -287,9 +293,10 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
             <SheetTitle className="text-primary-foreground">{sheetMode === "create" ? "Add catalogue record" : selectedBook?.title || "Catalogue record"}</SheetTitle>
             <SheetDescription className="text-primary-foreground/70">{sheetMode === "create" ? "Create a book or reference-only thesis using the configured catalogue fields." : `${selectedBook?.material_type === "thesis" ? "Thesis" : "Book"} record and operational details.`}</SheetDescription>
           </SheetHeader>
-          {sheetMode === "edit" && selectedBook?.material_type !== "thesis" ? <Tabs value={sheetSection} onValueChange={(value) => void changeSheetSection(value as "details" | "copies" | "holdings")} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 sm:px-5"><TabsList className="h-auto flex-wrap justify-start rounded-md bg-transparent p-0"><TabsTrigger value="details" className="rounded-sm px-3 py-2 text-xs">Details</TabsTrigger><TabsTrigger value="copies" className="rounded-sm px-3 py-2 text-xs">Copies</TabsTrigger><TabsTrigger value="holdings" className="rounded-sm px-3 py-2 text-xs">Holdings</TabsTrigger></TabsList></div>
+          {sheetMode === "edit" && selectedBook?.material_type !== "thesis" ? <Tabs value={sheetSection} onValueChange={(value) => void changeSheetSection(value as "details" | "image" | "copies" | "holdings")} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 sm:px-5"><TabsList className="h-auto flex-wrap justify-start rounded-md bg-transparent p-0"><TabsTrigger value="details" className="rounded-sm px-3 py-2 text-xs">Details</TabsTrigger><TabsTrigger value="image" className="rounded-sm px-3 py-2 text-xs">Image</TabsTrigger><TabsTrigger value="copies" className="rounded-sm px-3 py-2 text-xs">Copies</TabsTrigger><TabsTrigger value="holdings" className="rounded-sm px-3 py-2 text-xs">Holdings</TabsTrigger></TabsList></div>
             <TabsContent value="details" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /></TabsContent>
+            <TabsContent value="image" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage} /></TabsContent>
             <TabsContent value="copies" className="mt-0 flex min-h-0 overflow-hidden p-5"><BookCopiesModal embedded bookId={selectedBook.id} bookTitle={selectedBook.title} onClose={() => void requestClose()} /></TabsContent>
             <TabsContent value="holdings" className="mt-0 flex min-h-0 overflow-hidden"><BookHoldingsEditor key={`${selectedBook.id}-${initialHoldingCopyId ?? "first-missing"}`} bookId={selectedBook.id} bookTitle={selectedBook.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} onManageCopies={() => setSheetSection("copies")} isSuperAdmin={isSuperAdmin} /></TabsContent>
           </Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} onMaterialChange={(value) => { setMaterialType(value); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /> : null}</div>}

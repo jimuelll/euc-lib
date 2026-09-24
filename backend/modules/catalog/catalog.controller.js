@@ -65,6 +65,20 @@ const updateSchema = async (req, res) => {
 const getBooks = async (req, res) => {
   try {
     const query = String(req.query.query ?? "").trim();
+    if (req.publicCatalogue) {
+      return res.json(await service.searchPublicCatalogue({
+        query,
+        title: String(req.query.title ?? "").trim(),
+        author: String(req.query.author ?? "").trim(),
+        isbn: String(req.query.isbn ?? "").trim(),
+        format: String(req.query.format ?? req.query.materialType ?? "all"),
+        availability: String(req.query.availability ?? "all"),
+        subject: String(req.query.subject ?? ""),
+        sort: String(req.query.sort ?? "relevance"),
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 20,
+      }));
+    }
     if (!req.publicCatalogue && req.query.page !== undefined) {
       return res.json(await service.searchBooksPage({
         query,
@@ -153,6 +167,29 @@ const getBookCopies = async (req, res) => {
   } catch (err) {
     console.error("[catalog] getBookCopies:", err);
     res.status(500).json({ message: "Failed to fetch book copies" });
+  }
+};
+
+const uploadBookImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "Choose an image to upload" });
+    const result = await require("./catalog.image.service").uploadBookImage(Number(req.params.id), req.file, req.user?.id);
+    res.locals.auditEnqueued = true;
+    return res.json({ message: "Book image saved", ...result });
+  } catch (err) {
+    console.error("[catalog] uploadBookImage:", err);
+    return res.status(err.status ?? 500).json({ message: err.message ?? "Failed to upload book image" });
+  }
+};
+
+const removeBookImage = async (req, res) => {
+  try {
+    await require("./catalog.image.service").removeBookImage(Number(req.params.id), req.user?.id);
+    res.locals.auditEnqueued = true;
+    return res.json({ message: "Book image removed", image_url: null, image_public_id: null });
+  } catch (err) {
+    console.error("[catalog] removeBookImage:", err);
+    return res.status(err.status ?? 500).json({ message: err.message ?? "Failed to remove book image" });
   }
 };
 
@@ -286,6 +323,8 @@ module.exports = {
   lookupIsbn,
   createBook,
   updateBook,
+  uploadBookImage,
+  removeBookImage,
   deleteBook,
   getBookCopies,
   getBookHoldings,

@@ -32,6 +32,8 @@ export type Book = {
   deleted_at?: string | null;
   material_type?: "book" | "thesis";
   book_type_id?: number | string;
+  image_url?: string | null;
+  image_public_id?: string | null;
   needs_policy?: boolean | number;
   metadata?: Record<string, CatalogFormValue>;
   canBorrow?: boolean;

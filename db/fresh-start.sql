@@ -257,6 +257,8 @@ CREATE TABLE `books` (
   `title` varchar(255) NOT NULL,
   `material_type` enum('book','thesis') NOT NULL DEFAULT 'book',
   `metadata` json DEFAULT NULL,
+  `image_url` varchar(2048) DEFAULT NULL,
+  `image_public_id` varchar(255) DEFAULT NULL,
   `book_type_id` bigint(20) UNSIGNED DEFAULT NULL,
   `author` varchar(255) DEFAULT NULL,
   `isbn` varchar(20) DEFAULT NULL,

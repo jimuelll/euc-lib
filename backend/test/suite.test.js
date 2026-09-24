@@ -13,10 +13,14 @@ require("./backup.transforms.test");
 require("./borrowing.helpers.test");
 require("./borrowing.archive.test");
 require("./catalog.copy-lifecycle.test");
+require("./catalog.image.test");
+require("./catalog.public-search.test");
 require("./delivery.outbox.test");
 require("./holdings.accession.test");
 require("./policy.removal.test");
 require("./query.service.test");
+require("./recommendations.images.test");
+require("./recommendations.paging.test");
 require("./report.service.test");
 require("./reservation.visibility.test");
 

@@ -229,6 +229,7 @@ module.exports = {
   requireAdminRole,
   requireSuperAdminRole,
   requireCatalogRole,
+  requireCatalogRole,
   validateSchemaPayload,
   validateBookId,
   validateBarcode,
