@@ -287,10 +287,10 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
             <Select value={catalogStatus} onValueChange={(value: "active" | "archived" | "all") => { setCatalogStatus(value); setSelectedBook(null); }}><SelectTrigger className="h-11 rounded-md sm:w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="archived">Archived</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select>
             <Select value={policyStatus} onValueChange={(value: "all" | "needs_policy") => { setPolicyStatus(value); setSelectedBook(null); }}><SelectTrigger aria-label="Loan policy filter" className="h-11 rounded-md sm:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All loan policies</SelectItem><SelectItem value="needs_policy" disabled={catalogFilter === "thesis"}>Needs loan policy</SelectItem></SelectContent></Select>
           </div>
-          <div className="flex gap-2">
-            <Button className="h-11 rounded-md" variant="outline" disabled={loading} onClick={() => void handleSearchBooks()}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
-            <Button className="h-11 rounded-md" variant="outline" onClick={() => setViewMode("holdings")}><PanelsTopLeft className="mr-2 h-4 w-4" />View holdings</Button>
-            <Button className="h-11 rounded-md" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add record</Button>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+            <Button className="h-11 w-full rounded-md sm:w-auto" variant="outline" disabled={loading} onClick={() => void handleSearchBooks()}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
+            <Button className="h-11 w-full rounded-md sm:w-auto" variant="outline" onClick={() => setViewMode("holdings")}><PanelsTopLeft className="mr-2 h-4 w-4" />View holdings</Button>
+            <Button className="col-span-2 h-11 w-full rounded-md sm:col-span-1 sm:w-auto" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add record</Button>
           </div>
         </div>
 
