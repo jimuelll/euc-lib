@@ -134,7 +134,7 @@ For a brand new environment only, import the current baseline:
 mysql -u <user> -p <database> < db/fresh-start.sql
 ```
 
-`db/fresh-start.sql` drops and recreates application tables. Never run it against an existing database whose data must be preserved. A local demo dataset can be added after a fresh start with `db/realistic-demo-data.sql`; it creates permanent accession claims before holdings so seeded copies follow normal lending rules. Use demo data only in a non-production database.
+`db/fresh-start.sql` drops and recreates application tables. Never run it against an existing database whose data must be preserved. A local demo dataset can be added after a fresh start with `db/realistic-demo-data.sql`; it includes accessioned and unaccessioned copies, a voided accession, retired/lost/damaged copies, a book without a policy, an archived title, active and historical loans, and pending/ready reservations. It also seeds sample program/course acquisition details. Use demo data only in a non-production database.
 
 For an existing database, take and verify a full database backup before running any migration. This pre-migration backup must include the current schema, data, and triggers; an older database may not have the accession registry yet. Restore it to a disposable database and check that its application tables and a sample holding can be read. Keep the verified backup available until the release is complete.
 
@@ -156,7 +156,7 @@ The fine-ledger migration must reconcile existing borrowing charges before the n
 
 An accession number is permanently attached to its first physical copy. If staff entered the wrong number, a super admin can choose **Void mistaken accession** in the Holdings editor and enter a reason. Voiding never edits or removes the number or its claim, and the copy can no longer be borrowed. To use the correct number, staff add a new physical copy and assign it there; the voided number remains reserved forever. Voiding is blocked while the copy has an active loan or prepared reservation, or if it would leave pending reservations without enough eligible copies. Database triggers block direct accession edits and hard deletion of claimed copies and books, including a book delete that would cascade to copies and holdings. Application restores merge and retain claims and void events made after an older snapshot; if a claimed barcode is absent from that snapshot, its claim and void event remain reserved until the same physical copy is restored. Delivered and pending permanent-accession audit events are retained through application snapshot restores.
 
-The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata. A fresh `fresh-start.sql` followed by `realistic-demo-data.sql` creates permanent demo accession claims and holdings, fine accounts, and seeded charge entries as part of the demo data import.
+The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata. A fresh `fresh-start.sql` followed by `realistic-demo-data.sql` creates permanent demo accession claims and holdings, a lifecycle scenario set, fine accounts, and seeded charge entries as part of the demo data import.
 
 The connected copy/accession lifecycle review and state-by-state verification matrix are in [COPY-ACCESSION-LIFECYCLE-REVIEW.md](COPY-ACCESSION-LIFECYCLE-REVIEW.md).
 
@@ -172,7 +172,7 @@ DB_HOST=localhost
 DB_USER=your_mysql_user
 DB_PASS=your_mysql_password
 DB_NAME=library
-DB_CONNECTION_LIMIT=2
+DB_CONNECTION_LIMIT=76
 
 JWT_SECRET=replace_with_a_long_random_access_secret
 JWT_EXPIRES_IN=15m
