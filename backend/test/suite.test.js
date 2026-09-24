@@ -14,6 +14,7 @@ require("./borrowing.helpers.test");
 require("./borrowing.archive.test");
 require("./catalog.copy-lifecycle.test");
 require("./catalog.image.test");
+require("./catalog.isbn-lookup.test");
 require("./catalog.public-search.test");
 require("./delivery.outbox.test");
 require("./holdings.accession.test");
