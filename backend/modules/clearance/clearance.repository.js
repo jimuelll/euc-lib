@@ -40,6 +40,7 @@ async function findUserReservations(userId) {
     `SELECT r.id, r.status, r.reserved_at, r.expires_at, bk.title AS book_title
      FROM reservations r JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ? AND r.status IN ('pending', 'ready') AND r.deleted_at IS NULL
+       AND (r.expires_at IS NULL OR r.expires_at > NOW())
      ORDER BY r.reserved_at DESC`,
     [userId]
   );
@@ -83,7 +84,7 @@ async function findUserForPayment(studentEmployeeId, conn) {
 
 async function findBorrowingForAdjustment(borrowingId, conn) {
   const [[borrowing]] = await conn.query(
-    "SELECT id, user_id FROM borrowings WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
+    "SELECT id, user_id, deleted_at FROM borrowings WHERE id = ? FOR UPDATE",
     [borrowingId]
   );
   return borrowing || null;
@@ -121,6 +122,14 @@ async function findTransactionForReverse(transactionId, conn) {
     [transactionId]
   );
   return transaction || null;
+}
+
+async function lockUserForFineChange(userId, conn) {
+  const [[user]] = await conn.query(
+    "SELECT id, is_active, deleted_at FROM users WHERE id = ? FOR UPDATE",
+    [userId],
+  );
+  return user || null;
 }
 
 async function findExistingReversal(transactionId, conn) {
@@ -176,6 +185,7 @@ module.exports = {
   findBorrowingForAdjustment,
   createTransaction,
   findTransactionForReverse,
+  lockUserForFineChange,
   findExistingReversal,
   findTransactionItems,
   findReceipt,

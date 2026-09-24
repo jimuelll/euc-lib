@@ -30,7 +30,9 @@ const MyLibraryHistoryPanel = ({ data, historyLoading, historyPage, attendanceLo
                             key={`${item.kind}-${item.id}`}
                             title={item.title}
                             subtitle={item.author || "Unknown author"}
-                            meta={item.kind === "borrowing" ? `Returned ${formatDate(item.returned_at)}` : `${item.status[0].toUpperCase()}${item.status.slice(1)} | ${formatDate(item.reserved_at)}`}
+                            meta={item.kind === "borrowing"
+                              ? `Returned ${formatDate(item.returned_at)}${item.copy_barcode ? ` · Copy ${item.copy_barcode}` : item.copy_id ? ` · Copy ID ${item.copy_id}` : ""}${item.accession_number ? ` · Accession ${item.accession_number}` : ""}`
+                              : `${item.status[0].toUpperCase()}${item.status.slice(1)} | ${formatDate(item.reserved_at)}`}
                             badgeLabel={item.kind === "borrowing" ? "Borrowing" : "Reservation"}
                           />
                         ))}
@@ -75,5 +77,4 @@ const MyLibraryHistoryPanel = ({ data, historyLoading, historyPage, attendanceLo
 );
 
 export default MyLibraryHistoryPanel;
-
 

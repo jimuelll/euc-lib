@@ -8,14 +8,16 @@ const {
 } = require("./admin.service");
 const qr = require("qrcode");
 const repository = require("./admin.repository");
+const { bulkDeactivateStudentLikeUsers } = require("./admin.service");
 
 // CREATE
 async function handleCreateUser(req, res) {
   try {
-    const result = await createUser(req.body, req.user.role);
+    const result = await createUser(req.body, req.user.role, req.user.id);
+    res.locals.auditEnqueued = true;
     res.status(201).json(result);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(err.status ?? 400).json({ message: err.message, ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 }
 
@@ -24,9 +26,10 @@ async function handleDeleteUser(req, res) {
   try {
     const { student_employee_id } = req.params;
     const result = await deleteUser(student_employee_id, req.user.role, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(err.status ?? 400).json({ message: err.message, ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 }
 
@@ -34,10 +37,11 @@ async function handleDeleteUser(req, res) {
 async function handleRestoreUser(req, res) {
   try {
     const { student_employee_id } = req.params;
-    const result = await restoreUser(student_employee_id, req.user.role);
+    const result = await restoreUser(student_employee_id, req.user.role, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(err.status ?? 400).json({ message: err.message });
   }
 }
 
@@ -45,11 +49,20 @@ async function handleRestoreUser(req, res) {
 async function handleUpdateUser(req, res) {
   try {
     const { student_employee_id } = req.params;
-    const result = await updateUser(student_employee_id, req.body, req.user.role);
+    const result = await updateUser(student_employee_id, req.body, req.user.role, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(err.status ?? 400).json({ message: err.message, ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
+}
+
+async function handleBulkDeactivateStudentLikeUsers(req, res) {
+  try {
+    const result = await bulkDeactivateStudentLikeUsers(req.user.role, req.user.id);
+    res.locals.auditEnqueued = true;
+    res.json(result);
+  } catch (err) { res.status(err.status ?? 400).json({ message: err.message ?? "Bulk deactivation failed" }); }
 }
 
 // SEARCH
@@ -100,6 +113,7 @@ module.exports = {
   handleDeleteUser,
   handleRestoreUser,
   handleUpdateUser,
+  handleBulkDeactivateStudentLikeUsers,
   handleSearchUsers,
   handleQueryToolsSearch,
   handleGetBarcodePng,

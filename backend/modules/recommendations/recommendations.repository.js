@@ -1,22 +1,28 @@
 const db = require("../../db");
+const { activeLendableCopy, hasAccession, availableToBorrow, hasActiveBookPolicy } = require("../catalog/copyEligibility");
 
 async function getPublicFieldKeys() {
   const [fields] = await db.query("SELECT `key` FROM catalog_schema WHERE `public` = 1 AND archived = 0");
   return fields.map((field) => field.key);
 }
 
-async function findActiveCandidates(materialType, excludedIds = []) {
+async function findActiveCandidates(materialType, excludedIds = [], { showUnheldInOpac = true } = {}) {
   const exclusion = excludedIds.length ? " AND bk.id NOT IN (?)" : "";
+  const visibility = materialType !== "book" || showUnheldInOpac ? "" : ` AND EXISTS (
+    SELECT 1 FROM book_copies visible_bc
+    WHERE visible_bc.book_id = bk.id AND visible_bc.deleted_at IS NULL
+      AND visible_bc.is_active = 1 AND visible_bc.condition IN ('good','damaged')
+      AND ${hasAccession("visible_bc")}
+  )`;
   const [rows] = await db.query(
-    `SELECT bk.*, COUNT(DISTINCT bc.id) AS total_copies,
-       GREATEST(0, COUNT(DISTINCT bc.id) - COUNT(DISTINCT CASE WHEN br.status IN ('borrowed','overdue') OR rr.id IS NOT NULL THEN bc.id END)) AS available,
+    `SELECT bk.*, ${hasActiveBookPolicy("bk")} AS has_active_policy,
+       COUNT(DISTINCT CASE WHEN ${activeLendableCopy("bc")} AND ${hasAccession("bc", "held")} THEN bc.id END) AS total_copies,
+       COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
        COUNT(DISTINCT completed.id) AS popularity
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bc.deleted_at IS NULL
-     LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.status IN ('borrowed','overdue') AND br.deleted_at IS NULL
-     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL
      LEFT JOIN borrowings completed ON completed.book_id = bk.id AND completed.status = 'returned' AND completed.deleted_at IS NULL
-     WHERE bk.material_type = ? AND bk.deleted_at IS NULL${exclusion}
+     WHERE bk.material_type = ? AND bk.deleted_at IS NULL${visibility}${exclusion}
      GROUP BY bk.id`,
     [materialType, ...(excludedIds.length ? [excludedIds] : [])]
   );

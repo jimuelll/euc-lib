@@ -126,36 +126,39 @@ Repeatable fields store a list of text entries, so staff can add or remove indiv
 
 ## Local setup
 
-### 1. Create the database
+### 1. Create or migrate the database
 
-Select the target database, then import the current baseline:
+For a brand new environment only, import the current baseline:
 
 ```powershell
 mysql -u <user> -p <database> < db/fresh-start.sql
 ```
 
-`db/fresh-start.sql` drops and recreates the application tables in the selected database. It is safe to retry after a partial import, but it is destructive and must not be used against data that needs to be preserved.
+`db/fresh-start.sql` drops and recreates application tables. Never run it against an existing database whose data must be preserved. A local demo dataset can be added after a fresh start with `db/realistic-demo-data.sql`; it creates permanent accession claims before holdings so seeded copies follow normal lending rules. Use demo data only in a non-production database.
 
-For a local demo dataset, run this after the baseline import:
+For an existing database, take and verify a full database backup before running any migration. This pre-migration backup must include the current schema, data, and triggers; an older database may not have the accession registry yet. Restore it to a disposable database and check that its application tables and a sample holding can be read. Keep the verified backup available until the release is complete.
 
-```powershell
-mysql -u <user> -p <database> < db/realistic-demo-data.sql
-```
-
-The demo script documents its own test accounts and password. Use demo data only in a non-production database.
-
-If the database already exists, do not rerun the destructive baseline. Apply the additive migrations in date order:
+Then apply each unapplied migration below, in this order. Run each file once with the MySQL or MariaDB command-line client; the accession migration defines triggers and uses the client's `DELIMITER` command.
 
 ```powershell
 mysql -u <user> -p <database> < db/migrations/2026-09-09-add-user-guide.sql
-mysql -u <user> -p <database> < db/migrations/2026-09-19-role-specific-user-accounts.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-18-index-refresh-session-revocations.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-19-default-book-catalog-schema.sql
 mysql -u <user> -p <database> < db/migrations/2026-09-19-fine-ledger-and-loan-duration.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-19-role-specific-user-accounts.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-23-copy-holdings-and-catalog-visibility.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-23-cross-system-invariants.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-24-accession-lifecycle.sql
+mysql -u <user> -p <database> < db/migrations/2026-09-24-permanent-accession-voids.sql
 ```
 
-The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata.
+The fine-ledger migration must reconcile existing borrowing charges before the new backend is deployed. The accession migration backfills a permanent claim for each existing holding. The permanent-accession migration creates the append-only void registry and makes accession changes fail at the database level. After all migrations finish, take a second full backup and verify its restore includes `accession_claims`, `accession_claim_corrections`, `accession_claim_voids`, and the accession triggers. The release order is verified pre-migration backup, unapplied migrations, verified post-migration backup, backend, then frontend. Skip migrations already applied; do not rerun them. The accession migrations require permission to create triggers. Application snapshots are version 15 and include permanent accession claims and void events; full disaster-recovery backups must also include both registries and triggers.
 
-The fine-ledger migration is for databases that already contain borrowing history; make sure existing borrowings have been reconciled into the fine ledger before deploying the new server. A fresh `fresh-start.sql` followed by `realistic-demo-data.sql` creates the fine accounts and seeded charge entries as part of the test data import.
+An accession number is permanently attached to its first physical copy. If staff entered the wrong number, a super admin can choose **Void mistaken accession** in the Holdings editor and enter a reason. Voiding never edits or removes the number or its claim, and the copy can no longer be borrowed. To use the correct number, staff add a new physical copy and assign it there; the voided number remains reserved forever. Voiding is blocked while the copy has an active loan or prepared reservation, or if it would leave pending reservations without enough eligible copies. Database triggers block direct accession edits and hard deletion of claimed copies and books, including a book delete that would cascade to copies and holdings. Application restores merge and retain claims and void events made after an older snapshot; if a claimed barcode is absent from that snapshot, its claim and void event remain reserved until the same physical copy is restored. Delivered and pending permanent-accession audit events are retained through application snapshot restores.
+
+The application adds the initial guide modules on first use. Editors can then change them without future application starts overwriting their content. The role-specific migration creates Departments, adds the account-profile fields, and backfills primary identifiers from legacy IDs. The catalogue migration adds the repeatable field type, changes Publication Year to Copyright Year, and installs the current book defaults without deleting existing metadata. A fresh `fresh-start.sql` followed by `realistic-demo-data.sql` creates permanent demo accession claims and holdings, fine accounts, and seeded charge entries as part of the demo data import.
+
+The connected copy/accession lifecycle review and state-by-state verification matrix are in [COPY-ACCESSION-LIFECYCLE-REVIEW.md](COPY-ACCESSION-LIFECYCLE-REVIEW.md).
 
 ### 2. Configure the backend
 
@@ -308,9 +311,10 @@ Before deploying:
 - Never commit `backend/.env` or `frontend/.env`.
 - Use separate high-entropy values for `JWT_SECRET` and `JWT_REFRESH_SECRET` in every environment.
 - Keep Cloudinary upload presets narrowly scoped; browser uploads use the unsigned preset configured in the frontend.
-- Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing. Snapshot format version 10 includes Department records and upgrades older snapshots by adding an empty Departments list and mapping legacy user IDs to the new role-specific identifiers.
+- Snapshot restore replaces application data. Restrict it to trusted `super_admin` users and verify the automatically created recovery snapshot before continuing. Snapshot format version 15 includes the delivery outbox, permanent accession claims, and accession void events, upgrades older loans to the honest `Unknown historical policy` label, and retains later claims and void events when restoring an older snapshot.
 - AI analytics reports send aggregate evidence only. The backend rejects questions that request individual visitor or patron identities.
-- Treat `db/fresh-start.sql` as a reset script, not a migration. Additive SQL files in `db/migrations/` must currently be applied manually because there is no migration runner.
+- Apply existing-database migrations only after verifying a full backup, then deploy backend code and frontend code in that order. The single migration sequence and fresh-start rule are in “Create or migrate the database” above.
+- Holiday records are kept restorable when removed. Saved due dates do not identify which holiday extended them, so the system cannot prove that a holiday was unused and does not hard-delete it.
 
 ## Project notes
 

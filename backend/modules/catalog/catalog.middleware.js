@@ -144,9 +144,6 @@ const validateBookPayload = async (req, { requireCoreFields = false, requireAtLe
         throw createValidationError(`Field "${field.label}" is required`, 400, field.key);
       }
     }
-    if (materialType === "book" && (!Number.isInteger(Number(current.book_type_id)) || Number(current.book_type_id) < 1)) {
-      throw createValidationError("Book type is required", 400, "book_type_id");
-    }
   }
 };
 
@@ -213,6 +210,13 @@ const validateBarcode = (req, res, next) => {
   next();
 };
 
+const validateBookTypeId = (req, res, next) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: "Invalid book type ID" });
+  req.params.id = id;
+  next();
+};
+
 const validateCreateBookPayload = validate(async (req) => {
   await validateBookPayload(req, { requireCoreFields: true });
 });
@@ -228,6 +232,7 @@ module.exports = {
   validateSchemaPayload,
   validateBookId,
   validateBarcode,
+  validateBookTypeId,
   validateCreateBookPayload,
   validateUpdateBookPayload,
 };

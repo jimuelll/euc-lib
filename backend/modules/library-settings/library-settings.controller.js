@@ -4,7 +4,7 @@ const getLibrarySettings = async (req, res) => {
   try {
     const [settings, holidays] = await Promise.all([
       service.getSettings(),
-      service.listHolidays(),
+      service.listHolidays({ status: req.query?.holidays === "all" ? "all" : req.query?.holidays === "archived" ? "archived" : "active" }),
     ]);
 
     res.json({ settings, holidays });
@@ -21,6 +21,7 @@ const updateLibrarySettings = async (req, res) => {
       req.user?.id
     );
 
+    res.locals.auditEnqueued = true;
     res.json({ message: "Library settings updated successfully", settings });
   } catch (error) {
     console.error("[library-settings] updateLibrarySettings:", error);
@@ -39,6 +40,7 @@ const createHoliday = async (req, res) => {
       req.user?.id
     );
 
+    res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Holiday added successfully", holiday });
   } catch (error) {
     console.error("[library-settings] createHoliday:", error);
@@ -59,6 +61,7 @@ const updateHoliday = async (req, res) => {
       req.user?.id
     );
 
+    res.locals.auditEnqueued = true;
     res.json({ message: "Holiday updated successfully", holiday });
   } catch (error) {
     console.error("[library-settings] updateHoliday:", error);
@@ -69,17 +72,29 @@ const updateHoliday = async (req, res) => {
 const deleteHoliday = async (req, res) => {
   try {
     const holidayId = Number.parseInt(req.params.holidayId, 10);
-    await service.deleteHoliday(holidayId, req.user?.id);
-    res.json({ message: "Holiday removed successfully" });
+    const result = await service.deleteHoliday(holidayId, req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ ...result, message: "Holiday archived. Its saved due dates remain unchanged." });
   } catch (error) {
     console.error("[library-settings] deleteHoliday:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove holiday" });
   }
 };
 
+const restoreHoliday = async (req, res) => {
+  try {
+    const result = await service.restoreHoliday(Number.parseInt(req.params.holidayId, 10), req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ ...result, message: "Holiday restored" });
+  } catch (error) {
+    res.status(error.status ?? 500).json({ message: error.message ?? "Failed to restore holiday" });
+  }
+};
+
 const listAcademicPrograms = async (req, res) => {
   try {
-    const programs = await service.listAcademicPrograms();
+    const status = ["active", "archived", "all"].includes(req.query?.status) ? req.query.status : "active";
+    const programs = await service.listAcademicPrograms({ status });
     res.json({ programs });
   } catch (error) {
     console.error("[library-settings] listAcademicPrograms:", error);
@@ -90,6 +105,7 @@ const listAcademicPrograms = async (req, res) => {
 const createAcademicProgram = async (req, res) => {
   try {
     const program = await service.createAcademicProgram({ name: req.body?.name }, req.user?.id);
+    res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Program / course added", program });
   } catch (error) {
     console.error("[library-settings] createAcademicProgram:", error);
@@ -100,6 +116,7 @@ const createAcademicProgram = async (req, res) => {
 const updateAcademicProgram = async (req, res) => {
   try {
     const program = await service.updateAcademicProgram(Number.parseInt(req.params.programId, 10), { name: req.body?.name }, req.user?.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Program / course updated", program });
   } catch (error) {
     console.error("[library-settings] updateAcademicProgram:", error);
@@ -109,23 +126,36 @@ const updateAcademicProgram = async (req, res) => {
 
 const deleteAcademicProgram = async (req, res) => {
   try {
-    await service.deleteAcademicProgram(Number.parseInt(req.params.programId, 10), req.user?.id);
-    res.json({ message: "Program / course removed" });
+    const result = await service.deleteAcademicProgram(Number.parseInt(req.params.programId, 10), req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.locals.auditDetails = { affectedCount: result.reference_count, action: result.action };
+    res.json({ ...result, message: result.action === "deleted" ? "Unused program / course permanently deleted" : "Program / course archived because records still reference it" });
   } catch (error) {
     console.error("[library-settings] deleteAcademicProgram:", error);
     res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove program / course" });
   }
 };
 
-const listDepartments = async (_req, res) => { try { res.json({ departments: await service.listDepartments() }); } catch { res.status(500).json({ message: "Failed to fetch departments" }); } };
-const createDepartment = async (req, res) => { try { const department = await service.createDepartment({ name: req.body?.name }, req.user?.id); res.status(201).json({ message: "Department added", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add department" }); } };
-const updateDepartment = async (req, res) => { try { const department = await service.updateDepartment(Number.parseInt(req.params.departmentId, 10), { name: req.body?.name }, req.user?.id); res.json({ message: "Department updated", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update department" }); } };
-const deleteDepartment = async (req, res) => { try { await service.deleteDepartment(Number.parseInt(req.params.departmentId, 10), req.user?.id); res.json({ message: "Department removed" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove department" }); } };
+const restoreAcademicProgram = async (req, res) => {
+  try {
+    const result = await service.restoreAcademicProgram(Number.parseInt(req.params.programId, 10), req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ ...result, message: "Program / course restored" });
+  } catch (error) {
+    res.status(error.status ?? 500).json({ message: error.message ?? "Failed to restore program / course" });
+  }
+};
+
+const listDepartments = async (req, res) => { try { const status = ["active", "archived", "all"].includes(req.query?.status) ? req.query.status : "active"; res.json({ departments: await service.listDepartments({ status }) }); } catch { res.status(500).json({ message: "Failed to fetch departments" }); } };
+const createDepartment = async (req, res) => { try { const department = await service.createDepartment({ name: req.body?.name }, req.user?.id); res.locals.auditEnqueued = true; res.status(201).json({ message: "Department added", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add department" }); } };
+const updateDepartment = async (req, res) => { try { const department = await service.updateDepartment(Number.parseInt(req.params.departmentId, 10), { name: req.body?.name }, req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Department updated", department }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update department" }); } };
+const deleteDepartment = async (req, res) => { try { const result = await service.deleteDepartment(Number.parseInt(req.params.departmentId, 10), req.user?.id); res.locals.auditEnqueued = true; res.json({ ...result, message: result.action === "deleted" ? "Unused department permanently deleted" : "Department archived because employee records still reference it" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to remove department" }); } };
+const restoreDepartment = async (req, res) => { try { const result = await service.restoreDepartment(Number.parseInt(req.params.departmentId, 10), req.user?.id); res.locals.auditEnqueued = true; res.json({ ...result, message: "Department restored" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to restore department" }); } };
 const listAcademicTerms = async (_req, res) => { try { res.json({ terms: await service.listAcademicTerms() }); } catch (error) { res.status(500).json({ message: "Failed to fetch academic terms" }); } };
-const createAcademicTerm = async (req, res) => { try { const term = await service.createAcademicTerm({ name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.status(201).json({ message: "Academic term added", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add academic term" }); } };
-const updateAcademicTerm = async (req, res) => { try { const term = await service.updateAcademicTerm(Number.parseInt(req.params.termId, 10), { name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.json({ message: "Academic term updated", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
-const deleteAcademicTerm = async (req, res) => { try { await service.deleteAcademicTerm(Number.parseInt(req.params.termId, 10)); res.json({ message: "Academic term deleted" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to delete academic term" }); } };
-const setCurrentAcademicTerm = async (req, res) => { try { await service.setCurrentAcademicTerm(Number.parseInt(req.params.termId, 10), req.user?.id); res.json({ message: "Current academic term updated" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
+const createAcademicTerm = async (req, res) => { try { const term = await service.createAcademicTerm({ name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.locals.auditEnqueued = true; res.status(201).json({ message: "Academic term added", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add academic term" }); } };
+const updateAcademicTerm = async (req, res) => { try { const term = await service.updateAcademicTerm(Number.parseInt(req.params.termId, 10), { name: req.body?.name, startsOn: req.body?.starts_on, endsOn: req.body?.ends_on, isCurrent: Boolean(req.body?.is_current) }, req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Academic term updated", term }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
+const deleteAcademicTerm = async (req, res) => { try { await service.deleteAcademicTerm(Number.parseInt(req.params.termId, 10), req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Academic term deleted" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to delete academic term" }); } };
+const setCurrentAcademicTerm = async (req, res) => { try { await service.setCurrentAcademicTerm(Number.parseInt(req.params.termId, 10), req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Current academic term updated" }); } catch (error) { res.status(error.status ?? 500).json({ message: error.message ?? "Failed to update academic term" }); } };
 
 module.exports = {
   getLibrarySettings,
@@ -133,14 +163,17 @@ module.exports = {
   createHoliday,
   updateHoliday,
   deleteHoliday,
+  restoreHoliday,
   listAcademicPrograms,
   createAcademicProgram,
   updateAcademicProgram,
   deleteAcademicProgram,
+  restoreAcademicProgram,
   listDepartments,
   createDepartment,
   updateDepartment,
   deleteDepartment,
+  restoreDepartment,
   listAcademicTerms,
   createAcademicTerm,
   updateAcademicTerm,

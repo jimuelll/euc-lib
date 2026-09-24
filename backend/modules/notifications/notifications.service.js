@@ -1,4 +1,5 @@
 const repository = require("./notifications.repository");
+const outboxRepository = require("../delivery-outbox/outbox.repository");
 const hub = require("../../realtime/notificationHub");
 
 const DEFAULT_LIMIT = 20;
@@ -74,14 +75,24 @@ const createNotification = async ({
   sourceType = null,
   sourceId = null,
   replaceExisting = false,
+  deliveryKey = null,
 }) => {
-  const existingNotification = replaceExisting
+  const deliveredNotification = deliveryKey ? await repository.findNotificationByDeliveryKey(deliveryKey) : null;
+  const existingNotification = deliveredNotification ?? (replaceExisting
     ? await repository.findExistingNotification({ type, audienceType, audienceUserId, audienceRole, sourceType, sourceId })
-    : null;
+    : null);
 
   let notificationId = existingNotification?.id ?? null;
+  let shouldPush = !deliveredNotification;
   if (notificationId) {
-    await repository.updateNotification({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId });
+    if (!deliveredNotification) await repository.updateNotification({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey });
+  } else if (deliveryKey) {
+    const created = await repository.createNotificationWithDeliveryKey({
+      type, title, body, href, audienceType, audienceUserId, audienceRole,
+      expiresAt, createdBy, sourceType, sourceId, deliveryKey,
+    });
+    notificationId = created.id;
+    shouldPush = created.created;
   } else {
     notificationId = await repository.createNotification({
       type, title, body, href, audienceType, audienceUserId, audienceRole,
@@ -108,15 +119,25 @@ const createNotification = async ({
     is_read: false,
   };
 
-  if (audienceType === "user" && audienceUserId) {
-    const unreadCount = await getUnreadCountForUser({ userId: audienceUserId, role: await repository.getUserRole(audienceUserId) });
-    hub.pushNotification(audienceUserId, { type: "notification.created", notification: baseNotification, unreadCount });
-  } else {
-    hub.pushAudienceChanged({ audienceType, audienceRole });
+  if (shouldPush) {
+    try {
+      if (audienceType === "user" && audienceUserId) {
+        const unreadCount = await getUnreadCountForUser({ userId: audienceUserId, role: await repository.getUserRole(audienceUserId) });
+        hub.pushNotification(audienceUserId, { type: "notification.created", notification: baseNotification, unreadCount });
+      } else {
+        hub.pushAudienceChanged({ audienceType, audienceRole });
+      }
+    } catch (error) {
+      // Notification rows are committed first; realtime delivery is an
+      // optimization and must never make a saved notification look failed.
+      console.error("[notifications] Saved notification but realtime delivery failed:", error.message);
+    }
   }
 
   return baseNotification;
 };
+
+const enqueueNotification = (conn, payload) => outboxRepository.enqueue("notification", payload, conn);
 
 const listAdminNotifications = async ({ page = 1, limit = DEFAULT_LIMIT } = {}) => {
   const safeLimit = Math.min(Math.max(Number(limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
@@ -153,6 +174,7 @@ module.exports = {
   markAsRead,
   markAllAsRead,
   createNotification,
+  enqueueNotification,
   listAdminNotifications,
   getAdminStats,
 };

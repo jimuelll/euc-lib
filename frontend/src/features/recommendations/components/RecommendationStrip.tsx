@@ -4,7 +4,7 @@ import { BookMarked, BrainCircuit, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { dismissRecommendation, fetchRecommendations } from "../api";
 
-export type Recommendation = { id: number; title: string; author?: string | null; material_type: "book" | "thesis"; available?: number; reason: string; source: "rule" | "ai" };
+export type Recommendation = { id: number; title: string; author?: string | null; material_type: "book" | "thesis"; available?: number; needs_policy?: boolean; reason: string; source: "rule" | "ai" };
 export function RecommendationStrip({ materialType, seedBookId, personal = false, title }: { materialType: "book" | "thesis"; seedBookId?: number | null; personal?: boolean; title?: string }) {
   const [rows, setRows] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(Boolean(seedBookId || personal));
@@ -40,7 +40,7 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
         {personal ? <button type="button" onClick={() => void dismiss(book.id)} aria-label={`Not interested in ${book.title}`} className="absolute right-2 top-2 rounded-sm p-1 text-muted-foreground/50 opacity-100 transition-colors hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button> : null}
         <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="block pr-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           {book.source === "ai" ? <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-primary-foreground" title="Selected through Gemini semantic similarity"><Sparkles className="h-3 w-3 text-warning" aria-hidden="true" />AI semantic match</span> : null}
-          <p className="line-clamp-2 text-[13px] font-bold leading-5 text-foreground group-hover:text-primary" style={{ fontFamily: "var(--font-heading)" }}>{book.title}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{book.author || "Unknown author"}</p><p className="mt-3 min-h-8 text-[10px] leading-4 text-muted-foreground">{book.reason}</p><p className={`mt-2 text-[10px] font-bold uppercase tracking-[0.1em] ${book.material_type === "thesis" ? "text-warning" : book.available ? "text-success" : "text-muted-foreground"}`}>{book.material_type === "thesis" ? "Reference only" : book.available ? "Available" : "Checked out"}</p>
+          <p className="line-clamp-2 text-[13px] font-bold leading-5 text-foreground group-hover:text-primary" style={{ fontFamily: "var(--font-heading)" }}>{book.title}</p><p className="mt-1 truncate text-[11px] text-muted-foreground">{book.author || "Unknown author"}</p><p className="mt-3 min-h-8 text-[10px] leading-4 text-muted-foreground">{book.reason}</p><p className={`mt-2 text-[10px] font-bold uppercase tracking-[0.1em] ${book.material_type === "thesis" ? "text-warning" : book.available ? "text-success" : "text-muted-foreground"}`}>{book.material_type === "thesis" ? "Reference only" : book.needs_policy ? "Unavailable" : book.available ? "Available" : "Checked out"}</p>
         </Link>
       </article>)}
     </div>}

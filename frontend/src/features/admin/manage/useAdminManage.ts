@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
-import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
+import { archiveUser, bulkDeactivateStudentLikeUsers, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department, type BulkDeactivateResult } from "./api";
 
 export type { AcademicProgram, AcademicTerm, Department } from "./api";
 
@@ -46,6 +46,9 @@ interface UseAdminManageReturn {
   handleUpdateUser:  () => Promise<boolean>;
   handleArchiveUser: () => Promise<boolean>;
   handleRestoreUser: () => Promise<boolean>;
+  canBulkDeactivate: boolean;
+  bulkOutcome: BulkDeactivateResult | null;
+  handleBulkDeactivate: () => Promise<boolean>;
   confirmDialog: JSX.Element;
 
   // QR
@@ -75,6 +78,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
+  const [bulkOutcome, setBulkOutcome] = useState<BulkDeactivateResult | null>(null);
   const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
@@ -259,6 +263,27 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
   };
 
+  const handleBulkDeactivate = async () => {
+    const shouldProceed = await confirm({
+      title: "Bulk deactivate student-like accounts?",
+      description: "Eligible students, employees, and alumni will be archived. Accounts with active loans, active reservations, or unpaid fines will be skipped with reasons.",
+      actionLabel: "Deactivate eligible accounts",
+      tone: "danger",
+    });
+    if (!shouldProceed) return false;
+    setLoading(true);
+    try {
+      const result = await bulkDeactivateStudentLikeUsers();
+      setBulkOutcome(result);
+      toast.success(result.message);
+      await handleSearchUsers();
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Bulk deactivation failed");
+      return false;
+    } finally { setLoading(false); }
+  };
+
   return {
     form,
     setField,
@@ -287,6 +312,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
+    canBulkDeactivate: user?.role === "admin" || user?.role === "super_admin",
+    bulkOutcome,
+    handleBulkDeactivate,
     confirmDialog,
     qrTarget,
     setQrTarget,

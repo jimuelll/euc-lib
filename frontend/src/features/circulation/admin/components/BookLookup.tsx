@@ -23,8 +23,27 @@ const BookLookup = ({
 }: Props) => {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [results, setResults] = useState<{ id: number; title: string; author?: string; material_type?: string }[]>([]);
-  const [copies, setCopies] = useState<{ id: number; barcode: string; is_active: number; status?: string }[]>([]);
+  const [copies, setCopies] = useState<{ id: number; barcode: string; accession_number?: string | null; accession_voided?: boolean | number; borrow_eligible?: boolean | number; needs_policy?: boolean | number; is_active: number; status?: string }[]>([]);
   const [searching, setSearching] = useState(false);
+  const borrowEligibility = foundCopy
+    ? !foundCopy.is_active
+      ? { label: "Inactive copy · unavailable for checkout", eligible: false }
+      : foundCopy.accession_voided
+        ? { label: "Accession voided · unavailable for checkout", eligible: false }
+        : foundCopy.needs_policy
+        ? { label: "Needs loan policy", eligible: false }
+        : !foundCopy.accession_number
+          ? { label: "Needs accession number", eligible: false }
+          : foundCopy.condition === "lost"
+            ? { label: "Lost copy · unavailable for checkout", eligible: false }
+            : foundCopy.has_active_loan
+              ? { label: "Currently borrowed", eligible: false }
+              : foundCopy.is_reserved
+                ? { label: "Prepared for a reservation", eligible: false }
+            : foundCopy.borrow_eligible === false || foundCopy.borrow_eligible === 0
+              ? { label: "Not eligible for checkout", eligible: false }
+              : { label: "Eligible for checkout", eligible: true }
+    : null;
 
   useEffect(() => {
     const query = catalogQuery.trim();
@@ -44,7 +63,7 @@ const BookLookup = ({
     setResults([]); setCopies([]); setSearching(true);
     try {
       const data = await fetchCirculationBookCopies(book.id);
-      setCopies(data.filter((copy) => copy.is_active && copy.status !== "borrowed"));
+      setCopies(data.filter((copy) => copy.is_active && (type === "return" ? copy.status === "borrowed" : copy.status !== "borrowed")));
     } finally { setSearching(false); }
   };
 
@@ -55,7 +74,7 @@ const BookLookup = ({
       className="block text-sm font-medium text-muted-foreground"
       style={{ fontFamily: "var(--font-heading)" }}
     >
-      Book Copy QR Code
+      Accession number or copy QR code
     </label>
 
     <BarcodeInput
@@ -64,7 +83,7 @@ const BookLookup = ({
       onSubmit={onLookup}
       loading={lookingUp}
       disabled={disabled}
-      placeholder="Scan book QR code or type barcode"
+      placeholder="Type an accession number or scan a copy QR code"
     />
 
     <div className="border-t border-border/70 pt-3">
@@ -75,7 +94,7 @@ const BookLookup = ({
         {searching && <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />}
       </div>
       {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-xs  text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
-      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="font-mono text-xs text-foreground">{copy.barcode}</span><span className="text-xs font-bold  text-success">Available copy</span></button>)}</div>}
+      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => { const eligibility = copy.status === "borrowed" ? "Borrowed copy" : copy.status === "reserved" ? "Reserved copy" : copy.accession_voided ? "Accession voided" : copy.needs_policy ? "Needs loan policy" : !copy.accession_number ? "Needs accession" : copy.borrow_eligible === false || copy.borrow_eligible === 0 ? "Not lendable" : "Available copy"; return <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="min-w-0"><span className="block font-mono text-xs text-foreground">{copy.barcode}</span><span className="mt-1 block text-xs text-muted-foreground">{copy.accession_number ? `Accession ${copy.accession_number}` : "No accession number"}</span></span><span className={`shrink-0 text-xs font-bold ${eligibility.includes("Borrowed") ? "text-info" : eligibility === "Available copy" ? "text-success" : "text-warning"}`}>{eligibility}</span></button>; })}</div>}
     </div>
 
     {/* Found copy card */}
@@ -101,6 +120,7 @@ const BookLookup = ({
             </div>
             <div className="min-w-0 text-left sm:shrink-0 sm:text-right">
               <p className="break-all font-mono text-xs text-muted-foreground">{foundCopy.barcode}</p>
+              <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{foundCopy.accession_number ? `Accession ${foundCopy.accession_number}` : "No accession number"}</p>
               <p className={`mt-0.5 text-xs font-bold  ${
                 foundCopy.is_active ? "text-success" : "text-destructive"
               }`} style={{ fontFamily: "var(--font-heading)" }}>
@@ -131,12 +151,12 @@ const BookLookup = ({
             )
           )}
 
-          {type === "borrow" && !foundCopy.is_active && (
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-xs font-medium">
-                This copy is not available for borrowing
-              </span>
+          {type === "borrow" && borrowEligibility && (
+            <div className={`flex items-center gap-2 ${borrowEligibility.eligible ? "text-success" : "text-warning"}`}>
+              {borrowEligibility.eligible
+                ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              <span className="text-xs font-medium">{borrowEligibility.label}</span>
             </div>
           )}
         </div>

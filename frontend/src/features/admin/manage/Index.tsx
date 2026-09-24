@@ -30,6 +30,9 @@ const AdminManage = () => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
+    canBulkDeactivate,
+    bulkOutcome,
+    handleBulkDeactivate,
     confirmDialog,
     qrTarget,
     setQrTarget,
@@ -66,6 +69,9 @@ const AdminManage = () => {
         onUpdateUser={handleUpdateUser}
         onArchiveUser={handleArchiveUser}
         onRestoreUser={handleRestoreUser}
+        canBulkDeactivate={canBulkDeactivate}
+        bulkOutcome={bulkOutcome}
+        onBulkDeactivate={handleBulkDeactivate}
         qrTarget={qrTarget}
         onSetQrTarget={setQrTarget}
       />

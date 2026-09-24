@@ -8,6 +8,7 @@ export interface CatalogBook {
   isbn?: string;
   location?: string;
   copies: number;
+  registered_copies?: number;
   available: number;
   material_type?: "book" | "thesis";
   canReserve?: boolean;

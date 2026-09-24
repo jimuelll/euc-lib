@@ -3,7 +3,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 export type QueryColumn = { key: string; label: string; type: "text" | "date" | "dateTime" | "number" };
 export type QueryRow = Record<string, string | number | null>;
 export type QueryDataset = "catalog" | "users" | "borrowings" | "reservations" | "attendance" | "notifications" | "subscriptions" | "clearance";
-export type QueryReport = "fined" | "daily_users" | "date_due" | "top_users" | "daily_stats" | "resource_usage";
+export type QueryReport = "fined" | "daily_users" | "date_due" | "top_users" | "daily_stats" | "resource_usage" | "holdings_inventory";
 export type QueryFilters = Record<string, string | number | undefined> & { dataset: QueryDataset; page?: number; limit?: number };
 export type QueryResult = { dataset: QueryDataset; label: string; columns: QueryColumn[]; rows: QueryRow[]; pagination?: { page: number; limit: number; total: number; totalPages: number }; summary?: { overduePatrons: number; unpaidFinePatrons: number; overdueItems: number; outstandingAmount: number }; filters: Record<string, string> };
 export type QueryMeta = { datasets: { value: QueryDataset; label: string; filters: string[] }[]; bookTypes: { id: number; name: string }[]; categories: { value: string }[]; programs: { id: number; name: string }[]; issuers: { id: number; name: string }[]; subscriptionCategories: { value: string }[]; roles: string[] };

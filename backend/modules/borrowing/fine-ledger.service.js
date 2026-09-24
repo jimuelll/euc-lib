@@ -58,6 +58,42 @@ async function balancesForBorrowings(borrowingIds, conn = db) {
   }]));
 }
 
+async function lockBalancesForBorrowings(borrowingIds, conn) {
+  const ids = [...new Set((borrowingIds || []).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (!ids.length) return new Map();
+  const inClause = ids.map(() => "?").join(",");
+  await conn.query(`SELECT borrowing_id FROM fine_accounts WHERE borrowing_id IN (${inClause}) FOR UPDATE`, ids);
+  const [entries] = await conn.query(
+    `SELECT borrowing_id, amount FROM fine_ledger_entries
+      WHERE borrowing_id IN (${inClause}) ORDER BY borrowing_id, id FOR UPDATE`,
+    ids,
+  );
+  const balances = new Map(ids.map((id) => [id, 0]));
+  for (const entry of entries) {
+    const id = Number(entry.borrowing_id);
+    balances.set(id, roundCurrency((balances.get(id) || 0) + Number(entry.amount)));
+  }
+  return balances;
+}
+
+async function assertNoOutstandingFines(borrowingIds, conn, subject = "These records") {
+  const summary = await getOutstandingFineSummary(borrowingIds, conn);
+  if (summary.affectedLoans === 0) return summary;
+  throw Object.assign(
+    new Error(`${subject} have PHP ${summary.outstandingAmount.toFixed(2)} outstanding across ${summary.affectedLoans} borrowing${summary.affectedLoans === 1 ? "" : "s"}. Record payment or adjust the fine before archiving.`),
+    { status: 409, outstandingAmount: summary.outstandingAmount, affectedLoans: summary.affectedLoans },
+  );
+}
+
+async function getOutstandingFineSummary(borrowingIds, conn) {
+  const balances = await lockBalancesForBorrowings(borrowingIds, conn);
+  const outstanding = [...balances.entries()].filter(([, amount]) => amount > 0.005);
+  return {
+    outstandingAmount: roundCurrency(outstanding.reduce((total, [, balance]) => total + balance, 0)),
+    affectedLoans: outstanding.length,
+  };
+}
+
 async function postTransactionItem({ borrowingId, itemId, kind, amount, at = new Date() }, conn) {
   if (!["payment", "adjustment", "reversal"].includes(kind)) throw new Error("Invalid fine transaction kind");
   // Clearance allocations are positive for a payment/adjustment and negative
@@ -69,4 +105,4 @@ async function postTransactionItem({ borrowingId, itemId, kind, amount, at = new
   );
 }
 
-module.exports = { assessBorrowing, beginRenewalCycle, balancesForBorrowings, postTransactionItem };
+module.exports = { assessBorrowing, beginRenewalCycle, balancesForBorrowings, lockBalancesForBorrowings, getOutstandingFineSummary, assertNoOutstandingFines, postTransactionItem };

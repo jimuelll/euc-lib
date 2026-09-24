@@ -160,7 +160,8 @@ const Catalogue = () => {
           {!loading && books.length > 0 && (
             <div className="border-l border-border">
               {books.map((book, index) => {
-                const isReferenceOnly = book.material_type === "thesis" || book.canBorrow === false;
+                const isReferenceOnly = book.material_type === "thesis";
+                const unavailable = !isReferenceOnly && book.canReserve === false;
                 const availability = isReferenceOnly ? null : getAvailabilityLabel(book.available);
                 return (
                   <Fragment key={book.id}>
@@ -220,11 +221,11 @@ const Catalogue = () => {
                           className="text-xs font-bold uppercase tracking-[0.15em]"
                           style={{ fontFamily: "var(--font-heading)", color: availability.available ? "hsl(var(--success))" : "hsl(var(--destructive))" }}
                         >
-                          {availability.available ? "Available" : "Checked Out"}
+                          {availability.available ? "Available" : unavailable ? "Unavailable" : "Checked Out"}
                         </span>
                         {book.copies !== undefined && (
                           <span className="text-xs tracking-wide text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>
-                            {book.available ?? 0} of {book.copies} cop{book.copies === 1 ? "y" : "ies"} available
+                            {book.available ?? 0} of {book.registered_copies ?? 0} accessioned cop{book.registered_copies === 1 ? "y" : "ies"} available
                           </span>
                         )}
                       </div>

@@ -24,3 +24,9 @@ export const createUser = async (form: UserFormState) => (await axiosInstance.po
 export const updateUser = async (studentId: string, form: UserFormState) => (await axiosInstance.put<{ message: string }>(`/api/admin/users/${studentId}`, userPayload(form))).data;
 export const archiveUser = async (studentId: string) => (await axiosInstance.delete<{ message?: string }>(`/api/admin/users/${studentId}`)).data;
 export const restoreUser = async (studentId: string) => (await axiosInstance.patch<{ message?: string }>(`/api/admin/users/${studentId}/restore`)).data;
+export type BulkDeactivateResult = {
+  message: string; deactivated_count: number; skipped_count: number;
+  skipped_reason_counts: { active_loans: number; active_reservations: number; unpaid_fines: number };
+  skipped_users: Array<{ student_employee_id: string; role: string; active_loan_count: number; active_reservation_count: number; unpaid_fine_amount: number; unpaid_fine_loan_count: number; reasons: string[] }>;
+};
+export const bulkDeactivateStudentLikeUsers = async (): Promise<BulkDeactivateResult> => (await axiosInstance.post<BulkDeactivateResult>("/api/admin/users/bulk-deactivate-student-like")).data;

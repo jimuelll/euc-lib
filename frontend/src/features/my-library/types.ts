@@ -43,7 +43,9 @@ export interface BorrowHistoryItem {
   returned_at: string | null;
   due_date: string;
   status: "returned";
+  copy_id: number | null;
   copy_barcode: string | null;
+  accession_number: string | null;
 }
 
 export interface ActiveReservation {
@@ -84,6 +86,9 @@ export interface MyLibraryHistoryItem {
   borrowed_at: string | null;
   returned_at: string | null;
   reserved_at: string | null;
+  copy_id?: number | null;
+  copy_barcode?: string | null;
+  accession_number?: string | null;
 }
 
 export interface MyLibraryPage<T> {

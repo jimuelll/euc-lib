@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { QrTarget, User, UserFormState } from "./AdminManage.types";
 import type { AcademicProgram, AcademicTerm, Department } from "./useAdminManage";
+import type { BulkDeactivateResult } from "./api";
 import { CreateForm, EditForm, QrModal, SearchBar, SearchResultsTable } from "./components/AdminManage.components";
 
 interface AdminManageBuilderProps {
@@ -37,6 +38,9 @@ interface AdminManageBuilderProps {
   onUpdateUser: () => Promise<boolean>;
   onArchiveUser: () => Promise<boolean>;
   onRestoreUser: () => Promise<boolean>;
+  canBulkDeactivate: boolean;
+  bulkOutcome: BulkDeactivateResult | null;
+  onBulkDeactivate: () => Promise<boolean>;
   qrTarget: QrTarget | null;
   onSetQrTarget: (v: QrTarget | null) => void;
 }
@@ -47,6 +51,7 @@ const AdminManageBuilder = ({
   onRoleFilterChange, statusFilter, onStatusFilterChange, searchResults,
   userPagination, onSearch, showArchived, onArchivedViewChange, selectedUser,
   onSelectUser, onCreateUser, onUpdateUser, onArchiveUser, onRestoreUser,
+  canBulkDeactivate, bulkOutcome, onBulkDeactivate,
   qrTarget, onSetQrTarget,
 }: AdminManageBuilderProps) => {
   const [sheetMode, setSheetMode] = useState<"create" | "edit" | null>(null);
@@ -80,7 +85,14 @@ const AdminManageBuilder = ({
             onChange={onSearchQueryChange} onRoleFilterChange={onRoleFilterChange}
             onStatusFilterChange={onStatusFilterChange} onSearch={onSearch}
             onArchivedViewChange={async (archived) => { if (await confirmDiscard()) { setSheetMode(null); onResetForm(); onArchivedViewChange(archived); } }} onCreate={openCreate}
+            canBulkDeactivate={canBulkDeactivate} onBulkDeactivate={onBulkDeactivate}
           />
+
+          {bulkOutcome && <div role="status" className="border border-border bg-muted/15 px-4 py-3 text-sm">
+            <p className="font-medium text-foreground">Bulk deactivation result</p>
+            <p className="mt-1 text-muted-foreground">{bulkOutcome.message}</p>
+            {bulkOutcome.skipped_users.length > 0 && <ul className="mt-2 space-y-1 text-muted-foreground">{bulkOutcome.skipped_users.map((account) => <li key={account.student_employee_id} className="break-words"><span className="font-medium text-foreground">{account.student_employee_id}</span>: {account.reasons.map((reason) => reason.replace(/_/g, " ")).join(", ")}{account.active_loan_count ? ` · ${account.active_loan_count} active loan${account.active_loan_count === 1 ? "" : "s"}` : ""}{account.active_reservation_count ? ` · ${account.active_reservation_count} active reservation${account.active_reservation_count === 1 ? "" : "s"}` : ""}{account.unpaid_fine_amount ? ` · PHP ${Number(account.unpaid_fine_amount).toFixed(2)} unpaid` : ""}</li>)}</ul>}
+          </div>}
 
           {showArchived ? (
             <div className="flex items-center gap-2 border border-warning/20 bg-warning/5 px-4 py-3 text-sm text-foreground">

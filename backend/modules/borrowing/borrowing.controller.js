@@ -51,8 +51,9 @@ const borrowBook = async (req, res) => {
       req.user.id,
       bookId,
       req.user.id,
-      { isCopyBarcode: false, ipAddress: req.ip }
+      { isCopyBarcode: false, ipAddress: req.ip, auditRoute: `/api/borrowing/borrows/${bookId}` }
     );
+    res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book borrowed successfully", ...result });
   } catch (err) {
     console.error("[borrowing] borrowBook:", err);
@@ -67,6 +68,7 @@ const returnBook = async (req, res) => {
       return res.status(400).json({ message: "Invalid borrowing ID" });
     }
     await service.returnBook(borrowingId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully" });
   } catch (err) {
     console.error("[borrowing] returnBook:", err);
@@ -105,8 +107,9 @@ const scanBorrow = async (req, res) => {
       patron.id,
       copyBarcode.trim(),
       req.user.id,
-      { isCopyBarcode: true, ipAddress: req.ip, reservationId: parsedReservationId }
+      { isCopyBarcode: true, ipAddress: req.ip, reservationId: parsedReservationId, auditRoute: "/api/borrowing/scan/borrow" }
     );
+    res.locals.auditEnqueued = true;
 
     res.status(201).json({
       message: "Book borrowed successfully",
@@ -136,7 +139,8 @@ const scanReturn = async (req, res) => {
       return res.status(404).json({ message: "No active borrowing found for this copy" });
     }
 
-    await service.returnBook(row.id, row.user_id);
+    await service.returnBook(row.id, row.user_id, { auditRoute: "/api/borrowing/scan/return", actorId: req.user.id });
+    res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully", borrowingId: row.id });
   } catch (err) {
     console.error("[borrowing] scanReturn:", err);
@@ -209,10 +213,11 @@ const adminDeleteBorrowing = async (req, res) => {
       return res.status(400).json({ message: "Invalid borrowing ID" });
     }
     await service.adminDeleteBorrowing(borrowingId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Borrowing record archived successfully" });
   } catch (err) {
     console.error("[borrowing] adminDeleteBorrowing:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to archive borrowing" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to archive borrowing", ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 };
 
@@ -222,7 +227,8 @@ const adminRestoreBorrowing = async (req, res) => {
     if (isNaN(borrowingId) || borrowingId < 1) {
       return res.status(400).json({ message: "Invalid borrowing ID" });
     }
-    await service.adminRestoreBorrowing(borrowingId);
+    await service.adminRestoreBorrowing(borrowingId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Borrowing record restored successfully" });
   } catch (err) {
     console.error("[borrowing] adminRestoreBorrowing:", err);

@@ -1,5 +1,4 @@
 const service = require("./adminReservation.service");
-const notificationsService = require("../notifications/notifications.service");
 
 const getAdminReservations = async (req, res) => {
   try {
@@ -25,18 +24,8 @@ const markReservationReady = async (req, res) => {
     if (isNaN(reservationId) || reservationId < 1) {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
-    const target = await service.markReservationReady(reservationId);
-    if (target) {
-      await notificationsService.createNotification({
-        type: "reservation_ready",
-        title: "Reservation ready for pickup",
-        body: `${target.title} is now ready for pickup at the library front desk.`,
-        href: "/services/borrowing",
-        audienceType: "user",
-        audienceUserId: target.user_id,
-        createdBy: req.user.id,
-      });
-    }
+    await service.markReservationReady(reservationId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Reservation marked as ready" });
   } catch (err) {
     console.error("[admin/reservations] markReservationReady:", err);
@@ -56,18 +45,8 @@ const cancelReservationAdmin = async (req, res) => {
     if (isNaN(reservationId) || reservationId < 1) {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
-    const target = await service.cancelReservationAdmin(reservationId);
-    if (target) {
-      await notificationsService.createNotification({
-        type: "reservation_cancelled",
-        title: "Reservation rejected",
-        body: `Your reservation for ${target.title} was rejected by the library staff.`,
-        href: "/services/borrowing",
-        audienceType: "user",
-        audienceUserId: target.user_id,
-        createdBy: req.user.id,
-      });
-    }
+    await service.cancelReservationAdmin(reservationId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Reservation cancelled" });
   } catch (err) {
     console.error("[admin/reservations] cancelReservationAdmin:", err);
@@ -83,6 +62,7 @@ const deleteReservationAdmin = async (req, res) => {
     }
 
     await service.archiveReservation(reservationId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Reservation archived successfully" });
   } catch (err) {
     console.error("[admin/reservations] deleteReservationAdmin:", err);
@@ -96,7 +76,8 @@ const restoreReservationAdmin = async (req, res) => {
     if (isNaN(reservationId) || reservationId < 1) {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
-    await service.restoreReservation(reservationId);
+    await service.restoreReservation(reservationId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Reservation restored successfully" });
   } catch (err) {
     console.error("[admin/reservations] restoreReservationAdmin:", err);

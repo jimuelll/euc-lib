@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminPage } from "@/features/admin";
 
 export interface DashboardStats {
-  total_books: number; total_book_copies: number; available_book_copies: number; borrowed_book_copies: number;
+  total_books: number; total_book_copies: number; active_accessioned_copies: number; needs_accession_copies: number; available_book_copies: number; borrowed_book_copies: number;
   damaged_book_copies: number; lost_book_copies: number; active_users: number; total_users: number;
   active_borrowings: number; overdue_borrowings: number; borrowings_today: number; returns_today: number;
   active_reservations: number; ready_reservations: number; reservations_today: number; fulfilled_reservations_today: number;
@@ -38,7 +38,7 @@ export interface DashboardResponse {
 }
 
 const emptyStats = Object.fromEntries([
-  "total_books", "total_book_copies", "available_book_copies", "borrowed_book_copies", "damaged_book_copies", "lost_book_copies",
+  "total_books", "total_book_copies", "active_accessioned_copies", "needs_accession_copies", "available_book_copies", "borrowed_book_copies", "damaged_book_copies", "lost_book_copies",
   "active_users", "total_users", "active_borrowings", "overdue_borrowings", "borrowings_today", "returns_today", "active_reservations",
   "ready_reservations", "reservations_today", "fulfilled_reservations_today", "attendance_today", "borrowing_attendance_today",
   "entry_exit_attendance_today", "unique_visitors_today", "visit_hits_today", "total_unique_visitors", "total_visit_hits",
@@ -182,7 +182,7 @@ const AdminAnalytics = () => {
       <TabsContent value="collection" className="mt-0 space-y-5"><SectionIntro title="Collection performance" description="Inventory composition, condition, and who the collection is serving." /><div className="grid gap-5 xl:grid-cols-2">
         <AnalyticsPanel title="Catalog by category" description="Titles and physical copies"><ChartContainer className="h-[310px] w-full" config={{ titles: { label: "Titles", color: "#8f0000" }, copies: { label: "Copies", color: "#b45309" } }}><BarChart data={data.charts.catalogByCategory} layout="vertical" margin={{ left: 12, right: 8 }}><CartesianGrid horizontal={false} /><XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} /><YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={100} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="titles" fill="var(--color-titles)" radius={[0, 2, 2, 0]} /><Bar dataKey="copies" fill="var(--color-copies)" radius={[0, 2, 2, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
         <AnalyticsPanel title="Physical copy condition"><div className="grid items-center gap-5 sm:grid-cols-[1fr_0.8fr]"><ChartContainer className="mx-auto h-[260px] w-full max-w-[300px]" config={{ value: { label: "Copies", color: "#8f0000" } }}><PieChart><ChartTooltip content={<ChartTooltipContent />} /><Pie data={data.charts.copyCondition} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2}>{data.charts.copyCondition.map((item, index) => <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />)}</Pie></PieChart></ChartContainer><DistributionList items={data.charts.copyCondition} /></div></AnalyticsPanel>
-      </div><div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AnalyticsPanel title="Borrowing demand by role"><DistributionList items={data.charts.borrowingByRole} /></AnalyticsPanel><AnalyticsPanel title="Collection snapshot"><div className="divide-y divide-border/70"><SnapshotRow label="Catalog titles" value={data.stats.total_books} /><SnapshotRow label="Active copies" value={data.stats.total_book_copies} /><SnapshotRow label="Available" value={data.stats.available_book_copies} /><SnapshotRow label="Damaged" value={data.stats.damaged_book_copies} /><SnapshotRow label="Lost" value={data.stats.lost_book_copies} /></div></AnalyticsPanel></div></TabsContent>
+      </div><div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AnalyticsPanel title="Borrowing demand by role"><DistributionList items={data.charts.borrowingByRole} /></AnalyticsPanel><AnalyticsPanel title="Collection snapshot"><div className="divide-y divide-border/70"><SnapshotRow label="Catalog titles" value={data.stats.total_books} /><SnapshotRow label="Active physical copies" value={data.stats.total_book_copies} /><SnapshotRow label="Active accessioned" value={data.stats.active_accessioned_copies} /><SnapshotRow label="Needs accession" value={data.stats.needs_accession_copies} /><SnapshotRow label="Available to borrow" value={data.stats.available_book_copies} /><SnapshotRow label="Damaged" value={data.stats.damaged_book_copies} /><SnapshotRow label="Lost" value={data.stats.lost_book_copies} /></div></AnalyticsPanel></div></TabsContent>
 
       <TabsContent value="ai-report" className="mt-0 space-y-5">
         <section className="overflow-hidden border border-primary/30 bg-card">

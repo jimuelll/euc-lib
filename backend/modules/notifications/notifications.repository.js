@@ -98,15 +98,20 @@ const findExistingNotification = async ({
   return row ?? null;
 };
 
-const updateNotification = async ({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId }) => {
+const updateNotification = async ({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey = null }) => {
   await db.query(
     `UPDATE notifications
         SET title = ?, body = ?, href = ?, expires_at = ?, created_by = ?,
-            source_type = ?, source_id = ?, is_active = 1, created_at = NOW()
+            source_type = ?, source_id = ?, delivery_key = COALESCE(?, delivery_key), is_active = 1, created_at = NOW()
       WHERE id = ?`,
-    [title, body, href, expiresAt, createdBy, sourceType, sourceId, notificationId],
+    [title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey, notificationId],
   );
   await db.query("DELETE FROM notification_reads WHERE notification_id = ?", [notificationId]);
+};
+
+const findNotificationByDeliveryKey = async (deliveryKey) => {
+  const [[row]] = await db.query("SELECT id FROM notifications WHERE delivery_key = ? LIMIT 1", [deliveryKey]);
+  return row ?? null;
 };
 
 const createNotification = async ({
@@ -120,6 +125,22 @@ const createNotification = async ({
     [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId],
   );
   return result.insertId;
+};
+
+const createNotificationWithDeliveryKey = async ({
+  type, title, body, href, audienceType, audienceUserId, audienceRole,
+  expiresAt, createdBy, sourceType, sourceId, deliveryKey,
+}) => {
+  const [result] = await db.query(
+    `INSERT IGNORE INTO notifications
+      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, delivery_key, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId, deliveryKey],
+  );
+  if (result.affectedRows === 1) return { id: result.insertId, created: true };
+  const [[row]] = await db.query("SELECT id FROM notifications WHERE delivery_key = ? LIMIT 1", [deliveryKey]);
+  if (!row) throw new Error("Notification delivery key could not be resolved");
+  return { id: row.id, created: false };
 };
 
 const getUserRole = async (userId) => {
@@ -192,8 +213,10 @@ module.exports = {
   markAsRead,
   markAllAsRead,
   findExistingNotification,
+  findNotificationByDeliveryKey,
   updateNotification,
   createNotification,
+  createNotificationWithDeliveryKey,
   getUserRole,
   searchNotificationRecipients,
   findActiveNotificationRecipient,

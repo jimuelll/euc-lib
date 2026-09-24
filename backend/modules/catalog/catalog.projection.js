@@ -30,7 +30,15 @@ const hydrateCatalogRecord = (record, { publicKeys = null, publicFields = null }
   const metadata = keys
     ? Object.fromEntries(keys.filter((key) => Object.hasOwn(allMetadata, key)).map((key) => [key, allMetadata[key]]))
     : allMetadata;
-  return { ...record, ...metadata, metadata, ...capabilities(record.material_type) };
+  const typeCapabilities = capabilities(record.material_type);
+  return {
+    ...record,
+    ...metadata,
+    metadata,
+    ...typeCapabilities,
+    ...(Object.prototype.hasOwnProperty.call(record, "canBorrow") ? { canBorrow: Boolean(record.canBorrow) } : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, "canReserve") ? { canReserve: Boolean(record.canReserve) } : {}),
+  };
 };
 
 module.exports = { metadataValue, catalogDisplayColumns, parseMetadata, capabilities, hydrateCatalogRecord };

@@ -1,5 +1,8 @@
 const qr = require("qrcode");
 const service = require("./catalog.service");
+const holdingsService = require("./catalog.holdings.service");
+const catalogSettingsService = require("./catalog.settings.service");
+const copyStateService = require("./catalog.copy-state.service");
 
 const comparableSchema = (fields) => fields
   .map((field) => ({
@@ -69,6 +72,7 @@ const getBooks = async (req, res) => {
           ? String(req.query.status)
           : (req.query.archived === "true" ? "archived" : "active"),
         materialType: String(req.query.materialType ?? "all"),
+        policyStatus: String(req.query.policyStatus ?? "all"),
         page: Number(req.query.page),
         limit: Number(req.query.limit) || 25,
       }));
@@ -105,7 +109,8 @@ const getPublicSchema = async (_req, res) => {
 
 const createBook = async (req, res) => {
   try {
-    const id = await service.createBook(req.body, req.user.student_employee_id);
+    const id = await service.createBook(req.body, req.user.student_employee_id, req.user?.id);
+    res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book added successfully", id });
   } catch (err) {
     console.error("[catalog] createBook:", err);
@@ -118,7 +123,8 @@ const createBook = async (req, res) => {
 
 const updateBook = async (req, res) => {
   try {
-    await service.updateBook(req.params.id, req.body);
+    await service.updateBook(req.params.id, req.body, req.user?.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Book updated successfully" });
   } catch (err) {
     console.error("[catalog] updateBook:", err);
@@ -132,10 +138,11 @@ const updateBook = async (req, res) => {
 const deleteBook = async (req, res) => {
   try {
     await service.deleteBook(req.params.id, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Book deleted successfully" });
   } catch (err) {
     console.error("[catalog] deleteBook:", err);
-    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book", ...(err.outstandingAmount !== undefined ? { outstandingAmount: err.outstandingAmount, affectedLoans: err.affectedLoans } : {}) });
   }
 };
 
@@ -147,6 +154,73 @@ const getBookCopies = async (req, res) => {
     console.error("[catalog] getBookCopies:", err);
     res.status(500).json({ message: "Failed to fetch book copies" });
   }
+};
+
+const getBookHoldings = async (req, res) => {
+  try { res.json(await holdingsService.getBookHoldings(Number(req.params.id))); }
+  catch (err) { console.error("[catalog] getBookHoldings:", err); res.status(500).json({ message: "Failed to fetch book holdings" }); }
+};
+
+const getHoldings = async (req, res) => {
+  try {
+    const result = await holdingsService.searchHoldings({
+      query: String(req.query.query ?? "").trim(),
+      programId: req.query.programId ? Number(req.query.programId) : null,
+      status: ["all", "available", "borrowed", "reserved", "inactive"].includes(String(req.query.status)) ? String(req.query.status) : "all",
+      completion: ["all", "complete", "missing"].includes(String(req.query.completion)) ? String(req.query.completion) : "all",
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 25,
+    });
+    res.json({ ...result, pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.limit)) } });
+  } catch (err) { console.error("[catalog] getHoldings:", err); res.status(500).json({ message: "Failed to fetch holdings" }); }
+};
+
+const updateHolding = async (req, res) => {
+  try {
+    await holdingsService.updateHolding(Number.parseInt(req.params.copyId, 10), req.body, req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ message: "Holding saved successfully" });
+  } catch (err) {
+    console.error("[catalog] updateHolding:", err);
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to save holding" });
+  }
+};
+
+const voidAccession = async (req, res) => {
+  try {
+    const result = await holdingsService.voidAccession(Number.parseInt(req.params.copyId, 10), req.body, req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ message: "Accession voided permanently. Add a new physical copy to register a corrected accession.", accessionNumber: result.accessionNumber });
+  } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to void accession" }); }
+};
+
+const retireCopy = async (req, res) => {
+  try {
+    const result = await copyStateService.retireCopy(Number.parseInt(req.params.copyId, 10), req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ message: "Copy retired", copies: result.copies });
+  } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to retire copy" }); }
+};
+
+const restoreCopy = async (req, res) => {
+  try {
+    const result = await copyStateService.restoreCopy(Number.parseInt(req.params.copyId, 10), req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ message: "Copy restored", copies: result.copies, lendingEligible: result.lendingEligible });
+  } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to restore copy" }); }
+};
+
+const getCatalogSettings = async (_req, res) => {
+  try { res.json(await catalogSettingsService.getCatalogSettings()); }
+  catch (err) { console.error("[catalog] getCatalogSettings:", err); res.status(500).json({ message: "Failed to fetch catalog settings" }); }
+};
+
+const updateCatalogSettings = async (req, res) => {
+  try {
+    const settings = await catalogSettingsService.updateCatalogSettings(req.body?.show_unheld_in_opac, req.user?.id);
+    res.locals.auditEnqueued = true;
+    res.json({ message: "Catalog settings updated", settings });
+  } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update catalog settings" }); }
 };
 
 /**
@@ -189,7 +263,8 @@ const getCopyByBarcode = async (req, res) => {
 
 const restoreBook = async (req, res) => {
   try {
-    const result = await service.restoreBook(req.params.id);
+    const result = await service.restoreBook(req.params.id, req.user?.id);
+    res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
     console.error("[catalog] restoreBook:", err);
@@ -200,7 +275,8 @@ const restoreBook = async (req, res) => {
 const getBookTypes = async (_req, res) => { try { res.json(await service.getBookTypes()); } catch { res.status(500).json({ message: "Failed to fetch book types" }); } };
 const createBookType = async (req, res) => { try { res.status(201).json(await service.createBookType({ name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book type" }); } };
 const updateBookType = async (req, res) => { try { res.json(await service.updateBookType(Number(req.params.id), { name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book type" }); } };
-const updateCopyCondition = async (req, res) => { try { await service.updateCopyCondition(Number(req.params.copyId), req.body?.condition, req.body?.notes); res.json({ message: "Copy condition updated" }); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update copy" }); } };
+const deleteBookType = async (req, res) => { try { const result = await service.deleteBookType(Number(req.params.id), req.user?.id); res.locals.auditEnqueued = true; res.json({ ...result, message: result.affected_books ? `Policy deleted. ${result.affected_books} ${result.affected_books === 1 ? "book now needs" : "books now need"} a loan policy.` : "Policy deleted." }); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book type" }); } };
+const updateCopyCondition = async (req, res) => { try { await service.updateCopyCondition(Number(req.params.copyId), req.body?.condition, req.body?.notes, req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Copy condition updated" }); } catch (err) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update copy" }); } };
 
 module.exports = {
   getSchema,
@@ -212,11 +288,20 @@ module.exports = {
   updateBook,
   deleteBook,
   getBookCopies,
+  getBookHoldings,
+  getHoldings,
+  updateHolding,
+  voidAccession,
+  retireCopy,
+  restoreCopy,
+  getCatalogSettings,
+  updateCatalogSettings,
   getBarcodePng,
   getCopyByBarcode,
   restoreBook,
   getBookTypes,
   createBookType,
   updateBookType,
+  deleteBookType,
   updateCopyCondition,
 };

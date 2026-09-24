@@ -97,6 +97,21 @@ INSERT INTO books (title, material_type, metadata, book_type_id, author, isbn, c
 INSERT INTO book_copies (book_id, barcode, `condition`, is_active)
 SELECT id, CONCAT('LIB-', LPAD(id, 6, '0'), '-001'), 'good', 1 FROM books WHERE created_by = 'DEMO-REAL';
 
+-- Demo books are fully accessioned so the fixture exercises the same lending
+-- rules as the live catalogue. Claims are inserted before holdings because
+-- the fresh-start schema enforces the permanent registry with triggers.
+INSERT INTO accession_claims
+  (accession_number, copy_barcode, copy_id, book_id, book_title, claimed_by)
+SELECT CONCAT('DEMO-ACC-', LPAD(bc.id, 8, '0')), bc.barcode, bc.id, bk.id, bk.title, NULL
+  FROM book_copies bc JOIN books bk ON bk.id = bc.book_id
+ WHERE bk.created_by = 'DEMO-REAL';
+
+INSERT INTO copy_holdings (copy_id, accession_number, location)
+SELECT bc.id, CONCAT('DEMO-ACC-', LPAD(bc.id, 8, '0')),
+       JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.location'))
+  FROM book_copies bc JOIN books bk ON bk.id = bc.book_id
+ WHERE bk.created_by = 'DEMO-REAL';
+
 -- Shared reading patterns: these five users overlap on the same real titles.
 SELECT id INTO @naruto FROM books WHERE isbn = '9781569319000';
 SELECT id INTO @one_piece FROM books WHERE isbn = '9781569319017';

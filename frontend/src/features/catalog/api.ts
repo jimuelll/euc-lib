@@ -2,7 +2,7 @@ import axiosInstance from "@/utils/AxiosInstance";
 
 export interface PublicCatalogBook {
   id: number; title: string; author?: string; isbn?: string; category?: string; edition?: string;
-  publication_year?: number; copies?: number; available?: number; material_type?: "book" | "thesis";
+  publication_year?: number; copies?: number; registered_copies?: number; available?: number; material_type?: "book" | "thesis";
   canBorrow?: boolean; canReserve?: boolean; [key: string]: unknown;
 }
 export interface PublicCatalogSchemaField { key: string; label: string; type: string; order: number; locked?: boolean; public?: boolean; }

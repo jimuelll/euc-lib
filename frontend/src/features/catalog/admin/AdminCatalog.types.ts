@@ -24,11 +24,15 @@ export type Book = {
   edition?: string;
   publication_year?: number;
   copies?: number;
+  accessioned_copies?: number;
+  unaccessioned_copies?: number;
+  voided_copies?: number;
   available?: number;
   total_copies?: number;
   deleted_at?: string | null;
   material_type?: "book" | "thesis";
   book_type_id?: number | string;
+  needs_policy?: boolean | number;
   metadata?: Record<string, CatalogFormValue>;
   canBorrow?: boolean;
   canReserve?: boolean;
@@ -47,6 +51,9 @@ export type BookType = {
   fine_per_hour: number;
   fine_interval?: "hour" | "day";
   initial_fine?: number;
+  is_active?: number | boolean;
+  assigned_active_books?: number;
+  assigned_archived_books?: number;
 };
 
 export type CatalogPagination = { page: number; limit: number; total: number; totalPages: number };

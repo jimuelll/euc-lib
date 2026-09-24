@@ -9,7 +9,10 @@ const {
 } = require("./snapshot.transforms");
 
 async function getTableNames(connection) {
-  const discovered = await repository.listApplicationTables(connection, SYSTEM_TABLES);
+  // information_schema ordering follows the database collation, which can
+  // differ from JavaScript's ordering for names sharing underscores/prefixes.
+  // Compare the same table set in one canonical order on both sides.
+  const discovered = (await repository.listApplicationTables(connection, SYSTEM_TABLES)).sort();
   const expected = [...APPLICATION_TABLES].sort();
   if (JSON.stringify(discovered) !== JSON.stringify(expected)) {
     throw Object.assign(new Error("Application table registry is out of date. Add the new table and its snapshot default before deployment."), { status: 500 });

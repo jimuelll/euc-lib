@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "@/components/ui/sonner";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { X, ScanLine, Loader2, Download, Printer, BookOpen } from "lucide-react";
+import { X, ScanLine, Loader2, Download, Printer, BookOpen, Archive, ArchiveRestore } from "lucide-react";
 import { printCodeLabel } from "@/utils/printCodeLabel";
-import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition } from "../catalog.api";
+import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition, retireCatalogCopy, restoreCatalogCopy } from "../catalog.api";
 
 type Copy = {
   id: number;
   barcode: string;
+  accession_number?: string | null;
+  accession_voided?: boolean | number;
+  borrow_eligible?: boolean | number;
+  needs_policy?: boolean | number;
   condition: "good" | "damaged" | "lost";
   is_active: number;
   status: "available" | "borrowed" | "reserved";
@@ -72,6 +76,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
   const [scanning, setScanning]       = useState(false);
   const [scannedCopy, setScannedCopy] = useState<(Copy & { title?: string; author?: string }) | null>(null);
   const [barcodeUrls, setBarcodeUrls] = useState<Record<string, string>>({});
+  const [busyCopyId, setBusyCopyId] = useState<number | null>(null);
   const videoRef    = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
 
@@ -146,14 +151,37 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
   const handleConditionChange = async (copy: Copy, condition: Copy["condition"]) => {
     try {
       await updateCatalogCopyCondition(copy.id, condition);
-      setCopies((current) => current.map((item) => item.id === copy.id ? { ...item, condition } : item));
+      setCopies(await fetchCatalogBookCopies(bookId));
       if (scannedCopy?.id === copy.id) setScannedCopy({ ...scannedCopy, condition });
       toast.success("Copy condition updated");
     } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to update copy condition"); }
   };
 
-  const available = copies.filter((c) => c.status === "available" && c.is_active && c.condition !== "lost").length;
+  const handleRetire = async (copy: Copy) => {
+    if (!window.confirm(`Retire ${copy.barcode}? Its barcode, holdings, and history will be kept, and it will no longer be available for lending.`)) return;
+    setBusyCopyId(copy.id);
+    try {
+      await retireCatalogCopy(copy.id);
+      setCopies(await fetchCatalogBookCopies(bookId));
+      toast.success("Copy retired; its history and accession were kept");
+    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to retire copy"); }
+    finally { setBusyCopyId(null); }
+  };
+
+  const handleRestore = async (copy: Copy) => {
+    setBusyCopyId(copy.id);
+    try {
+      const result = await restoreCatalogCopy(copy.id);
+      setCopies(await fetchCatalogBookCopies(bookId));
+      toast.success(result.lendingEligible ? "Copy restored and available for circulation checks" : "Copy restored; record its accession or update its condition before lending");
+    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to restore copy"); }
+    finally { setBusyCopyId(null); }
+  };
+
+  const available = copies.filter((c) => c.status === "available" && c.is_active && Boolean(c.accession_number) && c.borrow_eligible !== false && c.borrow_eligible !== 0).length;
   const borrowed  = copies.filter((c) => c.status === "borrowed").length;
+  const active = copies.filter((c) => Boolean(c.is_active)).length;
+  const retired = copies.length - active;
 
   return (
     <div className={embedded ? "flex min-h-0 flex-1 flex-col" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"}>
@@ -206,9 +234,10 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
           {!loading && copies.length > 0 && (
             <div className="flex divide-x divide-primary-foreground/10 border-t border-primary-foreground/10">
               {[
-                { label: "Total",     value: copies.length },
+                { label: "Active",    value: active         },
                 { label: "Available", value: available     },
                 { label: "Borrowed",  value: borrowed      },
+                { label: "Retired",   value: retired       },
               ].map(({ label, value }) => (
                 <div key={label} className="flex-1 px-5 py-2.5 text-center">
                   <p
@@ -267,8 +296,9 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                 )}
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 text-sm flex-1">
                   <DetailRow label="Barcode" value={<span className="font-mono text-sm">{scannedCopy.barcode}</span>} />
+                  {scannedCopy.accession_number && <DetailRow label="Accession number" value={<span className="font-mono text-sm">{scannedCopy.accession_number}</span>} />}
                   {scannedCopy.title       && <DetailRow label="Book"     value={scannedCopy.title}        />}
-                  <DetailRow label="Status"    value={scannedCopy.status}    />
+                  <DetailRow label="Status" value={!scannedCopy.is_active ? "Inactive" : scannedCopy.accession_voided ? "Accession voided" : scannedCopy.status === "available" && scannedCopy.needs_policy ? "Needs loan policy" : scannedCopy.status === "available" && !scannedCopy.accession_number ? "Needs accession" : scannedCopy.status === "available" && !scannedCopy.borrow_eligible ? "Not lendable" : scannedCopy.status === "available" ? "Available to borrow" : scannedCopy.status} />
                   <DetailRow label="Condition" value={scannedCopy.condition} />
                   {scannedCopy.borrower_name && <DetailRow label="Borrower" value={scannedCopy.borrower_name} />}
                   {scannedCopy.due_date      && <DetailRow label="Due"      value={scannedCopy.due_date}      />}
@@ -303,7 +333,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               {/* Table head */}
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/50">
-                  {["#", "Barcode", "Status", "Condition", "Borrower / Notes", ""].map((h) => (
+                  {["#", "Copy / accession", "Status", "Condition", "Borrower / Notes", "Actions"].map((h) => (
                     <th
                       key={h}
                       className="px-4 py-2.5 text-left"
@@ -334,7 +364,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                       </span>
                     </td>
 
-                    {/* Barcode image + code */}
+                    {/* Barcode and accession */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {barcodeUrls[copy.barcode] ? (
@@ -348,18 +378,15 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                             <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                           </div>
                         )}
-                        <span className="font-mono text-xs text-foreground">{copy.barcode}</span>
+                        <div className="min-w-0"><span className="block font-mono text-xs text-foreground">{copy.barcode}</span><span className="mt-1 block text-xs text-muted-foreground">{copy.accession_number ? `Acc. ${copy.accession_number}` : "Needs accession"}</span></div>
                       </div>
                     </td>
 
                     {/* Status */}
                     <td className="px-4 py-3">
-                      <Badge className={STATUS_CONFIG[copy.status].className}>
-                        {STATUS_CONFIG[copy.status].label}
+                      <Badge className={copy.status === "available" && (!copy.is_active || !copy.accession_number || !copy.borrow_eligible) ? "border-warning/40 text-warning bg-warning/5" : STATUS_CONFIG[copy.status].className}>
+                        {!copy.is_active ? "Retired" : copy.accession_voided ? "Accession voided" : copy.status === "available" && copy.needs_policy ? "Needs loan policy" : copy.status === "available" && !copy.accession_number ? "Needs accession" : copy.status === "available" && !copy.borrow_eligible ? "Not lendable" : copy.status === "available" ? "Available to borrow" : STATUS_CONFIG[copy.status].label}
                       </Badge>
-                      {!copy.is_active && (
-                        <Badge className="ml-1 border-border text-muted-foreground">Inactive</Badge>
-                      )}
                     </td>
 
                     {/* Condition */}
@@ -385,8 +412,9 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                       )}
                     </td>
 
-                    {/* Download */}
+                    {/* Barcode and lifecycle actions */}
                     <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => handleDownload(copy.barcode)}
                         disabled={!copy.is_active || !barcodeUrls[copy.barcode]}
@@ -396,9 +424,11 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
                         <Download className="h-3 w-3" />
                         Export
                       </button>
-                      <button onClick={() => handlePrint(copy.barcode)} disabled={!copy.is_active || !barcodeUrls[copy.barcode]} className="mt-2 flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-xs font-bold  text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
+                      <button onClick={() => handlePrint(copy.barcode)} disabled={!copy.is_active || !barcodeUrls[copy.barcode]} className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30" style={{ fontFamily: "var(--font-heading)" }}>
                         <Printer className="h-3 w-3" /> Print
                       </button>
+                      {!copy.is_active ? <button type="button" onClick={() => void handleRestore(copy)} disabled={busyCopyId !== null} className="flex items-center gap-1.5 border border-success/30 px-2.5 py-1.5 text-xs font-bold text-success hover:bg-success/5 disabled:opacity-50"><ArchiveRestore className="h-3 w-3" />{busyCopyId === copy.id ? "Restoring…" : "Restore"}</button> : <button type="button" onClick={() => void handleRetire(copy)} disabled={busyCopyId !== null || copy.status === "borrowed" || copy.status === "reserved"} className="flex items-center gap-1.5 border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:border-destructive hover:text-destructive disabled:opacity-40"><Archive className="h-3 w-3" />{busyCopyId === copy.id ? "Retiring…" : "Retire"}</button>}
+                      </div>
                     </td>
                   </tr>
                 ))}

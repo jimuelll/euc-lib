@@ -4,33 +4,33 @@ function getConnection() {
   return db.getConnection();
 }
 
-async function findActiveProgram(programId) {
-  const [[program]] = await db.query("SELECT id FROM academic_programs WHERE id = ? AND is_active = 1 LIMIT 1", [programId]);
+async function findActiveProgram(programId, conn = db) {
+  const [[program]] = await conn.query("SELECT id FROM academic_programs WHERE id = ? AND is_active = 1 LIMIT 1 FOR UPDATE", [programId]);
   return program || null;
 }
 
-async function findActiveDepartment(departmentId) {
-  const [[department]] = await db.query("SELECT id FROM departments WHERE id = ? AND is_active = 1 LIMIT 1", [departmentId]);
+async function findActiveDepartment(departmentId, conn = db) {
+  const [[department]] = await conn.query("SELECT id FROM departments WHERE id = ? AND is_active = 1 LIMIT 1 FOR UPDATE", [departmentId]);
   return department || null;
 }
 
-async function findExistingUser(studentEmployeeId) {
-  const [users] = await db.query("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL", [studentEmployeeId]);
+async function findExistingUser(studentEmployeeId, conn = db) {
+  const [users] = await conn.query("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL FOR UPDATE", [studentEmployeeId]);
   return users;
 }
 
-async function findAcademicTerm(termId) {
-  const [[term]] = await db.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1", [termId]);
+async function findAcademicTerm(termId, conn = db) {
+  const [[term]] = await conn.query("SELECT id FROM academic_terms WHERE id = ? LIMIT 1 FOR UPDATE", [termId]);
   return term || null;
 }
 
-async function findCurrentAcademicTerm() {
-  const [[term]] = await db.query("SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1");
+async function findCurrentAcademicTerm(conn = db) {
+  const [[term]] = await conn.query("SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1");
   return term || null;
 }
 
-async function createUser({ studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email, name, passwordHash, role, address, contact, programId, academicTermId, yearLevel, departmentId, remarks }) {
-  const [result] = await db.query(
+async function createUser({ studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email, name, passwordHash, role, address, contact, programId, academicTermId, yearLevel, departmentId, remarks }, conn = db) {
+  const [result] = await conn.query(
     `INSERT INTO users
       (student_employee_id, library_card_number, student_number, employee_number, username, email, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id, year_level, department_id, remarks)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?)`,
@@ -38,7 +38,7 @@ async function createUser({ studentEmployeeId, libraryCardNumber, studentNumber,
   );
   const userId = result.insertId;
   const barcode = `LIB-USER-${String(userId).padStart(6, "0")}`;
-  await db.query("UPDATE users SET barcode = ? WHERE id = ?", [barcode, userId]);
+  await conn.query("UPDATE users SET barcode = ? WHERE id = ?", [barcode, userId]);
   return barcode;
 }
 
@@ -48,12 +48,17 @@ async function findUserForUpdate(studentEmployeeId, conn) {
 }
 
 async function findActiveBorrowings(userId, conn) {
-  const [rows] = await conn.query("SELECT id FROM borrowings WHERE user_id = ? AND status IN ('borrowed', 'overdue') FOR UPDATE", [userId]);
+  const [rows] = await conn.query("SELECT id FROM borrowings WHERE user_id = ? AND deleted_at IS NULL AND status IN ('borrowed', 'overdue') FOR UPDATE", [userId]);
   return rows;
 }
 
+async function findAllBorrowingIdsForUser(userId, conn) {
+  const [rows] = await conn.query("SELECT id FROM borrowings WHERE user_id = ? ORDER BY id FOR UPDATE", [userId]);
+  return rows.map((row) => Number(row.id));
+}
+
 async function findActiveReservations(userId, conn) {
-  const [rows] = await conn.query("SELECT id FROM reservations WHERE user_id = ? AND status IN ('pending', 'ready') AND deleted_at IS NULL FOR UPDATE", [userId]);
+  const [rows] = await conn.query("SELECT id FROM reservations WHERE user_id = ? AND status IN ('pending', 'ready') AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) FOR UPDATE", [userId]);
   return rows;
 }
 
@@ -61,13 +66,24 @@ async function deactivateUser(userId, requesterId, conn) {
   await conn.query("UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ? WHERE id = ?", [requesterId, userId]);
 }
 
-async function findArchivedUser(studentEmployeeId) {
-  const [users] = await db.query("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NOT NULL", [studentEmployeeId]);
+async function findArchivedUser(studentEmployeeId, conn = db) {
+  const [users] = await conn.query("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NOT NULL FOR UPDATE", [studentEmployeeId]);
   return users[0] || null;
 }
 
-async function restoreUser(studentEmployeeId) {
-  await db.query("UPDATE users SET deleted_at = NULL, deleted_by = NULL, is_active = 1 WHERE student_employee_id = ?", [studentEmployeeId]);
+async function restoreUser(studentEmployeeId, conn = db) {
+  const [result] = await conn.query("UPDATE users SET deleted_at = NULL, deleted_by = NULL, is_active = 1 WHERE student_employee_id = ? AND deleted_at IS NOT NULL", [studentEmployeeId]);
+  return Number(result.affectedRows);
+}
+
+async function findUserByIdForAudit(userId, conn = db) {
+  const [[user]] = await conn.query(
+    `SELECT id, name, student_employee_id, email, role, is_active, program_id, academic_term_id,
+            department_id, address, contact, year_level, remarks, deleted_at
+       FROM users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  return user || null;
 }
 
 async function findActiveUser(studentEmployeeId) {
@@ -75,13 +91,14 @@ async function findActiveUser(studentEmployeeId) {
   return users[0] || null;
 }
 
-async function updateUser(studentEmployeeId, updates) {
+async function updateUser(studentEmployeeId, updates, conn = db) {
   const fields = Object.keys(updates);
   if (!fields.length) return;
-  await db.query(
+  const [result] = await conn.query(
     `UPDATE users SET ${fields.map((field) => `\`${field}\` = ?`).join(", ")} WHERE student_employee_id = ? AND deleted_at IS NULL`,
     [...fields.map((field) => updates[field]), studentEmployeeId]
   );
+  return result.affectedRows;
 }
 
 async function searchUsers({ allowedRoles, showArchived, studentEmployeeId, name, role, status, page, limit = 25 }) {
@@ -155,26 +172,26 @@ async function queryToolsSearch(term, allowedRoles) {
   return { users: users[0], books: books[0], borrowings: borrowings[0], reservations: reservations[0], notifications: notifications[0] };
 }
 
-async function findStudentLikeUsers() {
+async function findStudentLikeUsersForUpdate(conn) {
   const roles = ["student", "employee", "alumni"];
-  const [users] = await db.query(
-    `SELECT u.id, u.student_employee_id, u.role,
-       COUNT(CASE WHEN b.status IN ('borrowed', 'overdue') THEN 1 END) AS active_borrow_count
-     FROM users u LEFT JOIN borrowings b ON b.user_id = u.id AND b.deleted_at IS NULL
-     WHERE u.deleted_at IS NULL AND u.is_active = 1 AND u.role IN (${roles.map(() => "?").join(", ")})
-     GROUP BY u.id, u.student_employee_id, u.role`,
+  const [users] = await conn.query(
+    `SELECT id, student_employee_id, role
+       FROM users
+      WHERE deleted_at IS NULL AND is_active = 1 AND role IN (${roles.map(() => "?").join(", ")})
+      ORDER BY id FOR UPDATE`,
     roles
   );
   return users;
 }
 
-async function bulkDeactivateUserIds(userIds, requesterId) {
+async function bulkDeactivateUserIds(userIds, requesterId, conn) {
   if (!userIds.length) return;
-  await db.query(
+  const [result] = await conn.query(
     `UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ?
      WHERE deleted_at IS NULL AND is_active = 1 AND id IN (${userIds.map(() => "?").join(", ")})`,
     [requesterId, ...userIds]
   );
+  return Number(result.affectedRows);
 }
 
-module.exports = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findActiveUser, updateUser, searchUsers, queryToolsSearch, findStudentLikeUsers, bulkDeactivateUserIds };
+module.exports = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findAllBorrowingIdsForUser, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findUserByIdForAudit, findActiveUser, updateUser, searchUsers, queryToolsSearch, findStudentLikeUsersForUpdate, bulkDeactivateUserIds };

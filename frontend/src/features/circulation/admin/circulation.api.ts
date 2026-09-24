@@ -100,7 +100,7 @@ export const restoreBorrowing = async (id: number): Promise<void> => {
 };
 
 export type CirculationCatalogResult = { id: number; title: string; author?: string; material_type?: string };
-export type CirculationCopyResult = { id: number; barcode: string; is_active: number; status?: string };
+export type CirculationCopyResult = { id: number; barcode: string; accession_number?: string | null; accession_voided?: number | boolean; borrow_eligible?: number | boolean; needs_policy?: number | boolean; is_active: number; status?: string };
 export const searchCirculationBooks = async (query: string): Promise<CirculationCatalogResult[]> => {
   const response = await axiosInstance.get<CirculationCatalogResult[]>("/api/admin/books", { params: { query } });
   return response.data;

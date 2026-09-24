@@ -1,7 +1,7 @@
 const { createHash } = require("crypto");
 const { APPLICATION_TABLES } = require("./snapshot.registry");
 
-const SNAPSHOT_VERSION = 11;
+const SNAPSHOT_VERSION = 15;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -250,6 +250,101 @@ function upgradeV10ToV11(backup) {
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   return backup;
 }
+function upgradeV11ToV12(backup) {
+  assertSnapshotIntegrity(backup);
+  backup.tables.copy_holdings ??= [];
+  backup.tables.catalog_settings ??= [{ id: 1, show_unheld_in_opac: 1, updated_by: null }];
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 12;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
+function upgradeV12ToV13(backup) {
+  assertSnapshotIntegrity(backup);
+  backup.tables.delivery_outbox ??= [];
+  for (const borrowing of backup.tables.borrowings ?? []) {
+    borrowing.loan_policy_id_snapshot ??= null;
+    borrowing.loan_policy_name_snapshot ??= "Unknown historical policy";
+  }
+  for (const notification of backup.tables.notifications ?? []) notification.delivery_key ??= null;
+  // Outbox locks belong to the process that created the snapshot. Pending
+  // work is made claimable after restore, while delivered events stay done.
+  for (const event of backup.tables.delivery_outbox) {
+    if (event.status === "processing") event.status = "pending";
+    event.locked_at = null;
+  }
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 13;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
+function upgradeV13ToV14(backup) {
+  assertSnapshotIntegrity(backup);
+  const claims = backup.tables.accession_claims ?? [];
+  const claimNumbers = new Set(claims.map((claim) => String(claim.accession_number)));
+  const copiesById = new Map((backup.tables.book_copies ?? []).map((copy) => [Number(copy.id), copy]));
+  const booksById = new Map((backup.tables.books ?? []).map((book) => [Number(book.id), book]));
+  for (const holding of backup.tables.copy_holdings ?? []) {
+    const copy = copiesById.get(Number(holding.copy_id));
+    if (!copy || !holding.accession_number || claimNumbers.has(String(holding.accession_number))) continue;
+    const book = booksById.get(Number(copy.book_id));
+    claims.push({
+      accession_number: holding.accession_number,
+      copy_barcode: copy.barcode,
+      copy_id: Number(copy.id),
+      book_id: Number(copy.book_id),
+      book_title: String(book?.title ?? `Book ID ${copy.book_id}`),
+      claimed_by: holding.created_by ?? holding.updated_by ?? null,
+      claimed_at: holding.created_at ?? backup.createdAt,
+    });
+    claimNumbers.add(String(holding.accession_number));
+  }
+  backup.tables.accession_claims = claims;
+  backup.tables.accession_claim_corrections ??= [];
+  for (const table of APPLICATION_TABLES) backup.tables[table] ??= [];
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 14;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
+
+function upgradeV14ToV15(backup) {
+  assertSnapshotIntegrity(backup);
+  const claims = new Map((backup.tables.accession_claims ?? []).map((claim) => [
+    String(claim.accession_number).trim().toLocaleLowerCase("en-US"), claim,
+  ]));
+  const voids = backup.tables.accession_claim_voids ?? [];
+  const voided = new Set(voids.map((entry) => String(entry.accession_number).trim().toLocaleLowerCase("en-US")));
+  for (const correction of backup.tables.accession_claim_corrections ?? []) {
+    const accessionNumber = String(correction.old_accession_number ?? "").trim();
+    const key = accessionNumber.toLocaleLowerCase("en-US");
+    if (!accessionNumber || voided.has(key)) continue;
+    const claim = claims.get(key);
+    if (!claim || String(claim.copy_barcode).toLocaleLowerCase("en-US") !== String(correction.copy_barcode).toLocaleLowerCase("en-US")
+      || Number(claim.book_id) !== Number(correction.book_id)) {
+      throw Object.assign(new Error("The snapshot has a legacy accession correction without its original permanent claim."), { status: 409 });
+    }
+    voids.push({
+      accession_number: accessionNumber,
+      copy_barcode: claim.copy_barcode,
+      copy_id: Number(claim.copy_id),
+      book_id: Number(claim.book_id),
+      book_title: claim.book_title,
+      reason: `Legacy correction: ${correction.reason ?? "no reason recorded"}`.slice(0, 500),
+      voided_by: correction.corrected_by ?? null,
+      voided_at: correction.corrected_at ?? backup.createdAt,
+    });
+    voided.add(key);
+  }
+  backup.tables.accession_claim_voids = voids;
+  for (const table of APPLICATION_TABLES) backup.tables[table] ??= [];
+  backup.tableManifest = Object.keys(backup.tables).sort();
+  backup.version = 15;
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  return backup;
+}
 
 // Each supported snapshot version advances through one reviewed transformer.
 const SNAPSHOT_TRANSFORMERS = new Map([
@@ -261,6 +356,10 @@ const SNAPSHOT_TRANSFORMERS = new Map([
   [8, upgradeV8ToV9],
   [9, upgradeV9ToV10],
   [10, upgradeV10ToV11],
+  [11, upgradeV11ToV12],
+  [12, upgradeV12ToV13],
+  [13, upgradeV13ToV14],
+  [14, upgradeV14ToV15],
 ]);
 
 function upgradeBackup(backup) {

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const repository = require("./recommendations.repository");
 const { hydrateCatalogRecord, parseMetadata } = require("../catalog/catalog.projection");
+const catalogSettings = require("../catalog/catalog.settings.service");
 
 const BOOK_LIMIT = 5;
 const THESIS_LIMIT = 5;
@@ -52,16 +53,22 @@ const publicFields = async () => {
   return new Set(await repository.getPublicFieldKeys());
 };
 const activeCandidates = async (materialType, excludedIds = []) => {
-  return repository.findActiveCandidates(materialType, excludedIds);
+  const settings = materialType === "book" ? await catalogSettings.getCatalogSettings() : { show_unheld_in_opac: true };
+  return repository.findActiveCandidates(materialType, excludedIds, { showUnheldInOpac: settings.show_unheld_in_opac });
 };
 const serialize = async (records) => {
   const fields = [...await publicFields()];
   return records.map((record) => {
     const hydrated = hydrateCatalogRecord(record, { publicKeys: fields });
+    const isBook = record.material_type === "book";
+    const hasActivePolicy = Boolean(record.has_active_policy);
     return {
       id: hydrated.id, title: hydrated.title, author: hydrated.author, isbn: hydrated.isbn,
       copies: hydrated.copies, material_type: hydrated.material_type, metadata: hydrated.metadata,
-      ...hydrated.metadata, canBorrow: hydrated.canBorrow, canReserve: hydrated.canReserve,
+      ...hydrated.metadata,
+      canBorrow: isBook && Number(record.available || 0) > 0,
+      canReserve: isBook && hasActivePolicy && Number(record.total_copies || 0) > 0,
+      needs_policy: isBook && !hasActivePolicy,
       available: Number(record.available || 0), total_copies: Number(record.total_copies || 0),
       reason: record.reason, source: record.source,
     };

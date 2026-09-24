@@ -10,7 +10,7 @@ const searchCatalogue = async (req, res) => {
     res.json(books);
   } catch (err) {
     console.error("[reservation] searchCatalogue:", err);
-    res.status(500).json({ message: "Failed to search catalogue" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to search catalogue" });
   }
 };
 
@@ -41,6 +41,7 @@ const reserveBook = async (req, res) => {
       return res.status(400).json({ message: "Invalid book ID" });
     }
     const result = await service.reserveBook(req.user.id, bookId);
+    res.locals.auditEnqueued = true;
     res.status(201).json({ message: "Book reserved successfully", ...result });
   } catch (err) {
     console.error("[reservation] reserveBook:", err);
@@ -55,6 +56,7 @@ const cancelReservation = async (req, res) => {
       return res.status(400).json({ message: "Invalid reservation ID" });
     }
     await service.cancelReservation(reservationId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Reservation cancelled" });
   } catch (err) {
     console.error("[reservation] cancelReservation:", err);

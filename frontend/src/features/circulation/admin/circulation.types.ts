@@ -10,9 +10,15 @@ export interface BookInfo {
   author: string;
   copies: number;
   barcode: string;
+  accession_number?: string | null;
+  accession_voided?: boolean | number;
   condition: string;
   is_active: boolean;
+  has_holding?: boolean | number;
+  borrow_eligible?: boolean | number;
+  needs_policy?: boolean | number;
   is_reserved?: boolean | number;
+  has_active_loan?: boolean | number;
 }
 
 export interface UserInfo {
@@ -33,6 +39,9 @@ export interface ClearanceStatus {
 export interface ActiveBorrow {
   id: number;
   book_id: number;
+  copy_id: number | null;
+  copy_barcode?: string | null;
+  accession_number?: string | null;
   title: string;
   author: string;
   borrowed_at: string;

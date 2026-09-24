@@ -66,7 +66,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       setActiveBorrows(activeBorrows);
       setClearance(clearance);
       setMatchedBorrow(type === "return" && foundCopy
-        ? activeBorrows.find((borrow) => borrow.book_id === foundCopy.book_id) ?? null
+        ? activeBorrows.find((borrow) => borrow.copy_id === foundCopy.id) ?? null
         : null);
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "User not found");
@@ -113,7 +113,7 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     }
 
     if (type === "return" && foundUser) {
-      const match = activeBorrows.find((b) => b.book_id === copy.book_id) ?? null;
+      const match = activeBorrows.find((b) => b.copy_id === copy.id) ?? null;
       setMatchedBorrow(match);
       if (!match) toast.error("No active borrow found for this copy and user");
     }
@@ -144,6 +144,18 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     }
     if (type === "return" && !matchedBorrow) {
       toast.error("No matching active borrow found");
+      return;
+    }
+    if (type === "borrow" && !foundCopy.accession_number) {
+      toast.error("This copy has no accession number and cannot be borrowed. Add its holding first.");
+      return;
+    }
+    if (type === "borrow" && (!foundCopy.is_active || foundCopy.borrow_eligible === false || foundCopy.borrow_eligible === 0)) {
+      toast.error("This copy is not eligible for checkout");
+      return;
+    }
+    if (type === "borrow" && foundCopy.has_active_loan) {
+      toast.error("This copy is already borrowed");
       return;
     }
     if (type === "borrow" && foundCopy.condition === "lost") {
@@ -186,10 +198,9 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     !submitting &&
     !!foundUser &&
     !!foundCopy &&
-    foundCopy.is_active &&
-    foundCopy.condition !== "lost" &&
-    (!foundCopy.is_reserved || Boolean(reservationCheckout)) &&
-    !(type === "return" && !matchedBorrow);
+    (type === "return"
+      ? !!matchedBorrow && matchedBorrow.copy_id === foundCopy.id
+      : foundCopy.is_active && Boolean(foundCopy.accession_number) && foundCopy.borrow_eligible !== false && foundCopy.borrow_eligible !== 0 && foundCopy.condition !== "lost" && !foundCopy.has_active_loan && (!foundCopy.is_reserved || Boolean(reservationCheckout)));
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 
   return {

@@ -36,6 +36,8 @@ async function getDashboardOverview({ range } = {}) {
       total_books: Number(stats.total_books || 0),
       total_book_copies: Number(stats.total_book_copies || 0),
       available_book_copies: Number(stats.available_book_copies || 0),
+      active_accessioned_copies: Number(stats.active_accessioned_copies || 0),
+      needs_accession_copies: Number(stats.needs_accession_copies || 0),
       borrowed_book_copies: Number(stats.borrowed_book_copies || 0),
       damaged_book_copies: Number(stats.damaged_book_copies || 0),
       lost_book_copies: Number(stats.lost_book_copies || 0),

@@ -41,6 +41,7 @@ export interface AuditItem {
   actor_name: string | null;
   actor_role: string | null;
   description: string;
+  copy_display_description?: string;
   metadata: unknown;
   restore_status: "retained" | "reversed";
   reversed_at: string | null;

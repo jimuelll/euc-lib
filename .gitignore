@@ -61,9 +61,11 @@ frontend/.env
 PRODUCT.md
 SKILL.md
 
-# Generated UML documentation (editable PlantUML, rendered figures, and PDF)
+# Generated UML and one-off cross-system review artifacts
 /docs/generated/uml/
+/docs/cross-system-mutation-matrix.md
+/docs/defense-cross-system-audit.md
+COPY-ACCESSION-LIFECYCLE-REVIEW.md
 
 # Local synthetic-data admin preview
 /frontend/scripts/admin-preview.mjs
-

@@ -1,5 +1,6 @@
 const db = require("../../db");
 const clearanceService = require("../clearance/clearance.service");
+const { availableToBorrow, hasAccession } = require("../catalog/copyEligibility");
 
 const PAGE_LIMIT = 25;
 const EXPORT_LIMIT = 10000;
@@ -13,10 +14,16 @@ const DATASETS = {
     dateField: "b.created_at",
     columns: [
       ["title", "Title"], ["author", "Author"], ["materialType", "Material type"], ["bookType", "Book type"],
-      ["category", "Category"], ["isbn", "ISBN"], ["copies", "Copies"], ["availableCopies", "Available copies"], ["createdAt", "Added"],
+      ["category", "Category"], ["isbn", "ISBN"], ["copies", "Physical copies"], ["activeAccessionedCopies", "Active accessioned"],
+      ["needsAccessionCopies", "Needs accession"], ["availableCopies", "Available to borrow"], ["createdAt", "Added"],
     ],
     from: "FROM books b LEFT JOIN book_types bt ON bt.id = b.book_type_id",
-    select: "b.title, b.author, b.material_type AS materialType, COALESCE(bt.name, 'Unassigned') AS bookType, COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.category')), ''), 'Uncategorized') AS category, b.isbn, COALESCE(b.copies, 0) AS copies, (SELECT COUNT(*) FROM book_copies bc WHERE bc.book_id = b.id AND bc.deleted_at IS NULL AND bc.is_active = 1 AND bc.condition = 'good' AND NOT EXISTS (SELECT 1 FROM borrowings ab WHERE ab.copy_id = bc.id AND ab.deleted_at IS NULL AND ab.status IN ('borrowed', 'overdue'))) AS availableCopies, b.created_at AS createdAt",
+    select: `b.title, b.author, b.material_type AS materialType, COALESCE(bt.name, 'Unassigned') AS bookType, COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.category')), ''), 'Uncategorized') AS category, b.isbn,
+      (SELECT COUNT(*) FROM book_copies physical WHERE physical.book_id = b.id AND physical.deleted_at IS NULL) AS copies,
+      (SELECT COUNT(*) FROM book_copies active_h WHERE active_h.book_id = b.id AND active_h.deleted_at IS NULL AND active_h.is_active = 1 AND ${hasAccession("active_h")}) AS activeAccessionedCopies,
+      (SELECT COUNT(*) FROM book_copies missing_h WHERE missing_h.book_id = b.id AND missing_h.deleted_at IS NULL AND missing_h.is_active = 1 AND NOT ${hasAccession("missing_h")}) AS needsAccessionCopies,
+      (SELECT COUNT(*) FROM book_copies available_copy WHERE available_copy.book_id = b.id AND ${availableToBorrow("available_copy")}) AS availableCopies,
+      b.created_at AS createdAt`,
     base: "b.deleted_at IS NULL",
     search: ["b.title", "b.author", "b.isbn"],
     order: "b.created_at DESC, b.id DESC",
@@ -36,10 +43,10 @@ const DATASETS = {
   borrowings: {
     label: "Borrowings",
     dateField: "b.borrowed_at",
-    columns: [["borrower", "Borrower"], ["studentEmployeeId", "Student / employee ID"], ["borrowerRole", "Borrower role"], ["title", "Book"], ["bookType", "Book type"], ["barcode", "Copy barcode"], ["status", "Status"], ["borrowedAt", "Borrowed"], ["dueDate", "Due"], ["returnedAt", "Returned"], ["issuedBy", "Issued by"]],
-    from: "FROM borrowings b JOIN users u ON u.id = b.user_id LEFT JOIN books bk ON bk.id = b.book_id LEFT JOIN book_types bt ON bt.id = bk.book_type_id LEFT JOIN book_copies bc ON bc.id = b.copy_id LEFT JOIN users issuer ON issuer.id = b.issued_by",
-    select: "u.name AS borrower, u.student_employee_id AS studentEmployeeId, u.role AS borrowerRole, bk.title, COALESCE(bt.name, 'Unassigned') AS bookType, bc.barcode, b.status, b.borrowed_at AS borrowedAt, b.due_date AS dueDate, b.returned_at AS returnedAt, COALESCE(issuer.name, 'System') AS issuedBy",
-    base: "b.deleted_at IS NULL AND u.deleted_at IS NULL AND bk.deleted_at IS NULL",
+    columns: [["borrower", "Borrower"], ["studentEmployeeId", "Student / employee ID"], ["borrowerRole", "Borrower role"], ["title", "Book"], ["bookType", "Loan policy at checkout"], ["barcode", "Copy barcode"], ["status", "Status"], ["borrowedAt", "Borrowed"], ["dueDate", "Due"], ["returnedAt", "Returned"], ["issuedBy", "Issued by"]],
+    from: "FROM borrowings b LEFT JOIN users u ON u.id = b.user_id LEFT JOIN books bk ON bk.id = b.book_id LEFT JOIN book_copies bc ON bc.id = b.copy_id LEFT JOIN users issuer ON issuer.id = b.issued_by",
+    select: "COALESCE(u.name, 'Deleted patron') AS borrower, u.student_employee_id AS studentEmployeeId, u.role AS borrowerRole, COALESCE(bk.title, 'Deleted book') AS title, COALESCE(NULLIF(b.loan_policy_name_snapshot, ''), 'Unknown historical policy') AS bookType, bc.barcode, b.status, b.borrowed_at AS borrowedAt, b.due_date AS dueDate, b.returned_at AS returnedAt, COALESCE(issuer.name, 'System') AS issuedBy",
+    base: "b.id IS NOT NULL",
     search: ["u.name", "u.student_employee_id", "bk.title", "bc.barcode"],
     order: "b.borrowed_at DESC, b.id DESC",
     filters: ["status", "borrowerRole", "bookType", "issuedBy"],
@@ -47,10 +54,10 @@ const DATASETS = {
   reservations: {
     label: "Reservations",
     dateField: "r.reserved_at",
-    columns: [["requester", "Requester"], ["studentEmployeeId", "Student / employee ID"], ["title", "Book"], ["bookType", "Book type"], ["status", "Status"], ["reservedAt", "Reserved"], ["expiresAt", "Expires"], ["fulfilledAt", "Fulfilled"]],
-    from: "FROM reservations r JOIN users u ON u.id = r.user_id JOIN books b ON b.id = r.book_id LEFT JOIN book_types bt ON bt.id = b.book_type_id",
-    select: "u.name AS requester, u.student_employee_id AS studentEmployeeId, b.title, COALESCE(bt.name, 'Unassigned') AS bookType, r.status, r.reserved_at AS reservedAt, r.expires_at AS expiresAt, r.fulfilled_at AS fulfilledAt",
-    base: "r.deleted_at IS NULL AND u.deleted_at IS NULL AND b.deleted_at IS NULL",
+    columns: [["requester", "Requester"], ["studentEmployeeId", "Student / employee ID"], ["title", "Book"], ["bookType", "Current book policy"], ["status", "Status"], ["reservedAt", "Reserved"], ["expiresAt", "Expires"], ["fulfilledAt", "Fulfilled"]],
+    from: "FROM reservations r LEFT JOIN users u ON u.id = r.user_id LEFT JOIN books b ON b.id = r.book_id LEFT JOIN book_types bt ON bt.id = b.book_type_id",
+    select: "COALESCE(u.name, 'Deleted patron') AS requester, u.student_employee_id AS studentEmployeeId, COALESCE(b.title, 'Deleted book') AS title, COALESCE(bt.name, 'Unassigned') AS bookType, r.status, r.reserved_at AS reservedAt, r.expires_at AS expiresAt, r.fulfilled_at AS fulfilledAt",
+    base: "r.id IS NOT NULL",
     search: ["u.name", "u.student_employee_id", "b.title"],
     order: "r.reserved_at DESC, r.id DESC",
     filters: ["status", "bookType"],
@@ -59,9 +66,9 @@ const DATASETS = {
     label: "Attendance",
     dateField: "a.created_at",
     columns: [["name", "Patron"], ["studentEmployeeId", "Student / employee ID"], ["purpose", "Purpose"], ["type", "Scan type"], ["scannedBy", "Scanned by"], ["createdAt", "Scanned at"]],
-    from: "FROM attendance_logs a JOIN users u ON u.id = a.user_id LEFT JOIN users scanner ON scanner.id = a.scanned_by",
-    select: "u.name, u.student_employee_id AS studentEmployeeId, a.purpose, a.type, COALESCE(scanner.name, 'Self-service') AS scannedBy, a.created_at AS createdAt",
-    base: "u.deleted_at IS NULL",
+    from: "FROM attendance_logs a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN users scanner ON scanner.id = a.scanned_by",
+    select: "COALESCE(u.name, 'Deleted patron') AS name, u.student_employee_id AS studentEmployeeId, a.purpose, a.type, COALESCE(scanner.name, 'Self-service') AS scannedBy, a.created_at AS createdAt",
+    base: "a.id IS NOT NULL",
     search: ["u.name", "u.student_employee_id"],
     order: "a.created_at DESC, a.id DESC",
     filters: ["purpose", "scanType"],
@@ -132,11 +139,18 @@ function buildWhere(datasetName, filters = {}) {
     pushInFilter(where, params, "b.material_type", value(filters, "materialType"), ["book", "thesis"]);
     const bookType = value(filters, "bookType"); pushIdFilter(where, params, "bt.id", bookType);
     const category = value(filters, "category"); if (category && category !== "all") { where.push("JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.category')) = ?"); params.push(category); }
-    const availability = value(filters, "availability"); if (availability && availability !== "all") { if (!["available", "unavailable"].includes(availability)) throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); where.push(availability === "available" ? "EXISTS (SELECT 1 FROM book_copies bc2 WHERE bc2.book_id = b.id AND bc2.deleted_at IS NULL AND bc2.is_active = 1 AND bc2.condition = 'good' AND NOT EXISTS (SELECT 1 FROM borrowings ab2 WHERE ab2.copy_id = bc2.id AND ab2.deleted_at IS NULL AND ab2.status IN ('borrowed', 'overdue')))" : "NOT EXISTS (SELECT 1 FROM book_copies bc2 WHERE bc2.book_id = b.id AND bc2.deleted_at IS NULL AND bc2.is_active = 1 AND bc2.condition = 'good' AND NOT EXISTS (SELECT 1 FROM borrowings ab2 WHERE ab2.copy_id = bc2.id AND ab2.deleted_at IS NULL AND ab2.status IN ('borrowed', 'overdue')))" ); }
+    const availability = value(filters, "availability"); if (availability && availability !== "all") { if (!["available", "unavailable"].includes(availability)) throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); const hasAvailable = `EXISTS (SELECT 1 FROM book_copies avail_filter WHERE avail_filter.book_id = b.id AND ${availableToBorrow("avail_filter")})`; where.push(availability === "available" ? hasAvailable : `NOT ${hasAvailable}`); }
     const condition = value(filters, "condition"); if (condition && condition !== "all") { if (!["good", "damaged", "lost"].includes(condition)) throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); where.push("EXISTS (SELECT 1 FROM book_copies bc3 WHERE bc3.book_id = b.id AND bc3.deleted_at IS NULL AND bc3.condition = ?)"); params.push(condition); }
   }
   if (datasetName === "users") { pushInFilter(where, params, "u.role", value(filters, "role"), ROLES); const status = value(filters, "accountStatus"); if (status && status !== "all") { pushInFilter(where, params, "u.is_active", status, ["0", "1"]); } pushIdFilter(where, params, "ap.id", value(filters, "program")); }
-  if (datasetName === "borrowings") { pushInFilter(where, params, "b.status", value(filters, "status"), BORROWING_STATUSES); pushInFilter(where, params, "u.role", value(filters, "borrowerRole"), ROLES); pushIdFilter(where, params, "bt.id", value(filters, "bookType")); pushIdFilter(where, params, "issuer.id", value(filters, "issuedBy")); }
+  if (datasetName === "borrowings") {
+    pushInFilter(where, params, "b.status", value(filters, "status"), BORROWING_STATUSES);
+    pushInFilter(where, params, "u.role", value(filters, "borrowerRole"), ROLES);
+    const policy = value(filters, "bookType");
+    if (policy === "0") where.push("(b.loan_policy_id_snapshot IS NULL OR b.loan_policy_name_snapshot = 'Unknown historical policy')");
+    else pushIdFilter(where, params, "b.loan_policy_id_snapshot", policy);
+    pushIdFilter(where, params, "issuer.id", value(filters, "issuedBy"));
+  }
   if (datasetName === "reservations") { pushInFilter(where, params, "r.status", value(filters, "status"), RESERVATION_STATUSES); pushIdFilter(where, params, "bt.id", value(filters, "bookType")); }
   if (datasetName === "attendance") { pushInFilter(where, params, "a.purpose", value(filters, "purpose"), ["entry_exit", "borrowing"]); pushInFilter(where, params, "a.type", value(filters, "scanType"), ["check_in", "check_out"]); }
   if (datasetName === "notifications") { const audience = value(filters, "audience"); if (audience && audience !== "all") { pushInFilter(where, params, "n.audience_type", audience === "public" ? "all" : audience, ["all", "user", "role"]); } const status = value(filters, "notificationStatus"); if (status === "active") where.push("n.is_active = 1 AND (n.expires_at IS NULL OR n.expires_at >= NOW())"); else if (status === "inactive") where.push("n.is_active = 0"); else if (status === "expired") where.push("n.expires_at IS NOT NULL AND n.expires_at < NOW()"); else if (status && status !== "all") throw Object.assign(new Error("One or more filters are invalid."), { status: 400 }); }
@@ -145,7 +159,7 @@ function buildWhere(datasetName, filters = {}) {
 }
 
 function queryColumns(dataset) {
-  return dataset.columns.map(([key, label]) => ({ key, label, type: key === "oldestDueDate" ? "date" : ["createdAt", "borrowedAt", "dueDate", "returnedAt", "reservedAt", "expiresAt", "fulfilledAt"].includes(key) ? "dateTime" : "text" }));
+  return dataset.columns.map(([key, label]) => ({ key, label, type: key === "oldestDueDate" ? "date" : ["createdAt", "borrowedAt", "dueDate", "returnedAt", "reservedAt", "expiresAt", "fulfilledAt"].includes(key) ? "dateTime" : ["copies", "activeAccessionedCopies", "needsAccessionCopies", "availableCopies", "overdueCount", "outstandingAmount", "fineRecords"].includes(key) ? "number" : "text" }));
 }
 
 function validateClearanceFilters(filters) {
@@ -196,7 +210,7 @@ async function exportQuery({ dataset: datasetName = "catalog", ...filters }) {
 
 async function getQueryMeta() {
   const [[bookTypes], [categories], [programs], [issuers], [subscriptionCategories]] = await Promise.all([
-    db.query("SELECT id, name FROM book_types WHERE is_active = 1 ORDER BY name ASC"),
+    db.query("SELECT id, name FROM book_types WHERE is_active = 1 UNION SELECT DISTINCT COALESCE(loan_policy_id_snapshot, 0) AS id, COALESCE(NULLIF(loan_policy_name_snapshot, ''), 'Unknown historical policy') AS name FROM borrowings ORDER BY name ASC"),
     db.query("SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) AS value FROM books WHERE deleted_at IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) <> '' ORDER BY value ASC"),
     db.query("SELECT id, name FROM academic_programs ORDER BY name ASC"),
     db.query("SELECT id, name FROM users WHERE deleted_at IS NULL AND role IN ('staff', 'admin', 'super_admin') ORDER BY name ASC"),

@@ -11,8 +11,9 @@ async function performRestore(backup, { restoredBy, restoredByName = null, resto
     const prepared = upgradeBackup(backup);
     await preflightRestore(prepared);
     await repository.setMaintenance("restoring", restoredBy);
+    await repository.preflightAccessionRestore(prepared);
     const preRestoreSnapshot = await uploadSnapshot(await createBackupPayload(), restoredBy, "pre_restore");
-    await repository.replaceApplicationData(prepared, {
+    const restoreDetails = await repository.replaceApplicationData(prepared, {
       restoredBy,
       restoredByName,
       restoredByRole,
@@ -23,7 +24,7 @@ async function performRestore(backup, { restoredBy, restoredByName = null, resto
       invalidateSessions: (connection) => invalidateAllSessionsAfterRestore(connection),
     });
     notificationHub.closeAllConnections({ type: "system.restored", message: "The library system was restored. Please sign in again." });
-    return preRestoreSnapshot;
+    return { ...preRestoreSnapshot, ...restoreDetails };
   } finally {
     await repository.setMaintenance("normal").catch(() => {});
     await lockConnection.query("SELECT RELEASE_LOCK('euc-library-restore')").catch(() => {});

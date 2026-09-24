@@ -93,7 +93,7 @@ const AdminCirculation = () => {
 
           </section>
           <h2 className="text-base font-semibold">3. Review and confirm</h2>
-          {foundUser && foundCopy && <p className="rounded-md bg-muted p-3 text-sm"><strong>{foundUser.name}</strong> · {foundCopy.title} · Copy {foundCopy.barcode}{matchedBorrow ? ` · Due ${new Date(matchedBorrow.due_date).toLocaleString()}` : ""}</p>}
+          {foundUser && foundCopy && <p className="rounded-md bg-muted p-3 text-sm"><strong>{foundUser.name}</strong> · {foundCopy.title} · {foundCopy.accession_number ? `Acc. ${foundCopy.accession_number}` : "No accession"} · QR ${foundCopy.barcode}{matchedBorrow ? ` · Due ${new Date(matchedBorrow.due_date).toLocaleString()}` : ""}</p>}
           {!canSubmit && <p className="text-sm text-muted-foreground">{!foundUser ? "Find a patron to continue." : !foundCopy ? "Scan or select a copy to continue." : clearance?.status === "blocked" && type === "borrow" ? "Resolve the patron’s clearance issues before borrowing." : "Review the copy and patron details above before continuing."}</p>}
           {type === "borrow" ? <p className="border-t border-border/70 pt-5 text-sm text-muted-foreground">The due date and hourly fine are applied automatically from this book’s configured type.</p> : null}
 

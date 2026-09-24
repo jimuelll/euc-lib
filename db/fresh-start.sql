@@ -34,6 +34,13 @@ DROP TABLE IF EXISTS
   `restore_audit_events`,
   `system_maintenance_state`,
   `auth_restore_state`,
+  `copy_holdings`,
+  `book_copies`,
+  `accession_claim_voids`,
+  `accession_claim_corrections`,
+  `accession_claims`,
+  `catalog_settings`,
+  `delivery_outbox`,
   `notification_reads`,
   `notifications`,
   `site_daily_visits`,
@@ -47,7 +54,6 @@ DROP TABLE IF EXISTS
   `recommendation_feedback`,
   `book_enrichment`,
   `book_embeddings`,
-  `book_copies`,
   `books`,
   `book_types`,
   `catalog_schema`,
@@ -65,6 +71,7 @@ DROP TABLE IF EXISTS
   `about_settings`,
   `academic_terms`,
   `academic_programs`,
+  `departments`,
   `backup_snapshots`,
   `user_guide_modules`,
   `users`;
@@ -201,6 +208,7 @@ CREATE TABLE `audit_events` (
   `description` varchar(500) NOT NULL,
   `route` varchar(255) DEFAULT NULL,
   `metadata` json DEFAULT NULL,
+  `event_key` varchar(64) DEFAULT NULL,
   `restore_status` enum('retained','reversed') NOT NULL DEFAULT 'retained',
   `reversed_at` datetime DEFAULT NULL,
   `reversed_by_restore_id` bigint(20) UNSIGNED DEFAULT NULL,
@@ -279,6 +287,68 @@ CREATE TABLE `book_copies` (
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Per-copy acquisition and accession details used by circulation.
+CREATE TABLE `copy_holdings` (
+  `copy_id` int(11) NOT NULL,
+  `accession_number` varchar(64) NOT NULL,
+  `price` decimal(10,2) DEFAULT NULL,
+  `program_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `course_code` varchar(64) DEFAULT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `date_acquired` date DEFAULT NULL,
+  `distributor` varchar(255) DEFAULT NULL,
+  `invoice_reference` varchar(128) DEFAULT NULL,
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Permanent accession registry deliberately has no copy or user foreign key.
+CREATE TABLE `accession_claims` (
+  `accession_number` varchar(64) NOT NULL,
+  `copy_barcode` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `copy_id` int(11) NOT NULL,
+  `book_id` int(11) NOT NULL,
+  `book_title` varchar(255) NOT NULL,
+  `claimed_by` bigint(20) unsigned DEFAULT NULL,
+  `claimed_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`accession_number`),
+  KEY `idx_accession_claims_barcode` (`copy_barcode`),
+  KEY `idx_accession_claims_book_sequence` (`book_id`, `copy_barcode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `accession_claim_voids` (
+  `accession_number` varchar(64) NOT NULL,
+  `copy_barcode` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `copy_id` int(11) NOT NULL,
+  `book_id` int(11) NOT NULL,
+  `book_title` varchar(255) NOT NULL,
+  `reason` varchar(500) NOT NULL,
+  `voided_by` bigint(20) unsigned DEFAULT NULL,
+  `voided_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`accession_number`),
+  KEY `idx_accession_claim_voids_barcode` (`copy_barcode`),
+  KEY `idx_accession_claim_voids_book` (`book_id`, `copy_barcode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `accession_claim_corrections` (
+  `correction_id` char(36) NOT NULL,
+  `copy_barcode` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `copy_id` int(11) NOT NULL,
+  `book_id` int(11) NOT NULL,
+  `book_title` varchar(255) NOT NULL,
+  `old_accession_number` varchar(64) NOT NULL,
+  `new_accession_number` varchar(64) NOT NULL,
+  `reason` varchar(500) NOT NULL,
+  `corrected_by` bigint(20) unsigned DEFAULT NULL,
+  `corrected_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`correction_id`),
+  UNIQUE KEY `uq_accession_corrections_old` (`old_accession_number`),
+  UNIQUE KEY `uq_accession_corrections_new` (`new_accession_number`),
+  KEY `idx_accession_corrections_barcode` (`copy_barcode`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Recommendation vectors are operational data, intentionally separate from
 -- flexible catalogue metadata so vectors are never exposed publicly.
 CREATE TABLE `book_embeddings` (
@@ -351,6 +421,8 @@ CREATE TABLE `borrowings` (
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `book_id` int(11) NOT NULL,
   `copy_id` int(11) DEFAULT NULL,
+  `loan_policy_id_snapshot` bigint(20) UNSIGNED DEFAULT NULL,
+  `loan_policy_name_snapshot` varchar(255) NOT NULL DEFAULT 'Unknown historical policy',
   `borrowed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `due_date` datetime NOT NULL,
   `loan_duration_minutes` int(11) DEFAULT NULL,
@@ -495,6 +567,14 @@ CREATE TABLE `library_circulation_settings` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `catalog_settings` (
+  `id` tinyint(3) UNSIGNED NOT NULL DEFAULT 1,
+  `show_unheld_in_opac` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --------------------------------------------------------
 
 --
@@ -532,6 +612,7 @@ CREATE TABLE `notifications` (
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `source_type` varchar(50) DEFAULT NULL,
   `source_id` bigint(20) DEFAULT NULL,
+  `delivery_key` varchar(64) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -548,6 +629,21 @@ CREATE TABLE `notification_reads` (
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `read_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `delivery_outbox` (
+  `id` char(36) NOT NULL,
+  `event_type` enum('notification','audit') NOT NULL,
+  `payload` json NOT NULL,
+  `status` enum('pending','delivered') NOT NULL DEFAULT 'pending',
+  `attempts` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `available_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `locked_at` datetime DEFAULT NULL,
+  `delivered_at` datetime DEFAULT NULL,
+  `last_error` varchar(1000) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_delivery_outbox_pending` (`status`,`available_at`,`locked_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -601,8 +697,12 @@ CREATE TABLE `site_daily_visits` (
 --
 
 CREATE TABLE `users` (
-  `id` bigint(20) UNSIGNED NOT NULL,
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `student_employee_id` varchar(50) NOT NULL,
+  `library_card_number` varchar(64) DEFAULT NULL,
+  `student_number` varchar(64) DEFAULT NULL,
+  `employee_number` varchar(64) DEFAULT NULL,
+  `username` varchar(64) DEFAULT NULL,
   `barcode` varchar(64) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
@@ -617,12 +717,16 @@ CREATE TABLE `users` (
   `address` varchar(100) NOT NULL DEFAULT '',
   `contact` varchar(11) NOT NULL DEFAULT '',
   `program_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `year_level` enum('1st Year','2nd Year','3rd Year','4th Year','Other') DEFAULT NULL,
+  `department_id` bigint(20) UNSIGNED DEFAULT NULL,
   `academic_term_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
   `deleted_at` timestamp NULL DEFAULT NULL,
   `deleted_by` bigint(20) UNSIGNED DEFAULT NULL,
   `_unique_sid` varchar(80) GENERATED ALWAYS AS (if(`deleted_at` is null,`student_employee_id`,concat('__deleted__',`student_employee_id`,'_',`deleted_at`))) STORED,
   `_unique_email` varchar(280) GENERATED ALWAYS AS (if(`deleted_at` is null,`email`,concat('__deleted__',`email`,'_',`deleted_at`))) STORED,
-  `_unique_barcode` varchar(90) GENERATED ALWAYS AS (if(`deleted_at` is null,`barcode`,concat('__deleted__',`barcode`,'_',`deleted_at`))) STORED
+  `_unique_barcode` varchar(90) GENERATED ALWAYS AS (if(`deleted_at` is null,`barcode`,concat('__deleted__',`barcode`,'_',`deleted_at`))) STORED,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -665,12 +769,27 @@ CREATE TABLE `academic_programs` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `departments` (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_departments_name` (`name`),
+  KEY `fk_departments_created_by` (`created_by`),
+  KEY `fk_departments_updated_by` (`updated_by`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `academic_terms` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
   `starts_on` date NOT NULL,
   `ends_on` date NOT NULL,
   `is_current` tinyint(1) NOT NULL DEFAULT 0,
+  `current_term_key` tinyint(1) GENERATED ALWAYS AS (CASE WHEN `is_current` = 1 THEN 1 ELSE NULL END) STORED,
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `updated_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -724,6 +843,7 @@ ALTER TABLE `auth_audit_events`
 --
 ALTER TABLE `audit_events`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_audit_events_event_key` (`event_key`),
   ADD KEY `idx_audit_events_time` (`occurred_at`),
   ADD KEY `idx_audit_events_category_time` (`category`,`occurred_at`),
   ADD KEY `idx_audit_events_actor_time` (`actor_id`,`occurred_at`),
@@ -844,11 +964,36 @@ ALTER TABLE `clearance_transaction_items`
   ADD KEY `idx_clearance_item_transaction` (`transaction_id`);
 
 --
+-- Indexes for table `catalog_settings`
+--
+ALTER TABLE `catalog_settings`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_catalog_settings_updated_by` (`updated_by`);
+
+--
+-- Indexes for table `copy_holdings`
+--
+ALTER TABLE `copy_holdings`
+  ADD PRIMARY KEY (`copy_id`),
+  ADD UNIQUE KEY `uq_copy_holdings_accession_number` (`accession_number`),
+  ADD KEY `idx_copy_holdings_program` (`program_id`),
+  ADD KEY `fk_copy_holdings_created_by` (`created_by`),
+  ADD KEY `fk_copy_holdings_updated_by` (`updated_by`);
+
+-- Accessions remain claimed after an application restore.
+
+--
 -- Indexes for table `library_circulation_settings`
 --
 ALTER TABLE `library_circulation_settings`
   ADD PRIMARY KEY (`id`),
   ADD KEY `fk_library_circulation_settings_updated_by` (`updated_by`);
+
+--
+-- Constraints for table `catalog_settings`
+--
+ALTER TABLE `catalog_settings`
+  ADD CONSTRAINT `fk_catalog_settings_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Indexes for table `library_holidays`
@@ -865,6 +1010,7 @@ ALTER TABLE `library_holidays`
 --
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_notifications_delivery_key` (`delivery_key`),
   ADD KEY `idx_notifications_active_created` (`is_active`,`created_at`),
   ADD KEY `idx_notifications_audience_user` (`audience_type`,`audience_user_id`),
   ADD KEY `idx_notifications_audience_role` (`audience_type`,`audience_role`),
@@ -904,12 +1050,12 @@ ALTER TABLE `site_daily_visits`
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_active_sid` (`_unique_sid`),
   ADD UNIQUE KEY `uq_active_email` (`_unique_email`),
   ADD UNIQUE KEY `uq_active_barcode` (`_unique_barcode`),
   ADD KEY `idx_users_deleted` (`deleted_at`),
   ADD KEY `idx_users_program` (`program_id`),
+  ADD KEY `idx_users_department` (`department_id`),
   ADD KEY `idx_users_academic_term` (`academic_term_id`);
 
 ALTER TABLE `academic_programs`
@@ -917,7 +1063,14 @@ ALTER TABLE `academic_programs`
   ADD UNIQUE KEY `uq_academic_program_name` (`name`);
 
 ALTER TABLE `academic_terms`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_academic_terms_single_current` (`current_term_key`);
+
+ALTER TABLE `copy_holdings`
+  ADD CONSTRAINT `fk_copy_holdings_copy` FOREIGN KEY (`copy_id`) REFERENCES `book_copies` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_copy_holdings_program` FOREIGN KEY (`program_id`) REFERENCES `academic_programs` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_copy_holdings_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_copy_holdings_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -1102,7 +1255,14 @@ ALTER TABLE `users`
   ADD CONSTRAINT `fk_users_program` FOREIGN KEY (`program_id`) REFERENCES `academic_programs` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `users`
   ADD CONSTRAINT `fk_users_academic_term` FOREIGN KEY (`academic_term_id`) REFERENCES `academic_terms` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE `departments`
+  ADD CONSTRAINT `fk_departments_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_departments_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE `user_guide_modules`
   ADD CONSTRAINT `fk_user_guide_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
@@ -1294,6 +1454,8 @@ INSERT INTO `catalog_schema` (`key`, `label`, `type`, `options`, `required`, `lo
 
 INSERT INTO `library_circulation_settings` (`id`, `overdue_fine_per_hour`) VALUES (1, 1.00)
 ON DUPLICATE KEY UPDATE `overdue_fine_per_hour` = VALUES(`overdue_fine_per_hour`);
+INSERT INTO `catalog_settings` (`id`, `show_unheld_in_opac`) VALUES (1, 1)
+ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 INSERT INTO `site_content_settings` (`id`, `hero_kicker`, `hero_title`, `hero_highlight`, `hero_description`, `hours`, `hero_stats`, `address`, `contact_email`, `contact_phone`) VALUES
 (1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567')
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
@@ -1306,3 +1468,97 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+DELIMITER //
+CREATE TRIGGER `trg_accession_claims_identity_insert` BEFORE INSERT ON `accession_claims` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 AND NOT EXISTS (SELECT 1 FROM book_copies bc WHERE bc.id = NEW.copy_id AND bc.barcode = NEW.copy_barcode AND bc.book_id = NEW.book_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession claim must identify an existing physical copy';
+  END IF;
+END//
+CREATE TRIGGER `trg_accession_claims_no_update` BEFORE UPDATE ON `accession_claims` FOR EACH ROW
+BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession claims are immutable'; END//
+CREATE TRIGGER `trg_accession_claims_no_delete` BEFORE DELETE ON `accession_claims` FOR EACH ROW
+BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession claims cannot be deleted'; END//
+CREATE TRIGGER `trg_accession_corrections_no_update` BEFORE UPDATE ON `accession_claim_corrections` FOR EACH ROW
+BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession correction history is immutable'; END//
+CREATE TRIGGER `trg_accession_corrections_no_delete` BEFORE DELETE ON `accession_claim_corrections` FOR EACH ROW
+BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession correction history cannot be deleted'; END//
+CREATE TRIGGER `trg_accession_corrections_validate_insert` BEFORE INSERT ON `accession_claim_corrections` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession correction events are legacy history and cannot be created';
+  END IF;
+END//
+CREATE TRIGGER `trg_accession_claim_voids_validate_insert` BEFORE INSERT ON `accession_claim_voids` FOR EACH ROW
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM accession_claims claim WHERE claim.accession_number = NEW.accession_number AND claim.copy_barcode = NEW.copy_barcode AND claim.book_id = NEW.book_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Only the original physical copy may void its permanently claimed accession';
+  END IF;
+END//
+CREATE TRIGGER `trg_accession_claim_voids_no_update` BEFORE UPDATE ON `accession_claim_voids` FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession void events are immutable';
+END//
+CREATE TRIGGER `trg_accession_claim_voids_no_delete` BEFORE DELETE ON `accession_claim_voids` FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Accession void events cannot be deleted';
+END//
+CREATE TRIGGER `trg_book_copies_claim_identity_insert` BEFORE INSERT ON `book_copies` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 AND EXISTS (SELECT 1 FROM accession_claims claim WHERE claim.copy_barcode = NEW.barcode) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A barcode reserved by permanent accession history cannot be reused';
+  END IF;
+END//
+CREATE TRIGGER `trg_copy_holdings_claim_insert` BEFORE INSERT ON `copy_holdings` FOR EACH ROW
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM accession_claims ac JOIN book_copies bc ON bc.id = NEW.copy_id WHERE ac.accession_number = NEW.accession_number AND ac.copy_barcode = bc.barcode AND ac.book_id = bc.book_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Create the permanent accession claim before assigning the holding';
+  END IF;
+END//
+CREATE TRIGGER `trg_copy_holdings_claim_update` BEFORE UPDATE ON `copy_holdings` FOR EACH ROW
+BEGIN
+  IF NEW.copy_id <> OLD.copy_id THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A holding cannot be transferred to another physical copy';
+  END IF;
+  IF BINARY NEW.accession_number <> BINARY OLD.accession_number THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'An assigned accession number is permanent and cannot be changed';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM accession_claims ac JOIN book_copies bc ON bc.id = NEW.copy_id WHERE ac.accession_number = NEW.accession_number AND ac.copy_barcode = bc.barcode AND ac.book_id = bc.book_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Holding accession does not match its permanent claim';
+  END IF;
+END//
+CREATE TRIGGER `trg_copy_holdings_claim_delete` BEFORE DELETE ON `copy_holdings` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 AND EXISTS (SELECT 1 FROM accession_claims ac WHERE ac.accession_number = OLD.accession_number) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A claimed accession cannot be removed from holdings';
+  END IF;
+END//
+CREATE TRIGGER `trg_books_accession_claim_delete` BEFORE DELETE ON `books` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 AND EXISTS (
+    SELECT 1 FROM book_copies bc JOIN accession_claims ac ON ac.copy_barcode = bc.barcode
+     WHERE bc.book_id = OLD.id
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A book with a claimed accession cannot be hard-deleted';
+  END IF;
+END//
+CREATE TRIGGER `trg_books_accession_claim_identity` BEFORE UPDATE ON `books` FOR EACH ROW
+BEGIN
+  IF NEW.id <> OLD.id AND EXISTS (SELECT 1 FROM book_copies bc JOIN accession_claims ac ON ac.copy_barcode = bc.barcode WHERE bc.book_id = OLD.id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A book with a claimed accession cannot change identity';
+  END IF;
+END//
+CREATE TRIGGER `trg_book_copies_claim_delete` BEFORE DELETE ON `book_copies` FOR EACH ROW
+BEGIN
+  IF COALESCE(@allow_accession_restore, 0) <> 1 AND EXISTS (SELECT 1 FROM accession_claims ac WHERE ac.copy_barcode = OLD.barcode) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A copy with a claimed accession cannot be hard-deleted';
+  END IF;
+END//
+CREATE TRIGGER `trg_book_copies_claim_identity` BEFORE UPDATE ON `book_copies` FOR EACH ROW
+BEGIN
+  IF (NEW.id <> OLD.id OR BINARY NEW.barcode <> BINARY OLD.barcode OR NEW.book_id <> OLD.book_id) AND EXISTS (SELECT 1 FROM accession_claims ac WHERE ac.copy_barcode = OLD.barcode AND ac.book_id = OLD.book_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A copy with a claimed accession cannot change physical identity';
+  END IF;
+END//
+DELIMITER ;

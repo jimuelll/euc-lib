@@ -42,6 +42,7 @@ const processBorrow = async (req, res) => {
       bookId,
       issuedBy: req.user.id,
     });
+    res.locals.auditEnqueued = true;
     res.status(201).json(result);
   } catch (err) {
     console.error("[circulation] processBorrow:", err);
@@ -56,7 +57,8 @@ const processReturn = async (req, res) => {
       return res.status(400).json({ message: "borrowingId is required" });
     }
 
-    await service.processReturn(borrowingId);
+    await service.processReturn(borrowingId, req.user.id);
+    res.locals.auditEnqueued = true;
     res.json({ message: "Book returned successfully" });
   } catch (err) {
     console.error("[circulation] processReturn:", err);
@@ -72,6 +74,7 @@ const processRenew = async (req, res) => {
     }
 
     const result = await service.processRenew({ borrowingId, renewedBy: req.user.id });
+    res.locals.auditEnqueued = true;
     res.json(result);
   } catch (err) {
     console.error("[circulation] processRenew:", err);

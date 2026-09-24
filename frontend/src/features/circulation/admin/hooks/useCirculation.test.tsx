@@ -8,8 +8,8 @@ import * as api from "../circulation.api";
 vi.mock("../circulation.api", () => ({ lookupUser: vi.fn(), lookupCopy: vi.fn(), processBorrow: vi.fn(), processReturn: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 const patron = { id: 1, name: "Test Patron", student_employee_id: "TEST-1", barcode: "TEST-1", role: "student" };
-const copy = { id: 2, book_id: 3, barcode: "COPY-2", title: "Test book", author: "Test author", copies: 1, condition: "good", is_active: true };
-const loan = { id: 4, book_id: 3, title: "Test book", author: "Test author", borrowed_at: "2026-09-01", due_date: "2026-09-30", status: "borrowed" as const };
+const copy = { id: 2, book_id: 3, barcode: "COPY-2", accession_number: "ACC-2", borrow_eligible: 1, title: "Test book", author: "Test author", copies: 1, condition: "good", is_active: true };
+const loan = { id: 4, book_id: 3, copy_id: 2, copy_barcode: "COPY-2", accession_number: null, title: "Test book", author: "Test author", borrowed_at: "2026-09-01", due_date: "2026-09-30", status: "borrowed" as const };
 const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={["/admin/circulation?transaction=return"]}>{children}</MemoryRouter>;
 beforeEach(() => {
   vi.resetAllMocks();
@@ -42,6 +42,26 @@ describe("desk transaction handoffs", () => {
     expect(result.current.completed).toContain("Return completed");
     expect(result.current.foundUser).toBeNull();
     expect(done).toHaveBeenCalledTimes(1);
+  });
+  it("allows a legacy return by the exact QR copy even without an accession number", async () => {
+    vi.mocked(api.lookupCopy).mockResolvedValue({ ...copy, accession_number: null });
+    const { result } = renderHook(() => useCirculation(), { wrapper });
+    await act(async () => { await result.current.handleLookupUser("TEST-1"); });
+    await act(async () => { await result.current.handleLookupCopy("COPY-2"); });
+    expect(result.current.canSubmit).toBe(true);
+    await act(async () => { await result.current.handleSubmit({ preventDefault() {} } as React.FormEvent); });
+    expect(api.processReturn).toHaveBeenCalledWith("COPY-2");
+  });
+  it("blocks checkout when a valid QR scan resolves to an unaccessioned copy", async () => {
+    vi.mocked(api.lookupCopy).mockResolvedValue({ ...copy, accession_number: null });
+    const { result } = renderHook(() => useCirculation(null), { wrapper });
+    await act(async () => { await result.current.handleLookupUser("TEST-1"); });
+    // Borrow is selected from the URL after switching transaction mode.
+    act(() => result.current.handleTypeChange("borrow"));
+    await act(async () => { await result.current.handleLookupCopy("COPY-2"); });
+    expect(result.current.canSubmit).toBe(false);
+    await act(async () => { await result.current.handleSubmit({ preventDefault() {} } as React.FormEvent); });
+    expect(api.processBorrow).not.toHaveBeenCalled();
   });
   it("keeps reservation checkout in Borrow and fulfills only through a successful borrow", async () => {
     const reservation = { id: 8, book_id: 3, book_title: "Test book", student_employee_id: "TEST-1", user_name: "Test Patron" };

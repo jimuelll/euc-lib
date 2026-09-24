@@ -1,6 +1,6 @@
 import axiosInstance from "@/utils/AxiosInstance";
 
-export type FineRow = { id: number; book_title: string; status: "borrowed" | "overdue" | "returned"; fine_amount: number; settled_amount: number; unsettled_amount: number };
+export type FineRow = { id: number; book_title: string; status: "borrowed" | "overdue" | "returned"; is_archived?: boolean; copy_barcode?: string | null; fine_amount: number; settled_amount: number; unsettled_amount: number };
 export type ClearanceProfile = { user: { name: string; student_employee_id: string; program_course?: string | null }; status: "blocked" | "eligible"; reasons: string[]; overdueItems: { id: number; title: string }[]; fineRows: FineRow[]; outstandingAmount: number; reservations: { id: number; status: string; book_title: string }[]; transactions: { id: number; receipt_number: string | null; transaction_type: string; amount: number; reason: string | null; created_at: string; corrected: number }[] };
 export type ClearanceUserSuggestion = { student_employee_id: string; name: string; role: string };
 export type QueueEntry = { userId: number; name: string; studentEmployeeId: string; overdueCount: number; oldestDueDate: string | null; overdueTitles: string[]; outstandingAmount: number; fineRecords: number };

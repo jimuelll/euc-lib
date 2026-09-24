@@ -2,6 +2,7 @@ const { mapBorrowingsWithFineDetails, syncOverdueBorrowings } = require("./overd
 const repository = require("./borrowing.repository");
 const { getClearanceProfile } = require("../clearance/clearance.service");
 const { getPagination } = require("./borrowing.helpers");
+const catalogSettings = require("../catalog/catalog.settings.service");
 
 const getActiveBorrows = async (userId) => {
   await syncOverdueBorrowings();
@@ -19,7 +20,8 @@ const getBorrowHistory = async (userId, { page, limit } = {}) => {
 
 const searchCatalogueWithAvailability = async (query) => {
   await syncOverdueBorrowings();
-  return repository.searchCatalogueWithAvailability(query);
+  const settings = await catalogSettings.getCatalogSettings();
+  return repository.searchCatalogueWithAvailability(query, { showUnheldInOpac: settings.show_unheld_in_opac });
 };
 
 const resolveUserByBarcode = (scannedValue) => repository.findUserByBarcode(scannedValue);

@@ -1,5 +1,5 @@
 const service = require("./clearance.service");
-const respond = (handler) => async (req, res) => { try { const result = await handler(req); if (result && typeof result === "object") { res.locals.auditDetails = { amount: result.amount, transactionId: result.transactionId, receiptNumber: result.receiptNumber }; } res.json(result); } catch (error) { console.error("[clearance]", error); res.status(error.status || 500).json({ message: error.message || "Clearance request failed", clearance: error.clearance }); } };
+const respond = (handler) => async (req, res) => { try { const result = await handler(req); if (req.method !== "GET" && result && typeof result === "object") res.locals.auditEnqueued = true; res.json(result); } catch (error) { console.error("[clearance]", error); res.status(error.status || 500).json({ message: error.message || "Clearance request failed", clearance: error.clearance }); } };
 exports.getProfile = respond((req) => service.getClearanceProfile(req.query.student_employee_id));
 exports.getQueue = respond((req) => service.getClearanceQueue({
   page: req.query.page === undefined ? undefined : Number(req.query.page),

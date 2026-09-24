@@ -151,7 +151,7 @@ const ReserveTab = ({
                       className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
-                      Available
+                      {book.canReserve === false && book.material_type !== "thesis" ? "Unavailable" : "Available"}
                     </p>
                     <p
                       className={`mt-0.5 text-[12px] font-bold ${
@@ -159,7 +159,7 @@ const ReserveTab = ({
                       }`}
                       style={{ fontFamily: "var(--font-heading)" }}
                     >
-                      {book.available} / {book.copies}
+                      {book.available} / {book.registered_copies ?? 0}
                     </p>
                     {book.location && (
                       <p className="mt-0.5 text-xs text-muted-foreground/60">
@@ -170,7 +170,7 @@ const ReserveTab = ({
                 }
                 action={
                    book.canReserve === false ? (
-                     <span className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/60" style={{ fontFamily: "var(--font-heading)" }}>Reference only</span>
+                     <span className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>{book.material_type === "thesis" ? "Reference only" : "Unavailable · no accessioned copies"}</span>
                    ) : alreadyReserved ? (
                     <span
                       className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/50"

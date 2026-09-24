@@ -47,10 +47,13 @@ async function findBorrowHistory(userId) {
        b.returned_at,
        b.due_date,
        b.status,
-       bc.barcode AS copy_barcode
+       bc.id AS copy_id,
+       bc.barcode AS copy_barcode,
+       h.accession_number
      FROM borrowings b
      JOIN books bk ON bk.id = b.book_id
-     LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id
+     LEFT JOIN copy_holdings h ON h.copy_id = bc.id
      WHERE b.user_id = ?
        AND b.status = 'returned'
        AND b.deleted_at IS NULL
@@ -76,7 +79,7 @@ async function findActiveReservations(userId) {
      JOIN books bk ON bk.id = r.book_id
      WHERE r.user_id = ?
        AND r.status IN ('pending', 'ready')
-       AND r.deleted_at IS NULL
+       AND r.deleted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > NOW())
      ORDER BY r.reserved_at DESC`,
     [userId]
   );
@@ -129,14 +132,18 @@ async function getHistory(userId, page, limit) {
   const [rows] = await db.query(
     `SELECT * FROM (
        SELECT b.id, bk.title, bk.author, 'borrowing' AS kind, b.status,
-              b.returned_at AS occurred_at, b.borrowed_at, b.returned_at, NULL AS reserved_at
+              b.returned_at AS occurred_at, b.borrowed_at, b.returned_at, NULL AS reserved_at,
+              bc.id AS copy_id, bc.barcode AS copy_barcode, h.accession_number
        FROM borrowings b
        JOIN books bk ON bk.id = b.book_id
+       LEFT JOIN book_copies bc ON bc.id = b.copy_id
+       LEFT JOIN copy_holdings h ON h.copy_id = bc.id
        WHERE b.user_id = ? AND b.status = 'returned' AND b.deleted_at IS NULL
        UNION ALL
        SELECT r.id, bk.title, bk.author, 'reservation' AS kind, r.status,
               COALESCE(r.fulfilled_at, r.cancelled_at, r.reserved_at) AS occurred_at,
-              NULL AS borrowed_at, NULL AS returned_at, r.reserved_at
+              NULL AS borrowed_at, NULL AS returned_at, r.reserved_at,
+              NULL AS copy_id, NULL AS copy_barcode, NULL AS accession_number
        FROM reservations r
        JOIN books bk ON bk.id = r.book_id
        WHERE r.user_id = ? AND r.status IN ('cancelled', 'expired', 'fulfilled') AND r.deleted_at IS NULL

@@ -73,6 +73,9 @@ async function restoreSavedSnapshot(req, res) {
     const backup = await getSnapshotPayload(snapshot);
     if (!validateBackup(backup)) throw Object.assign(new Error("The saved snapshot is invalid."), { status: 400 });
     const preRestoreSnapshot = await performRestore(backup, { restoredBy: req.user.id, restoredByName: req.user.name, restoredByRole: req.user.role, snapshotId: snapshot.id, snapshotKind: snapshot.kind, snapshotLabel: `saved snapshot “${snapshot.filename}”` });
+    // The restore transaction inserts its audit event before commit. Tell the
+    // generic response logger not to append a second, post-restore event.
+    res.locals.auditEnqueued = true;
     res.json({ message: "Database restored successfully.", preRestoreSnapshot });
   } catch (error) { sendError(res, error, "Restore failed before any database records were changed."); }
 }
@@ -82,6 +85,8 @@ async function restoreUploadedSnapshot(req, res) {
     requireRestoreSignOutAcknowledgement(req);
     if (!validateBackup(req.body)) throw Object.assign(new Error("This file is not a valid EUC Library backup."), { status: 400 });
     const preRestoreSnapshot = await performRestore(req.body, { restoredBy: req.user.id, restoredByName: req.user.name, restoredByRole: req.user.role, snapshotLabel: "uploaded snapshot" });
+    // performRestore commits a durable audit row as part of the data restore.
+    res.locals.auditEnqueued = true;
     res.json({ message: "Database restored successfully.", restoredAt: new Date().toISOString(), preRestoreSnapshot });
   } catch (error) { sendError(res, error, "Restore failed before any database records were changed."); }
 }

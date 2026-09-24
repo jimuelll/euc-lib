@@ -58,17 +58,22 @@ const mapBorrowingsWithFineDetails = async (rows, conn) => {
     if (!balance) throw new Error(`Fine ledger is missing loan #${row.id}. Apply and backfill the fine-ledger migration.`);
     return {
       ...row,
+      is_archived: Boolean(row.borrowing_archived_at),
       hours_overdue: hoursOverdue,
       fine_amount: balance.fineAmount,
       settled_amount: roundCurrency(balance.paidAmount + balance.adjustedAmount),
       unsettled_amount: balance.balance,
-      fine_per_hour: settings.overdue_fine_per_hour,
+      // The current library rate is only a fallback for legacy loans. Newer
+      // borrowings keep the terms that were saved at checkout.
+      fine_per_hour: row.fine_per_hour ?? settings.overdue_fine_per_hour,
+      fine_interval: row.fine_interval ?? "hour",
+      initial_fine: row.initial_fine ?? 0,
       status: row.status === "returned" ? row.status : (isOverdue ? "overdue" : row.status),
     };
   });
 };
 
-const syncOverdueBorrowings = async (conn) => {
+const syncOverdueBorrowingsInTransaction = async (conn) => {
   await ensureBorrowingPaymentColumns();
   const settings = await getSettings(conn);
   const rows = await repository.findOverdueCandidates(conn);
@@ -80,10 +85,10 @@ const syncOverdueBorrowings = async (conn) => {
     const unsettledAmount = balance?.balance ?? 0;
     const shouldNotifyAgain = unsettledAmount > 0 && (!row.last_overdue_notification_at || (Date.now() - new Date(row.last_overdue_notification_at).getTime()) >= OVERDUE_REMINDER_INTERVAL_MS);
     if (shouldNotifyAgain) {
-      await notificationsService.createNotification({
+      await notificationsService.enqueueNotification(conn, {
         type: "overdue_fine",
         title: "Borrowed book is overdue",
-        body: `"${row.title}" is overdue. Current unsettled balance: PHP ${unsettledAmount.toFixed(2)}. It continues to increase according to this book type's fine policy until the balance is settled or the book is returned.`,
+        body: `"${row.title}" is overdue. Current unsettled balance: PHP ${unsettledAmount.toFixed(2)}. The fine continues under the terms saved on this loan until it is settled or returned.`,
         href: "/my-library",
         audienceType: "user",
         audienceUserId: row.user_id,
@@ -93,6 +98,21 @@ const syncOverdueBorrowings = async (conn) => {
       });
       await repository.markOverdueNotificationSent(row.id, conn);
     }
+  }
+};
+
+const syncOverdueBorrowings = async (conn = null) => {
+  if (conn) return syncOverdueBorrowingsInTransaction(conn);
+  const connection = await repository.getConnection();
+  try {
+    await connection.beginTransaction();
+    await syncOverdueBorrowingsInTransaction(connection);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
   }
 };
 

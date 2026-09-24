@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, ArchiveX, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import {
   Input,
@@ -363,11 +363,13 @@ interface SearchBarProps {
   onSearch:         () => void;
   onArchivedViewChange: (archived: boolean) => void;
   onCreate: () => void;
+  canBulkDeactivate: boolean;
+  onBulkDeactivate: () => Promise<boolean>;
 }
 
 export const SearchBar = ({
   value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange,
-  onRoleFilterChange, onStatusFilterChange, onSearch, onArchivedViewChange, onCreate,
+  onRoleFilterChange, onStatusFilterChange, onSearch, onArchivedViewChange, onCreate, canBulkDeactivate, onBulkDeactivate,
 }: SearchBarProps) => (
   <div className="flex flex-col gap-2 border border-border bg-card p-3 lg:flex-row lg:items-center">
     <div className="relative min-w-0 flex-1">
@@ -379,9 +381,10 @@ export const SearchBar = ({
       {!showArchived ? <select aria-label="Filter users by account status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="all">All access</option><option value="active">Active</option><option value="inactive">Inactive</option></select> : null}
       <select aria-label="Filter archived users" value={showArchived ? "archived" : "current"} onChange={(event) => onArchivedViewChange(event.target.value === "archived")} className="h-11 min-w-32 border border-border bg-background px-3 text-sm"><option value="current">Current users</option><option value="archived">Archived users</option></select>
     </div>
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" className="h-11 flex-1 rounded-md lg:flex-none" onClick={() => onSearch()} disabled={loading}><Search className="mr-2 h-4 w-4" />Search</Button>
       <Button type="button" className="h-11 flex-1 rounded-md lg:flex-none" onClick={onCreate}><UserPlus className="mr-2 h-4 w-4" />Create user</Button>
+      {canBulkDeactivate && <Button type="button" variant="outline" className="h-11 flex-1 rounded-md lg:flex-none" onClick={() => void onBulkDeactivate()} disabled={loading}><ArchiveX className="mr-2 h-4 w-4" />Bulk deactivate</Button>}
     </div>
   </div>
 );

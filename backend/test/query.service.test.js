@@ -39,3 +39,32 @@ test("query service rejects unsupported filter values", () => {
   assert.throws(() => buildWhere("borrowings", { status: "deleted" }), { status: 400 });
   assert.throws(() => buildWhere("attendance", { scanType: "scan" }), { status: 400 });
 });
+
+test("catalog query and availability filter share accessioned circulation eligibility", () => {
+  const query = buildWhere("catalog", { availability: "available" });
+  assert.match(query.clause, /copy_holdings/);
+  assert.match(query.clause, /condition IN \('good', 'damaged'\)/);
+  assert.match(query.clause, /borrowed', 'overdue/);
+  assert.match(query.clause, /status = 'ready'/);
+  assert.match(DATASETS.catalog.select, /activeAccessionedCopies/);
+  assert.match(DATASETS.catalog.select, /needsAccessionCopies/);
+  assert.match(DATASETS.catalog.select, /availableCopies/);
+});
+
+test("borrowing history uses the saved policy snapshot and includes archived records", () => {
+  const query = buildWhere("borrowings", { bookType: "7" });
+  assert.match(DATASETS.borrowings.from, /LEFT JOIN users/);
+  assert.match(DATASETS.borrowings.select, /loan_policy_name_snapshot/);
+  assert.match(DATASETS.borrowings.base, /b\.id IS NOT NULL/);
+  assert.doesNotMatch(DATASETS.borrowings.base, /deleted_at/);
+  assert.match(query.clause, /b\.loan_policy_id_snapshot = \?/);
+  assert.deepEqual(query.params, [7]);
+  const unknown = buildWhere("borrowings", { bookType: "0" });
+  assert.match(unknown.clause, /Unknown historical policy/);
+});
+
+test("reservation reporting labels the live policy separately from historical loan policy", () => {
+  assert.match(DATASETS.reservations.columns.find(([key]) => key === "bookType")[1], /Current book policy/);
+  assert.match(DATASETS.reservations.from, /LEFT JOIN books/);
+  assert.doesNotMatch(DATASETS.reservations.base, /deleted_at/);
+});

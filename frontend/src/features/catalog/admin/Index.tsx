@@ -82,7 +82,7 @@ const AdminCatalog = () => {
 
   return (
     <AdminPage title={mode === "builder" ? "Catalog Configuration" : mode === "ai" ? "AI Recommendations" : "Catalog"} description={description} contentWidth="wide">
-      {mode === "catalog" && <div className="mt-5"><AdminCatalogData fields={fields} /></div>}
+      {mode === "catalog" && <div className="mt-5"><AdminCatalogData fields={fields} isSuperAdmin={user?.role === "super_admin"} /></div>}
       {mode === "builder" && canAccessBuilder && <div className="mt-5"><AdminCatalogBuilder fields={fields} onFieldsChange={setFields} /></div>}
       {mode === "ai" && canAccessBuilder && <div className="mt-5 space-y-5">
             <div className="grid gap-4 lg:grid-cols-3">

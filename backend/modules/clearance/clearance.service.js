@@ -1,6 +1,7 @@
 const repository = require("./clearance.repository");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const notificationsService = require("../notifications/notifications.service");
+const { enqueueTransactionalAudit } = require("../analytics/transactional-audit");
 
 const roundCurrency = (value) => Number((Number(value) || 0).toFixed(2));
 
@@ -108,9 +109,19 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }) => {
       createdBy,
       allocations: fines.rows.map((row) => ({ borrowingId: row.id, amount: row.unsettled_amount })),
     }, conn);
-    await conn.commit();
-    const clearance = await getClearanceProfile(user.student_employee_id);
-    await notificationsService.createNotification({
+    const [[savedTransaction]] = await conn.query("SELECT id, transaction_type, amount, receipt_number FROM clearance_transactions WHERE id = ?", [transaction.id]);
+    await enqueueTransactionalAudit(conn, {
+      actorId: createdBy,
+      category: "clearance",
+      route: "/api/admin/clearance/payment",
+      action: "payment_recorded",
+      description: `Recorded fine payment ${savedTransaction.receipt_number}`,
+      before: null,
+      after: savedTransaction,
+      details: { transactionId: savedTransaction.id, stateFrom: "Not recorded", stateTo: "Recorded", stateLabel: "Payment" },
+      type: "state_transition",
+    });
+    await notificationsService.enqueueNotification(conn, {
       type: "payment_settled",
       title: "Payment received",
       body: `A cash payment of PHP ${amount.toFixed(2)} was recorded for your library fines.`,
@@ -119,7 +130,9 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }) => {
       audienceUserId: user.id,
       createdBy,
     });
-    return { message: "Full payment recorded", receiptNumber: transaction.receiptNumber, transactionId: transaction.id, amount, clearance };
+    const clearance = await buildStatus(user.id, conn);
+    await conn.commit();
+    return { message: "Full payment recorded", receiptNumber: transaction.receiptNumber, transactionId: transaction.id, amount, clearance: { user, ...clearance } };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -148,8 +161,20 @@ const adjustFine = async ({ borrowingId, amount, reason, createdBy }) => {
       createdBy,
       allocations: [{ borrowingId, amount: reduction }],
     }, conn);
+    const [[savedTransaction]] = await conn.query("SELECT id, transaction_type, amount, receipt_number FROM clearance_transactions WHERE id = ?", [transaction.id]);
+    await enqueueTransactionalAudit(conn, {
+      actorId: createdBy,
+      category: "clearance",
+      route: `/api/admin/clearance/borrowings/${borrowingId}/adjust`,
+      action: "adjusted",
+      description: `Adjusted fine for borrowing ${borrowingId}`,
+      before: null,
+      after: savedTransaction,
+      details: { transactionId: savedTransaction.id, borrowingId, stateFrom: "Not recorded", stateTo: "Adjusted", stateLabel: "Fine adjustment" },
+      type: "state_transition",
+    });
     await conn.commit();
-    return { message: "Fine adjustment recorded", transactionId: transaction.id };
+    return { message: "Fine adjustment recorded", transactionId: transaction.id, amount: reduction };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -167,6 +192,10 @@ const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
     if (!transaction) throw Object.assign(new Error("Transaction not found"), { status: 404 });
     if (transaction.transaction_type === "reversal") throw Object.assign(new Error("A reversal cannot be reversed"), { status: 409 });
     if (await repository.findExistingReversal(transactionId, conn)) throw Object.assign(new Error("This transaction has already been corrected"), { status: 409 });
+    const patron = await repository.lockUserForFineChange(transaction.user_id, conn);
+    if (!patron || !patron.is_active || patron.deleted_at) {
+      throw Object.assign(new Error("Restore this patron account before changing its fine ledger"), { status: 409 });
+    }
     const items = await repository.findTransactionItems(transactionId, conn);
     const reversal = await repository.createTransaction({
       userId: transaction.user_id,
@@ -177,8 +206,20 @@ const reverseTransaction = async ({ transactionId, reason, createdBy }) => {
       reversesTransactionId: transactionId,
       allocations: items.map((item) => ({ borrowingId: item.borrowing_id, amount: -Number(item.amount) })),
     }, conn);
+    const [[savedTransaction]] = await conn.query("SELECT id, transaction_type, amount, receipt_number FROM clearance_transactions WHERE id = ?", [reversal.id]);
+    await enqueueTransactionalAudit(conn, {
+      actorId: createdBy,
+      category: "clearance",
+      route: `/api/admin/clearance/transactions/${transactionId}/reverse`,
+      action: "reversed",
+      description: `Corrected clearance transaction ${transactionId}`,
+      before: null,
+      after: savedTransaction,
+      details: { transactionId: savedTransaction.id, stateFrom: "Not recorded", stateTo: "Reversed", stateLabel: "Transaction correction" },
+      type: "state_transition",
+    });
     await conn.commit();
-    return { message: "Transaction corrected", transactionId: reversal.id };
+    return { message: "Transaction corrected", transactionId: reversal.id, amount: -Number(transaction.amount) };
   } catch (error) {
     await conn.rollback();
     throw error;
