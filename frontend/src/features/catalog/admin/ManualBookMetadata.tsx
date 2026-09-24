@@ -199,7 +199,7 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
       </section>
 
       <Sheet open={Boolean(selectedBook)} onOpenChange={(open) => { if (!open) closeEditor(); }}>
-        <SheetContent className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[560px]" onEscapeKeyDown={(event) => { if (saving) event.preventDefault(); }}>
+        <SheetContent className="admin-edit-sheet grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[560px]" onEscapeKeyDown={(event) => { if (saving) event.preventDefault(); }}>
           <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
             <SheetTitle className="text-primary-foreground">Add AI details</SheetTitle>
             <SheetDescription className="text-primary-foreground/80">{selectedBook?.title || "Book"}{selectedBook?.author ? ` · ${selectedBook.author}` : ""}</SheetDescription>

@@ -312,7 +312,7 @@ const AdminAttendanceLogs = () => {
             {!historyError && historyRows.length > 0 ? (
               <div className="space-y-4">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table className="admin-stack-attendance w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/20">
                         {["Person", "Role", "Type", "Purpose", "Scanned By", "Time"].map((heading) => (

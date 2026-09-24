@@ -43,7 +43,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
   } = model;
 
   return (
-    <div className="mt-6 flex w-full flex-col overflow-hidden border border-border">
+    <div className="admin-catalog-builder mt-6 flex w-full min-w-0 flex-col overflow-hidden border border-border">
       {confirmDialog}
 
       {/* ── Two-column: current fields + add new field ────────────────── */}
@@ -53,7 +53,7 @@ const CatalogBuilderPanels = ({ model }: Props) => {
         <div className="border-b lg:border-b-0 lg:border-r border-border">
           <PanelLabel>Current Fields</PanelLabel>
 
-          <div className="grid grid-cols-[24px_32px_1fr_auto_auto] gap-x-3 items-center px-5 py-2 border-b border-border bg-muted/20">
+          <div className="hidden grid-cols-[24px_32px_1fr_auto_auto] gap-x-3 items-center px-5 py-2 border-b border-border bg-muted/20 md:grid">
             {["", "#", "Label / Key", "Badges", ""].map((h, i) => (
               <span
                 key={i}
@@ -88,14 +88,16 @@ const CatalogBuilderPanels = ({ model }: Props) => {
                       type="button"
                       onClick={() => handleMove(f.key, "up")}
                       disabled={idx === 0 || saving}
-                      className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
-                    >▲</button>
+                      aria-label={`Move ${f.label} up`}
+                      className="grid min-h-11 min-w-11 place-items-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors md:min-h-0 md:min-w-0"
+                    ><ChevronUp className="h-4 w-4" /></button>
                     <button
                       type="button"
                       onClick={() => handleMove(f.key, "down")}
                       disabled={idx === sortedFields.length - 1 || saving}
-                      className="text-[8px] leading-none text-muted-foreground/30 hover:text-foreground disabled:opacity-20 transition-colors"
-                    >▼</button>
+                      aria-label={`Move ${f.label} down`}
+                      className="grid min-h-11 min-w-11 place-items-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors md:min-h-0 md:min-w-0"
+                    ><ChevronDown className="h-4 w-4" /></button>
                   </div>
 
                   {/* Index */}

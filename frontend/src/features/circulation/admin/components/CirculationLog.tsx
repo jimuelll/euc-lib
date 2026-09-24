@@ -224,7 +224,21 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
       </div>
 
       {/* ── Table ───────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto">
+      <div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="Transaction history">
+        {loading && <p className="p-4 text-sm text-muted-foreground">Loading transactions…</p>}
+        {!loading && rows.length === 0 && <p className="p-4 text-sm text-muted-foreground">{showArchived ? "No archived records found" : "No records found"}</p>}
+        {!loading && rows.map((row) => {
+          const cfg = statusConfig[row.status];
+          const isActioning = actionId === row.id;
+          return <article key={row.id} className="min-w-0 space-y-3 p-4">
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words text-base font-semibold">{row.book_title}</h3><p className="mt-1 break-words text-sm text-muted-foreground">{row.user_name} · {row.student_employee_id}</p></div><Badge className={cfg.className}>{cfg.label}</Badge></div>
+            <dl className="grid grid-cols-2 gap-2 text-sm"><div><dt className="text-muted-foreground">Borrowed</dt><dd>{formatDateTime(row.borrowed_at)}</dd></div><div><dt className="text-muted-foreground">Due</dt><dd>{formatDateTime(row.due_date)}</dd></div><div><dt className="text-muted-foreground">Returned</dt><dd>{row.returned_at ? formatDateTime(row.returned_at) : "—"}</dd></div><div><dt className="text-muted-foreground">Issued by</dt><dd className="break-words">{row.issued_by_name ?? "—"}</dd></div></dl>
+            {row.is_legacy && <p className="text-sm text-warning">Legacy loan</p>}
+            {showArchived ? <button type="button" onClick={() => handleRestore(row)} disabled={isActioning} className="min-h-11 w-full border border-warning/40 px-3 text-sm font-semibold text-warning disabled:opacity-40">{isActioning ? "Restoring…" : "Restore record"}</button> : row.status === "returned" ? <button type="button" onClick={() => handleArchive(row)} disabled={isActioning} className="min-h-11 w-full border border-border px-3 text-sm font-semibold disabled:opacity-40">{isActioning ? "Archiving…" : "Archive record"}</button> : null}
+          </article>;
+        })}
+      </div>
+      <div className="admin-desktop-table overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">

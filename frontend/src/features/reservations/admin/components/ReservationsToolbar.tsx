@@ -23,7 +23,7 @@ const ReservationsToolbar = ({
       <input
         aria-label="Search reservations"
         placeholder="Search by student ID, name, or book title…"
-        className="h-10 w-full border-b border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary xl:border-b-0 xl:border-r"
+        className="h-11 w-full border-b border-border bg-background pl-10 pr-4 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary md:text-sm xl:border-b-0 xl:border-r"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
       />
@@ -37,7 +37,7 @@ const ReservationsToolbar = ({
             key={opt.value}
             onClick={() => onStatusChange(opt.value)}
             aria-pressed={statusFilter === opt.value}
-            className={`h-10 shrink-0 border-r border-border px-3.5 text-sm font-semibold transition-colors last:border-r-0 ${
+            className={`h-11 shrink-0 border-r border-border px-3.5 text-sm font-semibold transition-colors last:border-r-0 ${
               statusFilter === opt.value
                 ? "bg-primary text-primary-foreground"
                 : "bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground"
@@ -54,7 +54,7 @@ const ReservationsToolbar = ({
     <button
       onClick={onRefresh}
       disabled={loading}
-      className="flex h-10 w-full items-center justify-center border-t border-border text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground disabled:opacity-40 xl:w-10 xl:border-t-0"
+      className="flex h-11 w-full items-center justify-center border-t border-border text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground disabled:opacity-40 xl:w-10 xl:border-t-0"
       title="Refresh"
       aria-label="Refresh reservations"
     >

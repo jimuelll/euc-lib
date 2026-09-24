@@ -92,7 +92,7 @@ export default function BookTypesSettings() {
         <div className="flex items-end"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Add book type"}</Button></div>
       </form>
       <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="admin-stack-policies w-full min-w-[900px] text-left text-sm">
           <thead><tr className="border-b border-border bg-muted/20"><th className="px-3 py-2">Book type</th><th className="px-3 py-2">Loan duration</th><th className="px-3 py-2">Initial fine</th><th className="px-3 py-2">Recurring fine</th><th className="px-3 py-2">Interval</th><th className="px-3 py-2">Assigned books</th><th className="px-3 py-2">Action</th></tr></thead>
           <tbody>{types.map((type, index) => {
             const activePolicy = Number(type.is_active ?? 1) === 1;

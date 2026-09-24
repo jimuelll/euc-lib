@@ -397,7 +397,18 @@ interface SearchResultsTableProps {
 }
 
 export const SearchResultsTable = ({ results, showArchived, onSelect, onViewQr }: SearchResultsTableProps) => (
-  <div className="overflow-x-auto">
+  <>
+  <div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="User records">
+    {results.map((u) => <article key={u.student_employee_id} className="min-w-0 space-y-3 p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0"><h3 className="break-words text-base font-semibold text-foreground">{u.name}</h3><p className="mt-1 break-all text-sm text-muted-foreground">{u.student_employee_id}</p></div>
+        <StatusBadge status={showArchived ? "archived" : u.is_active === 0 ? "inactive" : "active"} />
+      </div>
+      <dl className="grid gap-2 text-sm"><div><dt className="text-muted-foreground">Role</dt><dd className="font-medium capitalize">{formatRole(u.role)}</dd></div><div><dt className="text-muted-foreground">Program / course</dt><dd className="break-words">{u.program_course ?? "—"}</dd></div></dl>
+      <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => onSelect(u)}>{showArchived ? "Review account" : "Edit account"}</Button>{!showArchived && <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => onViewQr(u)}><QrCode className="mr-2 h-4 w-4" />View QR</Button>}</div>
+    </article>)}
+  </div>
+  <div className="admin-desktop-table overflow-x-auto">
     <table className="w-full min-w-[700px] text-left text-sm">
       <thead className="border-b border-border bg-secondary/40">
         <tr>
@@ -443,6 +454,7 @@ export const SearchResultsTable = ({ results, showArchived, onSelect, onViewQr }
       </tbody>
     </table>
   </div>
+  </>
 );
 
 // ─── Edit Form ────────────────────────────────────────────────────────────────

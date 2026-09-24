@@ -5,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "../layout/components/AdminSidebar";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { dashboardItem, visibleSidebarSections } from "../layout/AdminLayoutData";
 
 const auth = vi.hoisted(() => ({ role: "super_admin", logout: vi.fn() }));
@@ -15,7 +16,7 @@ function mount(role = "super_admin", route = "/admin", width = 1024) {
   auth.role = role;
   window.innerWidth = width;
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: width < 768, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-  return render(<MemoryRouter initialEntries={[route]}><SidebarProvider><SidebarTrigger aria-label="Toggle navigation" /><AdminSidebar /><LocationProbe /></SidebarProvider></MemoryRouter>);
+  return render(<ThemeProvider><MemoryRouter initialEntries={[route]}><SidebarProvider><SidebarTrigger aria-label="Toggle navigation" /><AdminSidebar /><LocationProbe /></SidebarProvider></MemoryRouter></ThemeProvider>);
 }
 describe("admin sidebar", () => {
   it.each(["staff", "admin", "super_admin"])("shows exactly the permitted tools for %s without expanding groups", role => {

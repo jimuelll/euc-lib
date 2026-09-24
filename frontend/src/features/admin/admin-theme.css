@@ -195,8 +195,90 @@ body.admin-workspace {
     box-shadow: -1px 0 hsl(var(--border));
   }
 }
+@media (max-width: 767px) {
+  .admin-workspace #admin-main { padding: 16px 12px max(24px, env(safe-area-inset-bottom)); }
+  .admin-workspace .admin-page-actions,
+  .admin-workspace .admin-panel-actions { width: 100%; }
+  .admin-workspace .admin-page-actions > :is(button, a),
+  .admin-workspace .admin-panel-actions > :is(button, a) { flex: 1 1 auto; min-height: 44px; }
+  .admin-workspace :is(input, textarea, select) { font-size: 16px; }
+  .admin-workspace :is(button, [role="button"], [role="tab"], [role="menuitem"]) { min-height: 44px; touch-action: manipulation; }
+  .admin-workspace [role="dialog"]:not(.inset-y-0) { max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  .admin-workspace .admin-edit-sheet { width: 100vw; max-width: 100vw; height: 100dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .admin-workspace .admin-edit-sheet > button.absolute { top: 12px; right: 12px; z-index: 2; display: grid; width: 44px; height: 44px; place-items: center; color: white; opacity: 1; }
+  .admin-workspace .admin-edit-sheet > button.absolute:hover { background: rgb(255 255 255 / 0.14); }
+  .admin-workspace [data-sidebar="sidebar"][data-mobile="true"] { padding-bottom: env(safe-area-inset-bottom); }
+  .admin-workspace .admin-mobile-records { display: block; }
+  .admin-workspace .admin-desktop-table { display: none; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) { display: block; min-width: 0; width: 100%; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) thead { display: none; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody { display: block; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody tr { display: block; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border)); }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody td { display: block; width: 100%; max-width: none; padding: 6px 0; overflow-wrap: anywhere; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody td::before { display: block; margin-bottom: 4px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; }
+  .admin-workspace .admin-stack-copies td:nth-child(1)::before { content: "Copy"; }
+  .admin-workspace .admin-stack-copies td:nth-child(2)::before { content: "Barcode / accession"; }
+  .admin-workspace .admin-stack-copies td:nth-child(3)::before { content: "Status"; }
+  .admin-workspace .admin-stack-copies td:nth-child(4)::before { content: "Condition"; }
+  .admin-workspace .admin-stack-copies td:nth-child(5)::before { content: "Borrower / notes"; }
+  .admin-workspace .admin-stack-copies td:nth-child(6)::before { content: "Actions"; }
+  .admin-workspace .admin-stack-policies td:nth-child(1)::before { content: "Book type"; }
+  .admin-workspace .admin-stack-policies td:nth-child(2)::before { content: "Loan duration"; }
+  .admin-workspace .admin-stack-policies td:nth-child(3)::before { content: "Initial fine"; }
+  .admin-workspace .admin-stack-policies td:nth-child(4)::before { content: "Recurring fine"; }
+  .admin-workspace .admin-stack-policies td:nth-child(5)::before { content: "Fine interval"; }
+  .admin-workspace .admin-stack-policies td:nth-child(6)::before { content: "Assigned books"; }
+  .admin-workspace .admin-stack-policies td:nth-child(7)::before { content: "Actions"; }
+  .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody td :is(button, select) { min-height: 44px; }
+  .admin-workspace .admin-stack-policies tbody td :is(input, select) { width: 100%; }
+  .admin-workspace .admin-stack-results { display: block; min-width: 0; width: 100%; }
+  .admin-workspace .admin-stack-results thead { display: none; }
+  .admin-workspace .admin-stack-results tbody { display: block; }
+  .admin-workspace .admin-stack-results tbody tr { display: block; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border)); }
+  .admin-workspace .admin-stack-results tbody td { display: block; width: 100%; max-width: none; padding: 6px 0; overflow-wrap: anywhere; }
+  .admin-workspace .admin-stack-results tbody td::before { content: attr(data-mobile-label); display: block; margin-bottom: 4px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) { display: block; min-width: 0; width: 100%; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) thead { display: none; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) tbody { display: block; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) tbody tr { display: block; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border)); }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) tbody td { display: block; position: static; width: 100%; max-width: none; padding: 6px 0; overflow-wrap: anywhere; box-shadow: none; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) tbody td::before { display: block; margin-bottom: 4px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; }
+  .admin-workspace .admin-stack-clearance-queue td:nth-child(1)::before { content: "Patron"; }
+  .admin-workspace .admin-stack-clearance-queue td:nth-child(2)::before { content: "Overdue returns"; }
+  .admin-workspace .admin-stack-clearance-queue td:nth-child(3)::before { content: "Unpaid fines"; }
+  .admin-workspace .admin-stack-clearance-fines td:nth-child(1)::before { content: "Book"; }
+  .admin-workspace .admin-stack-clearance-fines td:nth-child(2)::before { content: "Fine"; }
+  .admin-workspace .admin-stack-clearance-fines td:nth-child(3)::before { content: "Paid / adjusted"; }
+  .admin-workspace .admin-stack-clearance-fines td:nth-child(4)::before { content: "Outstanding"; }
+  .admin-workspace :is(.admin-stack-clearance-queue, .admin-stack-clearance-fines) td:last-child button { min-height: 44px; width: 100%; }
+  .admin-workspace .admin-stack-attendance { display: block; width: 100%; }
+  .admin-workspace .admin-stack-attendance thead { display: none; }
+  .admin-workspace .admin-stack-attendance tbody { display: block; }
+  .admin-workspace .admin-stack-attendance tbody tr { display: block; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border)); }
+  .admin-workspace .admin-stack-attendance tbody td { display: block; padding: 5px 0; overflow-wrap: anywhere; }
+  .admin-workspace .admin-stack-attendance tbody td::before { display: block; margin-bottom: 3px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; }
+  .admin-workspace .admin-stack-attendance td:nth-child(1)::before { content: "Person"; }
+  .admin-workspace .admin-stack-attendance td:nth-child(2)::before { content: "Role"; }
+  .admin-workspace .admin-stack-attendance td:nth-child(3)::before { content: "Type"; }
+  .admin-workspace .admin-stack-attendance td:nth-child(4)::before { content: "Purpose"; }
+  .admin-workspace .admin-stack-attendance td:nth-child(5)::before { content: "Scanned by"; }
+  .admin-workspace .admin-stack-attendance td:nth-child(6)::before { content: "Time"; }
+  .admin-workspace .admin-catalog-builder button { min-width: 44px; }
+  .admin-workspace .admin-catalog-builder [role="tablist"] { flex-wrap: nowrap; overflow-x: auto; }
+  .admin-workspace .admin-backup-actions { width: 100%; }
+  .admin-workspace .admin-backup-actions > :is(button, label) { width: 100%; min-height: 44px; }
+}
+@media (min-width: 768px) {
+  .admin-workspace .admin-mobile-records { display: none; }
+}
 @media print {
   body.admin-workspace { --background: 0 0% 100%; --foreground: 0 0% 0%; --card: 0 0% 100%; --muted-foreground: 0 0% 25%; --border: 0 0% 75%; }
   .admin-workspace [data-sidebar="sidebar"], .admin-workspace .admin-shell-backdrop > div > header { display: none !important; }
   .admin-workspace .admin-shell-backdrop, .admin-workspace #admin-main { height: auto; overflow: visible; }
+  .admin-workspace .admin-stack-results { display: table; min-width: 0; }
+  .admin-workspace .admin-stack-results thead { display: table-header-group; }
+  .admin-workspace .admin-stack-results tbody { display: table-row-group; }
+  .admin-workspace .admin-stack-results tbody tr { display: table-row; padding: 0; border: 0; }
+  .admin-workspace .admin-stack-results tbody td { display: table-cell; width: auto; padding: 12px 16px; }
+  .admin-workspace .admin-stack-results tbody td::before { display: none; }
 }

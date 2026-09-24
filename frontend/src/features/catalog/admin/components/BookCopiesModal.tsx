@@ -329,7 +329,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               </p>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="admin-stack-copies w-full text-sm">
               {/* Table head */}
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/50">

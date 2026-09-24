@@ -129,7 +129,7 @@ const AdminManageBuilder = ({
       </AdminPanel>
 
       <Sheet open={sheetMode !== null} onOpenChange={(open) => { if (!open && !loading) closeSheet(); }}>
-        <SheetContent side="right" className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[640px]">
+        <SheetContent side="right" className="admin-edit-sheet flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[640px]">
           <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
             <SheetTitle className="text-primary-foreground">{sheetMode === "create" ? "Create user" : selectedUser?.name || "User record"}</SheetTitle>
             <SheetDescription className="text-primary-foreground/70">

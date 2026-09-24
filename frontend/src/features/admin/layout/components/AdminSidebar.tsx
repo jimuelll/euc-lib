@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { dashboardItem, visibleSidebarSections, resolveCurrentItem, getInitials } from "../AdminLayoutData";
 import type { SidebarItem } from "../AdminLayout.types";
 import { AdminSidebarIcon, adminSidebarIconByUrl } from "./AdminSidebarIcon";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 
 export function AdminSidebar() {
   const { state, isMobile, openMobile, setOpenMobile } = useSidebar();
@@ -57,6 +58,7 @@ export function AdminSidebar() {
         </nav>
       </SidebarContent>
       <SidebarFooter className="admin-account-footer">
+        {isMobile && <div className="flex items-center justify-between px-2 py-2 text-sm"><span>Appearance</span><ThemeToggle /></div>}
         <DropdownMenu>
           <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
             <button type="button" className="admin-account-trigger" aria-label={`Account menu for ${name}`}>

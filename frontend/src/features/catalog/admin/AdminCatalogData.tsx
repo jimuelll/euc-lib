@@ -297,7 +297,17 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
         {catalogStatus === "archived" && <div className="flex items-center gap-2 border border-warning/20 bg-warning/5 px-4 py-3 text-sm text-foreground"><Archive className="h-4 w-4 text-warning" />Archived records are hidden from the public catalogue until restored.</div>}
 
         <div className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card">
-          {loading ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <div className="overflow-x-auto">
+          {loading ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <>
+            <div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="Catalogue records">{searchResults.map((book) => {
+              const archived = Boolean(book.deleted_at);
+              const identifier = book.material_type === "thesis" ? String(book.accession_number || book.metadata?.accession_number || "—") : (book.isbn || "—");
+              return <article key={book.id} className="min-w-0 space-y-3 p-4">
+                <div className="flex min-w-0 items-start gap-3"><CatalogBookThumbnail book={book} /><div className="min-w-0"><h3 className="break-words text-base font-semibold text-foreground">{book.title}</h3><p className="mt-1 break-words text-sm text-muted-foreground">{book.author || "Unknown author"}</p></div></div>
+                <dl className="grid gap-2 text-sm"><div><dt className="text-muted-foreground">Material</dt><dd>{book.material_type === "thesis" ? "Thesis" : "Book"}{archived ? " · Archived" : ""}</dd></div><div><dt className="text-muted-foreground">{book.material_type === "thesis" ? "Accession" : "ISBN"}</dt><dd className="break-all">{identifier}</dd></div><div><dt className="text-muted-foreground">Lending status</dt><dd><CatalogLendingStatusCell book={book} archived={archived} onAddHoldings={(selectedBook) => openHoldings(selectedBook)} onAssignPolicy={selectBookForEdit} /></dd></div></dl>
+                <div className="flex flex-wrap gap-2">{archived ? <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => void handleRestoreBook(book)}><ArchiveRestore className="mr-2 h-4 w-4" />Restore</Button> : <><Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => selectBookForEdit(book)}>Edit details</Button>{book.material_type !== "thesis" && <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => openCopies(book)}>Manage copies</Button>}</>}</div>
+              </article>;
+            })}</div>
+            <div className="admin-desktop-table overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
               <thead><tr className="border-b border-border bg-muted/30">{["Title and author", "Material", "Identifier", "Lending status", ""].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold text-muted-foreground">{heading}</th>)}</tr></thead>
               <tbody className="divide-y divide-border">
@@ -314,14 +324,14 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
                 })}
               </tbody>
             </table>
-          </div> : <div className="px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" /><p className="mt-3 text-sm font-medium text-foreground">No catalogue records found</p><p className="mt-1 text-sm text-muted-foreground">Adjust the search or filters, or add a new record.</p></div>}
+          </div></> : <div className="px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" /><p className="mt-3 text-sm font-medium text-foreground">No catalogue records found</p><p className="mt-1 text-sm text-muted-foreground">Adjust the search or filters, or add a new record.</p></div>}
           <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{catalogPagination.total} record{catalogPagination.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page <= 1 || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page - 1)}>Previous</Button><span className="tabular-nums">Page {catalogPagination.page} of {catalogPagination.totalPages}</span><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page >= catalogPagination.totalPages || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page + 1)}>Next</Button></div></div>
         </div>
       </div>
       }
 
       <Sheet open={sheetMode !== null} onOpenChange={(open) => { if (!open && !loading) void requestClose(); }}>
-        <SheetContent side="right" className="grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[640px]">
+        <SheetContent side="right" className="admin-edit-sheet grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[640px]">
           <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
             <SheetTitle className="text-primary-foreground">{sheetMode === "create" ? "Add catalogue record" : selectedBook?.title || "Catalogue record"}</SheetTitle>
             <SheetDescription className="text-primary-foreground/70">{sheetMode === "create" ? "Create a book or reference-only thesis using the configured catalogue fields." : `${selectedBook?.material_type === "thesis" ? "Thesis" : "Book"} record and operational details.`}</SheetDescription>

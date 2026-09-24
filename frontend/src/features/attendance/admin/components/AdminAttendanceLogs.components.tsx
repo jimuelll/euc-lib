@@ -94,7 +94,7 @@ export const FilterBar = ({ filter, search, onFilterChange, onSearchChange }: Fi
 // ─── Table Header ─────────────────────────────────────────────────────────────
 
 export const TableHeader = () => (
-  <div className="bg-primary">
+  <div className="hidden bg-primary md:block">
     <div className="h-[2px] w-full bg-warning" />
     <div className="grid grid-cols-[1fr_auto_auto_auto] sm:grid-cols-[2fr_1fr_1fr_auto] px-4 sm:px-6 py-3 gap-4">
       {TABLE_HEADERS.map((h) => (
@@ -123,35 +123,35 @@ export const TableRow = ({ log, index }: TableRowProps) => {
 
   return (
     <div
-      className={`grid grid-cols-[1fr_auto_auto_auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-center px-4 sm:px-6 py-3.5 gap-4 transition-colors hover:bg-muted/30 ${
+      className={`grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[2fr_1fr_1fr_auto] items-center px-4 sm:px-6 py-3.5 gap-3 md:gap-4 transition-colors hover:bg-muted/30 ${
         index % 2 !== 0 ? "bg-muted/10" : ""
       }`}
     >
       {/* Name / ID */}
       <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{log.name}</p>
-        <p className="text-xs font-mono text-muted-foreground truncate">
+        <p className="break-words text-sm font-medium text-foreground">{log.name}</p>
+        <p className="break-all text-xs font-mono text-muted-foreground">
           {log.student_employee_id}
         </p>
       </div>
 
       {/* Role */}
       <span
-        className={`${LABEL_CLS} tracking-[0.12em] text-muted-foreground hidden sm:block`}
+        className={`${LABEL_CLS} tracking-[0.12em] text-muted-foreground hidden md:block`}
         style={FONT}
       >
         {log.role}
       </span>
 
       {/* Type badge */}
-      <div className="flex items-center gap-1.5">
+      <div className="col-start-1 row-start-2 flex items-center gap-1.5 md:col-auto md:row-auto">
         {isIn ? (
           <LogIn className="h-3.5 w-3.5 text-foreground/60 shrink-0" />
         ) : (
           <LogOut className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         )}
         <span
-          className={`text-xs font-bold  hidden sm:block ${
+          className={`text-xs font-bold ${
             isIn ? "text-foreground/70" : "text-muted-foreground"
           }`}
           style={FONT}
@@ -161,11 +161,11 @@ export const TableRow = ({ log, index }: TableRowProps) => {
       </div>
 
       {/* Time */}
-      <div className="text-right shrink-0">
+      <div className="col-start-2 row-span-2 row-start-1 shrink-0 text-right md:col-auto md:row-auto md:row-span-1">
         <p className="text-sm font-bold text-foreground tabular-nums" style={FONT}>
           {time}
         </p>
-        <p className="text-xs text-muted-foreground hidden sm:block">{date}</p>
+        <p className="text-xs text-muted-foreground">{date}</p>
       </div>
     </div>
   );

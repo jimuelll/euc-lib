@@ -196,7 +196,7 @@ const AdminBackup = () => {
         title="Create a recovery point"
         description="Saved snapshots are retained in secure cloud storage. The latest 30 are kept automatically."
       >
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="admin-backup-actions mb-4 flex flex-wrap gap-2">
             <Button type="button" onClick={handleCreateSnapshot} disabled={exporting || savingSnapshot || restoring}>
               {savingSnapshot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
               {savingSnapshot ? "Saving snapshot..." : "Save Snapshot"}
@@ -239,7 +239,7 @@ const AdminBackup = () => {
                     {snapshot.createdBy ? ` · Saved by ${snapshot.createdBy}` : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="admin-backup-actions flex shrink-0 flex-wrap gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadSnapshot(snapshot)} disabled={restoring}>
                     <FileDown className="mr-2 h-3.5 w-3.5" /> Download
                   </Button>

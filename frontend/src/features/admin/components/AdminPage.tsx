@@ -44,15 +44,15 @@ export function AdminPage({
         : "max-w-none";
 
   return (
-    <div className={cn("flex w-full flex-col gap-6", widthClass, className)}>
-      <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className={cn("flex w-full min-w-0 flex-col gap-4 md:gap-6", widthClass, className)}>
+      <header className="flex min-w-0 flex-col gap-3 border-b border-border pb-4 md:gap-4 md:pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><h1
           className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl"
           style={{ fontFamily: "var(--font-heading)" }}
         >
           {title}
         </h1>{description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}</div>
-        {actions ? <div className="flex flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
+        {actions ? <div className="admin-page-actions flex flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
       </header>
 
       {children}
@@ -73,7 +73,7 @@ export function AdminPanel({
   return (
     <Card className={cn("admin-panel-surface admin-etched-border min-w-0 rounded-lg border-border bg-card shadow-none", className)}>
       {hasHeader ? (
-        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-card px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/70 bg-card px-4 py-4 md:px-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             {title ? (
               <CardTitle
@@ -86,11 +86,11 @@ export function AdminPanel({
             {description ? <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
           </div>
 
-          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="admin-panel-actions flex flex-wrap items-center gap-2">{actions}</div> : null}
         </CardHeader>
       ) : null}
 
-      <CardContent className={cn("p-5", hasHeader && "pt-5", contentClassName)}>
+      <CardContent className={cn("min-w-0 p-4 md:p-5", hasHeader && "pt-4 md:pt-5", contentClassName)}>
         {children}
       </CardContent>
     </Card>
