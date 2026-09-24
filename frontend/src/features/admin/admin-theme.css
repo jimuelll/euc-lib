@@ -33,6 +33,7 @@ body.admin-workspace {
   --sidebar-primary-foreground: 0 100% 22.1569%;
   --sidebar-border: 0 45% 42%;
   --sidebar-ring: 0 0% 100%;
+  --admin-sidebar-gold: hsl(42 78% 38%);
   caret-color: hsl(var(--action));
 }
 .dark body.admin-workspace {
@@ -83,6 +84,101 @@ body.admin-workspace {
 }
 .admin-workspace [data-sidebar="content"]::-webkit-scrollbar-thumb:hover { background: hsl(var(--sidebar-foreground) / 0.72); }
 .admin-workspace ::selection { background: #8f0000; color: white; }
+/* The wrapper is rendered inside both the desktop sidebar and mobile portal. */
+.admin-workspace [data-variant="sidebar"] > div:has(> [data-sidebar="sidebar"] > .admin-sidebar-design),
+.admin-workspace [data-sidebar="sidebar"][data-mobile="true"]:has(.admin-sidebar-design) { border-right: 0; box-shadow: none; }
+.admin-sidebar-design {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  color: hsl(var(--sidebar-foreground));
+  background: hsl(var(--sidebar-background));
+  font-family: var(--font-body);
+}
+.admin-sidebar-design .admin-brand {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 72px;
+  justify-content: center;
+  padding: 10px 16px;
+  border-top: 3px solid var(--admin-sidebar-gold);
+  border-bottom: 1px solid hsl(var(--sidebar-foreground) / 0.18);
+}
+.admin-brand-link { display: flex; align-items: center; gap: 10px; min-width: 0; border-radius: 6px; }
+.admin-brand-link img { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
+.admin-brand-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.admin-brand-copy strong { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.3; }
+.admin-brand-copy > span { font-size: 11px; line-height: 1.4; color: hsl(var(--sidebar-muted-foreground)); }
+.admin-nav-close { position: absolute; right: 8px; top: 12px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 6px; }
+.admin-sidebar-design .admin-nav-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+}
+.admin-sidebar-design [data-sidebar="menu"] { gap: 3px; }
+.admin-nav-section { margin-top: 10px; padding-top: 8px; border-top: 1px solid hsl(var(--sidebar-foreground) / 0.16); }
+.admin-nav-heading { margin: 0 0 4px; padding-inline: 8px; font-size: 10px; font-weight: 600; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.09em; color: hsl(var(--sidebar-muted-foreground)); }
+.admin-sidebar-design .admin-nav-link {
+  height: auto;
+  min-height: 38px;
+  padding: 7px 8px;
+  gap: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow: visible;
+  color: hsl(var(--sidebar-foreground));
+  transition: background-color 150ms, color 150ms;
+}
+.admin-sidebar-design .admin-nav-link > svg,
+.admin-sidebar-design .admin-signout > svg { width: 20px; height: 20px; flex-shrink: 0; }
+.admin-sidebar-design .admin-nav-link > .admin-nav-label { white-space: normal; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; }
+.admin-sidebar-design .admin-nav-link:hover,
+.admin-account-trigger:hover, .admin-signout:hover, .admin-nav-close:hover { background: hsl(var(--sidebar-foreground) / 0.1); }
+.admin-sidebar-design .admin-nav-link[data-active="true"],
+.admin-sidebar-design .admin-nav-link[data-active="true"]:hover {
+  background: hsl(var(--sidebar-primary));
+  color: hsl(var(--sidebar-primary-foreground));
+  font-weight: 600;
+}
+.admin-sidebar-design :is(a, button):focus-visible { outline: 2px solid white; outline-offset: 3px; box-shadow: none; }
+.admin-sidebar-design .admin-account-footer { flex-shrink: 0; gap: 0; padding: 8px 12px; border-top: 1px solid hsl(var(--sidebar-foreground) / 0.24); background: hsl(var(--sidebar-foreground) / 0.04); }
+.admin-account-trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 8px; text-align: left; border-radius: 6px; transition: background-color 150ms; }
+.admin-account-initials { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 6px; background: hsl(var(--sidebar-foreground) / 0.15); font-size: 11px; font-weight: 600; }
+.admin-account-copy { min-width: 0; flex: 1; }
+.admin-account-name { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 500; line-height: 1.4; }
+.admin-account-role { display: block; margin-top: 2px; font-size: 11px; text-transform: capitalize; color: hsl(var(--sidebar-muted-foreground)); }
+.admin-account-trigger > svg { flex-shrink: 0; }
+.admin-signout-row { margin-top: 5px; padding-top: 5px; border-top: 1px solid hsl(var(--sidebar-foreground) / 0.16); }
+.admin-signout { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 8px; font-size: 13px; border-radius: 6px; transition: background-color 150ms; }
+.admin-sidebar-design .admin-signout > svg { margin-inline: 6px; }
+.admin-sidebar-design[data-compact="true"] .admin-brand { padding-inline: 16px; }
+.admin-sidebar-design[data-compact="true"] .admin-brand-link img { width: 32px; height: 32px; }
+.admin-sidebar-design[data-compact="true"] .admin-nav-section { margin-top: 8px; }
+.admin-sidebar-design[data-compact="true"] .admin-nav-label { display: none; }
+.admin-sidebar-design[data-compact="true"] .admin-nav-scroll { padding-right: 4px; }
+.admin-workspace .admin-sidebar-design[data-compact="true"] .admin-nav-link {
+  width: 40px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  justify-content: center;
+}
+.admin-sidebar-design[data-compact="true"] :is(.admin-account-trigger, .admin-signout) { width: 40px; justify-content: center; padding-inline: 0; }
+.admin-sidebar-design[data-compact="true"] .admin-signout > svg { margin-inline: 0; }
+.admin-sidebar-design[data-mobile="true"] .admin-brand { padding-right: 56px; }
+.admin-sidebar-design[data-mobile="true"] :is(.admin-nav-link, .admin-signout) { min-height: 44px; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar-design *,
+  .admin-workspace [data-sidebar="sidebar"],
+  .admin-workspace .group[data-variant="sidebar"] > div { transition: none !important; animation: none !important; }
+}
 .admin-workspace table { font-variant-numeric: tabular-nums; }
 .admin-workspace th { font-weight: 600; }
 .admin-workspace :is(input, textarea)::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }

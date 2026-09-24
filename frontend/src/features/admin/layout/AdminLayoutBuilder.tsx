@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AdminSidebar, AdminTopbar } from "./components/AdminLayoutComponents";
@@ -6,7 +7,7 @@ const AdminLayoutBuilder = () => {
   const { pathname } = useLocation();
 
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "4rem" } as CSSProperties}>
       <div className="admin-shell-backdrop flex h-dvh w-full overflow-hidden bg-background">
         <a href="#admin-main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-card focus:p-3">Skip to main content</a>
         <AdminSidebar />
