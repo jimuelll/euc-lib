@@ -91,6 +91,14 @@ async function findActiveUser(studentEmployeeId) {
   return users[0] || null;
 }
 
+async function findActiveUserBarcode(studentEmployeeId) {
+  const [[user]] = await db.query(
+    "SELECT COALESCE(NULLIF(TRIM(barcode), ''), student_employee_id) AS barcode FROM users WHERE student_employee_id = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1",
+    [studentEmployeeId],
+  );
+  return user || null;
+}
+
 async function updateUser(studentEmployeeId, updates, conn = db) {
   const fields = Object.keys(updates);
   if (!fields.length) return;
@@ -102,9 +110,14 @@ async function updateUser(studentEmployeeId, updates, conn = db) {
 }
 
 async function searchUsers({ allowedRoles, showArchived, studentEmployeeId, name, role, status, page, limit = 25 }) {
-  let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.name, u.role, u.is_active, u.address, u.contact, u.program_id, u.year_level, u.department_id, u.remarks,
+  // Expired student terms are displayed as inactive without archiving or changing the account row.
+  const expiredStudentTerm = "(u.role = 'student' AND (assigned_term.ends_on IS NULL OR assigned_term.ends_on < CURRENT_DATE()))";
+  let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.name, u.role,
+                    CASE WHEN ${expiredStudentTerm} THEN 0 ELSE u.is_active END AS is_active,
+                    u.address, u.contact, u.program_id, u.academic_term_id, u.year_level, u.department_id, u.remarks,
                     p.name AS program_course, d.name AS department_name, u.deleted_at
              FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id LEFT JOIN departments d ON d.id = u.department_id
+             LEFT JOIN academic_terms assigned_term ON assigned_term.id = u.academic_term_id
              WHERE u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}
                AND u.role IN (${allowedRoles.map(() => "?").join(", ")})`;
   const values = [...allowedRoles];
@@ -116,8 +129,8 @@ async function searchUsers({ allowedRoles, showArchived, studentEmployeeId, name
     if (name) { sql += " AND u.name LIKE ?"; values.push(`%${name}%`); }
   }
   if (role) { sql += " AND u.role = ?"; values.push(role); }
-  if (status === "active") sql += " AND u.is_active = 1";
-  else if (status === "inactive") sql += " AND u.is_active = 0";
+  if (status === "active") sql += ` AND u.is_active = 1 AND NOT ${expiredStudentTerm}`;
+  else if (status === "inactive") sql += ` AND (u.is_active = 0 OR ${expiredStudentTerm})`;
   if (page === undefined) {
     const [rows] = await db.query(`${sql} ORDER BY u.name ASC`, values);
     return rows;
@@ -175,26 +188,4 @@ async function queryToolsSearch(term, allowedRoles) {
   return { users: users[0], books: books[0], borrowings: borrowings[0], reservations: reservations[0], notifications: notifications[0] };
 }
 
-async function findStudentLikeUsersForUpdate(conn) {
-  const roles = ["student", "employee", "alumni"];
-  const [users] = await conn.query(
-    `SELECT id, student_employee_id, role
-       FROM users
-      WHERE deleted_at IS NULL AND is_active = 1 AND role IN (${roles.map(() => "?").join(", ")})
-      ORDER BY id FOR UPDATE`,
-    roles
-  );
-  return users;
-}
-
-async function bulkDeactivateUserIds(userIds, requesterId, conn) {
-  if (!userIds.length) return;
-  const [result] = await conn.query(
-    `UPDATE users SET is_active = 0, deleted_at = NOW(), deleted_by = ?
-     WHERE deleted_at IS NULL AND is_active = 1 AND id IN (${userIds.map(() => "?").join(", ")})`,
-    [requesterId, ...userIds]
-  );
-  return Number(result.affectedRows);
-}
-
-module.exports = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findAllBorrowingIdsForUser, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findUserByIdForAudit, findActiveUser, updateUser, searchUsers, queryToolsSearch, findStudentLikeUsersForUpdate, bulkDeactivateUserIds };
+module.exports = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findAllBorrowingIdsForUser, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findUserByIdForAudit, findActiveUser, findActiveUserBarcode, updateUser, searchUsers, queryToolsSearch };

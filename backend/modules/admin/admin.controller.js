@@ -9,7 +9,6 @@ const {
 const { logError } = require("../../logger");
 const qr = require("qrcode");
 const repository = require("./admin.repository");
-const { bulkDeactivateStudentLikeUsers } = require("./admin.service");
 
 // CREATE
 async function handleCreateUser(req, res) {
@@ -58,14 +57,6 @@ async function handleUpdateUser(req, res) {
   }
 }
 
-async function handleBulkDeactivateStudentLikeUsers(req, res) {
-  try {
-    const result = await bulkDeactivateStudentLikeUsers(req.user.role, req.user.id);
-    res.locals.auditEnqueued = true;
-    res.json(result);
-  } catch (err) { res.status(err.status ?? 400).json({ message: err.message ?? "Bulk deactivation failed" }); }
-}
-
 // SEARCH
 async function handleSearchUsers(req, res) {
   try {
@@ -101,7 +92,7 @@ async function handleGetBarcodePng(req, res) {
     });
 
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Cache-Control", "private, no-store");
     res.send(png);
   } catch (err) {
     logError("[admin] getBarcodePng:", err);
@@ -114,7 +105,6 @@ module.exports = {
   handleDeleteUser,
   handleRestoreUser,
   handleUpdateUser,
-  handleBulkDeactivateStudentLikeUsers,
   handleSearchUsers,
   handleQueryToolsSearch,
   handleGetBarcodePng,

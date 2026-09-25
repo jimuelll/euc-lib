@@ -3,10 +3,8 @@ const qr = require("qrcode");
 const repository = require("./admin.repository");
 const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service");
 const fineLedger = require("../borrowing/fine-ledger.service");
-const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit");
 
-const STUDENT_LIKE_ROLES = ["student", "employee", "alumni"];
 const ACADEMIC_ROLES = ["student", "staff", "alumni"];
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy = {
@@ -119,13 +117,13 @@ async function deleteUser(student_employee_id, requesterRole, requesterId) {
     await conn.beginTransaction();
     user = await repository.findUserForUpdate(student_employee_id, conn);
     if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
-    if (!roleHierarchy[requesterRole]?.includes(user.role)) throw forbidden("You are not allowed to deactivate this user");
+    if (!roleHierarchy[requesterRole]?.includes(user.role)) throw forbidden("You are not allowed to archive this user");
     if (!user.is_active) throw conflict("User is already deactivated");
     await assertUserHasNoOutstandingFines(user.id, conn);
     const activeBorrows = await repository.findActiveBorrowings(user.id, conn);
-    if (activeBorrows.length) throw conflict(`User has ${activeBorrows.length} unreturned book${activeBorrows.length > 1 ? "s" : ""} — resolve before deactivating`);
+    if (activeBorrows.length) throw conflict(`User has ${activeBorrows.length} unreturned book${activeBorrows.length > 1 ? "s" : ""} — resolve before archiving`);
     const activeReservations = await repository.findActiveReservations(user.id, conn);
-    if (activeReservations.length) throw conflict(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before deactivating`);
+    if (activeReservations.length) throw conflict(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before archiving`);
     await repository.deactivateUser(user.id, requesterId, conn);
     const after = await repository.findUserByIdForAudit(user.id, conn);
     await enqueueTransactionalAudit(conn, {
@@ -133,7 +131,7 @@ async function deleteUser(student_employee_id, requesterRole, requesterId) {
       category: "users",
       route: `/api/admin/users/${encodeURIComponent(student_employee_id)}`,
       action: "archived",
-      description: "Deactivated user account",
+      description: "Archived user account",
       before: user,
       after,
     });
@@ -145,8 +143,8 @@ async function deleteUser(student_employee_id, requesterRole, requesterId) {
     conn.release();
   }
   try { await revokeAllRefreshSessionsForUser(user.id); }
-  catch (error) { console.error("[admin] User deactivation committed; refresh-session revocation failed:", error); }
-  return { message: "User deactivated successfully" };
+  catch (error) { console.error("[admin] User archival committed; refresh-session revocation failed:", error); }
+  return { message: "User archived successfully" };
 }
 
 async function restoreUser(student_employee_id, requesterRole, requesterId = null) {
@@ -169,7 +167,7 @@ async function restoreUser(student_employee_id, requesterRole, requesterId = nul
       before: { is_active: 0, deleted_at: "archived" },
       after,
       type: "state_transition",
-      details: { stateFrom: "Archived", stateTo: "Active", stateLabel: "Account state" },
+      details: { stateFrom: "Archived", stateTo: "Unarchived", stateLabel: "Archive state" },
     });
     await conn.commit();
   } catch (error) {
@@ -280,75 +278,4 @@ async function queryToolsSearch(term, requesterRole) {
   return repository.queryToolsSearch(query, allowedRoles);
 }
 
-async function bulkDeactivateStudentLikeUsers(requesterRole, requesterId) {
-  if (!["admin", "super_admin"].includes(requesterRole)) throw new Error("You are not allowed to bulk deactivate users");
-  const conn = await repository.getConnection();
-  let deactivatedUsers = [];
-  let skippedUsers = [];
-  const reasonCounts = { active_loans: 0, active_reservations: 0, unpaid_fines: 0 };
-  try {
-    await conn.beginTransaction();
-    const users = await repository.findStudentLikeUsersForUpdate(conn);
-    for (const user of users) {
-      const borrowingIds = await repository.findAllBorrowingIdsForUser(user.id, conn);
-      const activeLoans = await repository.findActiveBorrowings(user.id, conn);
-      const activeReservations = await repository.findActiveReservations(user.id, conn);
-      const fines = await fineLedger.getOutstandingFineSummary(borrowingIds, conn);
-      const reasons = [];
-      if (activeLoans.length) { reasons.push("active_loans"); reasonCounts.active_loans += 1; }
-      if (activeReservations.length) { reasons.push("active_reservations"); reasonCounts.active_reservations += 1; }
-      if (fines.affectedLoans) { reasons.push("unpaid_fines"); reasonCounts.unpaid_fines += 1; }
-      if (reasons.length) {
-        skippedUsers.push({
-          student_employee_id: user.student_employee_id,
-          role: user.role,
-          active_loan_count: activeLoans.length,
-          active_reservation_count: activeReservations.length,
-          unpaid_fine_amount: fines.outstandingAmount,
-          unpaid_fine_loan_count: fines.affectedLoans,
-          reasons,
-        });
-      } else deactivatedUsers.push(user);
-    }
-    const changed = await repository.bulkDeactivateUserIds(deactivatedUsers.map((user) => user.id), requesterId, conn) ?? 0;
-    if (changed !== deactivatedUsers.length) {
-      throw conflict("One or more accounts changed while bulk deactivation was running. No accounts were deactivated; reload and try again.");
-    }
-    await enqueueAuditEvent(conn, {
-      actorId: requesterId ?? null,
-      category: "users",
-      action: "bulk_deactivated",
-      description: `Bulk deactivated ${deactivatedUsers.length} student-like account${deactivatedUsers.length === 1 ? "" : "s"}; skipped ${skippedUsers.length}`,
-      route: "/api/admin/users/bulk-deactivate-student-like",
-      metadata: {
-        detail_status: "affected_record_summary",
-        affected_record_count: deactivatedUsers.length,
-        affected_record_type: "student-like accounts",
-        skipped_count: skippedUsers.length,
-        skip_reason_counts: reasonCounts,
-      },
-    });
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally { conn.release(); }
-
-  for (const user of deactivatedUsers) {
-    try { await revokeAllRefreshSessionsForUser(user.id); }
-    catch (error) { console.error("[admin] Bulk deactivation committed; refresh-session revocation failed:", error); }
-  }
-  const reasonLabels = [];
-  if (reasonCounts.active_loans) reasonLabels.push(`${reasonCounts.active_loans} with active loans`);
-  if (reasonCounts.active_reservations) reasonLabels.push(`${reasonCounts.active_reservations} with active reservations`);
-  if (reasonCounts.unpaid_fines) reasonLabels.push(`${reasonCounts.unpaid_fines} with unpaid fines`);
-  return {
-    message: `Deactivated ${deactivatedUsers.length} account${deactivatedUsers.length === 1 ? "" : "s"}.${skippedUsers.length ? ` Skipped ${skippedUsers.length}: ${reasonLabels.join(", ")}.` : ""}`,
-    deactivated_count: deactivatedUsers.length,
-    skipped_count: skippedUsers.length,
-    skipped_reason_counts: reasonCounts,
-    skipped_users: skippedUsers,
-  };
-}
-
-module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch, bulkDeactivateStudentLikeUsers };
+module.exports = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };

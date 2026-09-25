@@ -6,6 +6,11 @@ export async function fetchMyLibraryDashboard(signal?: AbortSignal): Promise<MyL
   return res.data;
 }
 
+export async function fetchMyLibraryBarcode(signal?: AbortSignal): Promise<Blob> {
+  const res = await axiosInstance.get<Blob>("/api/my-library/barcode-png", { responseType: "blob", signal });
+  return res.data;
+}
+
 export async function fetchMyLibraryHistory(page = 1, signal?: AbortSignal): Promise<MyLibraryPage<MyLibraryHistoryItem>> {
   const res = await axiosInstance.get("/api/my-library/history", { params: { page, limit: 20 }, signal });
   return res.data;

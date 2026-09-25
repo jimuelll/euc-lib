@@ -5,6 +5,7 @@ const { getActiveSubscriptions } = require("../subscriptions/subscriptions.servi
 const notificationsService = require("../notifications/notifications.service");
 
 const getUserProfile = async (userId) => repository.findUserProfile(userId);
+const getUserBarcode = async (userId) => repository.findUserBarcode(userId);
 
 const getActiveBorrows = async (userId) =>
   mapBorrowingsWithFineDetails(await repository.findActiveBorrows(userId));
@@ -119,4 +120,4 @@ const getDashboard = async (userId) => {
   };
 };
 
-module.exports = { getDashboard, getHistory, getAttendanceHistory };
+module.exports = { getDashboard, getHistory, getAttendanceHistory, getUserBarcode };

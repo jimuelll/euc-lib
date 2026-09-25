@@ -12,6 +12,17 @@ async function findUserProfile(userId) {
   return user ?? null;
 }
 
+async function findUserBarcode(userId) {
+  const [[user]] = await db.query(
+    `SELECT COALESCE(NULLIF(TRIM(barcode), ''), student_employee_id) AS barcode
+     FROM users
+     WHERE id = ? AND is_active = 1 AND deleted_at IS NULL
+     LIMIT 1`,
+    [userId],
+  );
+  return user?.barcode ?? null;
+}
+
 async function findActiveBorrows(userId) {
   const [rows] = await db.query(
     `SELECT
@@ -170,6 +181,7 @@ async function findAllAttendanceLogs(userId) {
 
 module.exports = {
   findUserProfile,
+  findUserBarcode,
   findActiveBorrows,
   findBorrowHistory,
   findActiveReservations,

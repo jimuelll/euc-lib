@@ -13,6 +13,7 @@ import { RecommendationStrip } from "@/features/recommendations";
 import MyLibraryCurrentPanel from "./components/MyLibraryCurrentPanel";
 import MyLibraryHistoryPanel from "./components/MyLibraryHistoryPanel";
 import MyLibraryUpdatesPanel from "./components/MyLibraryUpdatesPanel";
+import MyLibraryBarcode from "./components/MyLibraryBarcode";
 
 const fadeUp = (delay = 0) => ({
   hidden: { opacity: 0, y: 16 },
@@ -124,6 +125,8 @@ const MyLibrary = () => {
               hint={`${summary?.attendance_logs ?? 0} recorded library visits`}
             />
           </motion.div>
+
+          <MyLibraryBarcode />
 
           <div className="mt-8 space-y-5">
             <RecommendationStrip personal materialType="book" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, ArchiveX, MoreHorizontal, Search, UserPlus } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import {
   Input,
@@ -361,13 +361,11 @@ interface SearchBarProps {
   onSearch:         () => void;
   onArchivedViewChange: (archived: boolean) => void;
   onCreate: () => void;
-  canBulkDeactivate: boolean;
-  onBulkDeactivate: () => Promise<boolean>;
 }
 
 export const SearchBar = ({
   value, loading, showArchived, roleFilter, statusFilter, allowedRoles, onChange,
-  onRoleFilterChange, onStatusFilterChange, onSearch, onArchivedViewChange, onCreate, canBulkDeactivate, onBulkDeactivate,
+  onRoleFilterChange, onStatusFilterChange, onSearch, onArchivedViewChange, onCreate,
 }: SearchBarProps) => (
   <div className="flex flex-col gap-2 border border-border bg-card p-3 lg:flex-row lg:items-center">
     <div className="relative min-w-0 flex-1">
@@ -382,7 +380,6 @@ export const SearchBar = ({
     <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" className="h-11 flex-1 rounded-md lg:flex-none" onClick={() => onSearch()} disabled={loading}><Search className="mr-2 h-4 w-4" />Search</Button>
       <Button type="button" className="h-11 flex-1 rounded-md lg:flex-none" onClick={onCreate}><UserPlus className="mr-2 h-4 w-4" />Create user</Button>
-      {canBulkDeactivate && <Button type="button" variant="outline" className="h-11 flex-1 rounded-md lg:flex-none" onClick={() => void onBulkDeactivate()} disabled={loading}><ArchiveX className="mr-2 h-4 w-4" />Bulk deactivate</Button>}
     </div>
   </div>
 );

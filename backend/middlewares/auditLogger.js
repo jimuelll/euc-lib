@@ -16,7 +16,6 @@ const excludedMutationPaths = new Set([
 ]);
 
 const AUDIT_ROUTE_POLICIES = [
-  { prefix: "/api/admin/users/bulk-deactivate-student-like", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/admin/users", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/catalog-schema", methods: ["PUT"], type: "field_changes" },
   { prefix: "/api/admin/catalog-settings", methods: ["PUT"], type: "field_changes" },

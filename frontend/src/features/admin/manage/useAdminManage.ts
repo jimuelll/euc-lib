@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
-import { archiveUser, bulkDeactivateStudentLikeUsers, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department, type BulkDeactivateResult } from "./api";
+import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
 
 export type { AcademicProgram, AcademicTerm, Department } from "./api";
 
@@ -46,9 +46,6 @@ interface UseAdminManageReturn {
   handleUpdateUser:  () => Promise<boolean>;
   handleArchiveUser: () => Promise<boolean>;
   handleRestoreUser: () => Promise<boolean>;
-  canBulkDeactivate: boolean;
-  bulkOutcome: BulkDeactivateResult | null;
-  handleBulkDeactivate: () => Promise<boolean>;
   confirmDialog: JSX.Element;
 
   // QR
@@ -78,7 +75,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
-  const [bulkOutcome, setBulkOutcome] = useState<BulkDeactivateResult | null>(null);
   const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
@@ -175,7 +171,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       address:    u.address  || "",
       contact:    u.contact  || "",
       programId:  u.program_id ? String(u.program_id) : "",
-      academicTermId: "",
+      academicTermId: u.academic_term_id ? String(u.academic_term_id) : "",
       libraryCardNumber: u.library_card_number || "", studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || "", email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
       role:       u.role,
       password:   "",
@@ -244,7 +240,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!selectedUser) return false;
     const shouldRestore = await confirm({
       title: `Restore ${selectedUser.name}?`,
-      description: "They will be able to log in and appear in active searches again.",
+      description: "They will be able to sign in again. Students with an expired term will still appear as inactive until their term is renewed.",
       actionLabel: "Restore User",
     });
     if (!shouldRestore) return false;
@@ -261,27 +257,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleBulkDeactivate = async () => {
-    const shouldProceed = await confirm({
-      title: "Bulk deactivate student-like accounts?",
-      description: "Eligible students, employees, and alumni will be archived. Accounts with active loans, active reservations, or unpaid fines will be skipped with reasons.",
-      actionLabel: "Deactivate eligible accounts",
-      tone: "danger",
-    });
-    if (!shouldProceed) return false;
-    setLoading(true);
-    try {
-      const result = await bulkDeactivateStudentLikeUsers();
-      setBulkOutcome(result);
-      toast.success(result.message);
-      await handleSearchUsers();
-      return true;
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Bulk deactivation failed");
-      return false;
-    } finally { setLoading(false); }
   };
 
   return {
@@ -312,9 +287,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
     handleUpdateUser,
     handleArchiveUser,
     handleRestoreUser,
-    canBulkDeactivate: user?.role === "admin" || user?.role === "super_admin",
-    bulkOutcome,
-    handleBulkDeactivate,
     confirmDialog,
     qrTarget,
     setQrTarget,
