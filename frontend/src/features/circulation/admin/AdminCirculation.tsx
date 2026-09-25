@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useCirculation } from "./hooks/useCirculation";
 import { TRANSACTION_CONFIG } from "./circulation.types";
 import BookLookup from "./components/BookLookup";
+import ReturnLookup from "./components/ReturnLookup";
 import CirculationLog from "./components/CirculationLog";
 import TransactionTypePicker from "./components/TransactionTypePicker";
 import UserLookup from "./components/UserLookup";
@@ -31,12 +32,17 @@ const AdminCirculation = () => {
     activeBorrows,
     clearance,
     matchedBorrow,
+    returnPreview,
+    returnReceipt,
+    returnLookupError,
     canSubmit,
     setStudentId,
     setCopyBarcode,
+    handleReturnIdentifierChange,
     handleTypeChange,
     handleLookupUser,
     handleLookupCopy,
+    handleLookupReturn,
     handleSubmit,
     reservationCheckout,
   } = useCirculation(checkoutReservation, () => setLogRevision((revision) => revision + 1));
@@ -48,23 +54,23 @@ const AdminCirculation = () => {
     <AdminPage
       eyebrow="Service Desk"
       title="Borrow & Return"
-      description="Find a patron, scan a copy, and review the transaction before recording it."
+      description={type === "return" ? "Enter an accession number or scan a copy QR code to identify the borrower and record the return." : "Find a patron, scan a copy, and review the transaction before recording it."}
       contentWidth="wide"
     >
       <Tabs value={history ? "history" : "transaction"} onValueChange={tab => patchParams({ tab })}><TabsList><TabsTrigger value="transaction">Desk transaction</TabsTrigger><TabsTrigger value="history">Transaction history</TabsTrigger></TabsList></Tabs>
       {history ? <CirculationLog refreshKey={logRevision} /> : <>
-      {completed && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/40 bg-success/5 p-4"><span className="text-sm font-medium">{completed}</span><Button onClick={() => { startNextTransaction(); document.getElementById("circulation-patron")?.focus(); }}>Next transaction</Button></div>}
+      {completed && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/40 bg-success/5 p-4"><span className="text-sm font-medium">{completed}</span><Button onClick={() => { startNextTransaction(); document.getElementById(type === "return" ? "circulation-accession-input" : "circulation-patron")?.focus(); }}>Next transaction</Button></div>}
       <AdminPanel
         title={type === "borrow" ? "Borrow a library copy" : "Return a library copy"}
       >
         <div className="space-y-5">
-          {reservationCheckout ? (
+          {reservationCheckout && type === "borrow" ? (
             <div className="border border-info/30 bg-info/5 px-4 py-3 text-sm text-foreground">
               Complete checkout for <strong>{reservationCheckout.user_name}</strong> by scanning an available copy of <strong>{reservationCheckout.book_title}</strong>. The reservation will be fulfilled only after the borrow succeeds.
             </div>
           ) : null}
           <TransactionTypePicker value={type} onChange={handleTypeChange} />
-
+          {type === "borrow" ? <>
           <section aria-labelledby="patron-step"><h2 id="patron-step" className="mb-3 text-base font-semibold">1. Find the patron</h2>
           <UserLookup
             studentId={studentId}
@@ -94,8 +100,23 @@ const AdminCirculation = () => {
           </section>
           <h2 className="text-base font-semibold">3. Review and confirm</h2>
           {foundUser && foundCopy && <p className="rounded-md bg-muted p-3 text-sm"><strong>{foundUser.name}</strong> · {foundCopy.title} · {foundCopy.accession_number ? `Acc. ${foundCopy.accession_number}` : "No accession"} · QR ${foundCopy.barcode}{matchedBorrow ? ` · Due ${new Date(matchedBorrow.due_date).toLocaleString()}` : ""}</p>}
-          {!canSubmit && <p className="text-sm text-muted-foreground">{!foundUser ? "Find a patron to continue." : !foundCopy ? "Scan or select a copy to continue." : clearance?.status === "blocked" && type === "borrow" ? "Resolve the patron’s clearance issues before borrowing." : "Review the copy and patron details above before continuing."}</p>}
-          {type === "borrow" ? <p className="border-t border-border/70 pt-5 text-sm text-muted-foreground">The due date and hourly fine are applied automatically from this book’s configured type.</p> : null}
+          {!canSubmit && <p className="text-sm text-muted-foreground">{!foundUser ? "Find a patron to continue." : !foundCopy ? "Scan or select a copy to continue." : clearance?.status === "blocked" ? "Resolve the patron’s clearance issues before borrowing." : "Review the copy and patron details above before continuing."}</p>}
+          <p className="border-t border-border/70 pt-5 text-sm text-muted-foreground">The due date and hourly fine are applied automatically from this book’s configured type.</p>
+          </> : <section aria-labelledby="return-lookup-heading">
+            <h2 id="return-lookup-heading" className="mb-3 text-base font-semibold">Find the active loan</h2>
+            <ReturnLookup
+              identifier={copyBarcode}
+              onIdentifierChange={handleReturnIdentifierChange}
+              onLookup={(identifier) => { void handleLookupReturn(identifier, true); }}
+              lookingUp={lookingUpCopy}
+              preview={returnPreview}
+              receipt={returnReceipt}
+              error={returnLookupError}
+            />
+            {!canSubmit && !returnReceipt && !lookingUpCopy && copyBarcode.trim() && !returnLookupError ? <p className="mt-3 text-sm text-muted-foreground">Waiting for the accession lookup…</p> : null}
+          </section>}
+
+          {type === "return" && !canSubmit && !returnReceipt && !copyBarcode.trim() ? <p className="text-sm text-muted-foreground">Enter an accession number or scan a copy QR code to continue.</p> : null}
 
           <div className="border-t border-border/70 pt-5">
             <button

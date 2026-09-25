@@ -49,6 +49,29 @@ export interface ActiveBorrow {
   status: "borrowed" | "overdue";
 }
 
+export interface ReturnPreview {
+  borrowing_id: number;
+  borrowed_at: string;
+  due_date: string;
+  status: "borrowed" | "overdue";
+  user_id: number;
+  user_name: string;
+  student_employee_id: string;
+  role: string;
+  copy_id: number;
+  book_id: number;
+  copy_barcode: string;
+  copy_condition: string;
+  copy_is_active: boolean | number;
+  accession_number: string | null;
+  title: string;
+  author: string;
+}
+
+export interface ReturnReceipt extends ReturnPreview {
+  returned_at: string;
+}
+
 export interface TransactionConfig {
   label: string;
   icon: ElementType;

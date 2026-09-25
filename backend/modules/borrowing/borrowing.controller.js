@@ -140,12 +140,30 @@ const scanReturn = async (req, res) => {
       return res.status(404).json({ message: "No active borrowing found for this copy" });
     }
 
-    await service.returnBook(row.id, row.user_id, { auditRoute: "/api/borrowing/scan/return", actorId: req.user.id });
+    const result = await service.returnBook(row.id, row.user_id, { auditRoute: "/api/borrowing/scan/return", actorId: req.user.id });
     res.locals.auditEnqueued = true;
-    res.json({ message: "Book returned successfully", borrowingId: row.id });
+    res.json({ message: "Book returned successfully", borrowingId: row.id, returnedAt: result.returnedAt });
   } catch (err) {
     logError("[borrowing] scanReturn:", err);
     res.status(err.status ?? 500).json({ message: err.message ?? "Failed to return book" });
+  }
+};
+
+/**
+ * GET /borrowings/scan/return-preview/:identifier
+ * Resolves an accession number or copy QR code to its active loan and patron.
+ */
+const getReturnPreview = async (req, res) => {
+  try {
+    const identifier = req.params.identifier?.trim();
+    if (!identifier) return res.status(400).json({ message: "An accession number or copy QR code is required" });
+
+    const row = await service.getReturnPreviewByIdentifier(identifier);
+    if (!row) return res.status(404).json({ message: "No active loan found for this accession number or copy QR code" });
+    res.json(row);
+  } catch (err) {
+    logError("[borrowing] getReturnPreview:", err);
+    res.status(500).json({ message: "Failed to look up the active loan" });
   }
 };
 
@@ -279,6 +297,7 @@ module.exports = {
   returnBook,
   scanBorrow,
   scanReturn,
+  getReturnPreview,
   getCopyByBarcode,
   lookupUser,
   adminGetBorrowings,

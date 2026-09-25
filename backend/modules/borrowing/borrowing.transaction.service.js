@@ -185,6 +185,7 @@ const borrowBook = async (
 
 const returnBook = async (borrowingId, userId, { auditRoute = null, actorId = userId } = {}) => {
   const conn = await repository.getConnection();
+  let returnedAt;
   try {
     await conn.beginTransaction();
     const row = await repository.getBorrowingForReturn(borrowingId, conn);
@@ -194,7 +195,8 @@ const returnBook = async (borrowingId, userId, { auditRoute = null, actorId = us
     const changed = await repository.markReturned(borrowingId, conn);
     if (changed !== 1) throw Object.assign(new Error("This loan changed while the return was being processed. Reload and try again."), { status: 409 });
     const [[returned]] = await conn.query("SELECT returned_at FROM borrowings WHERE id = ?", [borrowingId]);
-    await fineLedger.assessBorrowing({ ...row, returned_at: returned.returned_at }, conn);
+    returnedAt = returned.returned_at;
+    await fineLedger.assessBorrowing({ ...row, returned_at: returnedAt }, conn);
     const target = await repository.getBorrowingNotificationTarget(borrowingId, conn);
     if (target) await notificationsService.enqueueNotification(conn, {
       type: "borrowing_returned",
@@ -231,6 +233,7 @@ const returnBook = async (borrowingId, userId, { auditRoute = null, actorId = us
   } finally {
     conn.release();
   }
+  return { borrowingId, returnedAt };
 };
 
 module.exports = { borrowBook, returnBook };

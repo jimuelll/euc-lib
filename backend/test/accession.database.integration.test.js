@@ -383,7 +383,18 @@ test("database: checkout and exact-copy return resolve accession and QR barcode"
   assert.equal(activeByAccession.id, accessionCheckout.borrowingId);
   assert.equal(activeByBarcode.id, accessionCheckout.borrowingId);
   assert.equal(activeByAccession.copy_id, copy.id);
-  await borrowingTransactions.returnBook(activeByAccession.id, fixture.userId, { actorId: 1 });
+  const [returnPreviewByAccession, returnPreviewByBarcode] = await Promise.all([
+    borrowingRepository.findReturnPreviewByIdentifier(copy.accession),
+    borrowingRepository.findReturnPreviewByIdentifier(copy.barcode),
+  ]);
+  assert.equal(returnPreviewByAccession.borrowing_id, accessionCheckout.borrowingId);
+  assert.equal(returnPreviewByAccession.user_id, fixture.userId);
+  assert.equal(returnPreviewByAccession.accession_number, copy.accession);
+  assert.equal(returnPreviewByBarcode.copy_id, copy.id);
+  assert.equal(returnPreviewByBarcode.copy_barcode, copy.barcode);
+  const returnedAccession = await borrowingTransactions.returnBook(activeByAccession.id, fixture.userId, { actorId: 1 });
+  assert.equal(returnedAccession.borrowingId, accessionCheckout.borrowingId);
+  assert.ok(returnedAccession.returnedAt, "return response includes the database recorded timestamp");
 
   const barcodeCheckout = await borrowingTransactions.borrowBook(
     fixture.userId, copy.barcode, 1, { isCopyBarcode: true, auditRoute: "/api/admin/circulation/borrow" },

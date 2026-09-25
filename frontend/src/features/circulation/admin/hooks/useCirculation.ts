@@ -1,14 +1,15 @@
 import { useAdminUrlState } from "@/features/admin";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
 import {
   lookupUser as apiLookupUser,
   lookupCopy as apiLookupCopy,
+  lookupReturnPreview as apiLookupReturnPreview,
   processBorrow,
   processReturn,
 } from "../circulation.api";
-import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus } from "../circulation.types";
+import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus, ReturnPreview, ReturnReceipt } from "../circulation.types";
 
 interface ReservationCheckout {
   id: number;
@@ -36,6 +37,11 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   const [activeBorrows, setActiveBorrows] = useState<ActiveBorrow[]>([]);
   const [matchedBorrow, setMatchedBorrow] = useState<ActiveBorrow | null>(null);
   const [clearance, setClearance] = useState<ClearanceStatus | null>(null);
+  const [returnPreview, setReturnPreview] = useState<ReturnPreview | null>(null);
+  const [returnReceipt, setReturnReceipt] = useState<ReturnReceipt | null>(null);
+  const [returnLookupError, setReturnLookupError] = useState("");
+  const returnLookupSequence = useRef(0);
+  const lastReturnLookup = useRef("");
 
   // Reset copy state when type changes
   useEffect(() => {
@@ -43,6 +49,12 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     setCompleted("");
     setMatchedBorrow(null);
     setCopyBarcode("");
+    setReturnPreview(null);
+    setReturnReceipt(null);
+    setReturnLookupError("");
+    setLookingUpCopy(false);
+    returnLookupSequence.current += 1;
+    lastReturnLookup.current = "";
   }, [type]);
 
   // Reset everything below user when student ID is cleared
@@ -99,7 +111,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       .finally(() => setLookingUpUser(false));
   }, [reservationCheckout?.id, reservationCheckout?.student_employee_id]);
 
-const handleLookupCopy = async (copyBarcodeOverride?: string) => {
+  const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
   if (!lookupBarcode) return;
   setLookingUpCopy(true);
@@ -127,6 +139,44 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   }
 };
 
+  const handleReturnIdentifierChange = (value: string) => {
+    returnLookupSequence.current += 1;
+    lastReturnLookup.current = "";
+    setCopyBarcode(value);
+    setReturnPreview(null);
+    setReturnReceipt(null);
+    setReturnLookupError("");
+    setLookingUpCopy(false);
+  };
+
+  const handleLookupReturn = useCallback(async (identifier: string, force = false) => {
+    const lookupIdentifier = identifier.trim();
+    if (!lookupIdentifier || (lastReturnLookup.current === lookupIdentifier && !force)) return;
+
+    const sequence = ++returnLookupSequence.current;
+    lastReturnLookup.current = lookupIdentifier;
+    setLookingUpCopy(true);
+    setReturnLookupError("");
+    setReturnPreview(null);
+    try {
+      const preview = await apiLookupReturnPreview(lookupIdentifier);
+      if (sequence === returnLookupSequence.current) setReturnPreview(preview);
+    } catch (err: any) {
+      if (sequence !== returnLookupSequence.current) return;
+      setReturnPreview(null);
+      setReturnLookupError(err.response?.data?.message ?? "No active loan found for this accession number or copy QR code");
+    } finally {
+      if (sequence === returnLookupSequence.current) setLookingUpCopy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const identifier = copyBarcode.trim();
+    if (type !== "return" || !identifier) return;
+    const timer = window.setTimeout(() => { void handleLookupReturn(identifier); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [copyBarcode, handleLookupReturn, type]);
+
   const resetForm = () => {
     setStudentId("");
     setCopyBarcode("");
@@ -134,10 +184,44 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     setFoundCopy(null);
     setActiveBorrows([]);
     setMatchedBorrow(null);
+    setReturnPreview(null);
+    setReturnReceipt(null);
+    setReturnLookupError("");
+    returnLookupSequence.current += 1;
+    lastReturnLookup.current = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (type === "return") {
+      if (!returnPreview || !copyBarcode.trim()) {
+        toast.error("Look up an active loan before recording the return");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const result = await processReturn(copyBarcode.trim());
+        setReturnReceipt({ ...returnPreview, returned_at: result.returnedAt });
+        setReturnPreview(null);
+        setCopyBarcode("");
+        setReturnLookupError("");
+        returnLookupSequence.current += 1;
+        lastReturnLookup.current = "";
+        toast.success(`"${returnPreview.title}" returned by ${returnPreview.user_name}`);
+        setCompleted(`Return completed: ${returnPreview.title} - ${returnPreview.user_name}`);
+        onTransactionCompleted?.();
+      } catch (err: any) {
+        if (err.response?.status === 404 || err.response?.status === 409) {
+          setReturnPreview(null);
+          setReturnLookupError(err.response?.data?.message ?? "This loan is no longer active. Look it up again.");
+          lastReturnLookup.current = "";
+        }
+        toast.error(err.response?.data?.message ?? "Transaction failed");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     if (!foundUser || !foundCopy) {
       toast.error("Look up both the user and the copy first");
       return;
@@ -180,9 +264,6 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
           navigate("/admin/reservations");
           return;
         }
-      } else if (type === "return") {
-        await processReturn(copyBarcode.trim());
-        toast.success(`"${foundCopy.title}" returned by ${foundUser.name}`);
       }
       setCompleted(`${type === "borrow" ? "Borrow" : "Return"} completed: ${foundCopy.title} - ${foundUser.name}`);
       resetForm();
@@ -194,13 +275,9 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     }
   };
 
-  const canSubmit =
-    !submitting &&
-    !!foundUser &&
-    !!foundCopy &&
-    (type === "return"
-      ? !!matchedBorrow && matchedBorrow.copy_id === foundCopy.id
-      : foundCopy.is_active && Boolean(foundCopy.accession_number) && foundCopy.borrow_eligible !== false && foundCopy.borrow_eligible !== 0 && foundCopy.condition !== "lost" && !foundCopy.has_active_loan && (!foundCopy.is_reserved || Boolean(reservationCheckout)));
+  const canSubmit = type === "return"
+    ? !submitting && !!returnPreview && !!copyBarcode.trim()
+    : !submitting && !!foundUser && !!foundCopy && foundCopy.is_active && Boolean(foundCopy.accession_number) && foundCopy.borrow_eligible !== false && foundCopy.borrow_eligible !== 0 && foundCopy.condition !== "lost" && !foundCopy.has_active_loan && (!foundCopy.is_reserved || Boolean(reservationCheckout));
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 
   return {
@@ -209,11 +286,14 @@ const handleLookupCopy = async (copyBarcodeOverride?: string) => {
     startNextTransaction: () => { setCompleted(""); resetForm(); },
     lookingUpUser, lookingUpCopy, submitting,
     foundUser, foundCopy, activeBorrows, matchedBorrow, clearance,
+    returnPreview, returnReceipt, returnLookupError,
     canSubmit: canSubmit && clearanceAllowsBorrow,
     setStudentId, setCopyBarcode,
+    handleReturnIdentifierChange,
     handleTypeChange: setType,
     handleLookupUser,
     handleLookupCopy,
+    handleLookupReturn,
     handleSubmit,
     reservationCheckout,
   };

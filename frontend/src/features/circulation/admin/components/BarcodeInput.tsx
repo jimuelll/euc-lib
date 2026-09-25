@@ -5,15 +5,16 @@ import { useZxingScanner } from "@/features/scan-qr";
 interface Props {
   value: string;
   onChange: (v: string) => void;
-  onSubmit: () => void;
+  onSubmit: (value: string) => void;
   loading: boolean;
   disabled?: boolean;
   placeholder?: string;
+  inputId?: string;
 }
 
 const BarcodeInput = ({
   value, onChange, onSubmit,
-  loading, disabled, placeholder = "Type or scan QR code",
+  loading, disabled, placeholder = "Type or scan QR code", inputId,
 }: Props) => {
   const [scanning, setScanning] = useState(false);
   const [success,  setSuccess]  = useState(false);
@@ -23,7 +24,7 @@ const BarcodeInput = ({
     setScanning(false);
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2500);
-    setTimeout(onSubmit, 100);
+    setTimeout(() => onSubmit(text), 100);
   };
 
   const { videoRef, error } = useZxingScanner({ onResult: handleResult, active: scanning });
@@ -34,9 +35,10 @@ const BarcodeInput = ({
       {/* ── Input row ──────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors sm:flex-nowrap">
         <input
+          id={inputId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSubmit())}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSubmit(value))}
           placeholder={placeholder}
           disabled={disabled || scanning}
           className={`h-10 min-w-0 basis-full bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground transition-colors disabled:opacity-50 sm:basis-auto sm:flex-1 ${
@@ -49,6 +51,7 @@ const BarcodeInput = ({
           type="button"
           disabled={disabled || loading}
           onClick={() => setScanning((s) => !s)}
+          aria-label={scanning ? "Stop QR scanning" : "Scan copy QR code"}
           title={scanning ? "Stop scanning" : "Scan QR code"}
           className={`flex h-10 flex-1 items-center justify-center border-t border-border transition-colors sm:w-10 sm:flex-none sm:border-l sm:border-t-0 ${
             scanning
@@ -63,7 +66,8 @@ const BarcodeInput = ({
         <button
           type="button"
           disabled={disabled || loading || !value.trim() || scanning}
-          onClick={onSubmit}
+          onClick={() => onSubmit(value)}
+          aria-label="Look up accession number or copy QR code"
           className="flex h-10 flex-1 items-center justify-center border-l border-t border-border bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 sm:w-10 sm:flex-none sm:border-t-0"
         >
           {loading

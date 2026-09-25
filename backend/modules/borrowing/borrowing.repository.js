@@ -117,8 +117,31 @@ const findActiveBorrowingByCopyBarcode = async (identifier) => {
      JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
      LEFT JOIN copy_holdings h ON h.copy_id = bc.id
      WHERE (bc.barcode = ? OR h.accession_number = ?) AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue')
+     ORDER BY (h.accession_number = ?) DESC
      LIMIT 1`,
-    [identifier.trim(), identifier.trim()],
+    [identifier.trim(), identifier.trim(), identifier.trim()],
+  );
+  return row ?? null;
+};
+
+const findReturnPreviewByIdentifier = async (identifier) => {
+  const [[row]] = await db.query(
+    `SELECT b.id AS borrowing_id, b.borrowed_at, b.due_date, b.status,
+            u.id AS user_id, u.name AS user_name, u.student_employee_id, u.role,
+            bc.id AS copy_id, bc.book_id, bc.barcode AS copy_barcode,
+            bc.condition AS copy_condition, bc.is_active AS copy_is_active,
+            h.accession_number, bk.title, bk.author
+       FROM borrowings b
+       JOIN book_copies bc ON bc.id = b.copy_id
+       JOIN books bk ON bk.id = b.book_id
+       JOIN users u ON u.id = b.user_id
+       LEFT JOIN copy_holdings h ON h.copy_id = bc.id
+      WHERE (h.accession_number = ? OR bc.barcode = ?)
+        AND b.deleted_at IS NULL
+        AND b.status IN ('borrowed', 'overdue')
+      ORDER BY (h.accession_number = ?) DESC
+      LIMIT 1`,
+    [identifier, identifier, identifier],
   );
   return row ?? null;
 };
@@ -511,6 +534,7 @@ module.exports = {
   countBorrowHistory,
   findActiveBorrows,
   findActiveBorrowingByCopyBarcode,
+  findReturnPreviewByIdentifier,
   findBorrowHistory,
   findCopyByBarcode,
   findUserByBarcode,

@@ -27,6 +27,10 @@ const searchCatalogueWithAvailability = async (query) => {
 const resolveUserByBarcode = (scannedValue) => repository.findUserByBarcode(scannedValue);
 const resolveCopyByBarcode = (barcode) => repository.findCopyByBarcode(barcode);
 const getActiveBorrowingByCopyBarcode = (barcode) => repository.findActiveBorrowingByCopyBarcode(barcode);
+const getReturnPreviewByIdentifier = async (identifier) => {
+  await syncOverdueBorrowings();
+  return repository.findReturnPreviewByIdentifier(identifier.trim());
+};
 
 const lookupUserWithBorrows = async (studentEmployeeId) => {
   const result = await repository.findUserWithActiveBorrows(studentEmployeeId);
@@ -46,5 +50,6 @@ module.exports = {
   resolveUserByBarcode,
   resolveCopyByBarcode,
   getActiveBorrowingByCopyBarcode,
+  getReturnPreviewByIdentifier,
   lookupUserWithBorrows,
 };

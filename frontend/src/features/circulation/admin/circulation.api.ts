@@ -1,5 +1,5 @@
 import axiosInstance from "@/utils/AxiosInstance";
-import type { BookInfo, UserInfo, ActiveBorrow, ClearanceStatus } from "./circulation.types";
+import type { BookInfo, UserInfo, ActiveBorrow, ClearanceStatus, ReturnPreview } from "./circulation.types";
 
 export interface LookupUserResult {
   user: UserInfo;
@@ -64,6 +64,11 @@ export const lookupCopy = async (barcode: string): Promise<BookInfo> => {
   return res.data;
 };
 
+export const lookupReturnPreview = async (identifier: string): Promise<ReturnPreview> => {
+  const res = await axiosInstance.get<ReturnPreview>(`/api/borrowing/scan/return-preview/${encodeURIComponent(identifier)}`);
+  return res.data;
+};
+
 export const processBorrow = async (
   userBarcode: string,
   copyBarcode: string,
@@ -79,7 +84,7 @@ export const processBorrow = async (
 
 export const processReturn = async (copyBarcode: string) => {
   const res = await axiosInstance.post("/api/borrowing/scan/return", { copyBarcode });
-  return res.data;
+  return res.data as { message: string; borrowingId: number; returnedAt: string };
 };
 
 export const getCirculationLog = async (
