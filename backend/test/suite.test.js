@@ -4,6 +4,7 @@ const db = require("../db");
 require("./analytics.helpers.test");
 require("./admin.bulk-deactivation.test");
 require("./audit.policy.test");
+require("./audit.lookup-labels.test");
 require("./accession.database.integration.test");
 require("./cross-system.database.integration.test");
 require("./architecture.test");

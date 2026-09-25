@@ -57,9 +57,9 @@ const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
 const formatRole = (role: string | null) => (role ? role.replace(/_/g, " ") : "System");
-type AuditChange = { field: string; value?: string; before?: string; after?: string };
-const formatAuditChange = (change: AuditChange) => `${change.field}: ${change.before !== undefined ? `${change.before} → ${change.after}` : change.value ?? "Changed"}`;
-const auditChanges = (metadata: unknown): AuditChange[] => {
+type AuditChange = { field: string; value?: string; before?: string; after?: string; current_name?: boolean };
+const formatAuditChange = (change: AuditChange) => `${change.field}${change.current_name ? " (current name)" : ""}: ${change.before !== undefined ? `${change.before} → ${change.after}` : change.value ?? "Changed"}`;
+const auditChanges = (metadata: unknown, displayChanges?: AuditChange[]): AuditChange[] => {
   if (!metadata) return [];
   try {
     const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
@@ -75,9 +75,10 @@ const auditChanges = (metadata: unknown): AuditChange[] => {
         field: field.replace(/_/g, " "),
         value: String(value),
       }));
-    const changedFields = Array.isArray(changes)
-      ? changes
-        .filter((change): change is { field: string; value?: string; before?: string; after?: string } =>
+    const resolvedChanges = Array.isArray(displayChanges) ? displayChanges : changes;
+    const changedFields = Array.isArray(resolvedChanges)
+      ? resolvedChanges
+                        .filter((change): change is AuditChange =>
           !!change
           && typeof change === "object"
           && typeof change.field === "string"
@@ -359,7 +360,7 @@ const AdminAuditLogs = () => {
                       </div>
 
                       <p className="text-sm font-medium leading-6 text-foreground">{item.copy_display_description ?? item.description}</p>
-                      {auditChanges(item.metadata).length ? <details className="max-w-full border border-border/70 bg-muted/15 px-3 py-2 text-xs"><summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 font-medium text-foreground"><span className="min-w-0 break-words whitespace-normal">{auditChanges(item.metadata).map(formatAuditChange).join(" · ")}</span><span className="shrink-0 text-muted-foreground">View details</span></summary><dl className="mt-2 grid gap-x-5 gap-y-2 text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata).map((change) => <div key={change.field} className="min-w-0"><dt className="font-medium text-foreground">{change.field}</dt><dd className="break-words whitespace-normal">{change.before !== undefined ? `${change.before} → ${change.after}` : change.value}</dd></div>)}</dl></details> : auditDetailStatus(item.metadata) === "no_field_changes" ? <p className="text-xs font-medium text-muted-foreground">No field changes</p> : auditDetailStatus(item.metadata) === "details_unavailable" ? <p className="text-xs font-medium text-muted-foreground">Details unavailable</p> : auditDetailStatus(item.metadata) === "affected_record_summary" ? <p className="text-xs font-medium text-muted-foreground">{auditAffectedSummary(item.metadata)}</p> : null}
+                      {auditChanges(item.metadata, item.display_changes).length ? <details className="max-w-full border border-border/70 bg-muted/15 px-3 py-2 text-xs"><summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 font-medium text-foreground"><span className="min-w-0 break-words whitespace-normal">{auditChanges(item.metadata, item.display_changes).map(formatAuditChange).join(" · ")}</span><span className="shrink-0 text-muted-foreground">View details</span></summary><dl className="mt-2 grid gap-x-5 gap-y-2 text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata, item.display_changes).map((change) => <div key={change.field} className="min-w-0"><dt className="font-medium text-foreground">{change.field}{change.current_name ? " (current name)" : ""}</dt><dd className="break-words whitespace-normal">{change.before !== undefined ? `${change.before} → ${change.after}` : change.value}</dd></div>)}</dl></details> : auditDetailStatus(item.metadata) === "no_field_changes" ? <p className="text-xs font-medium text-muted-foreground">No field changes</p> : auditDetailStatus(item.metadata) === "details_unavailable" ? <p className="text-xs font-medium text-muted-foreground">Details unavailable</p> : auditDetailStatus(item.metadata) === "affected_record_summary" ? <p className="text-xs font-medium text-muted-foreground">{auditAffectedSummary(item.metadata)}</p> : null}
                       {item.restore_status === "reversed" ? <p className="inline-flex w-fit border border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive">Reversed by snapshot restore{item.reversed_at ? ` · ${formatDateTime(item.reversed_at)}` : ""}</p> : null}
                       <p className="text-xs text-muted-foreground">
                         {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}

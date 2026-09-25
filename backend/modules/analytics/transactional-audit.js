@@ -1,4 +1,5 @@
 const { enqueueAuditEvent } = require("./analytics.audit.service");
+const { labelsForSnapshots } = require("./audit.lookup-labels");
 const { metadataFor } = require("../../middlewares/auditLogger");
 
 async function enqueueTransactionalAudit(conn, {
@@ -15,6 +16,8 @@ async function enqueueTransactionalAudit(conn, {
   isCreation = false,
 }) {
   const comparable = before !== null && after !== null;
+  let lookupLabels = {};
+  try { lookupLabels = await labelsForSnapshots(conn, route, before, after); } catch { /* Keep audit writes available if a lookup table is unavailable. */ }
   const metadata = metadataFor(
     route,
     {},
@@ -23,7 +26,7 @@ async function enqueueTransactionalAudit(conn, {
     details,
     isCreation,
     { type },
-    { failed: false, comparable },
+    { failed: false, comparable, lookupLabels },
   );
   Object.assign(metadata, extraMetadata);
   await enqueueAuditEvent(conn, {

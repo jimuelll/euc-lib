@@ -1,6 +1,7 @@
 const db = require("../../db");
 const { availableToBorrow, hasAccession } = require("../catalog/copyEligibility");
 const { enrichCopyAuditRows } = require("./audit.copy-label");
+const { enrichAuditLookupRows } = require("./audit.lookup-labels");
 const AUDIT_CATEGORIES = ["all", "auth", "users", "catalog", "academic_settings", "attendance", "borrowing", "reservation", "bulletin", "events", "content", "subscriptions", "notifications", "backup", "clearance", "system"];
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
 
@@ -101,10 +102,15 @@ async function getAuditLog({ limit = 20, page = 1, category = "all", action = ""
   );
   let displayRows = rows;
   try {
-    displayRows = await enrichCopyAuditRows(rows, db.query.bind(db));
+    displayRows = await enrichAuditLookupRows(displayRows, db.query.bind(db));
+  } catch (error) {
+    console.error("[analytics] Failed to resolve audit lookup labels:", error.message);
+  }
+  try {
+    displayRows = await enrichCopyAuditRows(displayRows, db.query.bind(db));
   } catch (error) {
     console.error("[analytics] Failed to resolve copy audit labels:", error.message);
-    displayRows = rows.map(({ route, ...row }) => row);
+    displayRows = displayRows.map(({ route, ...row }) => row);
   }
   return {
     rows: displayRows,

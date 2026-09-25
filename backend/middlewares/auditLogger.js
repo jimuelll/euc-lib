@@ -1,6 +1,7 @@
 const db = require("../db");
 const { enqueueAuditEvent } = require("../modules/analytics/audit.service");
 const { copyLabel } = require("../modules/analytics/audit.copy-label");
+const { applyCapturedLabels, labelsForSnapshots } = require("../modules/analytics/audit.lookup-labels");
 
 const ignoredPaths = new Set([
   "/api/analytics/visit",
@@ -279,9 +280,19 @@ function snapshotChanges(path, before, after, body = {}) {
   if (!before && !after) return bodyChanges(path, body);
   const fields = fieldsForPath(path);
   return fields.flatMap(([key, label]) => {
-    const nextValue = after ? after[key] : body[key];
-    return change(key, label, before?.[key], nextValue) || [];
+    const snapshotKey = key === "bookId" ? "book_id" : key;
+    const previousValue = before && has(before, key) ? before[key] : before?.[snapshotKey];
+    const nextValue = after
+      ? (has(after, key) ? after[key] : after[snapshotKey])
+      : (has(body, key) ? body[key] : body[snapshotKey]);
+    return change(key, label, previousValue, nextValue) || [];
   });
+}
+
+function snapshotFieldValue(snapshot, key) {
+  if (!snapshot) return undefined;
+  if (has(snapshot, key)) return snapshot[key];
+  return snapshot[key === "bookId" ? "book_id" : key];
 }
 
 const auditValuesEqual = (left, right, field = "") => {
@@ -336,8 +347,9 @@ function snapshotChangedSinceRequest(path, method, body, before, after, policy) 
       }
       continue;
     }
-    const expected = has(body, key) ? body[key] : before[key];
-    if (!auditValuesEqual(after[key], expected, key)) return true;
+    const bodyValue = has(body, key) ? body[key] : snapshotFieldValue(body, key);
+    const expected = bodyValue !== undefined ? bodyValue : snapshotFieldValue(before, key);
+    if (!auditValuesEqual(snapshotFieldValue(after, key), expected, key)) return true;
   }
   return false;
 }
@@ -513,6 +525,7 @@ function affectedRecordType(path) {
 function metadataFor(path, body, before, after, details = null, isCreation = false, policy = null, capture = {}) {
   body = body && typeof body === "object" ? body : {};
   let changes = capture.failed ? [] : (isCreation ? addedChanges(snapshotChanges(path, before, after, body)) : snapshotChanges(path, before, after, body));
+  changes = applyCapturedLabels(path, changes, capture.lookupLabels);
   if (policy?.type === "state_transition" && !capture.comparable && !(details?.stateFrom !== undefined && details?.stateTo !== undefined)) changes = [];
   if (policy?.type === "field_changes" && (capture.failed || !capture.comparable && !isCreation)) changes = [];
   const metadata = { changes };
@@ -578,7 +591,9 @@ async function auditLogger(req, res, next) {
       const drifted = beforeRead && afterRead && snapshotChangedSinceRequest(path, req.method, req.body, before, after, policy);
       if (drifted) console.warn(`[audit] ${req.method} ${safeRoute(path)} changed concurrently; field details are unavailable for this event.`);
       const comparable = beforeRead && afterRead && !drifted && before !== null && after !== null;
-      const metadata = metadataFor(path, req.body, before, after, details, isCreation, policy, { failed: !beforeRead || !afterRead || drifted, comparable });
+      let lookupLabels = {};
+      try { lookupLabels = await labelsForSnapshots(db, path, before, after, req.body); } catch { /* Label failures must not hide the mutation audit. */ }
+      const metadata = metadataFor(path, req.body, before, after, details, isCreation, policy, { failed: !beforeRead || !afterRead || drifted, comparable, lookupLabels });
       const baseDescription = getDescription(req.method, path, req.body, before, drifted ? before : after, details);
       let lastError;
       for (let attempt = 0; attempt < 3; attempt += 1) {

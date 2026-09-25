@@ -43,6 +43,7 @@ export interface AuditItem {
   description: string;
   copy_display_description?: string;
   metadata: unknown;
+  display_changes?: { field: string; value?: string; before?: string; after?: string; current_name?: boolean }[];
   restore_status: "retained" | "reversed";
   reversed_at: string | null;
 }
