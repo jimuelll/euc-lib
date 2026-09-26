@@ -90,9 +90,9 @@ Repeatable fields store a list of text entries, so staff can add or remove indiv
 ```text
 .
 ├── backend/
-│   ├── app.js                  Express middleware and route mounting
-│   ├── server.js               HTTP/WebSocket server entry point
-│   ├── db.js                   MySQL connection pool
+│   ├── app.ts                  Express middleware and route mounting
+│   ├── server.ts               HTTP/WebSocket server entry point
+│   ├── db.ts                   MySQL connection pool
 │   ├── middlewares/            Validation, rate limiting, maintenance, audit logging
 │   ├── modules/                Feature routes, controllers, and services
 │   ├── realtime/               Authenticated notification WebSocket hub
@@ -222,13 +222,14 @@ Install and start the API from `backend/`:
 ```powershell
 cd backend
 npm install
-node server.js
+npm run dev
 ```
 
-For automatic restarts during development:
+For a production build:
 
 ```powershell
-npx nodemon server.js
+npm run build
+npm start
 ```
 
 The API listens on `http://localhost:4000`. The authenticated notification socket is available at `ws://localhost:4000/ws?token=<access-token>`.
@@ -297,7 +298,7 @@ The Express application mounts feature modules under `/api`:
 - **Guide editing:** `/admin/user-guide` supports drafts, publishing, ordering, visibility, and archival for `admin` and `super_admin` roles.
 - **Super-admin:** `/admin/backup`, audit-log views, catalogue schema/book-type controls, and embedding maintenance.
 
-The exact endpoint contracts live beside each feature in `backend/modules/*/*.routes.js`. The backend also runs overdue-borrowing synchronization at startup and every five minutes.
+The exact endpoint contracts live beside each feature in `backend/modules/*/*.routes.ts`. The backend also runs overdue-borrowing synchronization at startup and every five minutes.
 
 ## Deployment
 
@@ -313,7 +314,7 @@ Before deploying:
 - Configure all backend secrets and database settings in the backend host.
 - Set `VITE_BASE_URL`, `VITE_CLOUDINARY_CLOUD_NAME`, and `VITE_CLOUDINARY_UPLOAD_PRESET` in Vercel. Do not copy local `.env` values such as `http://localhost:4000` to production.
 - Import `db/fresh-start.sql` into the deployment database only when initializing a new environment.
-- Add the exact production frontend origin to the CORS allowlist in `backend/app.js`. A new Vercel preview URL is a different origin and will be rejected until it is added.
+- Add the exact production frontend origin to the CORS allowlist in `backend/app.ts`. A new Vercel preview URL is a different origin and will be rejected until it is added.
 - Confirm the backend host can reach MySQL/MariaDB and Cloudinary.
 - Configure Gemini or Groq only if recommendations, embedding maintenance, or AI reports are enabled.
 

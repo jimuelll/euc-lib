@@ -1,0 +1,249 @@
+import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
+import type {
+  CreateNotificationInput,
+  NotificationAdminStats,
+  NotificationContext,
+  NotificationCountRow,
+  NotificationListAdminOptions,
+  NotificationListOptions,
+  NotificationRecipient,
+  NotificationRecord,
+  NotificationUpdateInput,
+  NotificationWrite,
+} from "./notifications.types";
+
+const db = require("../../db") as Pool;
+
+interface NotificationIdRow extends RowDataPacket {
+  id: number;
+}
+
+interface UserRoleRow extends RowDataPacket {
+  role: string;
+}
+
+const buildAudienceWhere = (): string => `
+  n.is_active = 1
+  AND (n.expires_at IS NULL OR n.expires_at > NOW())
+  AND (
+    n.audience_type = 'all'
+    OR (n.audience_type = 'user' AND n.audience_user_id = ?)
+    OR (n.audience_type = 'role' AND n.audience_role = ?)
+  )`;
+
+const listForUser = async ({ userId, role, limit, unreadOnly }: NotificationListOptions): Promise<NotificationRecord[]> => {
+  const unreadClause = unreadOnly ? "AND nr.read_at IS NULL" : "";
+  const [rows] = await db.query<NotificationRecord[]>(
+    `SELECT n.*, nr.read_at
+       FROM notifications n
+       LEFT JOIN notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = ?
+      WHERE ${buildAudienceWhere()}
+        ${unreadClause}
+      ORDER BY n.created_at DESC
+      LIMIT ?`,
+    [userId, userId, role, limit],
+  );
+  return rows;
+};
+
+const getUnreadCountForUser = async ({ userId, role }: NotificationContext): Promise<number> => {
+  const [[row]] = await db.query<NotificationCountRow[]>(
+    `SELECT COUNT(*) AS total
+       FROM notifications n
+       LEFT JOIN notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = ?
+      WHERE ${buildAudienceWhere()}
+        AND nr.read_at IS NULL`,
+    [userId, userId, role],
+  );
+  return row?.total ?? 0;
+};
+
+const getByIdForUser = async ({ notificationId, userId, role }: NotificationContext & { notificationId: number }): Promise<NotificationRecord | null> => {
+  const [[row]] = await db.query<NotificationRecord[]>(
+    `SELECT n.*, nr.read_at
+       FROM notifications n
+       LEFT JOIN notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = ?
+      WHERE n.id = ?
+        AND ${buildAudienceWhere()}
+      LIMIT 1`,
+    [userId, notificationId, userId, role],
+  );
+  return row ?? null;
+};
+
+const markAsRead = async ({ notificationId, userId }: { notificationId: number; userId: number }): Promise<void> => {
+  await db.query(
+    `INSERT INTO notification_reads (notification_id, user_id, read_at)
+     VALUES (?, ?, NOW())
+     ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
+    [notificationId, userId],
+  );
+};
+
+const markAllAsRead = async ({ userId, role }: NotificationContext): Promise<void> => {
+  await db.query(
+    `INSERT INTO notification_reads (notification_id, user_id, read_at)
+     SELECT n.id, ?, NOW()
+       FROM notifications n
+       LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ?
+      WHERE ${buildAudienceWhere()} AND nr.read_at IS NULL
+     ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
+    [userId, userId, userId, role],
+  );
+};
+
+const findExistingNotification = async ({
+  type,
+  audienceType,
+  audienceUserId,
+  audienceRole,
+  sourceType = null,
+  sourceId = null,
+}: Pick<NotificationWrite, "type" | "audienceType" | "audienceUserId" | "audienceRole" | "sourceType" | "sourceId">, conn: Pool | PoolConnection = db): Promise<NotificationIdRow | null> => {
+  if (!sourceType || sourceId === null || sourceId === undefined) return null;
+  const [[row]] = await conn.query<NotificationIdRow[]>(
+    `SELECT id
+       FROM notifications
+      WHERE type = ?
+        AND audience_type = ?
+        AND audience_user_id <=> ?
+        AND audience_role <=> ?
+        AND source_type = ?
+        AND source_id = ?
+      ORDER BY id DESC
+      LIMIT 1`,
+    [type, audienceType, audienceUserId, audienceRole, sourceType, sourceId],
+  );
+  return row ?? null;
+};
+
+const updateNotification = async ({
+  notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey = null,
+}: NotificationUpdateInput): Promise<void> => {
+  await db.query(
+    `UPDATE notifications
+        SET title = ?, body = ?, href = ?, expires_at = ?, created_by = ?,
+            source_type = ?, source_id = ?, delivery_key = COALESCE(?, delivery_key), is_active = 1, created_at = NOW()
+      WHERE id = ?`,
+    [title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey, notificationId],
+  );
+  await db.query("DELETE FROM notification_reads WHERE notification_id = ?", [notificationId]);
+};
+
+const findNotificationByDeliveryKey = async (deliveryKey: string): Promise<NotificationIdRow | null> => {
+  const [[row]] = await db.query<NotificationIdRow[]>("SELECT id FROM notifications WHERE delivery_key = ? LIMIT 1", [deliveryKey]);
+  return row ?? null;
+};
+
+const createNotification = async ({
+  type, title, body, href, audienceType, audienceUserId, audienceRole,
+  expiresAt, createdBy, sourceType, sourceId,
+}: NotificationWrite): Promise<number> => {
+  const [result] = await db.query<ResultSetHeader>(
+    `INSERT INTO notifications
+      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId],
+  );
+  return result.insertId;
+};
+
+const createNotificationWithDeliveryKey = async ({
+  type, title, body, href, audienceType, audienceUserId, audienceRole,
+  expiresAt, createdBy, sourceType, sourceId, deliveryKey,
+}: NotificationWrite & { deliveryKey: string }): Promise<{ id: number; created: boolean }> => {
+  const [result] = await db.query<ResultSetHeader>(
+    `INSERT IGNORE INTO notifications
+      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, delivery_key, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId, deliveryKey],
+  );
+  if (result.affectedRows === 1) return { id: result.insertId, created: true };
+  const [[row]] = await db.query<NotificationIdRow[]>("SELECT id FROM notifications WHERE delivery_key = ? LIMIT 1", [deliveryKey]);
+  if (!row) throw new Error("Notification delivery key could not be resolved");
+  return { id: row.id, created: false };
+};
+
+const getUserRole = async (userId: number): Promise<string> => {
+  const [[row]] = await db.query<UserRoleRow[]>("SELECT role FROM users WHERE id = ? LIMIT 1", [userId]);
+  return row?.role ?? "student";
+};
+
+const searchNotificationRecipients = async (query: string): Promise<NotificationRecipient[]> => {
+  const term = `%${query}%`;
+  const [rows] = await db.query<NotificationRecipient[]>(
+    `SELECT id, name, role, student_employee_id, library_card_number,
+            student_number, employee_number, username
+       FROM users
+      WHERE deleted_at IS NULL AND is_active = 1
+        AND (name LIKE ? OR CAST(id AS CHAR) LIKE ? OR student_employee_id LIKE ?
+          OR library_card_number LIKE ? OR student_number LIKE ?
+          OR employee_number LIKE ? OR username LIKE ?)
+      ORDER BY name ASC
+      LIMIT 10`,
+    [term, term, term, term, term, term, term],
+  );
+  return rows;
+};
+
+const findActiveNotificationRecipient = async (userId: number): Promise<NotificationRecipient | null> => {
+  const [[row]] = await db.query<NotificationRecipient[]>(
+    `SELECT id, name, role, student_employee_id, library_card_number,
+            student_number, employee_number, username
+       FROM users
+      WHERE id = ? AND deleted_at IS NULL AND is_active = 1
+      LIMIT 1`,
+    [userId],
+  );
+  return row ?? null;
+};
+
+const listAdminNotifications = async ({ page, limit }: NotificationListAdminOptions) => {
+  const [[{ total }]] = await db.query<NotificationCountRow[]>("SELECT COUNT(*) AS total FROM notifications");
+  const [rows] = await db.query<NotificationRecord[]>(
+    `SELECT n.*, creator.name AS creator_name,
+            recipient.name AS audience_user_name,
+            COALESCE(recipient.username, recipient.student_employee_id,
+                     recipient.library_card_number, recipient.employee_number,
+                     recipient.student_number) AS audience_user_identifier
+       FROM notifications n
+       LEFT JOIN users creator ON creator.id = n.created_by
+       LEFT JOIN users recipient ON recipient.id = n.audience_user_id
+      ORDER BY n.created_at DESC
+      LIMIT ? OFFSET ?`,
+    [limit, (page - 1) * limit],
+  );
+  return { rows, total: Number(total), page, limit };
+};
+
+const getAdminStats = async (): Promise<NotificationAdminStats | null> => {
+  const [[row]] = await db.query<NotificationAdminStats[]>(
+    `SELECT COUNT(*) AS total_notifications,
+            SUM(CASE WHEN created_at >= CURDATE() THEN 1 ELSE 0 END) AS created_today,
+            SUM(CASE WHEN audience_type = 'all' THEN 1 ELSE 0 END) AS broadcast_notifications,
+            SUM(CASE WHEN audience_type = 'user' THEN 1 ELSE 0 END) AS direct_notifications
+       FROM notifications`,
+  );
+  return row ?? null;
+};
+
+export = {
+  listForUser,
+  getUnreadCountForUser,
+  getByIdForUser,
+  markAsRead,
+  markAllAsRead,
+  findExistingNotification,
+  findNotificationByDeliveryKey,
+  updateNotification,
+  createNotification,
+  createNotificationWithDeliveryKey,
+  getUserRole,
+  searchNotificationRecipients,
+  findActiveNotificationRecipient,
+  listAdminNotifications,
+  getAdminStats,
+};

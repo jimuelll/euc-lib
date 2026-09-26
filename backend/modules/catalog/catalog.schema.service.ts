@@ -1,0 +1,46 @@
+const repository = require("./catalog.repository");
+
+interface CatalogSchemaField extends Record<string, any> {
+  key: string;
+  scope: string;
+  public?: boolean;
+}
+interface CatalogSchemaOptions {
+  publicOnly?: boolean;
+}
+
+const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "copies", "material_type", "metadata"];
+const OPERATIONAL_BOOK_KEYS = new Set(["title", "author", "isbn", "copies", "book_type_id", "material_type"]);
+
+const fieldsForMaterial = (schema: CatalogSchemaField[], materialType: string): CatalogSchemaField[] =>
+  schema.filter((field) => field.scope === "shared" || field.scope === materialType);
+
+const getSchema = async (options: CatalogSchemaOptions = {}): Promise<CatalogSchemaField[]> => repository.getSchema(options);
+
+const upsertSchema = async (fields: CatalogSchemaField[]): Promise<void> => {
+  const conn = await repository.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const existingKeys: string[] = await repository.findActiveSchemaKeys(conn);
+    const incomingKeys = new Set(fields.map((field) => field.key));
+    const toArchive = existingKeys.filter((key) => !incomingKeys.has(key));
+    await repository.archiveSchemaKeys(toArchive, conn);
+    await repository.upsertSchema(fields, conn);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+export = {
+  OPERATIONAL_BOOK_KEYS,
+  PUBLIC_CATALOGUE_CORE_KEYS,
+  fieldsForMaterial,
+  getSchema,
+  upsertSchema,
+};
