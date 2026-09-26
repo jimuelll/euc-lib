@@ -203,8 +203,29 @@ async function findBookForEmbedding(bookId: number): Promise<CatalogRecord | nul
   return book || null;
 }
 
-async function findReadyEnrichment(bookId: number): Promise<(RowDataPacket & { enrichment_json: string }) | null> {
-  const [rows] = await db.query<Array<RowDataPacket & { enrichment_json: string }>>("SELECT enrichment_json FROM book_enrichment WHERE book_id = ? AND status = 'ready'", [bookId]);
+async function findReadyEnrichment(bookId: number): Promise<(RowDataPacket & {
+  enrichment_json: string | null;
+  embedding_model: string | null;
+  embedding_content_hash: string | null;
+  embedding_dimensions: number | null;
+  embedding_status: string | null;
+}) | null> {
+  const [rows] = await db.query<Array<RowDataPacket & {
+    enrichment_json: string | null;
+    embedding_model: string | null;
+    embedding_content_hash: string | null;
+    embedding_dimensions: number | null;
+    embedding_status: string | null;
+  }>>(
+    `SELECT CASE WHEN enrichment.status = 'ready' THEN enrichment.enrichment_json ELSE NULL END AS enrichment_json,
+       embeddings.model AS embedding_model, embeddings.content_hash AS embedding_content_hash,
+       embeddings.dimensions AS embedding_dimensions, embeddings.status AS embedding_status
+     FROM books bk
+     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
+     LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
+     WHERE bk.id = ? AND bk.deleted_at IS NULL LIMIT 1`,
+    [bookId]
+  );
   const [row] = rows;
   return row || null;
 }
@@ -236,6 +257,13 @@ async function findBooksForBackfill(): Promise<BackfillBook[]> {
          (COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()})
          OR embeddings.book_id IS NULL
          OR embeddings.status <> 'ready'
+         OR (
+           enrichment.source = 'openlibrary_googlebooks'
+           AND enrichment.status = 'ready'
+           AND bk.isbn IS NOT NULL AND TRIM(bk.isbn) <> ''
+           AND COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.description'))), ''), '') = ''
+           AND CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.googleBooksSynopsisCheckVersion')), ''), '0') AS UNSIGNED) < 1
+         )
        )
      ORDER BY bk.id`
   );

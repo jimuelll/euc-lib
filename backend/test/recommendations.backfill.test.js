@@ -66,9 +66,9 @@ test("online metadata lookup failures are tracked separately from embedding fail
 
     assert.deepEqual(result, {
       __lookupFailed: true,
-      __lookupError: "Open Library: Metadata source failed (503)",
+      __lookupError: "Open Library: Metadata source failed (503); Open Library search: Metadata source failed (503); Google Books: Metadata source failed (503)",
     });
-    assert.equal(savedFailure, "Open Library: Metadata source failed (503)");
+    assert.equal(savedFailure, result.__lookupError);
   } finally {
     repository.findEnrichment = originals.findEnrichment;
     repository.findBookIsbn = originals.findBookIsbn;
@@ -139,9 +139,15 @@ test("Open Library ISBN search enriches books without a Google Books key", async
     repository.findBookIsbn = async () => ({ id: 127, isbn: "9781234567890" });
     repository.saveEnrichment = async (_bookId, metadata) => { savedMetadata = metadata; };
     delete process.env.GOOGLE_BOOKS_API_KEY;
+    const requests = [];
     global.fetch = async (url) => {
-      assert.match(String(url), /search\.json\?isbn=9781234567890/);
-      return { ok: true, json: async () => ({ docs: [{ subject: ["Library science"], publisher: ["Example Press"], language: ["eng"], number_of_pages_median: 248, publish_year: [2024] }] }) };
+      requests.push(String(url));
+      if (String(url).includes("/api/books?")) return { ok: true, json: async () => ({}) };
+      if (String(url).includes("/search.json?")) {
+        return { ok: true, json: async () => ({ docs: [{ subject: ["Library science"], publisher: ["Example Press"], language: ["eng"], number_of_pages_median: 248, publish_year: [2024] }] }) };
+      }
+      assert.match(String(url), /^https:\/\/www\.googleapis\.com\/books\/v1\/volumes\?q=isbn:9781234567890$/);
+      return { ok: true, json: async () => ({ items: [] }) };
     };
 
     const result = await service.enrichBook(127);
@@ -149,8 +155,9 @@ test("Open Library ISBN search enriches books without a Google Books key", async
     assert.deepEqual(result.subjects, ["Library science"]);
     assert.equal(result.publisher, "Example Press");
     assert.equal(result.pageCount, 248);
-    assert.equal(result.publishedDate, 2024);
+    assert.equal(result.publishedDate, "2024");
     assert.deepEqual(savedMetadata, result);
+    assert.equal(requests.length, 3);
   } finally {
     repository.findEnrichment = originals.findEnrichment;
     repository.findBookIsbn = originals.findBookIsbn;
@@ -158,6 +165,85 @@ test("Open Library ISBN search enriches books without a Google Books key", async
     global.fetch = originals.fetch;
     if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
     else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
+  }
+});
+
+test("an imported synopsis is saved privately and included in the generated embedding", async () => {
+  const originals = {
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    saveEnrichment: repository.saveEnrichment,
+    findBookForEmbedding: repository.findBookForEmbedding,
+    findReadyEnrichment: repository.findReadyEnrichment,
+    saveEmbedding: repository.saveEmbedding,
+    fetch: global.fetch,
+    provider: process.env.AI_EMBEDDING_PROVIDER,
+    geminiKey: process.env.GEMINI_API_KEY,
+  };
+  let savedEnrichment = null;
+  let embeddingRequest = null;
+  let savedEmbedding = null;
+  try {
+    repository.findEnrichment = async () => null;
+    repository.findBookIsbn = async () => ({ id: 128, isbn: "9781234567890" });
+    repository.saveEnrichment = async (_bookId, metadata) => { savedEnrichment = metadata; };
+    repository.findBookForEmbedding = async () => ({
+      id: 128, title: "Imported synopsis test", author: "A. Writer", material_type: "book",
+      metadata: JSON.stringify({ category: "Literature", edition: "First", publication_year: "2024" }),
+    });
+    repository.findReadyEnrichment = async () => ({ enrichment_json: JSON.stringify(savedEnrichment) });
+    repository.saveEmbedding = async (embedding) => { savedEmbedding = embedding; };
+    process.env.AI_EMBEDDING_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-key";
+    global.fetch = async (url, options) => {
+      if (String(url).startsWith("https://openlibrary.org/api/books?")) {
+        return { ok: true, json: async () => ({ "ISBN:9781234567890": { subjects: [{ name: "Literature" }] } }) };
+      }
+      if (String(url).startsWith("https://www.googleapis.com/books/v1/volumes?")) {
+        return { ok: true, json: async () => ({ items: [{ volumeInfo: { description: "<p>A &amp; clean synopsis.</p><script>ignored</script>" } }] }) };
+      }
+      assert.match(String(url), /generativelanguage\.googleapis\.com/);
+      embeddingRequest = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ embedding: { values: [0.1, 0.2] } }) };
+    };
+
+    const enrichment = await service.enrichBook(128);
+    const embedding = await service.embedBook(128);
+
+    assert.equal(enrichment.description, "A & clean synopsis.");
+    assert.equal(savedEnrichment.description, "A & clean synopsis.");
+    assert.deepEqual(savedEnrichment.subjects, ["Literature"]);
+    assert.match(embeddingRequest.content.parts[0].text, /A & clean synopsis\./);
+    assert.deepEqual(savedEmbedding.vector, [0.1, 0.2]);
+    assert.deepEqual(embedding, { bookId: 128, dimensions: 2 });
+  } finally {
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.saveEnrichment = originals.saveEnrichment;
+    repository.findBookForEmbedding = originals.findBookForEmbedding;
+    repository.findReadyEnrichment = originals.findReadyEnrichment;
+    repository.saveEmbedding = originals.saveEmbedding;
+    global.fetch = originals.fetch;
+    if (originals.provider === undefined) delete process.env.AI_EMBEDDING_PROVIDER;
+    else process.env.AI_EMBEDDING_PROVIDER = originals.provider;
+    if (originals.geminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originals.geminiKey;
+  }
+});
+
+test("automatic ISBN enrichment does not replace staff-entered AI metadata", async () => {
+  const originals = { findEnrichment: repository.findEnrichment, fetch: global.fetch };
+  const staffMetadata = { description: "Staff reviewed description", subjects: ["Staff topic"] };
+  try {
+    repository.findEnrichment = async () => ({ source: "manual", enrichment_json: JSON.stringify(staffMetadata) });
+    global.fetch = async () => { throw new Error("Manual metadata should avoid provider lookup"); };
+
+    const result = await service.enrichBook(129);
+
+    assert.deepEqual(result, staffMetadata);
+  } finally {
+    repository.findEnrichment = originals.findEnrichment;
+    global.fetch = originals.fetch;
   }
 });
 

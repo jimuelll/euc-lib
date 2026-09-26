@@ -1,0 +1,201 @@
+type RecordValue = Record<string, unknown>;
+
+interface IsbnMetadataLookup {
+  isbn: string;
+  title: string;
+  author: string;
+  publisher: string;
+  copyright_year: string;
+  publication_place: string;
+  physical_description: string;
+  subjects: string[];
+  categories: string[];
+  description: string;
+  language: string;
+  pageCount: string | number | null;
+  publishedDate: string;
+  errors: string[];
+  openLibraryResponded: boolean;
+  googleBooksResponded: boolean;
+  metadataFound: boolean;
+}
+
+interface ProviderLookup<T> {
+  record: T | null;
+  responded: boolean;
+  errors: string[];
+}
+
+let openLibraryQueue = Promise.resolve();
+let openLibraryLastRequestAt = 0;
+
+const toRecord = (value: unknown): RecordValue => value && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
+const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+const textValue = (value: unknown): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value).trim();
+  if (!value || typeof value !== "object") return "";
+  const record = toRecord(value);
+  return textValue(record.name ?? record.key ?? record.value ?? record.text);
+};
+const firstText = (...values: unknown[]): string => values.map(textValue).find(Boolean) || "";
+const firstValue = (...values: unknown[]): string | number | null => {
+  const value = values.find(Boolean);
+  return typeof value === "number" || typeof value === "string" ? value : null;
+};
+const uniqueText = (values: unknown[]): string[] => {
+  const seen = new Set<string>();
+  return values.map(textValue).filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (!value || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const namedEntities: Record<string, string> = {
+  amp: "&", apos: "'", copy: "©", gt: ">", hellip: "…", ldquo: "“", lsquo: "‘",
+  lt: "<", mdash: "—", nbsp: " ", ndash: "–", quot: '"', rdquo: "”", reg: "®",
+  rsquo: "’", trade: "™",
+};
+
+const decodeEntities = (value: string): string => value.replace(/&(#(?:x[\da-f]+|\d+)|[a-z][a-z\d]+);/gi, (entity, name: string) => {
+  if (name[0] === "#") {
+    const hexadecimal = name[1]?.toLowerCase() === "x";
+    const codePoint = Number.parseInt(name.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+    if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return "�";
+    return String.fromCodePoint(codePoint);
+  }
+  return namedEntities[name.toLowerCase()] ?? entity;
+});
+
+const cleanDescription = (value: unknown): string => {
+  if (typeof value !== "string") return "";
+  const plainText = decodeEntities(value
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(script|style|iframe|object|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<\s*br\b[^>]*\/?>/gi, "\n")
+    .replace(/<\s*hr\b[^>]*\/?>/gi, "\n")
+    .replace(/<\s*\/?\s*(p|div|li|ul|ol|blockquote|h[1-6]|section|article)\b[^>]*>/gi, "\n")
+    .replace(/<[^>]*>/g, " "))
+    .replace(/<(script|style|iframe|object|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<\/?[a-z][^>]*>/gi, " ");
+  return plainText
+    .replace(/[\t\f\v ]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim()
+    .slice(0, 8000)
+    .trim();
+};
+
+const fetchJson = async (url: string, headers: Record<string, string> = {}): Promise<unknown> => {
+  const response = await fetch(url, { headers: { Accept: "application/json", ...headers }, signal: AbortSignal.timeout(8000) });
+  if (!response.ok) throw new Error(`Metadata source failed (${response.status})`);
+  try { return await response.json(); }
+  catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { responseReceived: true }); }
+};
+
+const fetchOpenLibraryJson = (url: string): Promise<unknown> => {
+  const request = openLibraryQueue.then(async () => {
+    const waitMs = Math.max(0, 1000 - (Date.now() - openLibraryLastRequestAt));
+    if (waitMs) await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+    openLibraryLastRequestAt = Date.now();
+    const contact = String(process.env.OPEN_LIBRARY_CONTACT_EMAIL || "").replace(/[\r\n()]/g, "").trim();
+    const userAgent = `ECULibraryCatalogue/1.0${contact ? ` (${contact})` : ""}`;
+    return fetchJson(url, { "User-Agent": userAgent });
+  });
+  openLibraryQueue = request.then(() => undefined, () => undefined);
+  return request;
+};
+
+const lookupOpenLibrary = async (isbn: string): Promise<ProviderLookup<RecordValue>> => {
+  const errors: string[] = [];
+  let responded = false;
+  const isbnParam = encodeURIComponent(isbn);
+
+  try {
+    const result = toRecord(await fetchOpenLibraryJson(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbnParam}&format=json&jscmd=data`));
+    responded = true;
+    const record = toRecord(result[`ISBN:${isbn}`]);
+    if (Object.keys(record).length) return { record, responded, errors };
+  } catch (error) {
+    if ((error as Error & { responseReceived?: boolean })?.responseReceived) responded = true;
+    errors.push(`Open Library: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    const result = toRecord(await fetchOpenLibraryJson(`https://openlibrary.org/search.json?isbn=${isbnParam}&fields=title,author_name,subject,publisher,language,number_of_pages_median,publish_year,first_publish_year&limit=1`));
+    responded = true;
+    const record = toRecord(asArray(result.docs)[0]);
+    if (Object.keys(record).length) return { record, responded, errors: [] };
+  } catch (error) {
+    if ((error as Error & { responseReceived?: boolean })?.responseReceived) responded = true;
+    errors.push(`Open Library search: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return { record: null, responded, errors };
+};
+
+const lookupGoogleBooks = async (isbn: string): Promise<ProviderLookup<RecordValue>> => {
+  const googleKey = String(process.env.GOOGLE_BOOKS_API_KEY || "").trim();
+  const keyParam = googleKey ? `&key=${encodeURIComponent(googleKey)}` : "";
+  try {
+    const result = toRecord(await fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}${keyParam}`));
+    const item = toRecord(asArray(result.items)[0]);
+    const volumeInfo = toRecord(item.volumeInfo);
+    return { record: Object.keys(volumeInfo).length ? volumeInfo : null, responded: true, errors: [] };
+  } catch (error) {
+    return {
+      record: null,
+      responded: Boolean((error as Error & { responseReceived?: boolean })?.responseReceived),
+      errors: [`Google Books: ${error instanceof Error ? error.message : String(error)}`],
+    };
+  }
+};
+
+const lookupGoogleBooksSynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[] }> => {
+  const googleBooks = await lookupGoogleBooks(isbn);
+  return {
+    description: cleanDescription(googleBooks.record?.description),
+    responded: googleBooks.responded,
+    errors: googleBooks.errors,
+  };
+};
+
+const lookupIsbnMetadata = async (isbn: string): Promise<IsbnMetadataLookup> => {
+  const [openLibrary, googleBooks] = await Promise.all([lookupOpenLibrary(isbn), lookupGoogleBooks(isbn)]);
+  const open = openLibrary.record || {};
+  const google = googleBooks.record || {};
+  const openAuthors = asArray(open.authors ?? open.author_name).map(textValue);
+  const googleAuthors = asArray(google.authors).map(textValue);
+  const openSubjects = asArray(open.subjects ?? open.subject);
+  const googleCategories = asArray(google.categories);
+  const openPublishers = asArray(open.publishers ?? open.publisher);
+  const openPublicationPlaces = asArray(open.publish_places);
+  const openLanguages = asArray(open.languages ?? open.language);
+  const pageCount = firstValue(open.number_of_pages, open.number_of_pages_median, google.pageCount);
+  const publishedDate = firstText(open.publish_date, asArray(open.publish_year)[0], open.first_publish_year, google.publishedDate);
+
+  return {
+    isbn,
+    title: firstText(open.title, google.title),
+    author: uniqueText(openAuthors.length ? openAuthors : googleAuthors).join(", "),
+    publisher: firstText(openPublishers[0], open.publisher, google.publisher),
+    copyright_year: publishedDate.match(/\d{4}/)?.[0] || "",
+    publication_place: firstText(openPublicationPlaces[0]),
+    physical_description: pageCount !== null && Number(pageCount) > 0 ? `${pageCount} pages` : "",
+    subjects: uniqueText([...openSubjects, ...googleCategories]),
+    categories: uniqueText(googleCategories),
+    description: cleanDescription(google.description),
+    language: firstText(openLanguages[0], open.language, google.language),
+    pageCount,
+    publishedDate,
+    errors: [...openLibrary.errors, ...googleBooks.errors],
+    openLibraryResponded: openLibrary.responded,
+    googleBooksResponded: googleBooks.responded,
+    metadataFound: Boolean(openLibrary.record || googleBooks.record),
+  };
+};
+
+export = { lookupIsbnMetadata, lookupGoogleBooksSynopsis, cleanDescription };

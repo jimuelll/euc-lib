@@ -93,6 +93,7 @@ export interface EmbeddingStatusRecord extends RowDataPacket {
 
 export interface Enrichment {
   description?: string;
+  googleBooksSynopsisCheckVersion?: number;
   subjects?: string[];
   categories?: string[];
   publisher?: string;

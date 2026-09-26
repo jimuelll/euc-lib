@@ -1,6 +1,13 @@
 const repository = require("./catalog.repository");
 const { httpError, validateBookTypeInput, validateIsbn } = require("./catalog.validation");
 const { parseMetadata, hydrateCatalogRecord } = require("./catalog.projection");
+const isbnMetadataLookup = require("./isbn-metadata.lookup") as {
+  lookupIsbnMetadata: (isbn: string) => Promise<{
+    title: string; author: string; publisher: string; copyright_year: string; publication_place: string;
+    physical_description: string; subjects: string[]; description: string; metadataFound: boolean;
+    openLibraryResponded: boolean;
+  }>;
+};
 const recommendations = require("../recommendations/recommendations.service");
 const fineLedger = require("../borrowing/fine-ledger.service");
 const catalogSettings = require("./catalog.settings.service");
@@ -288,89 +295,26 @@ const updateCopyCondition = async (copyId: number, condition: string, notes: str
   }
 };
 
-const metadataFromOpenLibrary = (isbn: string, record: DataRow) => {
-  const subjects = (record.subjects || []).map((item: any) => item.name || item).filter(Boolean).slice(0, 10);
-  const pages = Number(record.number_of_pages);
-  return {
-    isbn,
-    title: record.title || "",
-    author: (record.authors || []).map((item: any) => item.name).filter(Boolean).join(", "),
-    copyright_year: record.publish_date?.match(/\d{4}/)?.[0] || "",
-    publisher: record.publishers?.[0]?.name || "",
-    publication_place: record.publish_places?.[0]?.name || "",
-    physical_description: Number.isFinite(pages) && pages > 0 ? `${pages} pages` : "",
-    subjects,
-  };
-};
-
-const metadataFromGoogleBooks = (isbn: string, record: DataRow) => {
-  const pages = Number(record.pageCount);
-  return {
-    isbn,
-    title: record.title || "",
-    author: Array.isArray(record.authors) ? record.authors.filter(Boolean).join(", ") : "",
-    copyright_year: String(record.publishedDate || "").match(/\d{4}/)?.[0] || "",
-    publisher: record.publisher || "",
-    publication_place: "",
-    physical_description: Number.isFinite(pages) && pages > 0 ? `${pages} pages` : "",
-    subjects: Array.isArray(record.categories) ? record.categories.filter(Boolean).slice(0, 10) : [],
-  };
-};
-
-const metadataFromOpenLibrarySearch = (isbn: string, record: DataRow) => {
-  const pages = Number(record.number_of_pages_median);
-  const publishedDate = record.publish_year?.[0] || record.first_publish_year || "";
-  return {
-    isbn,
-    title: record.title || "",
-    author: Array.isArray(record.author_name) ? record.author_name.filter(Boolean).join(", ") : "",
-    copyright_year: String(publishedDate).match(/\d{4}/)?.[0] || "",
-    publisher: Array.isArray(record.publisher) ? record.publisher.find(Boolean) || "" : "",
-    publication_place: "",
-    physical_description: Number.isFinite(pages) && pages > 0 ? `${pages} pages` : "",
-    subjects: Array.isArray(record.subject) ? record.subject.filter(Boolean).slice(0, 10) : [],
-  };
-};
-
 const lookupIsbn = async (value: unknown) => {
   const isbn = validateIsbn(value);
-  let openLibraryResponded = false;
-  try {
-    const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
-    openLibraryResponded = response.ok;
-    if (response.ok) {
-      const record = (await response.json())[`ISBN:${isbn}`];
-      if (record) return metadataFromOpenLibrary(isbn, record);
-    }
-  } catch {
-    // The ISBN-search endpoint below is the fallback for unavailable Open Library requests.
+  const metadata = await isbnMetadataLookup.lookupIsbnMetadata(isbn);
+  if (metadata.metadataFound) {
+    return {
+      isbn,
+      title: metadata.title,
+      author: metadata.author,
+      publisher: metadata.publisher,
+      copyright_year: metadata.copyright_year,
+      publication_place: metadata.publication_place,
+      physical_description: metadata.physical_description,
+      subjects: metadata.subjects,
+      ...(metadata.description ? { description: metadata.description } : {}),
+    };
   }
-
-  try {
-    const response = await fetch(`https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}&fields=title,author_name,subject,publisher,number_of_pages_median,publish_year,first_publish_year&limit=1`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
-    openLibraryResponded ||= response.ok;
-    if (response.ok) {
-      const record = (await response.json()).docs?.[0];
-      if (record) return metadataFromOpenLibrarySearch(isbn, record);
-    }
-  } catch {
-    // Google Books below is the final fallback for unavailable Open Library requests.
+  if (!metadata.openLibraryResponded) {
+    throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
   }
-
-  try {
-    const key = String(process.env.GOOGLE_BOOKS_API_KEY || "").trim();
-    const keyParam = key ? `&key=${encodeURIComponent(key)}` : "";
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}${keyParam}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
-    if (response.ok) {
-      const record = (await response.json()).items?.[0]?.volumeInfo;
-      if (record) return metadataFromGoogleBooks(isbn, record);
-    }
-  } catch {
-    // Return the same safe error below when both external sources are unavailable.
-  }
-
-  if (openLibraryResponded) throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
-  throw Object.assign(new Error("ISBN lookup is unavailable right now"), { status: 503 });
+  throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
 };
 
 export = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };
