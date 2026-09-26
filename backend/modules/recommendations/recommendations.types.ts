@@ -89,11 +89,14 @@ export interface EmbeddingStatusRecord extends RowDataPacket {
   stale: number | string;
   failed: number | string;
   missing: number | string;
+  missing_synopses: number | string;
+  needs_attention: number | string;
 }
 
 export interface Enrichment {
   description?: string;
   googleBooksSynopsisCheckVersion?: number;
+  googleBooksSynopsisLastError?: string;
   subjects?: string[];
   categories?: string[];
   publisher?: string;

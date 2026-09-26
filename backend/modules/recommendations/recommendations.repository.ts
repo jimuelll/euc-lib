@@ -117,6 +117,17 @@ function bookNeedsManualMetadataSql(alias = "enrichment") {
   ))`;
 }
 
+function bookMissingSynopsisSql(alias = "enrichment") {
+  return `COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.description'))), ''), '') = ''`;
+}
+
+function bookNeedsAttentionSql() {
+  return `(${bookMissingSynopsisSql()}
+    OR (COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()})
+    OR embeddings.book_id IS NULL
+    OR embeddings.status <> 'ready')`;
+}
+
 async function listBooksForMetadata({ query = "", needsAttention = false, page = 1, limit = 25 }: MetadataListOptions) {
   const filters = ["bk.material_type = 'book'", "bk.deleted_at IS NULL"];
   const params = [];
@@ -125,7 +136,7 @@ async function listBooksForMetadata({ query = "", needsAttention = false, page =
     filters.push("(bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)");
     params.push(match, match, match);
   }
-  if (needsAttention) filters.push(`((COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()}) OR embeddings.book_id IS NULL OR embeddings.status <> 'ready')`);
+  if (needsAttention) filters.push(bookNeedsAttentionSql());
   const where = filters.join(" AND ");
   const [countRows] = await db.query<Array<RowDataPacket & { total: number | string }>>(
     `SELECT COUNT(*) AS total FROM books bk
@@ -143,7 +154,7 @@ async function listBooksForMetadata({ query = "", needsAttention = false, page =
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
      LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
      WHERE ${where}
-     ORDER BY CASE WHEN ((${bookNeedsManualMetadataSql()}) OR embeddings.book_id IS NULL OR embeddings.status <> 'ready') THEN 0 ELSE 1 END, bk.title ASC, bk.id ASC
+       ORDER BY CASE WHEN ${bookNeedsAttentionSql()} THEN 0 ELSE 1 END, bk.title ASC, bk.id ASC
      LIMIT ? OFFSET ?`,
     [...params, limit, (page - 1) * limit]
   );
@@ -189,11 +200,16 @@ async function saveEnrichment(bookId: number, enrichment: Enrichment): Promise<v
   );
 }
 
-async function markEnrichmentFailed(bookId: number, message: string): Promise<void> {
+async function markEnrichmentFailed(bookId: number, message: string, enrichment?: Enrichment): Promise<void> {
   await db.query(
-    `INSERT INTO book_enrichment (book_id, source, status, last_error) VALUES (?, 'none', 'failed', ?)
-     ON DUPLICATE KEY UPDATE status=IF(source='manual', status, 'failed'), last_error=IF(source='manual', last_error, VALUES(last_error))`,
-    [bookId, message]
+    `INSERT INTO book_enrichment (book_id, source, enrichment_json, status, last_error)
+     VALUES (?, ?, ?, 'failed', ?)
+     ON DUPLICATE KEY UPDATE
+       source=IF(source='manual', source, VALUES(source)),
+       enrichment_json=IF(source='manual', enrichment_json, COALESCE(VALUES(enrichment_json), enrichment_json)),
+       status=IF(source='manual', status, 'failed'),
+       last_error=IF(source='manual', last_error, VALUES(last_error))`,
+    [bookId, enrichment ? "openlibrary_googlebooks" : "none", enrichment ? JSON.stringify(enrichment) : null, message]
   );
 }
 
@@ -276,8 +292,11 @@ async function getEmbeddingStatus(): Promise<{ row: EmbeddingStatusRecord; error
        COALESCE(SUM(embeddings.status = 'ready'), 0) AS ready,
        COALESCE(SUM(embeddings.status = 'stale'), 0) AS stale,
        COALESCE(SUM(embeddings.status = 'failed'), 0) AS failed,
-       COALESCE(SUM(embeddings.book_id IS NULL), 0) AS missing
+       COALESCE(SUM(embeddings.book_id IS NULL), 0) AS missing,
+       COALESCE(SUM(${bookMissingSynopsisSql()}), 0) AS missing_synopses,
+       COALESCE(SUM(${bookNeedsAttentionSql()}), 0) AS needs_attention
      FROM books bk
+     LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
      LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
      WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL`
   );

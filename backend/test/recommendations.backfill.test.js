@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const db = require("../db");
+const isbnLookup = require("../modules/catalog/isbn-metadata.lookup");
 const repository = require("../modules/recommendations/recommendations.repository");
 const service = require("../modules/recommendations/recommendations.service");
 
@@ -247,6 +249,42 @@ test("automatic ISBN enrichment does not replace staff-entered AI metadata", asy
   }
 });
 
+test("a successful Google Books check with no description is marked complete and remains visible to staff", async () => {
+  const originals = {
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    saveEnrichment: repository.saveEnrichment,
+    findBookMetadataRecord: repository.findBookMetadataRecord,
+    fetch: global.fetch,
+  };
+  let saved = null;
+  try {
+    repository.findEnrichment = async () => ({ source: "openlibrary_googlebooks", status: "ready", enrichment_json: JSON.stringify({ subjects: ["History"] }) });
+    repository.findBookIsbn = async () => ({ id: 130, isbn: "9781234567890" });
+    repository.saveEnrichment = async (_bookId, enrichment) => { saved = enrichment; };
+    repository.findBookMetadataRecord = async () => ({
+      id: 130, title: "No online synopsis", author: "A. Writer", isbn: "9781234567890", material_type: "book",
+      metadata_source: "openlibrary_googlebooks", metadata_status: "ready", enrichment_json: JSON.stringify(saved),
+      metadata_error: null, embedding_status: "ready", embedding_error: null,
+    });
+    global.fetch = async () => ({ ok: true, json: async () => ({ items: [] }) });
+
+    const enrichment = await service.enrichBook(130);
+    const details = await service.getManualMetadata(130);
+
+    assert.equal(enrichment.googleBooksSynopsisCheckVersion, 1);
+    assert.equal(enrichment.description, undefined);
+    assert.equal(details.synopsisStatus, "no_description");
+    assert.equal(details.summary, "");
+  } finally {
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.saveEnrichment = originals.saveEnrichment;
+    repository.findBookMetadataRecord = originals.findBookMetadataRecord;
+    global.fetch = originals.fetch;
+  }
+});
+
 test("book details expose a safe online lookup error to staff", async () => {
   const originalFindRecord = repository.findBookMetadataRecord;
   try {
@@ -285,7 +323,7 @@ test("embedding status counts books with no embedding record", async () => {
     db.query = async (sql) => {
       queries.push(sql);
       return queries.length === 1
-        ? [[{ total: 7, ready: 5, stale: 1, failed: 1, missing: 3 }]]
+        ? [[{ total: 7, ready: 5, stale: 1, failed: 1, missing: 3, missing_synopses: 2, needs_attention: 4 }]]
         : [originalErrors];
     };
     repository.getEmbeddingStatus = originalGetStatus;
@@ -293,8 +331,13 @@ test("embedding status counts books with no embedding record", async () => {
     const status = await repository.getEmbeddingStatus();
 
     assert.equal(Number(status.row.missing), 3);
+    assert.equal(Number(status.row.missing_synopses), 2);
+    assert.equal(Number(status.row.needs_attention), 4);
     assert.deepEqual(status.errors, originalErrors);
     assert.match(queries[0], /COALESCE\(SUM\(embeddings\.book_id IS NULL\), 0\) AS missing/);
+    assert.match(queries[0], /AS missing_synopses/);
+    assert.match(queries[0], /AS needs_attention/);
+    assert.match(queries[0], /JSON_EXTRACT\(enrichment\.enrichment_json, '\$\.description'\)/);
     assert.match(queries[0], /bk\.material_type = 'book' AND bk\.deleted_at IS NULL/);
   } finally {
     db.query = originalQuery;
@@ -303,9 +346,225 @@ test("embedding status counts books with no embedding record", async () => {
 
   const originalGetStatusForService = repository.getEmbeddingStatus;
   try {
-    repository.getEmbeddingStatus = async () => ({ row: { total: 7, ready: 5, stale: 1, failed: 1, missing: 3 }, errors: [] });
+    repository.getEmbeddingStatus = async () => ({ row: { total: 7, ready: 5, stale: 1, failed: 1, missing: 3, missing_synopses: 2, needs_attention: 4 }, errors: [] });
     assert.equal((await service.embeddingStatus()).missing, 3);
+    assert.equal((await service.embeddingStatus()).missingSynopses, 2);
+    assert.equal((await service.embeddingStatus()).needsAttention, 4);
   } finally {
     repository.getEmbeddingStatus = originalGetStatusForService;
+  }
+});
+
+test("manual books with blank summaries stay in the attention list with a missing synopsis status", async () => {
+  const originals = {
+    findBookMetadataRecord: repository.findBookMetadataRecord,
+    listBooksForMetadata: repository.listBooksForMetadata,
+  };
+  try {
+    repository.findBookMetadataRecord = async () => ({
+      id: 301, title: "Staff topics only", author: "A. Writer", isbn: null, material_type: "book",
+      metadata_source: "manual", metadata_status: "ready", metadata_error: null,
+      enrichment_json: JSON.stringify({ description: "", subjects: ["History"] }), embedding_status: "ready", embedding_error: null,
+    });
+    repository.listBooksForMetadata = async () => ({
+      total: 1,
+      rows: [{ id: 301, title: "Staff topics only", author: "A. Writer", isbn: null, metadata_source: "manual", metadata_status: "ready", enrichment_json: JSON.stringify({ description: "", subjects: ["History"] }), embedding_status: "ready" }],
+    });
+
+    const details = await service.getManualMetadata(301);
+    const result = await service.listMetadataBooks({ needsAttention: true });
+
+    assert.equal(details.synopsisStatus, "missing");
+    assert.equal(details.summary, "");
+    assert.equal(result.pagination.total, 1);
+    assert.equal(result.rows[0].synopsisStatus, "missing");
+    assert.equal(result.rows[0].metadataStatus, "manual");
+  } finally {
+    repository.findBookMetadataRecord = originals.findBookMetadataRecord;
+    repository.listBooksForMetadata = originals.listBooksForMetadata;
+  }
+});
+
+test("the attention-list query includes blank summaries independently of manual metadata", async () => {
+  const originalQuery = db.query;
+  const statements = [];
+  try {
+    db.query = async (sql) => {
+      statements.push(sql);
+      return statements.length === 1
+        ? [[{ total: 1 }]]
+        : [[{ id: 302, title: "Manual blank synopsis", author: "A. Writer", isbn: null, metadata_source: "manual", metadata_status: "ready", enrichment_json: JSON.stringify({ subjects: ["History"] }), embedding_status: "ready" }]];
+    };
+
+    const result = await repository.listBooksForMetadata({ needsAttention: true });
+
+    assert.equal(result.total, 1);
+    assert.equal(result.rows[0].metadata_source, "manual");
+    assert.match(statements[0], /SELECT COUNT\(\*\) AS total/);
+    assert.match(statements[0], /JSON_EXTRACT\(enrichment\.enrichment_json, '\$\.description'\)/);
+    assert.match(statements[0], /OR \(COALESCE\(enrichment\.source, ''\) <> 'manual'/);
+    assert.match(statements[0], /embeddings\.status <> 'ready'/);
+  } finally {
+    db.query = originalQuery;
+  }
+});
+
+test("a 429 retries once then pauses the batch and leaves remaining books deferred", async () => {
+  const originals = {
+    findBooksForBackfill: repository.findBooksForBackfill,
+    getEmbeddingStatus: repository.getEmbeddingStatus,
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    saveEnrichment: repository.saveEnrichment,
+    findBookForEmbedding: repository.findBookForEmbedding,
+    findReadyEnrichment: repository.findReadyEnrichment,
+    fetch: global.fetch,
+    model: process.env.GEMINI_EMBEDDING_MODEL,
+    googleKey: process.env.GOOGLE_BOOKS_API_KEY,
+  };
+  const books = [401, 402, 403].map((id) => ({ id, title: `Book ${id}`, author: "A. Writer", material_type: "book", metadata: "{}" }));
+  const saved = new Map();
+  let googleRequests = 0;
+  try {
+    repository.findBooksForBackfill = async () => books.map(({ id, title }) => ({ id, title }));
+    repository.getEmbeddingStatus = async () => ({ row: { total: 3, ready: 3, stale: 0, failed: 0, missing: 0, missing_synopses: 3, needs_attention: 3 }, errors: [] });
+    repository.findEnrichment = async () => ({ source: "openlibrary_googlebooks", status: "ready", enrichment_json: JSON.stringify({ subjects: ["History"] }) });
+    repository.findBookIsbn = async (id) => ({ id, isbn: `9780000000${id}` });
+    repository.saveEnrichment = async (id, enrichment) => { saved.set(id, enrichment); };
+    repository.findBookForEmbedding = async (id) => books.find((book) => book.id === id);
+    repository.findReadyEnrichment = async (id) => {
+      const enrichment = saved.get(id) || { subjects: ["History"] };
+      const text = [books.find((book) => book.id === id).title, "A. Writer", ...(enrichment.subjects || [])].filter(Boolean).join("\n");
+      return {
+        enrichment_json: JSON.stringify(enrichment), embedding_status: "ready", embedding_model: "backfill-test-model",
+        embedding_content_hash: crypto.createHash("sha256").update(text).digest("hex"), embedding_dimensions: 4,
+      };
+    };
+    process.env.GEMINI_EMBEDDING_MODEL = "backfill-test-model";
+    delete process.env.GOOGLE_BOOKS_API_KEY;
+    global.fetch = async (url) => {
+      assert.match(String(url), /^https:\/\/www\.googleapis\.com\/books\/v1\/volumes/);
+      googleRequests += 1;
+      return { ok: false, status: 429, headers: { get: () => "0" } };
+    };
+
+    const started = await service.startBackfill();
+    assert.equal(started.status, "running");
+    const deadline = Date.now() + 5000;
+    let progress = service.backfillProgress();
+    while (progress.status === "running" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      progress = service.backfillProgress();
+    }
+
+    assert.equal(progress.status, "paused_rate_limited");
+    assert.equal(progress.completed, 1);
+    assert.equal(progress.deferred, 2);
+    assert.equal(progress.lookupFailed, 1);
+    assert.equal(progress.failed, 0);
+    assert.equal(googleRequests, 2, "Google Books is retried once after a 429");
+    assert.ok(progress.rateLimitRetryAt);
+    assert.match(saved.get(401).googleBooksSynopsisLastError, /429/);
+    assert.equal(saved.has(402), false);
+    assert.equal(saved.has(403), false);
+  } finally {
+    repository.findBooksForBackfill = originals.findBooksForBackfill;
+    repository.getEmbeddingStatus = originals.getEmbeddingStatus;
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.saveEnrichment = originals.saveEnrichment;
+    repository.findBookForEmbedding = originals.findBookForEmbedding;
+    repository.findReadyEnrichment = originals.findReadyEnrichment;
+    global.fetch = originals.fetch;
+    if (originals.model === undefined) delete process.env.GEMINI_EMBEDDING_MODEL;
+    else process.env.GEMINI_EMBEDDING_MODEL = originals.model;
+    if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
+    else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
+  }
+});
+
+test("Google Books lookup exposes long Retry-After values without waiting past the cap", async () => {
+  const originalFetch = global.fetch;
+  let requests = 0;
+  try {
+    global.fetch = async () => {
+      requests += 1;
+      return { ok: false, status: 429, headers: { get: () => "61" } };
+    };
+
+    const lookup = await isbnLookup.lookupGoogleBooksSynopsis("9781234567890", { retryRateLimit: true });
+
+    assert.equal(requests, 1);
+    assert.equal(lookup.status, 429);
+    assert.equal(lookup.retryAfterMs, 61000);
+    assert.equal(lookup.rateLimited, true);
+    assert.match(lookup.errors[0], /429/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("provider failures finish with errors even when embeddings succeed", async () => {
+  const originals = {
+    findBooksForBackfill: repository.findBooksForBackfill,
+    getEmbeddingStatus: repository.getEmbeddingStatus,
+    findEnrichment: repository.findEnrichment,
+    findBookIsbn: repository.findBookIsbn,
+    markEnrichmentFailed: repository.markEnrichmentFailed,
+    findBookForEmbedding: repository.findBookForEmbedding,
+    findReadyEnrichment: repository.findReadyEnrichment,
+    saveEmbedding: repository.saveEmbedding,
+    fetch: global.fetch,
+    aiProvider: process.env.AI_EMBEDDING_PROVIDER,
+    geminiKey: process.env.GEMINI_API_KEY,
+  };
+  let savedFailure = null;
+  try {
+    repository.findBooksForBackfill = async () => [{ id: 501, title: "Provider failure" }];
+    repository.getEmbeddingStatus = async () => ({ row: { total: 1, ready: 1, stale: 0, failed: 0, missing: 0, missing_synopses: 1, needs_attention: 1 }, errors: [] });
+    repository.findEnrichment = async () => null;
+    repository.findBookIsbn = async () => ({ id: 501, isbn: "9781234567890" });
+    repository.markEnrichmentFailed = async (_bookId, message, enrichment) => { savedFailure = { message, enrichment }; };
+    repository.findBookForEmbedding = async () => ({ id: 501, title: "Provider failure", author: "A. Writer", material_type: "book", metadata: "{}" });
+    repository.findReadyEnrichment = async () => ({ enrichment_json: JSON.stringify(savedFailure?.enrichment || {}) });
+    repository.saveEmbedding = async () => {};
+    process.env.AI_EMBEDDING_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "test-key";
+    global.fetch = async (url) => {
+      const target = String(url);
+      if (target.startsWith("https://openlibrary.org/")) return { ok: true, json: async () => ({}) };
+      if (target.startsWith("https://www.googleapis.com/books/")) return { ok: false, status: 503 };
+      assert.match(target, /generativelanguage\.googleapis\.com/);
+      return { ok: true, json: async () => ({ embedding: { values: [0.2, 0.3] } }) };
+    };
+
+    await service.startBackfill();
+    const deadline = Date.now() + 5000;
+    let progress = service.backfillProgress();
+    while (progress.status === "running" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      progress = service.backfillProgress();
+    }
+
+    assert.equal(progress.status, "completed_with_errors");
+    assert.equal(progress.lookupFailed, 1);
+    assert.equal(progress.failed, 0);
+    assert.equal(progress.embedded, 1);
+    assert.match(savedFailure.message, /Google Books: Metadata source failed \(503\)/);
+    assert.match(savedFailure.enrichment.googleBooksSynopsisLastError, /503/);
+  } finally {
+    repository.findBooksForBackfill = originals.findBooksForBackfill;
+    repository.getEmbeddingStatus = originals.getEmbeddingStatus;
+    repository.findEnrichment = originals.findEnrichment;
+    repository.findBookIsbn = originals.findBookIsbn;
+    repository.markEnrichmentFailed = originals.markEnrichmentFailed;
+    repository.findBookForEmbedding = originals.findBookForEmbedding;
+    repository.findReadyEnrichment = originals.findReadyEnrichment;
+    repository.saveEmbedding = originals.saveEmbedding;
+    global.fetch = originals.fetch;
+    if (originals.aiProvider === undefined) delete process.env.AI_EMBEDDING_PROVIDER;
+    else process.env.AI_EMBEDDING_PROVIDER = originals.aiProvider;
+    if (originals.geminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originals.geminiKey;
   }
 });

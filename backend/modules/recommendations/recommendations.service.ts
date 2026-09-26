@@ -10,12 +10,14 @@ import type {
   RecommendationCandidate,
 } from "./recommendations.types";
 const isbnMetadataLookup = require("../catalog/isbn-metadata.lookup") as {
-  lookupIsbnMetadata: (isbn: string) => Promise<{
+  lookupIsbnMetadata: (isbn: string, options?: { retryRateLimit?: boolean; skipGoogleBooks?: boolean }) => Promise<{
     description: string; subjects: string[]; categories: string[]; publisher: string; language: string;
     pageCount: string | number | null; publishedDate: string; errors: string[];
-    googleBooksResponded: boolean;
+    googleBooksResponded: boolean; googleBooksStatus: number | null; googleBooksRetryAfterMs: number | null; googleBooksRateLimited: boolean;
   }>;
-  lookupGoogleBooksSynopsis: (isbn: string) => Promise<{ description: string; responded: boolean; errors: string[] }>;
+  lookupGoogleBooksSynopsis: (isbn: string, options?: { retryRateLimit?: boolean }) => Promise<{
+    description: string; responded: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
+  }>;
 };
 
 const { logDevelopment } = require("../../logger") as { logDevelopment: (...values: unknown[]) => void };
@@ -34,17 +36,33 @@ interface ScoredCandidate extends RecommendationCandidate {
 }
 
 interface BackfillState {
-  status: "idle" | "running" | "completed" | "completed_with_errors";
+  status: "idle" | "running" | "completed" | "completed_with_errors" | "paused_rate_limited";
   total: number;
   completed: number;
+  missingSynopses: number;
   embedded: number;
   synopsesAdded: number;
+  synopsesNotFound: number;
   failed: number;
   lookupFailed: number;
-  skipped: number;
+  deferred: number;
+  rateLimitRetryAt: string | null;
   currentTitle: string | null;
   errors: string[];
   lookupErrors: string[];
+}
+
+type SynopsisStatus = "present" | "not_checked" | "no_description" | "lookup_failed" | "missing";
+
+interface EnrichmentOutcome {
+  enrichment: Enrichment | null;
+  synopsisStatus: SynopsisStatus;
+  synopsisCheckedNow: boolean;
+  descriptionAddedNow: boolean;
+  lookupFailed: boolean;
+  lookupErrors: string[];
+  rateLimited: boolean;
+  retryAfterMs: number | null;
 }
 
 interface ServiceError extends Error {
@@ -60,7 +78,7 @@ const BOOK_RULE_LIMIT = 3;
 const BOOK_AI_LIMIT = BOOK_LIMIT - BOOK_RULE_LIMIT;
 const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 const GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION = 1;
-let activeBackfill: BackfillState = { status: "idle", total: 0, completed: 0, embedded: 0, synopsesAdded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [], lookupErrors: [] };
+let activeBackfill: BackfillState = { status: "idle", total: 0, completed: 0, missingSynopses: 0, embedded: 0, synopsesAdded: 0, synopsesNotFound: 0, failed: 0, lookupFailed: 0, deferred: 0, rateLimitRetryAt: null, currentTitle: null, errors: [], lookupErrors: [] };
 
 const normalized = (value: unknown): string => String(value || "").toLowerCase().trim();
 const parseEnrichment = (value: unknown): Enrichment => {
@@ -79,6 +97,15 @@ const hasUsefulMetadata = (enrichment: Enrichment | null | undefined): boolean =
   || String(enrichment?.pageCount || "").trim()
   || String(enrichment?.publishedDate || "").trim()
 );
+const hasDescription = (enrichment: Enrichment | null | undefined): boolean => Boolean(String(enrichment?.description || "").trim());
+const hasSynopsisCheck = (enrichment: Enrichment | null | undefined): boolean => Number(enrichment?.googleBooksSynopsisCheckVersion || 0) >= GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION;
+const synopsisStatus = (isbn: string | null | undefined, source: string | null | undefined, enrichment: Enrichment): SynopsisStatus => {
+  if (hasDescription(enrichment)) return "present";
+  if (!isbn || source === "manual") return "missing";
+  if (String(enrichment.googleBooksSynopsisLastError || "").trim()) return "lookup_failed";
+  if (hasSynopsisCheck(enrichment)) return "no_description";
+  return "not_checked";
+};
 const publicEmbeddingError = (error: unknown): string => String(error instanceof Error ? error.message : error || "Embedding failed").replace(/key=[^&\s]+/gi, "key=[redacted]").slice(0, 240);
 const publicMetadataError = (error: unknown): string => String(error instanceof Error ? error.message : error || "Metadata lookup failed")
   .replace(/key=[^&\s]+/gi, "key=[redacted]")
@@ -250,6 +277,7 @@ const listMetadataBooks = async ({ query = "", needsAttention = false, page = 1,
     return {
       id: row.id, title: row.title, author: row.author, isbn: row.isbn,
       source: row.metadata_source || null, metadataStatus, embeddingStatus: row.embedding_status || "missing",
+      synopsisStatus: synopsisStatus(row.isbn, row.metadata_source, enrichment),
     };
   });
   return { rows, pagination: { page, limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / limit)) } };
@@ -274,6 +302,8 @@ const getManualMetadata = async (bookId: number) => {
     source: record.metadata_source || null,
     metadataStatus: record.metadata_status === "failed" ? "failed" : hasUsefulMetadata(enrichment) ? (record.metadata_source === "manual" ? "manual" : "ready") : "missing",
     metadataError: record.metadata_status === "failed" && record.metadata_error ? publicMetadataError(record.metadata_error) : null,
+    synopsisStatus: synopsisStatus(record.isbn, record.metadata_source, enrichment),
+    synopsisError: enrichment.googleBooksSynopsisLastError ? publicMetadataError(enrichment.googleBooksSynopsisLastError) : null,
     embeddingStatus: record.embedding_status || "missing",
     embeddingError: record.embedding_error ? publicEmbeddingError(record.embedding_error) : null,
   };
@@ -325,6 +355,7 @@ const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload
     }
   }
   const enrichment = { ...existing, description: summary, subjects, publisher, categories, language, pageCount, publishedDate };
+  delete enrichment.googleBooksSynopsisLastError;
   if (!hasUsefulMetadata(enrichment)) throw createServiceError("Add at least one book detail before saving", 400);
   await repository.saveManualEnrichment(bookId, enrichment);
 
@@ -339,60 +370,91 @@ const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload
   }
 };
 
-const enrichBook = async (bookId: number): Promise<(Enrichment & { __lookupFailed?: boolean; __lookupError?: string }) | null> => {
+const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }: { retryRateLimit?: boolean } = {}): Promise<EnrichmentOutcome> => {
   const existing = await repository.findEnrichment(bookId);
   const savedEnrichment = parseEnrichment(existing?.enrichment_json);
-  if (existing?.source === "manual") return savedEnrichment;
-  if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) return savedEnrichment;
-  const book = await repository.findBookIsbn(bookId);
-  if (!book?.isbn) return null;
-  const metadata = await isbnMetadataLookup.lookupIsbnMetadata(book.isbn);
-  const enrichment: Enrichment = {
-    description: metadata.description,
-    subjects: metadata.subjects,
-    categories: metadata.categories,
-    publisher: metadata.publisher,
-    language: metadata.language,
-    pageCount: metadata.pageCount,
-    publishedDate: metadata.publishedDate,
-    ...(metadata.googleBooksResponded && !metadata.errors.some((error) => error.startsWith("Google Books:"))
-      ? { googleBooksSynopsisCheckVersion: GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION }
-      : {}),
-  };
-  if (!hasUsefulMetadata(enrichment) && metadata.errors.length) {
-    const lookupError = metadata.errors.join("; ").slice(0, 500);
-    await repository.markEnrichmentFailed(book.id, lookupError);
-    return { __lookupFailed: true, __lookupError: lookupError };
+  if (existing?.source === "manual") {
+    return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(null, "manual", savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
   }
-  await repository.saveEnrichment(book.id, enrichment);
-  return enrichment;
-};
-
-const refreshGoogleBooksSynopsis = async (bookId: number): Promise<{ descriptionAdded: boolean; lookupFailed?: boolean; lookupError?: string }> => {
-  const existing = await repository.findEnrichment(bookId);
-  if (!existing || existing.source === "manual" || existing.status !== "ready") return { descriptionAdded: false };
-  const savedEnrichment = parseEnrichment(existing.enrichment_json);
-  if (String(savedEnrichment.description || "").trim()
-    || Number(savedEnrichment.googleBooksSynopsisCheckVersion || 0) >= GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION) return { descriptionAdded: false };
-
-  const book = await repository.findBookIsbn(bookId);
-  if (!book?.isbn) return { descriptionAdded: false };
-  const lookup = await isbnMetadataLookup.lookupGoogleBooksSynopsis(book.isbn);
-  if (!lookup.responded || lookup.errors.length) {
+  const isbnRecord = await repository.findBookIsbn(bookId);
+  if (!isbnRecord?.isbn) {
+    return { enrichment: Object.keys(savedEnrichment).length ? savedEnrichment : null, synopsisStatus: "missing", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
+  }
+  if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) {
+    if (hasDescription(savedEnrichment) || hasSynopsisCheck(savedEnrichment)) {
+      return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(isbnRecord.isbn, existing.source, savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
+    }
+    const lookup = await isbnMetadataLookup.lookupGoogleBooksSynopsis(isbnRecord.isbn, { retryRateLimit });
+    if (!lookup.responded || lookup.errors.length) {
+      const lookupError = publicMetadataError(lookup.errors.join("; ") || "Google Books did not return a usable response");
+      const enrichment: Enrichment = { ...savedEnrichment, googleBooksSynopsisLastError: lookupError };
+      await repository.saveEnrichment(bookId, enrichment);
+      return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs };
+    }
+    const enrichment: Enrichment = { ...savedEnrichment, googleBooksSynopsisCheckVersion: GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION };
+    delete enrichment.googleBooksSynopsisLastError;
+    if (lookup.description) enrichment.description = lookup.description;
+    await repository.saveEnrichment(bookId, enrichment);
     return {
-      descriptionAdded: false,
-      lookupFailed: true,
-      lookupError: lookup.errors.join("; ") || "Google Books did not return a usable response",
+      enrichment,
+      synopsisStatus: lookup.description ? "present" : "no_description",
+      synopsisCheckedNow: true,
+      descriptionAddedNow: Boolean(lookup.description),
+      lookupFailed: false,
+      lookupErrors: [],
+      rateLimited: false,
+      retryAfterMs: null,
     };
   }
 
+  const markerAlreadySet = hasSynopsisCheck(savedEnrichment);
+  const metadata = await isbnMetadataLookup.lookupIsbnMetadata(isbnRecord.isbn, { retryRateLimit, skipGoogleBooks: markerAlreadySet });
+  const googleError = metadata.errors.find((error) => error.startsWith("Google Books:"));
   const enrichment: Enrichment = {
     ...savedEnrichment,
-    googleBooksSynopsisCheckVersion: GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION,
-    ...(lookup.description ? { description: lookup.description } : {}),
+    description: metadata.description || String(savedEnrichment.description || ""),
+    subjects: metadata.subjects.length ? metadata.subjects : savedEnrichment.subjects || [],
+    categories: metadata.categories.length ? metadata.categories : savedEnrichment.categories || [],
+    publisher: metadata.publisher || savedEnrichment.publisher || "",
+    language: metadata.language || savedEnrichment.language || "",
+    pageCount: metadata.pageCount ?? savedEnrichment.pageCount ?? null,
+    publishedDate: metadata.publishedDate || savedEnrichment.publishedDate || "",
   };
-  await repository.saveEnrichment(bookId, enrichment);
-  return { descriptionAdded: Boolean(lookup.description) };
+  const synopsisCheckedNow = metadata.googleBooksResponded && !googleError;
+  if (synopsisCheckedNow) {
+    enrichment.googleBooksSynopsisCheckVersion = GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION;
+    delete enrichment.googleBooksSynopsisLastError;
+  } else if (googleError) {
+    enrichment.googleBooksSynopsisLastError = publicMetadataError(googleError);
+  }
+  const usefulMetadataFound = hasUsefulMetadata(enrichment);
+  const lookupFailed = metadata.errors.length > 0;
+  const lookupErrors = metadata.errors.map(publicMetadataError);
+  if (!hasUsefulMetadata(enrichment) && metadata.errors.length) {
+    const lookupError = metadata.errors.join("; ").slice(0, 500);
+    await repository.markEnrichmentFailed(isbnRecord.id, lookupError, enrichment);
+  } else {
+    await repository.saveEnrichment(isbnRecord.id, enrichment);
+  }
+  return {
+    enrichment,
+    synopsisStatus: synopsisStatus(isbnRecord.isbn, "openlibrary_googlebooks", enrichment),
+    synopsisCheckedNow,
+    descriptionAddedNow: synopsisCheckedNow && Boolean(metadata.description) && !hasDescription(savedEnrichment),
+    lookupFailed,
+    lookupErrors,
+    rateLimited: metadata.googleBooksRateLimited,
+    retryAfterMs: metadata.googleBooksRetryAfterMs,
+  };
+};
+
+const enrichBook = async (bookId: number): Promise<(Enrichment & { __lookupFailed?: boolean; __lookupError?: string }) | null> => {
+  const outcome = await enrichBookWithOutcome(bookId);
+  if (!outcome.enrichment) return null;
+  if (outcome.lookupFailed && !hasUsefulMetadata(outcome.enrichment)) {
+    return { __lookupFailed: true, __lookupError: outcome.lookupErrors.join("; ") };
+  }
+  return outcome.enrichment;
 };
 
 const embedBook = async (bookId: number): Promise<{ bookId: number; dimensions: number } | null> => {
@@ -443,26 +505,38 @@ const queueEnrichmentAndEmbedding = (bookId: number): Promise<void> => new Promi
       .finally(resolve);
   });
 });
+const addLookupErrors = (messages: string[], title: string): void => {
+  for (const value of messages) {
+    const message = `${title}: ${publicMetadataError(value)}`.slice(0, 240);
+    if (message && !activeBackfill.lookupErrors.includes(message) && activeBackfill.lookupErrors.length < 4) activeBackfill.lookupErrors.push(message);
+  }
+};
+
 const runBackfill = async (books: BackfillBook[]): Promise<void> => {
+  let pauseForRateLimit = false;
   for (const book of books) {
     activeBackfill.currentTitle = book.title;
+    let outcome: EnrichmentOutcome | null = null;
     try {
-      const enrichment = await enrichBook(book.id);
-      if (enrichment?.__lookupFailed) {
+      outcome = await enrichBookWithOutcome(book.id, { retryRateLimit: true });
+      if (outcome.synopsisCheckedNow && outcome.synopsisStatus === "no_description") activeBackfill.synopsesNotFound += 1;
+      if (outcome.descriptionAddedNow) activeBackfill.synopsesAdded += 1;
+      if (outcome.lookupFailed) {
         activeBackfill.lookupFailed += 1;
-        const lookupError = publicMetadataError(enrichment.__lookupError);
-        if (lookupError && !activeBackfill.lookupErrors.includes(lookupError) && activeBackfill.lookupErrors.length < 4) activeBackfill.lookupErrors.push(lookupError);
-      } else {
-        const synopsisRefresh = await refreshGoogleBooksSynopsis(book.id);
-        if (synopsisRefresh.descriptionAdded) activeBackfill.synopsesAdded += 1;
-        if (synopsisRefresh.lookupFailed) {
-          activeBackfill.lookupFailed += 1;
-          const lookupError = publicMetadataError(synopsisRefresh.lookupError);
-          if (lookupError && !activeBackfill.lookupErrors.includes(lookupError) && activeBackfill.lookupErrors.length < 4) activeBackfill.lookupErrors.push(lookupError);
-        }
+        addLookupErrors(outcome.lookupErrors, book.title);
       }
-      await embedBook(book.id);
-      activeBackfill.embedded += 1;
+    } catch (error: unknown) {
+      activeBackfill.lookupFailed += 1;
+      addLookupErrors([errorMessage(error)], book.title);
+    }
+    if (outcome?.rateLimited) {
+      pauseForRateLimit = true;
+      const waitMs = outcome.retryAfterMs;
+      activeBackfill.rateLimitRetryAt = waitMs == null ? null : new Date(Date.now() + waitMs).toISOString();
+    }
+    try {
+      const embedding = await embedBook(book.id);
+      if (embedding) activeBackfill.embedded += 1;
     } catch (error: unknown) {
       activeBackfill.failed += 1;
       const message = `${book.title}: ${publicEmbeddingError(error)}`.slice(0, 240);
@@ -470,14 +544,23 @@ const runBackfill = async (books: BackfillBook[]): Promise<void> => {
     } finally {
       activeBackfill.completed += 1;
     }
+    if (pauseForRateLimit) {
+      activeBackfill.status = "paused_rate_limited";
+      activeBackfill.deferred = activeBackfill.total - activeBackfill.completed;
+      break;
+    }
   }
-  activeBackfill.status = activeBackfill.failed ? "completed_with_errors" : "completed";
+  if (!pauseForRateLimit) activeBackfill.status = activeBackfill.failed || activeBackfill.lookupFailed ? "completed_with_errors" : "completed";
   activeBackfill.currentTitle = null;
+  try {
+    const { row } = await repository.getEmbeddingStatus();
+    activeBackfill.missingSynopses = Number(row.missing_synopses || 0);
+  } catch { /* Preserve the last known count if the refresh query fails. */ }
 };
 const startBackfill = async () => {
   if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
-  const books = await repository.findBooksForBackfill();
-  activeBackfill = { status: "running", total: books.length, completed: 0, embedded: 0, synopsesAdded: 0, failed: 0, lookupFailed: 0, skipped: 0, currentTitle: null, errors: [], lookupErrors: [] };
+  const [books, status] = await Promise.all([repository.findBooksForBackfill(), repository.getEmbeddingStatus()]);
+  activeBackfill = { status: "running", total: books.length, completed: 0, missingSynopses: Number(status.row.missing_synopses || 0), embedded: 0, synopsesAdded: 0, synopsesNotFound: 0, failed: 0, lookupFailed: 0, deferred: 0, rateLimitRetryAt: null, currentTitle: null, errors: [], lookupErrors: [] };
   if (!books.length) { activeBackfill.status = "completed"; return { ...activeBackfill }; }
   setImmediate(() => runBackfill(books).catch((error: unknown) => {
     activeBackfill.status = "completed_with_errors";
@@ -488,7 +571,11 @@ const startBackfill = async () => {
 const backfillProgress = (): BackfillState => ({ ...activeBackfill, errors: [...activeBackfill.errors] });
 const embeddingStatus = async () => {
   const { row, errors } = await repository.getEmbeddingStatus();
-  return { total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), missing: Number(row.missing || 0), errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })) };
+  return {
+    total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), missing: Number(row.missing || 0),
+    missingSynopses: Number(row.missing_synopses || 0), needsAttention: Number(row.needs_attention || 0),
+    errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })),
+  };
 };
 
 export = { recommendationsForSeed, personalized, dismiss, listMetadataBooks, getManualMetadata, saveManualMetadata, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, backfillProgress, embeddingStatus };

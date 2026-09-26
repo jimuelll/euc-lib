@@ -17,6 +17,9 @@ interface IsbnMetadataLookup {
   errors: string[];
   openLibraryResponded: boolean;
   googleBooksResponded: boolean;
+  googleBooksStatus: number | null;
+  googleBooksRetryAfterMs: number | null;
+  googleBooksRateLimited: boolean;
   metadataFound: boolean;
 }
 
@@ -24,6 +27,17 @@ interface ProviderLookup<T> {
   record: T | null;
   responded: boolean;
   errors: string[];
+  status?: number | null;
+  retryAfterMs?: number | null;
+  rateLimited?: boolean;
+}
+
+interface GoogleBooksLookupOptions {
+  retryRateLimit?: boolean;
+}
+
+interface IsbnLookupOptions extends GoogleBooksLookupOptions {
+  skipGoogleBooks?: boolean;
 }
 
 let openLibraryQueue = Promise.resolve();
@@ -89,9 +103,22 @@ const cleanDescription = (value: unknown): string => {
     .trim();
 };
 
+const parseRetryAfter = (value: string | null | undefined): number | null => {
+  const retryAfter = String(value || "").trim();
+  if (!retryAfter) return null;
+  if (/^\d+(?:\.\d+)?$/.test(retryAfter)) return Math.max(0, Math.ceil(Number(retryAfter) * 1000));
+  const retryAt = Date.parse(retryAfter);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - Date.now()) : null;
+};
+
 const fetchJson = async (url: string, headers: Record<string, string> = {}): Promise<unknown> => {
   const response = await fetch(url, { headers: { Accept: "application/json", ...headers }, signal: AbortSignal.timeout(8000) });
-  if (!response.ok) throw new Error(`Metadata source failed (${response.status})`);
+  if (!response.ok) {
+    throw Object.assign(new Error(`Metadata source failed (${response.status})`), {
+      status: response.status,
+      retryAfterMs: parseRetryAfter(response.headers?.get?.("Retry-After")),
+    });
+  }
   try { return await response.json(); }
   catch (error) { throw Object.assign(error instanceof Error ? error : new Error(String(error)), { responseReceived: true }); }
 };
@@ -137,34 +164,61 @@ const lookupOpenLibrary = async (isbn: string): Promise<ProviderLookup<RecordVal
   return { record: null, responded, errors };
 };
 
-const lookupGoogleBooks = async (isbn: string): Promise<ProviderLookup<RecordValue>> => {
+const lookupGoogleBooksOnce = async (isbn: string): Promise<ProviderLookup<RecordValue>> => {
   const googleKey = String(process.env.GOOGLE_BOOKS_API_KEY || "").trim();
   const keyParam = googleKey ? `&key=${encodeURIComponent(googleKey)}` : "";
   try {
     const result = toRecord(await fetchJson(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}${keyParam}`));
     const item = toRecord(asArray(result.items)[0]);
     const volumeInfo = toRecord(item.volumeInfo);
-    return { record: Object.keys(volumeInfo).length ? volumeInfo : null, responded: true, errors: [] };
+    return { record: Object.keys(volumeInfo).length ? volumeInfo : null, responded: true, errors: [], status: null, retryAfterMs: null, rateLimited: false };
   } catch (error) {
     return {
       record: null,
       responded: Boolean((error as Error & { responseReceived?: boolean })?.responseReceived),
       errors: [`Google Books: ${error instanceof Error ? error.message : String(error)}`],
+      status: typeof (error as Error & { status?: unknown })?.status === "number" ? (error as Error & { status: number }).status : null,
+      retryAfterMs: typeof (error as Error & { retryAfterMs?: unknown })?.retryAfterMs === "number" ? (error as Error & { retryAfterMs: number }).retryAfterMs : null,
+      rateLimited: typeof (error as Error & { status?: unknown })?.status === "number" && (error as Error & { status: number }).status === 429,
     };
   }
 };
 
-const lookupGoogleBooksSynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[] }> => {
-  const googleBooks = await lookupGoogleBooks(isbn);
+const lookupGoogleBooks = async (isbn: string, { retryRateLimit = false }: GoogleBooksLookupOptions = {}): Promise<ProviderLookup<RecordValue>> => {
+  const firstAttempt = await lookupGoogleBooksOnce(isbn);
+  if (!retryRateLimit || firstAttempt.status !== 429) return firstAttempt;
+
+  const waitMs = firstAttempt.retryAfterMs ?? 2000;
+  if (waitMs > 60000) return { ...firstAttempt, rateLimited: true };
+  if (waitMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+
+  const retry = await lookupGoogleBooksOnce(isbn);
+  return {
+    ...retry,
+    rateLimited: retry.status === 429,
+    retryAfterMs: retry.status === 429 ? retry.retryAfterMs ?? waitMs : retry.retryAfterMs ?? null,
+  };
+};
+
+const lookupGoogleBooksSynopsis = async (isbn: string, options: GoogleBooksLookupOptions = {}): Promise<{
+  description: string; responded: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
+}> => {
+  const googleBooks = await lookupGoogleBooks(isbn, options);
   return {
     description: cleanDescription(googleBooks.record?.description),
     responded: googleBooks.responded,
     errors: googleBooks.errors,
+    status: googleBooks.status ?? null,
+    retryAfterMs: googleBooks.retryAfterMs ?? null,
+    rateLimited: Boolean(googleBooks.rateLimited),
   };
 };
 
-const lookupIsbnMetadata = async (isbn: string): Promise<IsbnMetadataLookup> => {
-  const [openLibrary, googleBooks] = await Promise.all([lookupOpenLibrary(isbn), lookupGoogleBooks(isbn)]);
+const lookupIsbnMetadata = async (isbn: string, options: IsbnLookupOptions = {}): Promise<IsbnMetadataLookup> => {
+  const googleBooksRequest = options.skipGoogleBooks
+    ? Promise.resolve<ProviderLookup<RecordValue>>({ record: null, responded: false, errors: [], status: null, retryAfterMs: null, rateLimited: false })
+    : lookupGoogleBooks(isbn, options);
+  const [openLibrary, googleBooks] = await Promise.all([lookupOpenLibrary(isbn), googleBooksRequest]);
   const open = openLibrary.record || {};
   const google = googleBooks.record || {};
   const openAuthors = asArray(open.authors ?? open.author_name).map(textValue);
@@ -194,6 +248,9 @@ const lookupIsbnMetadata = async (isbn: string): Promise<IsbnMetadataLookup> => 
     errors: [...openLibrary.errors, ...googleBooks.errors],
     openLibraryResponded: openLibrary.responded,
     googleBooksResponded: googleBooks.responded,
+    googleBooksStatus: googleBooks.status ?? null,
+    googleBooksRetryAfterMs: googleBooks.retryAfterMs ?? null,
+    googleBooksRateLimited: Boolean(googleBooks.rateLimited),
     metadataFound: Boolean(openLibrary.record || googleBooks.record),
   };
 };
