@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Loader2, Search, ChevronLeft, ChevronRight, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem,
@@ -6,9 +7,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { getCirculationLog, archiveBorrowing, restoreBorrowing } from "../circulation.api";
-import type { CirculationLogEntry } from "../circulation.api";
+import type { CirculationLogEntry, CirculationLogResult } from "../circulation.api";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAdminConfirmDialog } from "@/features/admin";
+import { circulationKeys } from "../circulation.keys";
 
 const statusConfig: Record<
   CirculationLogEntry["status"],
@@ -46,41 +48,41 @@ const formatDateTime = (value?: string | null) => {
 };
 
 const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
-  const [rows,         setRows]         = useState<CirculationLogEntry[]>([]);
-  const [total,        setTotal]        = useState(0);
-  const [totalPages,   setTotalPages]   = useState(1);
+  const queryClient = useQueryClient();
   const [page,         setPage]         = useState(1);
   const [status,       setStatus]       = useState("all");
   const [search,       setSearch]       = useState("");
-  const [loading,      setLoading]      = useState(false);
   const [showArchived, setShowArchived] = useState(false);  // ← NEW
   const [actionId,     setActionId]     = useState<number | null>(null); // tracks which row is mid-action
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
   const debouncedSearch = useDebounce(search, 400);
 
-  const fetchLog = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await getCirculationLog({
-        status:   status === "all" ? undefined : status,
-        search:   debouncedSearch || undefined,
-        page,
-        limit:    20,
-        archived: showArchived || undefined,
-      });
-      setRows(result.rows);
-      setTotal(result.total);
-      setTotalPages(result.totalPages);
-    } catch {
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [status, debouncedSearch, page, showArchived]);
-
-  useEffect(() => { void fetchLog(); }, [fetchLog, refreshKey]);
+  const filters = { status: status === "all" ? undefined : status, search: debouncedSearch || undefined, page, limit: 20, archived: showArchived || undefined };
+  const logQuery = useQuery({
+    queryKey: circulationKeys.log(filters),
+    queryFn: ({ signal }) => getCirculationLog(filters, signal),
+    placeholderData: (previousData) => previousData,
+  });
+  const rows = logQuery.data?.rows ?? [];
+  const total = logQuery.data?.total ?? 0;
+  const totalPages = logQuery.data?.totalPages ?? 1;
+  const loading = logQuery.isPending;
+  useEffect(() => { if (refreshKey > 0) void queryClient.invalidateQueries({ queryKey: circulationKeys.logs() }); }, [refreshKey, queryClient]);
   useEffect(() => { setPage(1); }, [status, debouncedSearch, showArchived]);
+  const updateCachedLog = async (id: number) => {
+    await queryClient.cancelQueries({ queryKey: circulationKeys.logs() });
+    const snapshot = queryClient.getQueriesData<CirculationLogResult>({ queryKey: circulationKeys.logs() });
+    snapshot.forEach(([key, result]) => {
+      if (result?.rows.some((row) => row.id === id)) queryClient.setQueryData<CirculationLogResult>(key, { ...result, rows: result.rows.filter((row) => row.id !== id), total: Math.max(0, result.total - 1) });
+    });
+    return snapshot;
+  };
+  const restoreCachedLog = (_error: unknown, _id: number, snapshot: Array<[QueryKey, CirculationLogResult | undefined]> | undefined) => {
+    snapshot?.forEach(([key, result]) => { if (result) queryClient.setQueryData(key, result); });
+  };
+  const archiveMutation = useMutation({ mutationFn: archiveBorrowing, onMutate: updateCachedLog, onError: restoreCachedLog, onSettled: () => queryClient.invalidateQueries({ queryKey: circulationKeys.logs() }) });
+  const restoreMutation = useMutation({ mutationFn: restoreBorrowing, onMutate: updateCachedLog, onError: restoreCachedLog, onSettled: () => queryClient.invalidateQueries({ queryKey: circulationKeys.logs() }) });
 
   // ── Toggle archived — resets page & clears selection ─────────────────────
   const handleToggleArchived = () => {
@@ -99,10 +101,8 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
     if (!shouldArchive) return;
     setActionId(row.id);
     try {
-      await archiveBorrowing(row.id);
+      await archiveMutation.mutateAsync(row.id);
       toast.success("Borrowing record archived");
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
-      setTotal((t) => t - 1);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to archive record");
     } finally {
@@ -120,10 +120,8 @@ const CirculationLog = ({ refreshKey = 0 }: { refreshKey?: number }) => {
     if (!shouldRestore) return;
     setActionId(row.id);
     try {
-      await restoreBorrowing(row.id);
+      await restoreMutation.mutateAsync(row.id);
       toast.success("Borrowing record restored");
-      setRows((prev) => prev.filter((r) => r.id !== row.id));
-      setTotal((t) => t - 1);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to restore record");
     } finally {

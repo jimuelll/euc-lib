@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Menu, X, Bell, QrCode, LogOut, UserCog, LayoutDashboard, Baby, ChevronDown,
+  Menu, X, Bell, QrCode, LogOut, UserCog, LayoutDashboard, ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -530,22 +530,13 @@ const UserDropdown = ({
 // ── Scanner tools ─────────────────────────────────────────────────────────────
 
 const ScannerTools = ({ onNavigate }: { onNavigate: (path: string) => void }) => (
-  <>
-    <button
-      aria-label="Open QR scanner"
-      className="flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-      onClick={() => onNavigate("/scan-qr")}
-    >
-      <QrCode className="h-4 w-4" />
-    </button>
-    <button
-      aria-label="Open child attendance scanner"
-      className="flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
-      onClick={() => onNavigate("/scan-qr")}
-    >
-      <Baby className="h-4 w-4" />
-    </button>
-  </>
+  <button
+    aria-label="Open QR scanner"
+    className="flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+    onClick={() => onNavigate("/scan-qr")}
+  >
+    <QrCode className="h-4 w-4" />
+  </button>
 );
 
 // ── Mobile primitives ─────────────────────────────────────────────────────────

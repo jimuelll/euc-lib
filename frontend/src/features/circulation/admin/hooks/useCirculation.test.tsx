@@ -3,6 +3,8 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createTestQueryClient } from "@/test-utils/query-client";
 import { useCirculation } from "./useCirculation";
 import * as api from "../circulation.api";
 
@@ -35,9 +37,11 @@ const preview = {
   title: "Test book",
   author: "Test author",
 };
-const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={["/admin/circulation?transaction=return"]}>{children}</MemoryRouter>;
+let testClient: QueryClient;
+const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={testClient}><MemoryRouter initialEntries={["/admin/circulation?transaction=return"]}>{children}</MemoryRouter></QueryClientProvider>;
 
 beforeEach(() => {
+  testClient = createTestQueryClient();
   vi.resetAllMocks();
   vi.useRealTimers();
   vi.mocked(api.lookupUser).mockResolvedValue({ user: patron, activeBorrows: [], clearance: { status: "eligible", reasons: [], overdueItems: [], outstandingAmount: 0 } });
@@ -57,9 +61,9 @@ describe("desk transaction handoffs", () => {
     const { result } = renderHook(() => useCirculation(), { wrapper });
     expect(result.current.type).toBe("return");
     act(() => result.current.handleReturnIdentifierChange("ACC-2"));
-    await waitFor(() => expect(api.lookupReturnPreview).toHaveBeenCalledWith("ACC-2"));
+    await waitFor(() => expect(api.lookupReturnPreview).toHaveBeenCalledWith("ACC-2", expect.any(AbortSignal)));
     await waitFor(() => expect(result.current.returnPreview?.user_name).toBe("Test Patron"));
-    expect(api.lookupReturnPreview).toHaveBeenCalledWith("ACC-2");
+    expect(api.lookupReturnPreview).toHaveBeenCalledWith("ACC-2", expect.any(AbortSignal));
     expect(result.current.returnPreview?.user_name).toBe("Test Patron");
     expect(result.current.returnPreview?.title).toBe("Test book");
     expect(result.current.canSubmit).toBe(true);
@@ -135,7 +139,7 @@ describe("desk transaction handoffs", () => {
     await act(async () => { await result.current.handleLookupReturn("COPY-2", true); });
     expect(result.current.canSubmit).toBe(true);
     await act(async () => { await result.current.handleSubmit({ preventDefault() {} } as React.FormEvent); });
-    expect(api.lookupReturnPreview).toHaveBeenCalledWith("COPY-2");
+    expect(api.lookupReturnPreview).toHaveBeenCalledWith("COPY-2", expect.any(AbortSignal));
     expect(api.processReturn).toHaveBeenCalledWith("COPY-2");
   });
 

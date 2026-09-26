@@ -13,6 +13,7 @@ interface ScanningViewProps {
 
 const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: ScanningViewProps) => {
   const [manualMode, setManualMode] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<"environment" | "user">("environment");
   const [manualInput, setManualInput] = useState("");
   const [videoReady, setVideoReady] = useState(false); // <-- NEW
   const manualInputRef = useRef<HTMLInputElement>(null);
@@ -30,11 +31,12 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
     if (!manualMode && scanMode === "scanning") {
       setVideoReady(false);
     }
-  }, [manualMode, scanMode]);
+  }, [cameraFacingMode, manualMode, scanMode]);
 
   const { videoRef, error: cameraError } = useZxingScanner({
     onResult: onScanned,
     active: scanMode === "scanning" && !manualMode,
+    facingMode: cameraFacingMode,
   });
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -95,7 +97,7 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
               onPlaying={() => setVideoReady(true)} // <-- KEY FIX: only show once stream is live
               className="absolute inset-0 w-full h-full object-cover"
               style={{
-                transform: "scaleX(-1)",
+                transform: cameraFacingMode === "user" ? "scaleX(-1)" : "none",
                 // Keep video in the DOM (for zxing to read) but invisible until ready
                 opacity: videoReady ? 1 : 0,
                 transition: "opacity 0.2s ease",
@@ -173,6 +175,31 @@ const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: Scannin
 
         <div className="absolute inset-0 bg-warning/[0.02] pointer-events-none" />
       </div>
+
+      {!manualMode && (
+        <div className="grid grid-cols-2 border-x border-border bg-background sm:hidden" role="group" aria-label="Camera selection">
+          {([
+            { label: "Back camera", value: "environment" },
+            { label: "Front camera", value: "user" },
+          ] as const).map(({ label, value }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={cameraFacingMode === value}
+              disabled={isProcessing}
+              onClick={() => setCameraFacingMode(value)}
+              className={`min-h-11 border-b border-border px-3 text-xs font-semibold transition-colors disabled:opacity-40 ${
+                cameraFacingMode === value
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60"
+              } ${value === "environment" ? "border-r" : ""}`}
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Camera / Manual toggle */}
       <div className="grid grid-cols-2 border-l border-b border-r border-border">

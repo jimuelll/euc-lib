@@ -1,6 +1,10 @@
 import { useUnsavedChanges } from "@/features/admin";
 import { useAdminUrlState, queryPage } from "@/features/admin";
 import { useState, useEffect, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
+import { invalidateServerState } from "@/app/server-state";
+import { catalogKeys } from "../catalog.keys";
 import {
   Input,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -23,7 +27,7 @@ import BookHoldingsEditor from "./components/BookHoldingsEditor";
 import CatalogImageEditor from "./components/CatalogImageEditor";
 import CatalogHoldingsView from "./components/CatalogHoldingsView";
 import CatalogLendingStatusCell from "./components/CatalogLendingStatusCell";
-import type { CatalogHolding } from "./catalog.api";
+import type { CatalogHolding, CatalogSearchResponse } from "./catalog.api";
 
 type Props = { fields: FormField[]; isSuperAdmin: boolean };
 type ApiFieldError = { response?: { data?: { fields?: Record<string, string> } } };
@@ -52,32 +56,43 @@ function CatalogBookThumbnail({ book }: { book: Book }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
+  const queryClient = useQueryClient();
   const [params, patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
   const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | null>(null);
   const [sheetSection,  setSheetSection]  = useState<"details" | "image" | "copies" | "holdings">("details");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
-  const [isbnLookup,    setIsbnLookup]    = useState(false);
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
   const [coverFile,     setCoverFile]     = useState<File | null>(null);
   const [loading,       setLoading]       = useState(false);
   const searchQuery = params.get("q") ?? "";
+  const debouncedSearch = useDebounce(searchQuery, 180);
   const setSearchQuery = (q: string) => patchParams({ q, page: null }, true);
   const catalogFilter = params.get("material") === "book" ? "book" : params.get("material") === "thesis" ? "thesis" : "all";
   const setCatalogFilter = (material: string) => patchParams({ material, ...(material === "thesis" ? { policy: null } : {}), page: null });
-  const [searchResults, setSearchResults] = useState<Book[]>([]);
-  const [catalogPagination, setCatalogPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const catalogStatus = params.get("status") === "archived" ? "archived" : params.get("status") === "all" ? "all" : "active";
   const setCatalogStatus = (status: string) => patchParams({ status, page: null });
   const policyStatus = params.get("policy") === "needs" ? "needs_policy" : "all";
   const setPolicyStatus = (status: "all" | "needs_policy") => patchParams({ policy: status === "needs_policy" ? "needs" : null, page: null });
-  const [bookTypes, setBookTypes] = useState<BookType[]>([]);
   const [viewMode, setViewMode] = useState<"catalog" | "holdings">("catalog");
   const [initialHoldingCopyId, setInitialHoldingCopyId] = useState<number | null>(null);
   const holdingGuardRef = useRef<(() => Promise<boolean>) | null>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
+  const searchFilters: Parameters<typeof searchCatalogBooks>[0] = { query: debouncedSearch, materialType: catalogFilter, page: currentPage, status: catalogStatus, policyStatus };
+  const catalogQuery = useQuery({ queryKey: catalogKeys.adminSearch(searchFilters), queryFn: ({ signal }) => searchCatalogBooks(searchFilters, signal), placeholderData: (previousData) => previousData });
+  const searchResults = catalogQuery.data?.rows ?? [];
+  const catalogPagination = catalogQuery.data?.pagination ?? { page: currentPage, limit: 25, total: 0, totalPages: 1 };
+  const bookTypesQuery = useQuery({ queryKey: catalogKeys.bookTypes(), queryFn: ({ signal }) => fetchBookTypes(signal) });
+  const bookTypes: BookType[] = bookTypesQuery.data?.filter((type) => Number(type.is_active ?? 1) === 1) ?? [];
+  const invalidateCatalog = () => invalidateServerState(queryClient, "catalog");
+  const createMutation = useMutation({ mutationFn: createCatalogBook, onSuccess: invalidateCatalog });
+  const updateMutation = useMutation({ mutationFn: ({ id, values }: { id: number; values: CatalogFormValues }) => updateCatalogBook(id, values), onSuccess: invalidateCatalog });
+  const archiveMutation = useMutation({ mutationFn: archiveCatalogBook, onSuccess: invalidateCatalog });
+  const restoreMutation = useMutation({ mutationFn: restoreCatalogBook, onSuccess: invalidateCatalog });
+  const isbnLookupMutation = useMutation({ mutationFn: lookupBookIsbn });
+  const isbnLookup = isbnLookupMutation.isPending;
 
   const { confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
   const requestClose = async () => {
@@ -93,14 +108,11 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const clearForm = () => { setFormValues({}); setFieldErrors({}); setCoverFile(null); };
   const closeSheet = () => { setSheetMode(null); setSelectedBook(null); setSheetSection("details"); setInitialHoldingCopyId(null); clearForm(); };
 
-  useEffect(() => { fetchBookTypes().then((types) => setBookTypes(types.filter((type) => Number(type.is_active ?? 1) === 1))).catch(() => toast.error("Failed to load book types")); }, []);
-
   const lookupIsbn = async () => {
     const isbn = String(formValues.isbn ?? "").trim();
     if (!isbn) return toast.error("Enter an ISBN first");
-    setIsbnLookup(true);
     try {
-      const metadata = await lookupBookIsbn(isbn);
+      const metadata = await isbnLookupMutation.mutateAsync(isbn);
       // The lookup may return more than the active form supports. Keep the
       // payload aligned with the current form-builder schema so optional
       // metadata can never become an unknown-field save error.
@@ -127,7 +139,6 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
       const message = getApiErrorMessage(error, "ISBN lookup failed");
       setFieldErrors((current) => ({ ...current, isbn: message }));
     }
-    finally { setIsbnLookup(false); }
   };
 
   const validateRequired = (type = materialType, requirePolicy = true) => {
@@ -148,7 +159,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     if (!validateRequired()) return;
     setLoading(true);
     try {
-      const result = await createCatalogBook({ ...formValues, material_type: materialType });
+      const result = await createMutation.mutateAsync({ ...formValues, material_type: materialType });
       let coverUploadError: string | null = null;
       if (materialType === "book" && coverFile) {
         try {
@@ -157,8 +168,8 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
           coverUploadError = getApiErrorMessage(error, "Could not upload the cover image.");
         }
       }
+      await invalidateCatalog();
       closeSheet();
-      await handleSearchBooks();
       if (coverUploadError) {
         toast.error(`Book created, but its cover image could not be uploaded: ${coverUploadError} Open the book's Image tab to retry.`);
       } else {
@@ -170,42 +181,29 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     } finally { setLoading(false); }
   };
 
-  const handleSearchBooks = async (statusOverride?: "active" | "archived" | "all", materialOverride?: "all" | "book" | "thesis", pageOverride = currentPage) => {
+  const handleSearchBooks = async (_statusOverride?: "active" | "archived" | "all", _materialOverride?: "all" | "book" | "thesis", pageOverride = currentPage) => {
     if (pageOverride !== currentPage) { patchParams({ page: pageOverride }); return; }
-    setLoading(true);
-    const status = statusOverride ?? catalogStatus;
-    try {
-      const result = await searchCatalogBooks({ query: searchQuery, materialType: materialOverride ?? catalogFilter, page: pageOverride, status, policyStatus });
-      const rows = result.rows;
-      setSearchResults(rows);
-      setCatalogPagination(result.pagination);
-      if (!rows.length) {
+    const result = await catalogQuery.refetch();
+    if (result.isSuccess) {
+      if (!result.data.rows.length) {
         toast.info(
           searchQuery.trim()
             ? "No catalogue records match the current filters"
-            : `No ${status === "all" ? "" : `${status} `}catalogue records are available`
+            : `No ${catalogStatus === "all" ? "" : `${catalogStatus} `}catalogue records are available`
         );
       }
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Search failed"));
-    } finally { setLoading(false); }
+    } else toast.error(getApiErrorMessage(result.error, "Search failed"));
   };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => { void handleSearchBooks(); }, 180);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, catalogFilter, catalogStatus, policyStatus, currentPage]);
 
   const handleUpdateBook = async () => {
     const selectedMaterial = selectedBook?.material_type === "thesis" ? "thesis" : "book";
-    if (!selectedBook || !validateRequired(selectedMaterial, selectedMaterial !== "book" || !Boolean(selectedBook.needs_policy))) return;
+    if (!selectedBook || !validateRequired(selectedMaterial, selectedMaterial !== "book" || !selectedBook.needs_policy)) return;
     setLoading(true);
     try {
       const updateValues: CatalogFormValues = { ...formValues, material_type: selectedMaterial };
       if (selectedMaterial === "book" && selectedBook.needs_policy && !String(updateValues.book_type_id ?? "").trim()) delete updateValues.book_type_id;
-      const result = await updateCatalogBook(selectedBook.id, updateValues);
-      toast.success(result.message); closeSheet(); await handleSearchBooks();
+      const result = await updateMutation.mutateAsync({ id: selectedBook.id, values: updateValues });
+      toast.success(result.message); closeSheet();
     } catch (error: unknown) {
       setFieldErrors(getServerFieldErrors(error));
       toast.error(getApiErrorMessage(error, "Update failed"));
@@ -223,8 +221,8 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     if (!shouldDelete) return;
     setLoading(true);
     try {
-      const result = await archiveCatalogBook(selectedBook.id);
-      toast.success(result.message); closeSheet(); await handleSearchBooks();
+      const result = await archiveMutation.mutateAsync(selectedBook.id);
+      toast.success(result.message); closeSheet();
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Delete failed"));
     } finally { setLoading(false); }
@@ -240,9 +238,8 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     if (!shouldRestore) return;
     setLoading(true);
     try {
-      const result = await restoreCatalogBook(book.id);
+      const result = await restoreMutation.mutateAsync(book.id);
       toast.success(result.message);
-      await handleSearchBooks();
       if (selectedBook?.id === book.id) closeSheet();
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Restore failed"));
@@ -261,7 +258,8 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const updateSelectedBookImage = (imageUrl: string | null, publicId: string | null) => {
     const selectedId = selectedBook?.id;
     setSelectedBook((current) => current ? { ...current, image_url: imageUrl, image_public_id: publicId } : current);
-    setSearchResults((current) => current.map((book) => book.id === selectedId ? { ...book, image_url: imageUrl, image_public_id: publicId } : book));
+    queryClient.setQueryData<CatalogSearchResponse>(catalogKeys.adminSearch({ ...searchFilters, policyStatus }), (current) => current ? { ...current, rows: current.rows.map((book) => book.id === selectedId ? { ...book, image_url: imageUrl, image_public_id: publicId } : book) } : current);
+    void invalidateCatalog();
   };
   const openCopies = (book: Book) => { selectBookForEdit(book); setSheetSection("copies"); };
   const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("holdings"); };
@@ -297,7 +295,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
         {catalogStatus === "archived" && <div className="flex items-center gap-2 border border-warning/20 bg-warning/5 px-4 py-3 text-sm text-foreground"><Archive className="h-4 w-4 text-warning" />Archived records are hidden from the public catalogue until restored.</div>}
 
         <div className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card">
-          {loading ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <>
+          {loading || catalogQuery.isPending ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <>
             <div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="Catalogue records">{searchResults.map((book) => {
               const archived = Boolean(book.deleted_at);
               const identifier = book.material_type === "thesis" ? String(book.accession_number || book.metadata?.accession_number || "—") : (book.isbn || "—");

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchSubscriptions } from "../api";
+import { subscriptionsKeys } from "../subscriptions.keys";
 import type { Subscription, FetchStatus } from "../types";
 
 interface UseSubscriptionsReturn {
@@ -9,30 +10,15 @@ interface UseSubscriptionsReturn {
 }
 
 export function useSubscriptions(): UseSubscriptionsReturn {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [status, setStatus] = useState<FetchStatus>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: subscriptionsKeys.public(),
+    queryFn: ({ signal }) => fetchSubscriptions(signal),
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    (async () => {
-      try {
-        setStatus("loading");
-        setError(null);
-        const data = await fetchSubscriptions(controller.signal);
-        setSubscriptions(data);
-        setStatus("success");
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          setError("Failed to load subscriptions. Please try again.");
-          setStatus("error");
-        }
-      }
-    })();
-
-    return () => controller.abort();
-  }, []);
-
-  return { subscriptions, status, error };
+  const status: FetchStatus = query.isPending ? "loading" : query.isError ? "error" : "success";
+  return {
+    subscriptions: query.data ?? [],
+    status,
+    error: query.isError ? "Failed to load subscriptions. Please try again." : null,
+  };
 }

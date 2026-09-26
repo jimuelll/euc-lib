@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search, TriangleAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { UserInfo, ActiveBorrow, TransactionType, ClearanceStatus } from "../circulation.types";
 import { searchAdminUsers } from "@/features/admin";
+import { useDebounce } from "@/hooks/use-debounce";
+import { circulationKeys } from "../circulation.keys";
 
 interface Props {
   studentId: string;
@@ -21,19 +23,14 @@ const UserLookup = ({
   studentId, onStudentIdChange, onLookup,
   lookingUp, foundUser, activeBorrows, type, clearance,
 }: Props) => {
-  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
-  useEffect(() => {
-    const query = studentId.trim();
-    if (query.length < 2 || foundUser?.student_employee_id === query) { setSuggestions([]); return; }
-    let active = true;
-    const timer = window.setTimeout(async () => {
-      try {
-        const data = await searchAdminUsers(query);
-        if (active) setSuggestions(data.slice(0, 6));
-      } catch { if (active) setSuggestions([]); }
-    }, 180);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [studentId, foundUser?.student_employee_id]);
+  const search = useDebounce(studentId.trim(), 180);
+  const suggestionsQuery = useQuery({
+    queryKey: circulationKeys.userSuggestions(search),
+    queryFn: ({ signal }) => searchAdminUsers(search, signal),
+    enabled: search.length >= 2 && foundUser?.student_employee_id !== search && !lookingUp,
+    staleTime: 15_000,
+  });
+  const suggestions: UserSuggestion[] = suggestionsQuery.data?.slice(0, 6) ?? [];
 
   return <div className="space-y-2">
 
@@ -70,7 +67,7 @@ const UserLookup = ({
     {suggestions.length > 0 && (
       <div className="divide-y divide-border border border-border bg-card shadow-sm">
         {suggestions.map((user) => (
-          <button key={user.student_employee_id} type="button" onClick={() => { setSuggestions([]); onLookup(user.student_employee_id); }} className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40">
+          <button key={user.student_employee_id} type="button" onClick={() => onLookup(user.student_employee_id)} className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40">
             <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-xs text-muted-foreground">{user.student_employee_id}</span></span>
             <span className="text-xs  text-muted-foreground">{user.role}</span>
           </button>

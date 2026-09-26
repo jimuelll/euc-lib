@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { UpcomingEvent } from "../types";
 import { createEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
+import { siteContentKeys } from "@/features/site-content";
 
 const upcomingEvents: UpcomingEvent[] = [
   { title: "Research Writing Workshop", date: "March 25, 2026", time: "2:00 PM – 4:00 PM" },
@@ -13,31 +15,25 @@ const upcomingEvents: UpcomingEvent[] = [
 
 export function BulletinSidebar() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const canManage = ["admin", "super_admin"].includes(user?.role ?? "");
-  const [events, setEvents] = useState<UpcomingEvent[]>(upcomingEvents);
+  const eventsQuery = useQuery({ queryKey: siteContentKeys.eventList(false), queryFn: ({ signal }) => fetchEvents(false, signal) });
+  const createMutation = useMutation({ mutationFn: createEvent, onSuccess: () => queryClient.invalidateQueries({ queryKey: siteContentKeys.events() }) });
+  const events: UpcomingEvent[] = eventsQuery.data ? eventsQuery.data.map((event: SiteEvent) => {
+    const start = new Date(event.starts_at);
+    const end = event.ends_at ? new Date(event.ends_at) : null;
+    return {
+      id: event.id,
+      title: event.title,
+      date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
+      time: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${end ? ` – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`,
+    };
+  }) : upcomingEvents;
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
-  const load = async () => {
-    try {
-      const data = await fetchEvents();
-      setEvents(data.map((event: SiteEvent) => {
-        const start = new Date(event.starts_at);
-        const end = event.ends_at ? new Date(event.ends_at) : null;
-        return {
-          id: event.id,
-          title: event.title,
-          date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
-          time: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${end ? ` – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`,
-        };
-      }));
-    } catch {
-      // Keep the supplied fallback events when the endpoint is unavailable.
-    }
-  };
-  useEffect(() => { void load(); }, []);
-  const save = async () => { if (!title.trim() || !startsAt) return; await createEvent({ title, starts_at: startsAt, ends_at: endsAt || null }); setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false); await load(); };
+  const save = async () => { if (!title.trim() || !startsAt) return; await createMutation.mutateAsync({ title, starts_at: startsAt, ends_at: endsAt || null }); setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false); };
   return (
     <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
 

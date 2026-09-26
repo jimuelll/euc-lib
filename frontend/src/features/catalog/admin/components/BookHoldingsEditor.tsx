@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Barcode, Check, Loader2, Save, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { fetchAcademicPrograms, type AcademicProgram } from "@/features/library-settings";
+import { fetchAcademicPrograms } from "@/features/library-settings";
 import { useUnsavedChanges } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { fetchBookHoldings, saveCopyHolding, voidCopyAccession, type CatalogHolding } from "../catalog.api";
+import { catalogKeys } from "../../catalog.keys";
+import { librarySettingsKeys } from "@/features/library-settings/library-settings.keys";
 
 type Draft = { accession_number: string; price: string; program_id: string; course_code: string; location: string; date_acquired: string; distributor: string; invoice_reference: string };
 const emptyDraft = (): Draft => ({ accession_number: "", price: "", program_id: "", course_code: "", location: "", date_acquired: "", distributor: "", invoice_reference: "" });
@@ -24,6 +27,7 @@ const copyLabel = (copy: Pick<CatalogHolding, "copy_id" | "barcode">): string =>
   return copy.barcode ? `Barcode ${copy.barcode}` : `Copy ID ${copy.copy_id}`;
 };
 const labelClass = "mb-1.5 block text-xs font-medium text-muted-foreground";
+const EMPTY_HOLDINGS: CatalogHolding[] = [];
 const lendingStatus = (copy: CatalogHolding) => {
   if (!copy.is_active) return "Inactive";
   if (copy.accession_voided) return "Accession voided";
@@ -45,39 +49,48 @@ type Props = {
 };
 
 export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = null, guardRef, onManageCopies, isSuperAdmin = false }: Props) {
-  const [copies, setCopies] = useState<CatalogHolding[]>([]);
+  const queryClient = useQueryClient();
+  const holdingsQuery = useQuery({ queryKey: catalogKeys.bookHoldings(bookId), queryFn: ({ signal }) => fetchBookHoldings(bookId, signal) });
+  const programsQuery = useQuery({ queryKey: librarySettingsKeys.programs("active"), queryFn: ({ signal }) => fetchAcademicPrograms("active", signal) });
+  const copies = holdingsQuery.data ?? EMPTY_HOLDINGS;
   const [copyIndex, setCopyIndex] = useState(0);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [programs, setPrograms] = useState<AcademicProgram[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [voiding, setVoiding] = useState(false);
+  const programs = programsQuery.data ?? [];
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const [markSavedAfterUpdate, setMarkSavedAfterUpdate] = useState(false);
+  const [initializedSelection, setInitializedSelection] = useState<string | null>(null);
   const current = copies[copyIndex] ?? null;
+  const selectionIdentity = `${bookId}:${initialCopyId ?? "first"}`;
+  const selectionInitialized = initializedSelection === selectionIdentity;
+  const loading = holdingsQuery.isPending || (holdingsQuery.data !== undefined && !selectionInitialized);
   const canEditHolding = Boolean(current && (current.is_active || current.accession_number));
   const guardIdentity = current?.copy_id ?? `${bookId}-none`;
-  const { dirty, confirmDiscard, discardDialog, markSaved } = useUnsavedChanges(draft, Boolean(current), guardIdentity);
+  const savedDraft = current ? asDraft(current) : null;
+  const isDraftDirty = Boolean(current && selectionInitialized && savedDraft && JSON.stringify(draft) !== JSON.stringify(savedDraft));
+  const { dirty, confirmDiscard, discardDialog, markSaved } = useUnsavedChanges(draft, Boolean(current && selectionInitialized), guardIdentity, isDraftDirty);
   const completeCount = useMemo(() => copies.filter((copy) => Boolean(copy.accession_number) && !copy.accession_voided).length, [copies]);
 
+  const saveMutation = useMutation({
+    mutationFn: ({ copyId, payload }: { copyId: number; payload: Draft }) => saveCopyHolding(copyId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
+  });
+  const voidMutation = useMutation({
+    mutationFn: ({ copyId, reason }: { copyId: number; reason: string }) => voidCopyAccession(copyId, { reason }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
+  });
+  const saving = saveMutation.isPending;
+  const voiding = voidMutation.isPending;
+
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    Promise.all([fetchBookHoldings(bookId), fetchAcademicPrograms()])
-      .then(([data, courses]) => {
-        if (!alive) return;
-        setCopies(data);
-        setPrograms(courses);
-        const preferred = initialCopyId === null ? data.findIndex((copy) => !copy.accession_number) : data.findIndex((copy) => copy.copy_id === initialCopyId);
-        const selectedIndex = preferred >= 0 ? preferred : 0;
-        setCopyIndex(selectedIndex);
-        setDraft(data[selectedIndex] ? asDraft(data[selectedIndex]) : emptyDraft());
-      })
-      .catch(() => toast.error("Failed to load holdings"))
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [bookId, initialCopyId]);
+    if (!holdingsQuery.data || initializedSelection === selectionIdentity) return;
+    const data = holdingsQuery.data;
+    const preferred = initialCopyId === null ? data.findIndex((copy) => !copy.accession_number) : data.findIndex((copy) => copy.copy_id === initialCopyId);
+    const selectedIndex = preferred >= 0 ? preferred : 0;
+    setCopyIndex(selectedIndex);
+    setDraft(data[selectedIndex] ? asDraft(data[selectedIndex]) : emptyDraft());
+    setInitializedSelection(selectionIdentity);
+  }, [holdingsQuery.data, initialCopyId, initializedSelection, selectionIdentity]);
 
   useEffect(() => {
     guardRef.current = confirmDiscard;
@@ -95,25 +108,22 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
     if (!await confirmDiscard()) return;
     setDraft(asDraft(copies[nextIndex]));
     setCopyIndex(nextIndex);
-  }, [copies.length, copyIndex, confirmDiscard]);
+  }, [copies, copyIndex, confirmDiscard]);
 
   const setField = (key: keyof Draft, value: string) => setDraft((previous) => ({ ...previous, [key]: value }));
 
   const save = async () => {
     if (!current || !canEditHolding) return;
     if (!draft.accession_number.trim()) return toast.error("Accession number is required");
-    setSaving(true);
     try {
-      await saveCopyHolding(current.copy_id, { ...draft, accession_number: draft.accession_number.trim() });
-      const refreshed = await fetchBookHoldings(bookId);
-      setCopies(refreshed);
+      await saveMutation.mutateAsync({ copyId: current.copy_id, payload: { ...draft, accession_number: draft.accession_number.trim() } });
+      const refreshed = queryClient.getQueryData<CatalogHolding[]>(catalogKeys.bookHoldings(bookId)) ?? [];
       const nextIndex = refreshed.findIndex((copy) => copy.copy_id === current.copy_id);
       if (nextIndex >= 0) setCopyIndex(nextIndex);
-      setDraft(asDraft(refreshed[nextIndex]));
+      if (refreshed[nextIndex]) setDraft(asDraft(refreshed[nextIndex]));
       setMarkSavedAfterUpdate(true);
       toast.success("Holding saved");
     } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to save holding")); }
-    finally { setSaving(false); }
   };
 
   return <>
@@ -127,7 +137,7 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
       {!loading && copies.length > 0 && <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{completeCount} of {copies.length} accessioned</span>}
     </div>
 
-    {loading ? <div className="flex flex-1 items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading copy holdings…</div> : copies.length === 0 ? <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+    {loading ? <div className="flex flex-1 items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading copy holdings…</div> : holdingsQuery.isError ? <div role="alert" className="flex flex-1 flex-col items-center justify-center py-12 text-center"><p className="text-sm text-destructive">{getApiErrorMessage(holdingsQuery.error, "Failed to load holdings")}</p><Button className="mt-3" variant="outline" onClick={() => void holdingsQuery.refetch()}>Try again</Button></div> : copies.length === 0 ? <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
       <p className="text-sm font-medium text-foreground">This book has no copies yet</p>
       <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">Add a copy in Copies before recording its accession details.</p>
       <Button className="mt-4" variant="outline" onClick={onManageCopies}>Manage copies</Button>
@@ -178,20 +188,17 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
           <Button type="button" variant="outline" disabled={voiding} onClick={() => setVoidDialogOpen(false)}>Cancel</Button>
           <Button type="button" disabled={voiding || Boolean(current?.has_active_loan || current?.has_ready_reservation) || !voidReason.trim()} onClick={async () => {
             if (!current) return;
-            setVoiding(true);
             try {
-              await voidCopyAccession(current.copy_id, { reason: voidReason.trim() });
-              const refreshed = await fetchBookHoldings(bookId);
+              await voidMutation.mutateAsync({ copyId: current.copy_id, reason: voidReason.trim() });
+              const refreshed = queryClient.getQueryData<CatalogHolding[]>(catalogKeys.bookHoldings(bookId)) ?? [];
               const selectedIndex = refreshed.findIndex((copy) => copy.copy_id === current.copy_id);
               const nextIndex = selectedIndex >= 0 ? selectedIndex : 0;
-              setCopies(refreshed);
               setCopyIndex(nextIndex);
               setDraft(refreshed[nextIndex] ? asDraft(refreshed[nextIndex]) : emptyDraft());
               setMarkSavedAfterUpdate(true);
               setVoidDialogOpen(false);
               toast.success("Accession voided permanently");
             } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to void accession")); }
-            finally { setVoiding(false); }
           }}>{voiding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Void accession permanently</Button>
         </DialogFooter>
       </DialogContent>

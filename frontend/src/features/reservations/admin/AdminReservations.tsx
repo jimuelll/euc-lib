@@ -14,6 +14,7 @@ const AdminReservations = () => {
     data,
     error,
     loading,
+    initialLoading,
     search,
     statusFilter,
     actionId,
@@ -57,7 +58,7 @@ const AdminReservations = () => {
 
       <AdminPanel contentClassName="p-0">
         <div className="border-b border-border p-4"><ReservationsToolbar search={search} statusFilter={statusFilter} loading={loading} showArchived={showArchived} onSearchChange={handleSearchChange} onStatusChange={handleStatusChange} onRefresh={fetchReservations} /></div>
-        <ReservationsTable rows={data?.rows ?? EMPTY_ROWS} loading={loading} actionId={actionId} showArchived={showArchived} onMarkReady={handleMarkReady} onFulfill={handleFulfill} onCancel={handleCancel} onArchive={handleArchive} onRestore={handleRestore} />
+        <ReservationsTable rows={data?.rows ?? EMPTY_ROWS} loading={initialLoading} actionId={actionId} showArchived={showArchived} onMarkReady={handleMarkReady} onFulfill={handleFulfill} onCancel={handleCancel} onArchive={handleArchive} onRestore={handleRestore} />
         {data && <ReservationsPagination page={data.page} totalPages={data.totalPages} total={data.total} loading={loading} onPageChange={setPage} />}
       </AdminPanel>
     </AdminPage>

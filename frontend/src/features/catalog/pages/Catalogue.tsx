@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -7,7 +8,9 @@ import PublicPageMasthead from "@/components/layout/PublicPageMasthead";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RecommendationStrip } from "@/features/recommendations";
 import { useDebounce } from "@/hooks/use-debounce";
-import { fetchPublicCatalogSchema, searchPublicCatalogue, type PublicCatalogBook as Book, type PublicCatalogFacets, type PublicCatalogSchemaField as SchemaField } from "@/features/catalog/api";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { fetchPublicCatalogSchema, searchPublicCatalogue, type PublicCatalogBook as Book, type PublicCatalogFacets } from "@/features/catalog/api";
+import { catalogKeys, normalizeCatalogSearch } from "../catalog.keys";
 
 const CORE_KEYS = new Set(["id", "title", "author", "isbn", "category", "edition", "publication_year", "copies", "image_url"]);
 const EMPTY_FACETS: PublicCatalogFacets = {
@@ -45,12 +48,6 @@ function BookCover({ book }: { book: Book }) {
 const Catalogue = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") || "");
-  const [books, setBooks] = useState<Book[]>([]);
-  const [schema, setSchema] = useState<SchemaField[]>([]);
-  const [facets, setFacets] = useState<PublicCatalogFacets>(EMPTY_FACETS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
   const paramsKey = searchParams.toString();
@@ -79,9 +76,33 @@ const Catalogue = () => {
     setSearchParams(next, { replace: true });
   }, [debouncedQuery, queryParam, searchParams, setSearchParams]);
 
-  useEffect(() => {
-    fetchPublicCatalogSchema().then(setSchema).catch(() => {});
-  }, []);
+  const schemaQuery = useQuery({
+    queryKey: catalogKeys.schema(),
+    queryFn: ({ signal }) => fetchPublicCatalogSchema(signal),
+  });
+  const schema = schemaQuery.data ?? [];
+  const searchFilters = useMemo(() => normalizeCatalogSearch({
+    query: params.get("q") || "",
+    title: params.get("title") || "",
+    author: params.get("author") || "",
+    isbn: params.get("isbn") || "",
+    format: params.get("format") || "all",
+    availability: params.get("availability") || "all",
+    category: params.get("category") || "",
+    sort: params.get("sort") || "relevance",
+    page,
+  }), [params, page]);
+  const catalogQuery = useQuery({
+    queryKey: catalogKeys.search(searchFilters),
+    queryFn: ({ signal }) => searchPublicCatalogue(searchFilters, signal),
+    placeholderData: (previousData) => previousData,
+  });
+  const books = catalogQuery.data?.rows ?? [];
+  const facets: PublicCatalogFacets = catalogQuery.data?.facets ?? EMPTY_FACETS;
+  const pagination = catalogQuery.data?.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 1 };
+  const loading = catalogQuery.isPending;
+  const fetching = catalogQuery.isFetching;
+  const error = catalogQuery.isError ? getApiErrorMessage(catalogQuery.error, "Something went wrong while loading the catalogue.") : null;
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 1024px)");
@@ -107,33 +128,6 @@ const Catalogue = () => {
     next.delete("page");
     setSearchParams(next, { replace: true });
   };
-
-  useEffect(() => {
-    let current = true;
-    setLoading(true);
-    setError(null);
-    void searchPublicCatalogue({
-      query: params.get("q") || "",
-      title: params.get("title") || "",
-      author: params.get("author") || "",
-      isbn: params.get("isbn") || "",
-      format: params.get("format") || "all",
-      availability: params.get("availability") || "all",
-      category: params.get("category") || "",
-      sort: params.get("sort") || "relevance",
-      page,
-    }).then((result) => {
-      if (!current) return;
-      setBooks(result.rows ?? []);
-      setPagination(result.pagination);
-      setFacets(result.facets ?? EMPTY_FACETS);
-    }).catch((err: any) => {
-      if (!current) return;
-      setError(err.response?.data?.message ?? "Something went wrong while loading the catalogue.");
-      setBooks([]);
-    }).finally(() => { if (current) setLoading(false); });
-    return () => { current = false; };
-  }, [paramsKey, page]);
 
   useEffect(() => setSelectedBook(null), [paramsKey]);
 
@@ -190,7 +184,7 @@ const Catalogue = () => {
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-warning" />
-              {loading ? <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-warning" /> : null}
+              {fetching ? <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-warning" /> : null}
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}

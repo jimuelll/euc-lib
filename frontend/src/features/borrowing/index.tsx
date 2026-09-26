@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BookMarked, RotateCcw, Search, ArrowLeft } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
@@ -8,76 +9,63 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/context/AuthContext";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { invalidateServerState } from "@/app/server-state";
 import ReserveTab from "./tabs/ReserveTab";
 import HistoryTab from "./tabs/HistoryTab";
 
-import type { CatalogBook, ActiveReservation, ReservationHistory } from "./types";
+import type { ActiveReservation } from "./types";
 import { fetchActiveReservations, fetchReservationHistory, searchReservationCatalogue, type ReservationPagination } from "./api";
+import { borrowingKeys } from "./borrowing.keys";
 
 type Pagination = ReservationPagination;
 
 const LibraryServices = () => {
   const { loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch]                         = useState("");
-  const [catalog, setCatalog]                       = useState<CatalogBook[]>([]);
-  const [activeReservations, setActiveReservations] = useState<ActiveReservation[]>([]);
-  const [history, setHistory]                       = useState<ReservationHistory[]>([]);
-  const [catalogPagination, setCatalogPagination]   = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [historyPagination, setHistoryPagination]   = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [catalogLoading, setCatalogLoading]         = useState(false);
-  const [dataLoading, setDataLoading]               = useState(true);
-  const [error, setError]                           = useState<string | null>(null);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [historyPageNumber, setHistoryPageNumber] = useState(1);
 
   const debouncedSearch = useDebounce(search, 400);
 
-  // Wait for auth to restore token before fetching
-  useEffect(() => {
-    if (authLoading) return;
-    const fetchUserData = async () => {
-      setDataLoading(true);
-      try {
-        const [activeReservationsResult, historyResult] = await Promise.all([fetchActiveReservations(), fetchReservationHistory(1)]);
-        setActiveReservations(activeReservationsResult);
-        setHistory(historyResult.rows ?? []);
-        setHistoryPagination(historyResult.pagination);
-      } catch (err: any) {
-        setError(err.response?.data?.message ?? "Failed to load your reservations");
-      } finally {
-        setDataLoading(false);
-      }
-    };
-    fetchUserData();
-  }, [authLoading]);
+  useEffect(() => setCatalogPage(1), [debouncedSearch]);
+  const activeQuery = useQuery({
+    queryKey: borrowingKeys.active(),
+    queryFn: ({ signal }) => fetchActiveReservations(signal),
+    enabled: !authLoading,
+  });
+  const historyQuery = useQuery({
+    queryKey: borrowingKeys.historyPage(historyPageNumber),
+    queryFn: ({ signal }) => fetchReservationHistory(historyPageNumber, signal),
+    enabled: !authLoading,
+    placeholderData: (previousData) => previousData,
+  });
+  const catalogQuery = useQuery({
+    queryKey: borrowingKeys.catalogSearch(debouncedSearch, catalogPage),
+    queryFn: ({ signal }) => searchReservationCatalogue(debouncedSearch, catalogPage, signal),
+    enabled: !authLoading && Boolean(debouncedSearch.trim()),
+    placeholderData: (previousData) => previousData,
+  });
+  const activeReservations = activeQuery.data ?? [];
+  const history = historyQuery.data?.rows ?? [];
+  const catalog = debouncedSearch.trim() ? (catalogQuery.data?.rows ?? []) : [];
+  const catalogPagination: Pagination = catalogQuery.data?.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 };
+  const historyPagination: Pagination = historyQuery.data?.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 };
+  const catalogLoading = catalogQuery.isPending && Boolean(debouncedSearch.trim());
+  const dataLoading = activeQuery.isPending || historyQuery.isPending;
+  const error = activeQuery.isError || historyQuery.isError
+    ? getApiErrorMessage(activeQuery.error ?? historyQuery.error, "Failed to load your reservations")
+    : catalogQuery.isError ? getApiErrorMessage(catalogQuery.error, "Catalogue search failed") : null;
 
-  // Catalogue search — also gated on auth being ready
-  const fetchCatalogue = useCallback(async (q: string, page = 1) => {
-    if (!q.trim() || authLoading) { setCatalog([]); return; }
-    setCatalogLoading(true);
-    try {
-      const result = await searchReservationCatalogue(q, page);
-      setCatalog(result.rows ?? []);
-      setCatalogPagination(result.pagination);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Catalogue search failed");
-    } finally {
-      setCatalogLoading(false);
-    }
-  }, [authLoading]);
-
-  useEffect(() => {
-    void fetchCatalogue(debouncedSearch, 1);
-  }, [debouncedSearch, fetchCatalogue]);
-
-  const handleReserveSuccess = useCallback(
-    (newReservation: ActiveReservation) => {
-      setActiveReservations((prev) => [newReservation, ...prev]);
-    },
-    []
-  );
-
-  const handleCancelSuccess = useCallback((reservationId: number) => {
-    setActiveReservations((prev) => prev.filter((r) => r.id !== reservationId));
-  }, []);
+  const handleReserveSuccess = (reservation: ActiveReservation) => {
+    queryClient.setQueryData<ActiveReservation[]>(borrowingKeys.active(), (current) => [reservation, ...(current ?? [])]);
+    void invalidateServerState(queryClient, "reservation");
+  };
+  const handleCancelSuccess = (reservationId: number) => {
+    queryClient.setQueryData<ActiveReservation[]>(borrowingKeys.active(), (current) => current?.filter((reservation) => reservation.id !== reservationId) ?? []);
+    void invalidateServerState(queryClient, "reservation");
+  };
 
   const pendingCount = activeReservations.filter((r) => r.status === "pending").length;
   const readyCount   = activeReservations.filter((r) => r.status === "ready").length;
@@ -155,14 +143,14 @@ const LibraryServices = () => {
                 dataLoading={dataLoading}
                 hasSearched={!!debouncedSearch.trim()}
                 pagination={catalogPagination}
-                onPageChange={(page) => void fetchCatalogue(debouncedSearch, page)}
+                onPageChange={setCatalogPage}
                 onReserveSuccess={handleReserveSuccess}
                 onCancelSuccess={handleCancelSuccess}
               />
             </TabsContent>
 
             <TabsContent value="history" className="mt-5">
-              <HistoryTab history={history} loading={dataLoading} pagination={historyPagination} onPageChange={async (page) => { setDataLoading(true); try { const response = await fetchReservationHistory(page); setHistory(response.rows ?? []); setHistoryPagination(response.pagination); } finally { setDataLoading(false); } }} />
+              <HistoryTab history={history} loading={historyQuery.isFetching} pagination={historyPagination} onPageChange={setHistoryPageNumber} />
             </TabsContent>
           </Tabs>
 

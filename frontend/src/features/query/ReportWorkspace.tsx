@@ -1,5 +1,6 @@
 import { useAdminFilters } from "@/features/admin";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { downloadReportCsv, fetchQueryMeta, fetchReport, type QueryReport, type ReportFilters, type ReportResult } from "./api";
+import { downloadReportCsv, fetchQueryMeta, fetchReport, type QueryReport, type ReportFilters } from "./api";
 import { formatQueryValue } from "./format";
+import { queryKeys } from "./query.keys";
 
 const reports: Array<{ value: QueryReport; label: string; description: string; ranking?: boolean; snapshot?: boolean }> = [
   { value: "fined", label: "Fined", description: "Charges, payments, adjustments, and outstanding balances." },
@@ -25,28 +27,31 @@ const number = new Intl.NumberFormat("en-PH");
 export default function ReportWorkspace() {
   const { applied, setApplied, page, setPage } = useAdminFilters<ReportFilters>("report", emptyFilters("fined"));
   const [draft, setDraft] = useState<ReportFilters>(applied);
-  const [result, setResult] = useState<ReportResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const metaQuery = useQuery({ queryKey: queryKeys.meta(), queryFn: ({ signal }) => fetchQueryMeta(signal) });
+  const reportQuery = useQuery({
+    queryKey: queryKeys.reports({ ...applied, page, limit: 25 }),
+    queryFn: ({ signal }) => fetchReport({ ...applied, page, limit: 25 }, signal),
+    placeholderData: keepPreviousData,
+  });
+  const result = reportQuery.data;
+  const loading = reportQuery.isFetching;
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
-  const [programs, setPrograms] = useState<Array<{ id: number; name: string }>>([]);
+  const programs = metaQuery.data?.programs ?? [];
+  const loadError = metaQuery.isError
+    ? getApiErrorMessage(metaQuery.error, "Filter options could not be loaded. Try refreshing the page.")
+    : reportQuery.isError
+      ? getApiErrorMessage(reportQuery.error, "Unable to load this report.")
+      : "";
   useEffect(() => { setDraft(applied); }, [applied]);
-  useEffect(() => { void fetchQueryMeta().then((meta) => setPrograms(meta.programs)).catch(() => setPrograms([])); }, []);
 
   const selected = reports.find((item) => item.value === draft.report) ?? reports[0];
   const changed = JSON.stringify(draft) !== JSON.stringify(applied);
-  const load = useCallback(async (filters: ReportFilters, currentPage = 1) => {
-    setLoading(true); setError("");
-    try { setResult(await fetchReport({ ...filters, page: currentPage, limit: 25 })); }
-    catch (failure) { setResult(null); setError(getApiErrorMessage(failure, "Unable to load this report.")); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { void load(applied, page); }, [load, applied, page]);
   const update = (key: string, value: string) => setDraft((current) => ({ ...current, [key]: value }));
   const run = (event: FormEvent) => {
     event.preventDefault();
     if (!selected.snapshot && draft.dateFrom && draft.dateTo && String(draft.dateFrom) > String(draft.dateTo)) { setError("The start date must be on or before the end date."); return; }
-    setPage(1); setApplied({ ...draft });
+    setError(""); setPage(1); setApplied({ ...draft });
   };
   const choose = (report: QueryReport) => { const next = emptyFilters(report); setDraft(next); setPage(1); setApplied(next); };
   const reset = () => { const next = emptyFilters(draft.report); setDraft(next); setPage(1); setApplied(next); };
@@ -55,7 +60,7 @@ export default function ReportWorkspace() {
 
   return <div className="space-y-5">
     <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Run operational reports for fines, attendance, due dates, patron activity, collection usage, and current holdings.</p>
-    {error && <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div>}
+    {(error || loadError) && <div role="alert" className="flex items-center justify-between gap-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{error || loadError}</span>{loadError && <Button type="button" variant="outline" size="sm" onClick={() => void (metaQuery.isError ? metaQuery.refetch() : reportQuery.refetch())}>Try again</Button>}</div>}
     <form onSubmit={run} className="border-y border-border bg-muted/20 px-3 py-4 sm:px-5">
       <div className="grid gap-3 md:grid-cols-[minmax(15rem,0.8fr)_minmax(14rem,1fr)_auto] md:items-end">
         <div className="space-y-1.5"><Label htmlFor="report-type" className="text-xs font-medium text-muted-foreground">Report type</Label><Select value={draft.report} onValueChange={(value) => choose(value as QueryReport)}><SelectTrigger id="report-type" className="h-11 rounded-md bg-background"><SelectValue /></SelectTrigger><SelectContent>{reports.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
@@ -78,7 +83,7 @@ export default function ReportWorkspace() {
     </form>
     <section className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card" aria-busy={loading}>
       <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold" style={{ fontFamily: "var(--font-heading)" }}>{selected.label}</h2><p className="mt-1 text-xs text-muted-foreground">{loading ? "Loading report…" : `${number.format(result?.pagination?.total ?? 0)} matching rows`}{changed ? " · Run the report to apply changes" : ""}</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result} onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Preview report</Button><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result || exporting} onClick={() => void download()}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download CSV</Button></div></div>
-      {loading ? <div className="space-y-2 p-4">{[0,1,2,3,4].map((item) => <Skeleton key={item} className="h-12 w-full rounded-md" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="admin-stack-results w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={index} className="hover:bg-muted/20">{result.columns.map((column) => <td data-mobile-label={column.label} key={column.key} className="max-w-[26rem] px-4 py-3 align-top">{formatQueryValue(row[column.key], column.type)}</td>)}</tr>)}</tbody></table></div> : <div className="px-5 py-12 text-center text-sm text-muted-foreground">No rows match this report. Adjust the {selected.snapshot ? "filters" : "dates or search"}.</div>}
+      {!result && reportQuery.isPending ? <div className="space-y-2 p-4">{[0,1,2,3,4].map((item) => <Skeleton key={item} className="h-12 w-full rounded-md" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="admin-stack-results w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={index} className="hover:bg-muted/20">{result.columns.map((column) => <td data-mobile-label={column.label} key={column.key} className="max-w-[26rem] px-4 py-3 align-top">{formatQueryValue(row[column.key], column.type)}</td>)}</tr>)}</tbody></table></div> : !reportQuery.isError && <div className="px-5 py-12 text-center text-sm text-muted-foreground">No rows match this report. Adjust the {selected.snapshot ? "filters" : "dates or search"}.</div>}
       <div className="flex items-center justify-between border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground"><span>{number.format(result?.pagination?.total ?? 0)} rows</span><div className="flex items-center gap-3"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={!result || loading || result.pagination?.page === 1} onClick={() => setPage((result?.pagination?.page ?? 1) - 1)}>Previous</Button><span>Page {result?.pagination?.page ?? 1} of {result?.pagination?.totalPages ?? 1}</span><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={!result || loading || (result.pagination?.page ?? 1) >= (result.pagination?.totalPages ?? 1)} onClick={() => setPage((result?.pagination?.page ?? 1) + 1)}>Next</Button></div></div>
     </section>
   </div>;

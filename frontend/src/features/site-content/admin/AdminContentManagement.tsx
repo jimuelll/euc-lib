@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { BookOpenCheck, BookOpenText, CalendarDays, FileText, Globe2, Loader2, Plus, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,37 +12,47 @@ import { AdminAbout } from "@/features/about";
 import { AdminBulletin } from "@/features/bulletin";
 import { AdminSubscriptions } from "@/features/subscriptions";
 import { UserGuideEditor } from "@/features/user-guide";
-import { getSiteContent, updateSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
+import { updateSiteContent as saveSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
 import { createEvent, deleteEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
+import { useSiteContent } from "../useSiteContent";
+import { siteContentKeys } from "../site-content.keys";
 
 type Event = SiteEvent;
 const HomeContent = () => {
   const [form, setForm] = useState<SiteContent | null>(null); const [saving, setSaving] = useState(false); const [message, setMessage] = useState("");
-  useEffect(() => { getSiteContent().then(setForm).catch(() => setMessage("Could not load site content.")); }, []);
+  const queryClient = useQueryClient();
+  const contentQuery = useSiteContent();
+  const saveMutation = useMutation({ mutationFn: saveSiteContent, onSuccess: (content) => { queryClient.setQueryData(siteContentKeys.home(), content); } });
+  const updateSiteContent = (content: SiteContent) => saveMutation.mutateAsync(content);
+  useEffect(() => { if (contentQuery.data && !form) setForm(contentQuery.data); }, [contentQuery.data, form]);
+  if (contentQuery.isError && !form) return <p className="py-8 text-sm text-destructive">Could not load site content. <Button variant="outline" onClick={() => void contentQuery.refetch()}>Try again</Button></p>;
   if (!form) return <p className="py-8 text-sm text-muted-foreground">Loading homepage content…</p>;
   const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) => setForm({ ...form, [key]: value });
   return <AdminPanel title="Homepage content" description="Changes publish directly to the public homepage."><form className="space-y-5" onSubmit={async (e) => { e.preventDefault(); setSaving(true); try { setForm(await updateSiteContent(form)); setMessage("Homepage content saved."); } catch (err: any) { setMessage(err.response?.data?.message || "Could not save changes."); } finally { setSaving(false); } }}><div className="grid gap-4 md:grid-cols-2"><Field label="Institution line"><Input value={form.hero_kicker} onChange={(e) => set("hero_kicker", e.target.value)} /></Field><Field label="Hero image URL"><Input value={form.hero_image_url || ""} onChange={(e) => set("hero_image_url", e.target.value || null)} placeholder="Leave blank for the default image" /></Field><Field label="Hero title"><Input value={form.hero_title} onChange={(e) => set("hero_title", e.target.value)} /></Field><Field label="Highlighted word"><Input value={form.hero_highlight} onChange={(e) => set("hero_highlight", e.target.value)} /></Field></div><Field label="Hero description"><Textarea rows={3} value={form.hero_description} onChange={(e) => set("hero_description", e.target.value)} /></Field><div className="border-y border-border py-5"><p className="mb-4 text-sm font-semibold">Hero statistics</p><p className="mb-4 text-xs text-muted-foreground">These are intentionally customizable rather than tied to private inventory figures.</p><div className="grid gap-3 md:grid-cols-3">{form.hero_stats.map((stat, index) => <div className="space-y-2" key={index}><Input aria-label={`Statistic ${index + 1} value`} value={stat.value} placeholder="Value" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, value: e.target.value } : item))} /><Input aria-label={`Statistic ${index + 1} label`} value={stat.label} placeholder="Label" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, label: e.target.value } : item))} /></div>)}</div></div><div className="border-b border-border pb-5"><p className="mb-4 text-sm font-semibold">Operating hours</p><div className="space-y-3">{form.hours.map((row, index) => <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]" key={index}><Input value={row.day} aria-label="Day" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, day: e.target.value } : h))} /><Input value={row.time} aria-label="Hours" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, time: e.target.value } : h))} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={row.open} onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, open: e.target.checked } : h))} /> Open</label><Button type="button" variant="ghost" size="icon" aria-label="Remove hours row" onClick={() => set("hours", form.hours.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}</div><Button type="button" variant="outline" className="mt-4" onClick={() => set("hours", [...form.hours, { day: "", time: "", open: true }])}><Plus className="mr-2 h-4 w-4" />Add hours</Button></div><div className="grid gap-4 md:grid-cols-3"><Field label="Address"><Input value={form.address} onChange={(e) => set("address", e.target.value)} /></Field><Field label="Email"><Input type="email" value={form.contact_email} onChange={(e) => set("contact_email", e.target.value)} /></Field><Field label="Phone"><Input value={form.contact_phone} onChange={(e) => set("contact_phone", e.target.value)} /></Field></div>{message && <p className="text-sm text-muted-foreground">{message}</p>}<Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save homepage content"}</Button></form></AdminPanel>;
 };
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-2"><Label>{label}</Label>{children}</div>;
 const Events = () => {
-  const [events, setEvents] = useState<Event[]>([]);
+  const queryClient = useQueryClient();
+  const eventsQuery = useQuery({ queryKey: siteContentKeys.eventList(true), queryFn: ({ signal }) => fetchEvents(true, signal) });
+  const events: Event[] = eventsQuery.data ?? [];
+  const invalidateEvents = () => queryClient.invalidateQueries({ queryKey: siteContentKeys.events() });
+  const createMutation = useMutation({ mutationFn: createEvent, onSuccess: invalidateEvents });
+  const deleteMutation = useMutation({ mutationFn: deleteEvent, onSuccess: invalidateEvents });
   const [title, setTitle] = useState("");
   const [starts, setStarts] = useState("");
   const [ends, setEnds] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const load = () => fetchEvents(true).then(setEvents);
-  useEffect(() => { void load(); }, []);
   const addEvent = async () => {
     setPending("add"); setError("");
-    try { await createEvent({ title, starts_at: starts, ends_at: ends || null }); setTitle(""); setStarts(""); setEnds(""); await load(); }
+    try { await createMutation.mutateAsync({ title, starts_at: starts, ends_at: ends || null }); setTitle(""); setStarts(""); setEnds(""); }
     catch (err: any) { setError(err.response?.data?.message || "Could not add event."); }
     finally { setPending(null); }
   };
   const removeEvent = async (event: Event) => {
     if (!window.confirm(`Delete ${event.title}?`)) return;
     setPending(`delete-${event.id}`); setError("");
-    try { await deleteEvent(event.id); await load(); }
+    try { await deleteMutation.mutateAsync(event.id); }
     catch (err: any) { setError(err.response?.data?.message || "Could not delete event."); }
     finally { setPending(null); }
   };

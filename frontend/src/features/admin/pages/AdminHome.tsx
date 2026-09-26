@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, ArrowRightLeft, BookMarked, CheckCircle2, ClipboardList, RefreshCcw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,31 +13,15 @@ const emptyStats: DashboardStats = { total_books: 0, available_book_copies: 0, b
 const currency = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>(emptyStats);
-  const [activity, setActivity] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [hasLoadedData, setHasLoadedData] = useState(false);
-
-  const load = async (refresh = false) => {
-    refresh ? setRefreshing(true) : setLoading(true);
-    setError("");
-    try {
-      const response = await fetchAdminDashboard();
-      setStats(response.stats);
-      setActivity(response.recentActivity ?? []);
-      setUpdatedAt(new Date());
-      setHasLoadedData(true);
-    } catch (requestError: any) {
-      setError(requestError.response?.data?.message ?? "Couldn’t update the desk. Try refreshing again.");
-    } finally {
-      refresh ? setRefreshing(false) : setLoading(false);
-    }
-  };
-
-  useEffect(() => { void load(); }, []);
+  const query = useQuery({ queryKey: ["analytics", "desk"], queryFn: ({ signal }) => fetchAdminDashboard(signal) });
+  const stats: DashboardStats = query.data?.stats ?? emptyStats;
+  const activity: RecentActivity[] = query.data?.recentActivity ?? [];
+  const loading = query.isPending;
+  const refreshing = query.isFetching && !query.isPending;
+  const error = query.isError ? (query.error as any)?.response?.data?.message ?? "Couldn’t update the desk. Try refreshing again." : "";
+  const updatedAt = query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null;
+  const hasLoadedData = Boolean(query.data);
+  const load = async (_refresh = false) => { await query.refetch(); };
 
   const attentionItems = useMemo<AttentionItem[]>(() => [
     { label: "Overdue returns", detail: stats.overdue_borrowings ? "Resolve these loans before completing clearance." : "All active loans are within their due date.", href: "/admin/clearance?review=queue", status: stats.overdue_borrowings ? "urgent" : "clear", value: String(stats.overdue_borrowings) },

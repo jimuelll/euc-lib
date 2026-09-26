@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -62,11 +62,6 @@ export function BulletinPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
-
-  useEffect(() => {
-    setCurrentPage(1);
-    fetchPosts(1, debouncedSearch);
-  }, [debouncedSearch, fetchPosts, setCurrentPage]);
 
   const handleLikeToggle = useCallback((postId: number, liked: boolean, total: number) => {
     updatePost(postId, { liked_by_me: liked, likes: total });

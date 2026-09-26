@@ -41,8 +41,8 @@ export interface HolidayInput {
   description?: string;
 }
 
-export async function fetchLibrarySettings(holidayStatus: "active" | "archived" | "all" = "active"): Promise<LibrarySettingsPayload> {
-  const res = await axiosInstance.get("/api/admin/library-settings", { params: { holidays: holidayStatus } });
+export async function fetchLibrarySettings(holidayStatus: "active" | "archived" | "all" = "active", signal?: AbortSignal): Promise<LibrarySettingsPayload> {
+  const res = await axiosInstance.get("/api/admin/library-settings", { params: { holidays: holidayStatus }, signal });
   return res.data;
 }
 
@@ -69,8 +69,8 @@ export async function deleteLibraryHoliday(holidayId: number) {
 }
 export async function restoreLibraryHoliday(holidayId: number) { return (await axiosInstance.post(`/api/admin/library-holidays/${holidayId}/restore`)).data; }
 
-export async function fetchAcademicPrograms(status: "active" | "archived" | "all" = "active"): Promise<AcademicProgram[]> {
-  const res = await axiosInstance.get("/api/admin/academic-programs", { params: { status } });
+export async function fetchAcademicPrograms(status: "active" | "archived" | "all" = "active", signal?: AbortSignal): Promise<AcademicProgram[]> {
+  const res = await axiosInstance.get("/api/admin/academic-programs", { params: { status }, signal });
   return res.data.programs ?? [];
 }
 
@@ -89,12 +89,12 @@ export async function deleteAcademicProgram(programId: number) {
   return res.data;
 }
 export async function restoreAcademicProgram(programId: number) { return (await axiosInstance.post(`/api/admin/academic-programs/${programId}/restore`)).data; }
-export async function fetchDepartments(status: "active" | "archived" | "all" = "active"): Promise<Department[]> { const res = await axiosInstance.get("/api/admin/departments", { params: { status } }); return res.data.departments ?? []; }
+export async function fetchDepartments(status: "active" | "archived" | "all" = "active", signal?: AbortSignal): Promise<Department[]> { const res = await axiosInstance.get("/api/admin/departments", { params: { status }, signal }); return res.data.departments ?? []; }
 export async function createDepartment(name: string) { return (await axiosInstance.post("/api/admin/departments", { name })).data; }
 export async function updateDepartment(id: number, name: string) { return (await axiosInstance.put(`/api/admin/departments/${id}`, { name })).data; }
 export async function deleteDepartment(id: number) { return (await axiosInstance.delete(`/api/admin/departments/${id}`)).data; }
 export async function restoreDepartment(id: number) { return (await axiosInstance.post(`/api/admin/departments/${id}/restore`)).data; }
-export async function fetchAcademicTerms(): Promise<AcademicTerm[]> { const res = await axiosInstance.get("/api/admin/academic-terms"); return res.data.terms ?? []; }
+export async function fetchAcademicTerms(signal?: AbortSignal): Promise<AcademicTerm[]> { const res = await axiosInstance.get("/api/admin/academic-terms", { signal }); return res.data.terms ?? []; }
 export async function createAcademicTerm(payload: { name: string; starts_on: string; ends_on: string; is_current: boolean }) { const res = await axiosInstance.post("/api/admin/academic-terms", payload); return res.data; }
 export async function updateAcademicTerm(termId: number, payload: { name: string; starts_on: string; ends_on: string; is_current: boolean }) { const res = await axiosInstance.put(`/api/admin/academic-terms/${termId}`, payload); return res.data; }
 export async function deleteAcademicTerm(termId: number) { const res = await axiosInstance.delete(`/api/admin/academic-terms/${termId}`); return res.data; }

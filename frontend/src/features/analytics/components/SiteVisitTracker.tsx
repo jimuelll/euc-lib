@@ -1,13 +1,20 @@
 import { useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { recordSiteVisit } from "../api/visitor.api";
 import { useAuth } from "@/context/AuthContext";
+import { invalidateServerState } from "@/app/server-state";
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
 const SiteVisitTracker = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
+  const { mutateAsync: recordVisitMutation } = useMutation({
+    mutationFn: recordSiteVisit,
+    onSuccess: () => invalidateServerState(queryClient, "analytics"),
+  });
 
   useEffect(() => {
     if (loading) return;
@@ -19,7 +26,7 @@ const SiteVisitTracker = () => {
 
     let cancelled = false;
 
-    recordSiteVisit(location.pathname)
+    recordVisitMutation(location.pathname)
       .then(() => {
         if (!cancelled) {
           sessionStorage.setItem(storageKey, "1");
@@ -32,7 +39,7 @@ const SiteVisitTracker = () => {
     return () => {
       cancelled = true;
     };
-  }, [loading, location.pathname, user]);
+  }, [loading, location.pathname, user, recordVisitMutation]);
 
   return null;
 };

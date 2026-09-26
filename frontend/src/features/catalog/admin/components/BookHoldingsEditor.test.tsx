@@ -8,6 +8,7 @@ import type { CatalogHolding } from "../catalog.api";
 import type { AcademicProgram } from "@/features/library-settings";
 import { fetchBookHoldings, voidCopyAccession } from "../catalog.api";
 import { fetchAcademicPrograms } from "@/features/library-settings";
+import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
 vi.mock("../catalog.api", () => ({ fetchBookHoldings: vi.fn(), saveCopyHolding: vi.fn(), voidCopyAccession: vi.fn() }));
 vi.mock("@/features/library-settings", () => ({ fetchAcademicPrograms: vi.fn() }));
@@ -22,6 +23,7 @@ const renderEditor = (isSuperAdmin = false) => render(
   <MemoryRouter>
     <BookHoldingsEditor bookId={4} bookTitle="Atlas" guardRef={{ current: null }} onManageCopies={vi.fn()} isSuperAdmin={isSuperAdmin} />
   </MemoryRouter>,
+  { wrapper: createTestQueryClientWrapper() },
 );
 
 beforeEach(() => {
@@ -46,10 +48,10 @@ describe("copy holdings editor", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
-  it("warns before switching copies with unsaved accession details", async () => {
+  it("warns before switching copies with unsaved holding edits", async () => {
     renderEditor();
     await screen.findByText("Accession ACC-1");
-    fireEvent.change(screen.getByLabelText(/Accession number/), { target: { value: "ACC-1-edited" } });
+    fireEvent.change(screen.getByLabelText("Price"), { target: { value: "11.00" } });
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByText("Discard unsaved changes?")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
@@ -62,6 +64,7 @@ describe("copy holdings editor", () => {
     renderEditor(true);
     await screen.findByText("Accession ACC-1");
     expect(screen.getByLabelText(/Accession number/)).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: "Void mistaken accession" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Void mistaken accession" }));
     expect(await screen.findByRole("heading", { name: "Void accession number" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Transcription error" } });

@@ -47,11 +47,11 @@ const unwrap = <T>(response: { data: T | { data: T } }): T => {
     : (payload as T);
 };
 
-export const getPublishedGuide = async () =>
-  unwrap<GuideModule[]>(await axiosInstance.get("/api/user-guide"));
+export const getPublishedGuide = async (signal?: AbortSignal) =>
+  unwrap<GuideModule[]>(await axiosInstance.get("/api/user-guide", { signal }));
 
-export const getGuideForEditing = async () =>
-  unwrap<EditableGuideModule[]>(await axiosInstance.get("/api/admin/user-guide"));
+export const getGuideForEditing = async (signal?: AbortSignal) =>
+  unwrap<EditableGuideModule[]>(await axiosInstance.get("/api/admin/user-guide", { signal }));
 
 export const createGuideDraft = async (draft: GuideContent) =>
   unwrap<EditableGuideModule>(await axiosInstance.post("/api/admin/user-guide", draft));

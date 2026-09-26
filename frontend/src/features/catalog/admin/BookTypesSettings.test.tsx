@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import "@testing-library/jest-dom/vitest";
 import BookTypesSettings from "./BookTypesSettings";
 import * as catalogApi from "./catalog.api";
+import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
 vi.mock("./catalog.api", () => ({
   createBookType: vi.fn(),
@@ -41,7 +42,7 @@ describe("book type policies", () => {
   });
 
   it("shows assigned book counts and confirms which books will need a policy", async () => {
-    render(<BookTypesSettings />);
+    render(<BookTypesSettings />, { wrapper: createTestQueryClientWrapper() });
     expect(await screen.findByText("2 active · 1 archived")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete policy" }));
@@ -58,7 +59,7 @@ describe("book type policies", () => {
   it("keeps inactive legacy policies available for permanent deletion", async () => {
     const inactivePolicy = { ...policy, id: 8, name: "Legacy", is_active: 0, assigned_active_books: 1, assigned_archived_books: 0 };
     vi.mocked(catalogApi.fetchBookTypes).mockResolvedValueOnce([inactivePolicy]);
-    render(<BookTypesSettings />);
+    render(<BookTypesSettings />, { wrapper: createTestQueryClientWrapper() });
 
     expect(await screen.findByText("Inactive · delete only")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();

@@ -1,7 +1,10 @@
 import { useAdminUrlState } from "@/features/admin";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
+import { invalidateServerState } from "@/app/server-state";
+import { circulationKeys } from "../circulation.keys";
 import {
   lookupUser as apiLookupUser,
   lookupCopy as apiLookupCopy,
@@ -21,6 +24,12 @@ interface ReservationCheckout {
 
 export const useCirculation = (reservationCheckout: ReservationCheckout | null = null, onTransactionCompleted?: () => void) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const borrowMutation = useMutation({
+    mutationFn: ({ studentId, barcode, reservationId }: { studentId: string; barcode: string; reservationId?: number }) => processBorrow(studentId, barcode, reservationId),
+    onSuccess: () => invalidateServerState(queryClient, "circulation"),
+  });
+  const returnMutation = useMutation({ mutationFn: processReturn, onSuccess: () => invalidateServerState(queryClient, "circulation") });
   const [params, patchParams] = useAdminUrlState();
   const type: TransactionType = reservationCheckout ? "borrow" : params.get("transaction") === "return" ? "return" : "borrow";
   const setType = (transaction: TransactionType) => patchParams({ transaction });
@@ -72,7 +81,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     if (!lookupId) return;
     setLookingUpUser(true);
     try {
-      const { user, activeBorrows, clearance } = await apiLookupUser(lookupId);
+      const { user, activeBorrows, clearance } = await queryClient.fetchQuery({ queryKey: circulationKeys.user(lookupId), queryFn: ({ signal }) => apiLookupUser(lookupId, signal), staleTime: 0 });
       setStudentId(lookupId);
       setFoundUser(user);
       setActiveBorrows(activeBorrows);
@@ -95,7 +104,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     if (!reservationCheckout?.id || !lookupId) return;
     setStudentId(lookupId);
     setLookingUpUser(true);
-    void apiLookupUser(lookupId)
+    void queryClient.fetchQuery({ queryKey: circulationKeys.user(lookupId), queryFn: ({ signal }) => apiLookupUser(lookupId, signal), staleTime: 0 })
       .then(({ user, activeBorrows, clearance }) => {
         setFoundUser(user);
         setActiveBorrows(activeBorrows);
@@ -109,14 +118,14 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
         setClearance(null);
       })
       .finally(() => setLookingUpUser(false));
-  }, [reservationCheckout?.id, reservationCheckout?.student_employee_id]);
+  }, [reservationCheckout?.id, reservationCheckout?.student_employee_id, queryClient]);
 
   const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
   if (!lookupBarcode) return;
   setLookingUpCopy(true);
   try {
-    const copy = await apiLookupCopy(lookupBarcode);
+    const copy = await queryClient.fetchQuery({ queryKey: circulationKeys.copy(lookupBarcode), queryFn: ({ signal }) => apiLookupCopy(lookupBarcode, signal), staleTime: 0 });
     setCopyBarcode(lookupBarcode);
     setFoundCopy(copy);
 
@@ -140,6 +149,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
 };
 
   const handleReturnIdentifierChange = (value: string) => {
+    if (lastReturnLookup.current) void queryClient.cancelQueries({ queryKey: circulationKeys.returnPreview(lastReturnLookup.current) });
     returnLookupSequence.current += 1;
     lastReturnLookup.current = "";
     setCopyBarcode(value);
@@ -159,7 +169,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     setReturnLookupError("");
     setReturnPreview(null);
     try {
-      const preview = await apiLookupReturnPreview(lookupIdentifier);
+      const preview = await queryClient.fetchQuery({ queryKey: circulationKeys.returnPreview(lookupIdentifier), queryFn: ({ signal }) => apiLookupReturnPreview(lookupIdentifier, signal), staleTime: 0 });
       if (sequence === returnLookupSequence.current) setReturnPreview(preview);
     } catch (err: any) {
       if (sequence !== returnLookupSequence.current) return;
@@ -168,7 +178,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     } finally {
       if (sequence === returnLookupSequence.current) setLookingUpCopy(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const identifier = copyBarcode.trim();
@@ -200,7 +210,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       }
       setSubmitting(true);
       try {
-        const result = await processReturn(copyBarcode.trim());
+        const result = await returnMutation.mutateAsync(copyBarcode.trim());
         setReturnReceipt({ ...returnPreview, returned_at: result.returnedAt });
         setReturnPreview(null);
         setCopyBarcode("");
@@ -224,10 +234,6 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     }
     if (!foundUser || !foundCopy) {
       toast.error("Look up both the user and the copy first");
-      return;
-    }
-    if (type === "return" && !matchedBorrow) {
-      toast.error("No matching active borrow found");
       return;
     }
     if (type === "borrow" && !foundCopy.accession_number) {
@@ -254,7 +260,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     try {
       if (type === "borrow") {
         // Backend expects a barcode OR student_employee_id as userBarcode
-        await processBorrow(studentId.trim(), copyBarcode.trim(), reservationCheckout?.id);
+        await borrowMutation.mutateAsync({ studentId: studentId.trim(), barcode: copyBarcode.trim(), reservationId: reservationCheckout?.id });
         toast.success(
           reservationCheckout
             ? `Reservation fulfilled and "${foundCopy.title}" borrowed by ${foundUser.name}`

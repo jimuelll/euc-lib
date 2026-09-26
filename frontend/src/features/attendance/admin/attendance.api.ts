@@ -8,5 +8,5 @@ export interface AttendanceHistoryResponse {
   summary: { total_records: number; check_in_count: number; check_out_count: number; unique_users: number; borrowing_scan_count: number };
   sessions?: Array<{ id: number; name: string; student_employee_id: string; checked_in_at: string; checked_out_at: string | null; duration_minutes: number | null; status: "complete" | "incomplete" }>;
 }
-export const fetchTodayAttendance = async (params: Record<string, string | number>): Promise<AttendanceLog[]> => (await axiosInstance.get<AttendanceLog[]>("/api/attendance/today", { params })).data;
-export const fetchAttendanceHistory = async (params: Record<string, string | number | undefined>): Promise<AttendanceHistoryResponse> => (await axiosInstance.get<AttendanceHistoryResponse>("/api/attendance/logs", { params })).data;
+export const fetchTodayAttendance = async (params: Record<string, string | number>, signal?: AbortSignal): Promise<AttendanceLog[]> => (await axiosInstance.get<AttendanceLog[]>("/api/attendance/today", { params, signal })).data;
+export const fetchAttendanceHistory = async (params: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<AttendanceHistoryResponse> => (await axiosInstance.get<AttendanceHistoryResponse>("/api/attendance/logs", { params, signal })).data;

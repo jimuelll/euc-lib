@@ -1,4 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
+import { invalidateServerState } from "@/app/server-state";
+import { clearanceKeys } from "../clearance.keys";
 import { useAdminUrlState, queryPage } from "@/features/admin";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, CheckCircle2, CircleDollarSign, Loader2, RefreshCcw, Search, ShieldCheck } from "lucide-react";
@@ -10,53 +14,43 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
-import { adjustClearanceFine, fetchClearanceProfile, fetchClearanceQueue, recordClearancePayment, reverseClearanceTransaction, searchClearanceUsers, type ClearanceProfile as Profile, type ClearanceUserSuggestion as UserSuggestion, type FineRow, type QueueEntry, type QueueResponse } from "@/features/clearance/api";
+import { adjustClearanceFine, fetchClearanceProfile, fetchClearanceQueue, recordClearancePayment, reverseClearanceTransaction, searchClearanceUsers, type FineRow } from "@/features/clearance/api";
 
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 
 export default function AdminClearance() {
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams, patchParams] = useAdminUrlState();
   const queuePage = queryPage(searchParams.get("page"));
-  const [search, setSearch] = useState(() => searchParams.get("student_employee_id") ?? ""); const [profile, setProfile] = useState<Profile | null>(null);
-  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
-  const [queue, setQueue] = useState<QueueEntry[]>([]); const queueOpen = searchParams.get("review") === "queue"; const [loadingQueue, setLoadingQueue] = useState(false); const [queuePagination, setQueuePagination] = useState<QueueResponse["pagination"]>({ page: 1, limit: 25, total: 0, totalPages: 0 });
-  const [loading, setLoading] = useState(false); const [paying, setPaying] = useState(false);
+  const [search, setSearch] = useState(() => searchParams.get("student_employee_id") ?? "");
+  const queueOpen = searchParams.get("review") === "queue";
+  const requestedStudentId = searchParams.get("student_employee_id") ?? "";
+  const [lookingUpProfile, setLookingUpProfile] = useState(false);
+  const queueQuery = useQuery({ queryKey: clearanceKeys.queue(queuePage), queryFn: ({ signal }) => fetchClearanceQueue(queuePage, signal), enabled: queueOpen, placeholderData: (previousData) => previousData });
+  const profileQuery = useQuery({ queryKey: clearanceKeys.profile(requestedStudentId), queryFn: ({ signal }) => fetchClearanceProfile(requestedStudentId, signal), enabled: !queueOpen && Boolean(requestedStudentId) });
+  const profile = !queueOpen ? profileQuery.data ?? null : null;
+  const queue = queueQuery.data?.rows ?? [];
+  const queuePagination = queueQuery.data?.pagination ?? { page: queuePage, limit: 25, total: 0, totalPages: 0 };
+  const loadingQueue = queueQuery.isFetching;
+  const loading = lookingUpProfile || (Boolean(requestedStudentId) && profileQuery.isPending);
+  const debouncedSearch = useDebounce(search, 180).trim();
+  const suggestionsQuery = useQuery({ queryKey: clearanceKeys.suggestions(debouncedSearch), queryFn: ({ signal }) => searchClearanceUsers(debouncedSearch, signal), enabled: !queueOpen && debouncedSearch.length >= 2 && debouncedSearch !== profile?.user.student_employee_id });
+  const suggestions = debouncedSearch.length >= 2 && debouncedSearch !== profile?.user.student_employee_id ? suggestionsQuery.data?.slice(0, 6) ?? [] : [];
+  const invalidateClearance = () => invalidateServerState(queryClient, "clearance");
+  const paymentMutation = useMutation({ mutationFn: recordClearancePayment, onSuccess: invalidateClearance });
+  const adjustmentMutation = useMutation({ mutationFn: ({ id, amount, reason }: { id: number; amount: number; reason: string }) => adjustClearanceFine(id, amount, reason), onSuccess: invalidateClearance });
+  const correctionMutation = useMutation({ mutationFn: ({ id, reason }: { id: number; reason: string }) => reverseClearanceTransaction(id, reason), onSuccess: invalidateClearance });
+  const paying = paymentMutation.isPending;
   const [adjustment, setAdjustment] = useState<FineRow | null>(null); const [amount, setAmount] = useState(""); const [reason, setReason] = useState("");
   const [correction, setCorrection] = useState<number | null>(null); const [correctionReason, setCorrectionReason] = useState("");
   const canAdjust = currentUser?.role === "admin" || currentUser?.role === "super_admin";
-  const loadQueue = async (page = queuePage) => { if (page !== queuePage) { patchParams({ page }); return; } setLoadingQueue(true); try { const response = await fetchClearanceQueue(page); setQueue(response.rows ?? []); setQueuePagination(response.pagination); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to load the clearance review queue"); } finally { setLoadingQueue(false); } };
-  useEffect(() => { const query = search.trim(); if (query.length < 2 || profile?.user.student_employee_id === query) { setSuggestions([]); return; } let active = true; const timer = window.setTimeout(async () => { try { const data = await searchClearanceUsers(query); if (active) setSuggestions(data.slice(0, 6)); } catch { if (active) setSuggestions([]); } }, 180); return () => { active = false; window.clearTimeout(timer); }; }, [search, profile?.user.student_employee_id]);
-  const loadProfile = async (event?: FormEvent, studentIdOverride?: string) => { event?.preventDefault(); const studentId = (studentIdOverride ?? search).trim(); if (!studentId) return toast.error("Enter a student ID, employee ID, or name"); setLoading(true); try { const response = await fetchClearanceProfile(studentId); setSearch(response.user.student_employee_id); setProfile(response); setSuggestions([]); if (searchParams.get("student_employee_id") !== response.user.student_employee_id || queueOpen) patchParams({ student_employee_id: response.user.student_employee_id, review: null }); } catch (error: any) { setProfile(null); toast.error(error.response?.data?.message ?? "Unable to find this user"); } finally { setLoading(false); } };
-  useEffect(() => {
-    if (!queueOpen) return;
-    let active = true;
-    setLoadingQueue(true);
-    fetchClearanceQueue(queuePage).then(response => {
-      if (active) { setQueue(response.rows ?? []); setQueuePagination(response.pagination); }
-    }).catch((error: any) => {
-      if (active) toast.error(error.response?.data?.message ?? "Unable to load the clearance review queue");
-    }).finally(() => { if (active) setLoadingQueue(false); });
-    return () => { active = false; };
-  }, [queueOpen, queuePage]);
-  const requestedStudentId = searchParams.get("student_employee_id");
-  const loadedStudentId = profile?.user.student_employee_id;
-  useEffect(() => {
-    if (queueOpen) return;
-    if (!requestedStudentId) { setProfile(null); setSearch(""); return; }
-    if (requestedStudentId === loadedStudentId) return;
-    let active = true;
-    setLoading(true);
-    fetchClearanceProfile(requestedStudentId).then(response => {
-      if (active) { setProfile(response); setSearch(response.user.student_employee_id); setSuggestions([]); }
-    }).catch((error: any) => {
-      if (active) { setProfile(null); toast.error(error.response?.data?.message ?? "Unable to find this user"); }
-    }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [requestedStudentId, loadedStudentId, queueOpen]);
-  const recordPayment = async () => { if (!profile) return; setPaying(true); try { const response = await recordClearancePayment(profile.user.student_employee_id); toast.success("Cash payment recorded"); await Promise.all([loadProfile(), loadQueue(queuePagination.page)]); window.open(`/admin/clearance/receipt/${encodeURIComponent(response.receiptNumber)}`, "_blank", "noopener,noreferrer"); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to record payment"); } finally { setPaying(false); } };
-  const submitAdjustment = async (event: FormEvent) => { event.preventDefault(); if (!adjustment) return; try { await adjustClearanceFine(adjustment.id, Number(amount), reason); toast.success("Fine adjustment recorded"); setAdjustment(null); setAmount(""); setReason(""); await Promise.all([loadProfile(), loadQueue(queuePagination.page)]); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to adjust fine"); } };
-  const submitCorrection = async (event: FormEvent) => { event.preventDefault(); if (!correction) return; try { await reverseClearanceTransaction(correction, correctionReason); toast.success("Transaction corrected"); setCorrection(null); setCorrectionReason(""); await loadProfile(); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to correct transaction"); } };
+  const loadQueue = async (page = queuePage) => { if (page !== queuePage) patchParams({ page }); else await queueQuery.refetch(); };
+  const loadProfile = async (event?: FormEvent, studentIdOverride?: string) => { event?.preventDefault(); const studentId = (studentIdOverride ?? search).trim(); if (!studentId) return toast.error("Enter a student ID, employee ID, or name"); setLookingUpProfile(true); try { const response = await queryClient.fetchQuery({ queryKey: clearanceKeys.profile(studentId), queryFn: ({ signal }) => fetchClearanceProfile(studentId, signal), staleTime: 0 }); setSearch(response.user.student_employee_id); queryClient.setQueryData(clearanceKeys.profile(response.user.student_employee_id), response); if (requestedStudentId !== response.user.student_employee_id || queueOpen) patchParams({ student_employee_id: response.user.student_employee_id, review: null }); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to find this user"); } finally { setLookingUpProfile(false); } };
+  useEffect(() => { if (profile?.user.student_employee_id) setSearch(profile.user.student_employee_id); else if (!requestedStudentId && !queueOpen) setSearch(""); }, [profile?.user.student_employee_id, requestedStudentId, queueOpen]);
+  const recordPayment = async () => { if (!profile) return; try { const response = await paymentMutation.mutateAsync(profile.user.student_employee_id); toast.success("Cash payment recorded"); window.open(`/admin/clearance/receipt/${encodeURIComponent(response.receiptNumber)}`, "_blank", "noopener,noreferrer"); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to record payment"); } };
+  const submitAdjustment = async (event: FormEvent) => { event.preventDefault(); if (!adjustment) return; try { await adjustmentMutation.mutateAsync({ id: adjustment.id, amount: Number(amount), reason }); toast.success("Fine adjustment recorded"); setAdjustment(null); setAmount(""); setReason(""); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to adjust fine"); } };
+  const submitCorrection = async (event: FormEvent) => { event.preventDefault(); if (!correction) return; try { await correctionMutation.mutateAsync({ id: correction, reason: correctionReason }); toast.success("Transaction corrected"); setCorrection(null); setCorrectionReason(""); } catch (error: any) { toast.error(error.response?.data?.message ?? "Unable to correct transaction"); } };
   return <AdminPage eyebrow="Administration" title="Clearance & Fines" description="Review overdue loans, settle outstanding fines, and check patron eligibility.">
     <Tabs value={queueOpen ? "queue" : "patron"} onValueChange={tab => patchParams({ review: tab === "queue" ? "queue" : null, page: null })}><TabsList><TabsTrigger value="patron">Find a patron</TabsTrigger><TabsTrigger value="queue">Review queue</TabsTrigger></TabsList></Tabs>
     {queueOpen && <AdminPanel title="Needs clearance review" actions={<Button size="sm" variant="outline" onClick={() => void loadQueue()} disabled={loadingQueue}><RefreshCcw className="mr-2 size-4" />Refresh queue</Button>}>

@@ -12,11 +12,11 @@ const normaliseUserSearch = (data: UserSearchResponse) => {
   return { rows, pagination: Array.isArray(data) ? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } : data.pagination ?? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } };
 };
 
-export const fetchAcademicTerms = async (): Promise<AcademicTerm[]> => (await axiosInstance.get<{ terms?: AcademicTerm[] }>("/api/admin/academic-terms")).data.terms ?? [];
-export const fetchAcademicPrograms = async (): Promise<AcademicProgram[]> => (await axiosInstance.get<{ programs?: AcademicProgram[] }>("/api/admin/academic-programs")).data.programs ?? [];
-export const fetchDepartments = async (): Promise<Department[]> => (await axiosInstance.get<{ departments?: Department[] }>("/api/admin/departments")).data.departments ?? [];
-export const searchUsers = async ({ query, role, status, archived, page = 1 }: { query: string; role: string; status: string; archived: boolean; page?: number }) => {
-  const response = await axiosInstance.get<UserSearchResponse>("/api/admin/users", { params: { student_employee_id: query.trim() || undefined, name: query.trim() || undefined, role: role === "all" ? undefined : role, status: archived || status === "all" ? undefined : status, archived: archived ? "true" : undefined, page, limit: 25 } });
+export const fetchAcademicTerms = async (signal?: AbortSignal): Promise<AcademicTerm[]> => (await axiosInstance.get<{ terms?: AcademicTerm[] }>("/api/admin/academic-terms", { signal })).data.terms ?? [];
+export const fetchAcademicPrograms = async (signal?: AbortSignal): Promise<AcademicProgram[]> => (await axiosInstance.get<{ programs?: AcademicProgram[] }>("/api/admin/academic-programs", { signal })).data.programs ?? [];
+export const fetchDepartments = async (signal?: AbortSignal): Promise<Department[]> => (await axiosInstance.get<{ departments?: Department[] }>("/api/admin/departments", { signal })).data.departments ?? [];
+export const searchUsers = async ({ query, role, status, archived, page = 1 }: { query: string; role: string; status: string; archived: boolean; page?: number }, signal?: AbortSignal) => {
+  const response = await axiosInstance.get<UserSearchResponse>("/api/admin/users", { params: { student_employee_id: query.trim() || undefined, name: query.trim() || undefined, role: role === "all" ? undefined : role, status: archived || status === "all" ? undefined : status, archived: archived ? "true" : undefined, page, limit: 25 }, signal });
   return normaliseUserSearch(response.data);
 };
 const userPayload = (form: UserFormState) => ({ name: form.fullName, role: form.role, password: form.password || undefined, address: form.address, contact: form.contact, email: form.email, library_card_number: form.libraryCardNumber, student_number: form.studentNumber, employee_number: form.employeeNumber, username: form.username, program_id: form.programId || null, academic_term_id: form.academicTermId || null, year_level: form.yearLevel, department_id: form.departmentId || null, remarks: form.remarks });

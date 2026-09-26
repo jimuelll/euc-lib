@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import type { Recommendation } from "./RecommendationStrip";
+import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
 const { fetchRecommendations, dismissRecommendation } = vi.hoisted(() => ({
   fetchRecommendations: vi.fn(),
@@ -14,7 +15,8 @@ vi.mock("../api", () => ({ fetchRecommendations, dismissRecommendation }));
 import { RecommendationStrip } from "./RecommendationStrip";
 
 afterEach(cleanup);
-beforeEach(() => vi.clearAllMocks());
+let QueryWrapper: ReturnType<typeof createTestQueryClientWrapper>;
+beforeEach(() => { vi.resetAllMocks(); dismissRecommendation.mockResolvedValue(undefined); QueryWrapper = createTestQueryClientWrapper(); });
 
 const setViewport = (width: number) => {
   Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: width });
@@ -45,7 +47,7 @@ describe("recommendation cards", () => {
       row({ id: 7, title: "Seventh recommendation" }),
       row({ id: 8, title: "Eighth recommendation" }),
     ] });
-    render(<MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter>);
+    render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
 
     const cover = await screen.findByRole("img", { name: "Cover of Cover book" });
     expect(cover).toHaveAttribute("src", "https://covers.example/book.jpg");
@@ -71,7 +73,7 @@ describe("recommendation cards", () => {
   it.each([[390, 1, 8], [768, 2, 4], [960, 3, 3], [1440, 3, 3]])("paginates to fit %i px wide layouts", async (width, cards, pages) => {
     setViewport(width);
     fetchRecommendations.mockResolvedValue({ rows: Array.from({ length: 8 }, (_, index) => row({ id: index + 1, title: `Book ${index + 1}` })) });
-    render(<MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter>);
+    render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
 
     expect(await screen.findByText(`1 of ${pages}`)).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(cards);
@@ -82,25 +84,26 @@ describe("recommendation cards", () => {
     const firstSet = Array.from({ length: 8 }, (_, index) => row({ id: index + 1, title: `First set ${index + 1}` }));
     const secondSet = Array.from({ length: 8 }, (_, index) => row({ id: index + 21, title: `Second set ${index + 1}` }));
     fetchRecommendations.mockResolvedValueOnce({ rows: firstSet }).mockResolvedValueOnce({ rows: secondSet });
-    const { rerender } = render(<MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter>);
+    const { rerender } = render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
     fireEvent.click(await screen.findByRole("button", { name: "Next recommendations" }));
     expect(screen.getByText("2 of 3")).toBeInTheDocument();
 
-    rerender(<MemoryRouter><RecommendationStrip materialType="book" seedBookId={43} /></MemoryRouter>);
+    rerender(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={43} /></MemoryRouter></QueryWrapper>);
     expect(await screen.findByText("Second set 1")).toBeInTheDocument();
     expect(screen.getByText("1 of 3")).toBeInTheDocument();
   });
 
   it("keeps a personal recommendation page valid after a dismissal", async () => {
     setViewport(1440);
-    fetchRecommendations.mockResolvedValue({ rows: Array.from({ length: 5 }, (_, index) => row({ id: index + 1, title: `Personal book ${index + 1}` })) });
-    render(<MemoryRouter><RecommendationStrip materialType="book" personal /></MemoryRouter>);
+    fetchRecommendations.mockResolvedValueOnce({ rows: Array.from({ length: 5 }, (_, index) => row({ id: index + 1, title: `Personal book ${index + 1}` })) })
+      .mockResolvedValue({ rows: Array.from({ length: 4 }, (_, index) => row({ id: index + 1, title: `Personal book ${index + 1}` })) });
+    render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" personal /></MemoryRouter></QueryWrapper>);
     fireEvent.click(await screen.findByRole("button", { name: "Next recommendations" }));
     expect(screen.getByText("2 of 2")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Not interested in Personal book 5" }));
 
     expect(screen.getByText("2 of 2")).toBeInTheDocument();
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(1));
     expect(screen.getByText("Personal book 4")).toBeInTheDocument();
     expect(screen.queryByText("Personal book 5")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous recommendations" })).toBeEnabled();
@@ -110,14 +113,14 @@ describe("recommendation cards", () => {
 
   it("uses the thesis fallback and preserves personal dismiss actions", async () => {
     setViewport(390);
-    fetchRecommendations.mockResolvedValue({ rows: [
+    fetchRecommendations.mockResolvedValueOnce({ rows: [
       row({ id: 3, title: "Thesis example", material_type: "thesis", image_url: "https://covers.example/ignored-thesis.jpg" }),
-    ] });
-    render(<MemoryRouter><RecommendationStrip materialType="thesis" personal /></MemoryRouter>);
+    ] }).mockResolvedValue({ rows: [] });
+    render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="thesis" personal /></MemoryRouter></QueryWrapper>);
 
     expect(await screen.findByRole("img", { name: "Generic thesis cover" })).toHaveAttribute("src", "/thesis-cover-fallback.svg");
     fireEvent.click(screen.getByRole("button", { name: "Not interested in Thesis example" }));
-    expect(dismissRecommendation).toHaveBeenCalledWith(3);
+    await waitFor(() => expect(dismissRecommendation).toHaveBeenCalledWith(3));
     await waitFor(() => expect(screen.queryByText("Thesis example")).not.toBeInTheDocument());
   });
 });

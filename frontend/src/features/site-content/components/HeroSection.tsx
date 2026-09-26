@@ -1,18 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
+import { useSiteContent } from "../useSiteContent";
 
 const HeroSection = () => {
   const [query, setQuery] = useState("");
-  const [content, setContent] = useState<SiteContent | null>(null);
+  const { data: content } = useSiteContent();
   const navigate = useNavigate();
   const { isLoggedIn, loading } = useAuth();
-
-  useEffect(() => {
-    getSiteContent().then(setContent).catch(() => undefined);
-  }, []);
 
   const submitSearch = () => {
     if (query.trim()) navigate(`/catalogue?q=${encodeURIComponent(query.trim())}`);

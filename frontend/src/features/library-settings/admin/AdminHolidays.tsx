@@ -1,5 +1,8 @@
 import { useAdminUrlState } from "@/features/admin";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateServerState } from "@/app/server-state";
+import { librarySettingsKeys } from "../library-settings.keys";
 import { Archive, BookOpen, CalendarDays, CalendarOff, Check, Loader2, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -39,11 +42,16 @@ export default function AcademicSettings() {
   const [params, patchParams] = useAdminUrlState();
   const tab = ["terms", "programs", "holidays"].includes(params.get("tab") ?? "") ? params.get("tab")! : "terms";
   const setTab = (tab: string) => patchParams({ tab });
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState<string | null>(null);
-  const [terms, setTerms] = useState<AcademicTerm[]>([]);
-  const [programs, setPrograms] = useState<AcademicProgram[]>([]);
-  const [holidays, setHolidays] = useState<LibraryHoliday[]>([]);
+  const settingsQuery = useQuery({ queryKey: librarySettingsKeys.settings("all"), queryFn: ({ signal }) => fetchLibrarySettings("all", signal) });
+  const programsQuery = useQuery({ queryKey: librarySettingsKeys.programs("all"), queryFn: ({ signal }) => fetchAcademicPrograms("all", signal) });
+  const termsQuery = useQuery({ queryKey: librarySettingsKeys.terms(), queryFn: ({ signal }) => fetchAcademicTerms(signal) });
+  const holidays: LibraryHoliday[] = settingsQuery.data?.holidays ?? [];
+  const programs: AcademicProgram[] = programsQuery.data ?? [];
+  const terms: AcademicTerm[] = termsQuery.data ?? [];
+  const loading = settingsQuery.isPending || programsQuery.isPending || termsQuery.isPending;
+  const settingsMutation = useMutation({ mutationFn: (operation: () => Promise<any>) => operation(), onSuccess: () => invalidateServerState(queryClient, "settings") });
   const [programStatus, setProgramStatus] = useState<"active" | "archived">("active");
   const [holidayStatus, setHolidayStatus] = useState<"active" | "archived">("active");
   const [term, setTerm] = useState<TermDraft>(blankTerm);
@@ -53,18 +61,9 @@ export default function AcademicSettings() {
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
   const [editingHolidayId, setEditingHolidayId] = useState<number | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [settings, nextPrograms, nextTerms] = await Promise.all([fetchLibrarySettings("all"), fetchAcademicPrograms("all"), fetchAcademicTerms()]);
-      setHolidays(settings.holidays); setPrograms(nextPrograms); setTerms(nextTerms);
-    } catch (error) { toast.error(messageOf(error)); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { void load(); }, []);
   const run = async (key: string, operation: () => Promise<unknown>, success: string) => {
     setPending(key);
-    try { await operation(); toast.success(success); await load(); return true; }
+    try { await settingsMutation.mutateAsync(operation); toast.success(success); return true; }
     catch (error) { toast.error(messageOf(error)); return false; }
     finally { setPending(null); }
   };
@@ -81,9 +80,8 @@ export default function AcademicSettings() {
     if (!window.confirm(`${references ? "Archive" : "Permanently delete"} “${item.name}”?${explanation}`)) return;
     setPending(`program-delete-${item.id}`);
     try {
-      const result = await deleteAcademicProgram(item.id);
+      const result = await settingsMutation.mutateAsync(() => deleteAcademicProgram(item.id));
       toast.success(result.action === "archived" ? "Program / course archived; existing references are preserved" : "Unused program / course permanently deleted");
-      await load();
     } catch (error) { toast.error(messageOf(error)); }
     finally { setPending(null); }
   };

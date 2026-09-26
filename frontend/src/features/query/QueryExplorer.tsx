@@ -1,5 +1,6 @@
 import { useAdminFilters } from "@/features/admin";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Download, ExternalLink, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { downloadQueryCsv, fetchQuery, fetchQueryMeta, type QueryDataset, type QueryFilters, type QueryMeta, type QueryResult } from "./api";
 import { formatQueryValue } from "./format";
+import { queryKeys } from "./query.keys";
 
 const INITIAL_DATASET: QueryDataset = "catalog";
 const wideScreen = () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
@@ -40,16 +42,26 @@ function FilterSelect({ id, label, value, options, onChange }: { id: string; lab
 }
 
 const QueryExplorer = () => {
-  const [meta, setMeta] = useState<QueryMeta | null>(null);
   const { applied, setApplied, page, setPage } = useAdminFilters<QueryFilters>("records", initialFilters(INITIAL_DATASET));
   const [draft, setDraft] = useState<QueryFilters>(applied);
   useEffect(() => { setDraft(applied); }, [applied]);
-  const [result, setResult] = useState<QueryResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const metaQuery = useQuery({ queryKey: queryKeys.meta(), queryFn: ({ signal }) => fetchQueryMeta(signal) });
+  const resultQuery = useQuery({
+    queryKey: queryKeys.records({ ...applied, page, limit: 25 }),
+    queryFn: ({ signal }) => fetchQuery({ ...applied, page, limit: 25 }, signal),
+    placeholderData: keepPreviousData,
+  });
+  const meta = metaQuery.data ?? null;
+  const result: QueryResult | null = resultQuery.data ?? null;
+  const loading = resultQuery.isFetching;
   const [exporting, setExporting] = useState(false);
   const [showFilters, setShowFilters] = useState(wideScreen);
   const [error, setError] = useState("");
-  const requestId = useRef(0);
+  const loadError = metaQuery.isError
+    ? getApiErrorMessage(metaQuery.error, "Filter options could not be loaded. Try refreshing the page.")
+    : resultQuery.isError
+      ? getApiErrorMessage(resultQuery.error, "Unable to load records. Check the filters and try again.")
+      : "";
 
   const datasets = meta?.datasets ?? fallbackDatasets;
   const selected = datasets.find((dataset) => dataset.value === draft.dataset) ?? fallbackDatasets[0];
@@ -59,22 +71,6 @@ const QueryExplorer = () => {
   const activeFilterCount = Object.entries(draft).filter(([key, value]) => !["dataset", "search"].includes(key) && value !== undefined && value !== "" && value !== "all").length;
   const update = (key: string, value: string) => setDraft((current) => ({ ...current, [key]: value }));
 
-  const load = useCallback(async (filters: QueryFilters, page = 1) => {
-    const currentId = ++requestId.current;
-    setLoading(true); setError("");
-    try {
-      const next = await fetchQuery({ ...filters, page, limit: 25 });
-      if (currentId === requestId.current) setResult(next);
-    } catch (failure) {
-      if (currentId === requestId.current) { setResult(null); setError(getApiErrorMessage(failure, "Unable to load records. Check the filters and try again.")); }
-    } finally { if (currentId === requestId.current) setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    void fetchQueryMeta().then(setMeta).catch((failure) => setError(getApiErrorMessage(failure, "Filter options could not be loaded. Try refreshing the page.")));
-
-    return () => { requestId.current += 1; };
-  }, [load]);
   useEffect(() => {
     const screen = window.matchMedia("(min-width: 768px)");
     const onWidthChange = () => setShowFilters(screen.matches);
@@ -82,24 +78,22 @@ const QueryExplorer = () => {
     return () => screen.removeEventListener("change", onWidthChange);
   }, []);
 
-  useEffect(() => { void load(applied, page); }, [applied, page, load]);
-
   const chooseDataset = (dataset: QueryDataset) => {
     const next = initialFilters(dataset);
-    setDraft(next); setApplied(next); setResult(null);
+    setDraft(next); setApplied(next); setPage(1); setError("");
     setShowFilters(wideScreen());
 
   };
   const reset = () => {
     const next = initialFilters(draft.dataset);
-    setDraft(next); setApplied(next);
+    setDraft(next); setApplied(next); setPage(1); setError("");
 
   };
   const run = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!isClearance && (!validDate(String(draft.dateFrom ?? "")) || !validDate(String(draft.dateTo ?? "")))) { setError("Choose valid start and end dates."); return; }
     if (!isClearance && draft.dateFrom && draft.dateTo && String(draft.dateFrom) > String(draft.dateTo)) { setError("The start date must be on or before the end date."); return; }
-    setApplied({ ...draft });
+    setError(""); setPage(1); setApplied({ ...draft });
 
   };
 
@@ -137,7 +131,7 @@ const QueryExplorer = () => {
 
   return <div className="space-y-5">
     <p className="max-w-3xl text-sm leading-6 text-muted-foreground">Search library records, review live clearance exceptions, and export the matching results.</p>
-    {error && <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div>}
+    {(error || loadError) && <div role="alert" className="flex items-center justify-between gap-3 border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{error || loadError}</span>{loadError && <Button type="button" variant="outline" size="sm" onClick={() => void (metaQuery.isError ? metaQuery.refetch() : resultQuery.refetch())}>Try again</Button>}</div>}
 
     <form onSubmit={run} className="border-y border-border bg-muted/20 px-3 py-4 sm:px-5">
       <div className="grid gap-3 md:grid-cols-[minmax(12rem,0.65fr)_minmax(14rem,1fr)_auto] md:items-end">
@@ -160,7 +154,7 @@ const QueryExplorer = () => {
         <div><h2 className="font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{result?.label ?? selected.label}</h2><p className="mt-1 text-xs text-muted-foreground">{loading ? "Loading records…" : `${number.format(result?.pagination?.total ?? 0)} matching records`}{draftChanged ? " · Showing the last run; run the query to apply changes" : ""}</p></div>
         <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result} onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-2 h-4 w-4" />Preview CSV</Button><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || exporting || !result} onClick={() => void exportCsv()}>{exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download CSV</Button></div>
       </div>
-      {loading ? <div className="space-y-2 p-4" aria-label="Loading query results">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-12 w-full rounded-md" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="admin-stack-results w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={`${result.pagination?.page ?? 1}-${index}`} className="hover:bg-muted/20">{result.columns.map((column, columnIndex) => <td data-mobile-label={column.label} key={column.key} className={`max-w-[26rem] px-4 py-3 align-top text-foreground ${columnIndex === 0 ? "font-medium" : ""}`}><span className="block min-w-0 break-words">{column.key === "outstandingAmount" ? money.format(Number(row[column.key] ?? 0)) : formatQueryValue(row[column.key], column.type)}</span></td>)}</tr>)}</tbody></table></div> : <div className="px-5 py-12 text-center text-sm text-muted-foreground">No records match these filters. Adjust the search or reset the filters.</div>}
+      {!result && resultQuery.isPending ? <div className="space-y-2 p-4" aria-label="Loading query results">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-12 w-full rounded-md" />)}</div> : result?.rows.length ? <div className="overflow-x-auto"><table className="admin-stack-results w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border bg-muted/30">{result.columns.map((column) => <th key={column.key} scope="col" className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-muted-foreground">{column.label}</th>)}</tr></thead><tbody className="divide-y divide-border">{result.rows.map((row, index) => <tr key={`${result.pagination?.page ?? 1}-${index}`} className="hover:bg-muted/20">{result.columns.map((column, columnIndex) => <td data-mobile-label={column.label} key={column.key} className={`max-w-[26rem] px-4 py-3 align-top text-foreground ${columnIndex === 0 ? "font-medium" : ""}`}><span className="block min-w-0 break-words">{column.key === "outstandingAmount" ? money.format(Number(row[column.key] ?? 0)) : formatQueryValue(row[column.key], column.type)}</span></td>)}</tr>)}</tbody></table></div> : !resultQuery.isError && <div className="px-5 py-12 text-center text-sm text-muted-foreground">No records match these filters. Adjust the search or reset the filters.</div>}
       <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{number.format(result?.pagination?.total ?? 0)} record{result?.pagination?.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result || result.pagination?.page === 1} onClick={() => setPage((result?.pagination?.page ?? 1) - 1)}>Previous</Button><span className="whitespace-nowrap tabular-nums">Page {result?.pagination?.page ?? 1} of {result?.pagination?.totalPages ?? 1}</span><Button type="button" variant="outline" size="sm" className="rounded-md" disabled={loading || !result || (result.pagination?.page ?? 1) >= (result.pagination?.totalPages ?? 1)} onClick={() => setPage((result?.pagination?.page ?? 1) + 1)}>Next</Button></div></div>
     </section>
   </div>;

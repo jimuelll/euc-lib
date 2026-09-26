@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { QrCode } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -11,10 +12,16 @@ import ScanningView from "./components/ScanningView";
 import { SuccessView, NoticeView, ErrorView } from "./components/ResultView";
 import type { ScanMode, AttendanceType, AttendanceResult, AttendanceNotice } from "./types";
 import { postAttendanceScan, AttendanceScanError, AUTO_RESET_DELAY } from "./utils";
+import { invalidateServerState } from "@/app/server-state";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const ScanQR = () => {
+  const queryClient = useQueryClient();
+  const { mutateAsync: submitAttendanceScan } = useMutation({
+    mutationFn: ({ scannedId, type }: { scannedId: string; type: AttendanceType }) => postAttendanceScan(scannedId, type),
+    onSuccess: () => invalidateServerState(queryClient, "attendance"),
+  });
   const [scanMode, setScanMode] = useState<ScanMode>("idle");
   const [attendanceType, setAttendanceType] = useState<AttendanceType>("check_in");
   const [result, setResult] = useState<AttendanceResult | null>(null);
@@ -62,7 +69,7 @@ const ScanQR = () => {
       setNotice(null);
 
       try {
-        const data = await postAttendanceScan(scannedId.trim(), attendanceType);
+        const data = await submitAttendanceScan({ scannedId: scannedId.trim(), type: attendanceType });
         setResult({
           type: data.type,
           userName: data.user.name,
@@ -92,7 +99,7 @@ const ScanQR = () => {
         isProcessingRef.current = false;
       }
     },
-    [attendanceType]
+    [attendanceType, submitAttendanceScan]
   );
 
   // ── Render ──────────────────────────────────────────────────────────────────

@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { X, ScanLine, Loader2, Download, Printer, BookOpen, Archive, ArchiveRestore } from "lucide-react";
 import { printCodeLabel } from "@/utils/printCodeLabel";
 import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition, retireCatalogCopy, restoreCatalogCopy } from "../catalog.api";
+import { catalogKeys } from "../../catalog.keys";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 type Copy = {
   id: number;
@@ -71,21 +75,20 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props) => {
-  const [copies, setCopies]           = useState<Copy[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const queryClient = useQueryClient();
+  const copiesQuery = useQuery({ queryKey: catalogKeys.adminCopies(bookId), queryFn: ({ signal }) => fetchCatalogBookCopies(bookId, signal) });
+  const copies: Copy[] = copiesQuery.data ?? [];
+  const loading = copiesQuery.isPending;
   const [scanning, setScanning]       = useState(false);
   const [scannedCopy, setScannedCopy] = useState<(Copy & { title?: string; author?: string }) | null>(null);
   const [barcodeUrls, setBarcodeUrls] = useState<Record<string, string>>({});
-  const [busyCopyId, setBusyCopyId] = useState<number | null>(null);
   const videoRef    = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
-
-  useEffect(() => {
-    fetchCatalogBookCopies(bookId)
-      .then((data) => setCopies(data))
-      .catch(() => toast.error("Failed to load copies"))
-      .finally(() => setLoading(false));
-  }, [bookId]);
+  const invalidateCatalogData = () => queryClient.invalidateQueries({ queryKey: catalogKeys.all });
+  const conditionMutation = useMutation({ mutationFn: ({ copy, condition }: { copy: Copy; condition: Copy["condition"] }) => updateCatalogCopyCondition(copy.id, condition), onSuccess: invalidateCatalogData });
+  const retireMutation = useMutation({ mutationFn: retireCatalogCopy, onSuccess: invalidateCatalogData });
+  const restoreMutation = useMutation({ mutationFn: restoreCatalogCopy, onSuccess: invalidateCatalogData });
+  const busyCopyId = conditionMutation.isPending ? conditionMutation.variables?.copy.id ?? null : retireMutation.isPending ? retireMutation.variables ?? null : restoreMutation.isPending ? restoreMutation.variables ?? null : null;
 
   useEffect(() => {
     if (!copies.length) return;
@@ -122,7 +125,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
           const barcode = result.getText();
           stopScanner();
           try {
-            const data = await fetchCatalogCopy(barcode);
+            const data = await queryClient.fetchQuery({ queryKey: catalogKeys.adminCopy(barcode), queryFn: ({ signal }) => fetchCatalogCopy(barcode, signal) });
             setScannedCopy(data);
             if (!barcodeUrls[barcode]) {
               const url = await fetchBarcodeObjectUrl(barcode);
@@ -135,7 +138,7 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
       .then((controls) => { controlsRef.current = controls; })
       .catch((e) => { toast.error("Camera error: " + e.message); stopScanner(); });
     return () => { controlsRef.current?.stop(); controlsRef.current = null; };
-  }, [scanning, stopScanner]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scanning, stopScanner, queryClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownload = (barcode: string) => {
     const url = barcodeUrls[barcode];
@@ -150,32 +153,25 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
   };
   const handleConditionChange = async (copy: Copy, condition: Copy["condition"]) => {
     try {
-      await updateCatalogCopyCondition(copy.id, condition);
-      setCopies(await fetchCatalogBookCopies(bookId));
+      await conditionMutation.mutateAsync({ copy, condition });
       if (scannedCopy?.id === copy.id) setScannedCopy({ ...scannedCopy, condition });
       toast.success("Copy condition updated");
-    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to update copy condition"); }
+    } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to update copy condition")); }
   };
 
   const handleRetire = async (copy: Copy) => {
     if (!window.confirm(`Retire ${copy.barcode}? Its barcode, holdings, and history will be kept, and it will no longer be available for lending.`)) return;
-    setBusyCopyId(copy.id);
     try {
-      await retireCatalogCopy(copy.id);
-      setCopies(await fetchCatalogBookCopies(bookId));
+      await retireMutation.mutateAsync(copy.id);
       toast.success("Copy retired; its history and accession were kept");
-    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to retire copy"); }
-    finally { setBusyCopyId(null); }
+    } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to retire copy")); }
   };
 
   const handleRestore = async (copy: Copy) => {
-    setBusyCopyId(copy.id);
     try {
-      const result = await restoreCatalogCopy(copy.id);
-      setCopies(await fetchCatalogBookCopies(bookId));
+      const result = await restoreMutation.mutateAsync(copy.id);
       toast.success(result.lendingEligible ? "Copy restored and available for circulation checks" : "Copy restored; record its accession or update its condition before lending");
-    } catch (error: any) { toast.error(error.response?.data?.message ?? "Failed to restore copy"); }
-    finally { setBusyCopyId(null); }
+    } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to restore copy")); }
   };
 
   const available = copies.filter((c) => c.status === "available" && c.is_active && Boolean(c.accession_number) && c.borrow_eligible !== false && c.borrow_eligible !== 0).length;
@@ -317,6 +313,11 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
               >
                 Loading copies…
               </p>
+            </div>
+          ) : copiesQuery.isError ? (
+            <div role="alert" className="flex flex-col items-center gap-3 py-16 text-sm text-destructive">
+              <p>{getApiErrorMessage(copiesQuery.error, "Failed to load copies")}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void copiesQuery.refetch()}>Try again</Button>
             </div>
           ) : copies.length === 0 ? (
             <div className="flex flex-col items-center py-16 gap-3">

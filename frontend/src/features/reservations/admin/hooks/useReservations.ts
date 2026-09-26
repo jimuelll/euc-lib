@@ -1,67 +1,137 @@
-import { useAdminUrlState, queryPage } from "@/features/admin";
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
+import { invalidateServerState } from "@/app/server-state";
+import { useAdminUrlState, queryPage, useAdminConfirmDialog } from "@/features/admin";
 import {
+  archiveReservation,
+  cancelReservationAdmin,
   getAdminReservations,
   markReservationReady,
-  cancelReservationAdmin,
-  archiveReservation,
   restoreReservation,
 } from "../reservations.api";
-import { PAGE_SIZE } from "../reservations.types";
-import type { AdminReservation, ReservationsResult } from "../reservations.types";
-import { useAdminConfirmDialog } from "@/features/admin";
+import { PAGE_SIZE, type AdminReservation, type ReservationFilters, type ReservationsResult } from "../reservations.types";
+import { normalizeReservationFilters, reservationsKeys } from "../reservations.keys";
+
+type ReservationCacheSnapshot = Array<[QueryKey, ReservationsResult | undefined]>;
+
+function removeReservationFromCachedLists(
+  queryClient: ReturnType<typeof useQueryClient>,
+  reservationId: number
+): ReservationCacheSnapshot {
+  const previous = queryClient.getQueriesData<ReservationsResult>({
+    queryKey: reservationsKeys.lists(),
+  });
+
+  previous.forEach(([queryKey, result]) => {
+    if (!result?.rows.some((reservation) => reservation.id === reservationId)) return;
+
+    queryClient.setQueryData<ReservationsResult>(queryKey, {
+      ...result,
+      rows: result.rows.filter((reservation) => reservation.id !== reservationId),
+      total: Math.max(0, result.total - 1),
+    });
+  });
+
+  return previous;
+}
+
+function restoreReservationCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  snapshot: ReservationCacheSnapshot | undefined
+) {
+  snapshot?.forEach(([queryKey, result]) => {
+    if (result) queryClient.setQueryData(queryKey, result);
+  });
+}
+
+const actionErrorMessage = (error: any, fallback: string) =>
+  error?.response?.data?.message ?? fallback;
 
 export const useReservations = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [params, patchParams] = useAdminUrlState();
-  const [data,         setData]         = useState<ReservationsResult | null>(null);
-  const [loading,      setLoading]      = useState(true);
   const search = params.get("q") ?? "";
-  const statusFilter = ["pending", "ready", "fulfilled", "cancelled", "expired"].includes(params.get("status") ?? "") ? params.get("status")! : "all";
+  const statusFilter = ["pending", "ready", "fulfilled", "cancelled", "expired"].includes(params.get("status") ?? "")
+    ? params.get("status")!
+    : "all";
   const page = queryPage(params.get("page"));
-  const setPage = (page: number) => patchParams({ page });
-  const [actionId,     setActionId]     = useState<number | null>(null);
+  const setPage = (nextPage: number) => patchParams({ page: nextPage });
+  const [actionId, setActionId] = useState<number | null>(null);
   const showArchived = params.get("archived") === "true";
-  const [error, setError] = useState("");
   const { confirm, confirmDialog } = useAdminConfirmDialog();
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  const filters = useMemo<ReservationFilters>(() => normalizeReservationFilters({
+    page,
+    limit: PAGE_SIZE,
+    ...(search.trim() ? { search: search.trim() } : {}),
+    ...(showArchived ? { archived: true } : {}),
+    ...(!showArchived && statusFilter !== "all" ? { status: statusFilter } : {}),
+  }), [page, search, showArchived, statusFilter]);
 
+  const reservationsQuery = useQuery({
+    queryKey: reservationsKeys.list(filters),
+    queryFn: ({ signal }) => getAdminReservations(filters, signal),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const invalidateReservationLists = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: reservationsKeys.lists() }),
+    [queryClient]
+  );
+
+  const markReadyMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => markReservationReady(id),
+    onSuccess: () => invalidateServerState(queryClient, "reservation"),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => cancelReservationAdmin(id),
+    onSuccess: () => invalidateServerState(queryClient, "reservation"),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => archiveReservation(id),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: reservationsKeys.lists() });
+      return removeReservationFromCachedLists(queryClient, id);
+    },
+    onError: (_error, _variables, snapshot) => {
+      restoreReservationCache(queryClient, snapshot);
+    },
+    onSuccess: invalidateReservationLists,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) => restoreReservation(id),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: reservationsKeys.lists() });
+      return removeReservationFromCachedLists(queryClient, id);
+    },
+    onError: (_error, _variables, snapshot) => {
+      restoreReservationCache(queryClient, snapshot);
+    },
+    onSuccess: invalidateReservationLists,
+  });
+
+  const { refetch } = reservationsQuery;
   const fetchReservations = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const filters: Record<string, unknown> = { page, limit: PAGE_SIZE };
-      if (search)                filters.search   = search;
-      if (showArchived)          filters.archived = true;
-      // status filter is hidden in archived mode (all archived are terminal)
-      if (!showArchived && statusFilter !== "all") filters.status = statusFilter;
+    await refetch();
+  }, [refetch]);
 
-      const result = await getAdminReservations(filters);
-      setData(result);
-    } catch {
-      setError("Reservations could not be loaded. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search, statusFilter, showArchived]);
-
-  useEffect(() => { fetchReservations(); }, [fetchReservations]);
-
-  const handleSearchChange = (q: string) => patchParams({ q, page: null }, true);
+  const handleSearchChange = (nextSearch: string) => patchParams({ q: nextSearch, page: null }, true);
   const handleStatusChange = (status: string) => patchParams({ status, page: null });
   const handleToggleArchived = () => patchParams({ archived: !showArchived, page: null });
 
   const handleMarkReady = async (id: number, title: string) => {
     setActionId(id);
     try {
-      await markReservationReady(id);
+      await markReadyMutation.mutateAsync({ id });
       toast.success(`"${title}" marked as ready for pickup`);
-      fetchReservations();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Action failed");
+    } catch (error) {
+      toast.error(actionErrorMessage(error, "Action failed"));
     } finally {
       setActionId(null);
     }
@@ -80,11 +150,10 @@ export const useReservations = () => {
   const handleCancel = async (id: number, title: string) => {
     setActionId(id);
     try {
-      await cancelReservationAdmin(id);
+      await cancelMutation.mutateAsync({ id });
       toast.success(`Reservation for "${title}" cancelled`);
-      fetchReservations();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Action failed");
+    } catch (error) {
+      toast.error(actionErrorMessage(error, "Action failed"));
     } finally {
       setActionId(null);
     }
@@ -100,16 +169,10 @@ export const useReservations = () => {
     if (!shouldArchive) return;
     setActionId(id);
     try {
-      await archiveReservation(id);
+      await archiveMutation.mutateAsync({ id });
       toast.success("Reservation archived");
-      // Optimistically remove from list
-      setData((prev) =>
-        prev
-          ? { ...prev, rows: prev.rows.filter((r) => r.id !== id), total: prev.total - 1 }
-          : prev
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Failed to archive reservation");
+    } catch (error) {
+      toast.error(actionErrorMessage(error, "Failed to archive reservation"));
     } finally {
       setActionId(null);
     }
@@ -124,37 +187,30 @@ export const useReservations = () => {
     if (!shouldRestore) return;
     setActionId(id);
     try {
-      await restoreReservation(id);
+      await restoreMutation.mutateAsync({ id });
       toast.success("Reservation restored");
-      setData((prev) =>
-        prev
-          ? { ...prev, rows: prev.rows.filter((r) => r.id !== id), total: prev.total - 1 }
-          : prev
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Failed to restore reservation");
+    } catch (error) {
+      toast.error(actionErrorMessage(error, "Failed to restore reservation"));
     } finally {
       setActionId(null);
     }
   };
 
   return {
-    // state
-    data,
-    error,
-    loading,
+    data: reservationsQuery.data ?? null,
+    error: reservationsQuery.isError ? "Reservations could not be loaded. Try again." : "",
+    loading: reservationsQuery.isFetching,
+    initialLoading: reservationsQuery.isPending,
     search,
     statusFilter,
     page,
     actionId,
     showArchived,
     confirmDialog,
-    // filter handlers
     handleSearchChange,
     handleStatusChange,
     handleToggleArchived,
     setPage,
-    // action handlers
     handleMarkReady,
     handleFulfill,
     handleCancel,

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import { ImagePlus, X, Loader2, AlertCircle, Pin } from "lucide-react";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useAuth } from "@/context/AuthContext";
 import { createBulletinPost } from "../api";
+import { bulletinKeys } from "../bulletin.keys";
 
 interface CreatePostModalProps {
   open: boolean;
@@ -49,6 +51,11 @@ const inputBase =
   "w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-primary focus:ring-0 transition-colors duration-150";
 
 export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalProps) {
+  const queryClient = useQueryClient();
+  const createMutation = useMutation({
+    mutationFn: createBulletinPost,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: bulletinKeys.all }),
+  });
   const { user } = useAuth();
   const canPin   = CAN_PIN_ROLES.includes(user?.role ?? "");
 
@@ -133,7 +140,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
     }
 
     try {
-      const data = await createBulletinPost({
+      const data = await createMutation.mutateAsync({
         ...form,
         image_url,
         image_public_id,

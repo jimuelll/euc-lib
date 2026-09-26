@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getAboutSettingsAdmin, updateAboutSettings } from "@/features/about/api/about.service";
 import { type AboutForm, EMPTY_ABOUT_FORM } from "./AdminAbout.types";
+import { aboutKeys } from "../about.keys";
 
 export const useAboutData = () => {
   const [form,    setForm]    = useState<AboutForm>(EMPTY_ABOUT_FORM);
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
+  const queryClient = useQueryClient();
+  const aboutQuery = useQuery({ queryKey: aboutKeys.admin(), queryFn: ({ signal }) => getAboutSettingsAdmin(signal) });
+  const saveMutation = useMutation({ mutationFn: updateAboutSettings, onSuccess: () => queryClient.invalidateQueries({ queryKey: aboutKeys.all }) });
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    getAboutSettingsAdmin()
-      .then((data) =>
-        setForm({
+    if (!aboutQuery.data || initialized) return;
+    const data = aboutQuery.data;
+    setForm({
           library_name:  data.library_name  ?? "",
           established:   data.established   ? String(data.established) : "",
           mission_title: data.mission_title ?? "",
@@ -22,30 +26,25 @@ export const useAboutData = () => {
           facilities:    Array.isArray(data.facilities) ? data.facilities : [],
           staff:         Array.isArray(data.staff)      ? data.staff      : [],
           spaces:        Array.isArray(data.spaces)     ? data.spaces     : [],
-        })
-      )
-      .catch(() => { /* keep empty defaults */ })
-      .finally(() => setLoading(false));
-  }, []);
+        });
+    setInitialized(true);
+  }, [aboutQuery.data, initialized]);
 
   const setField = <K extends keyof AboutForm>(key: K, value: AboutForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     try {
-      await updateAboutSettings({
+      await saveMutation.mutateAsync({
         ...form,
         established: form.established ? parseInt(form.established, 10) : null,
       });
       toast.success("About page updated successfully.");
     } catch {
       toast.error("Failed to save changes. Please try again.");
-    } finally {
-      setSaving(false);
     }
   };
 
-  return { form, setField, loading, saving, handleSubmit };
+  return { form, setField, loading: aboutQuery.isPending, saving: saveMutation.isPending, handleSubmit };
 };

@@ -20,14 +20,14 @@ export interface AboutSettings {
 // ── API calls ─────────────────────────────────────────────────────────────────
 
 /** Public — no auth required */
-export const getAboutSettings = async (): Promise<AboutSettings> => {
-  const res = await axiosInstance.get("/api/about");
+export const getAboutSettings = async (signal?: AbortSignal): Promise<AboutSettings> => {
+  const res = await axiosInstance.get("/api/about", { signal });
   return res.data;
 };
 
 /** Admin-only — requires admin or super_admin role */
-export const getAboutSettingsAdmin = async (): Promise<AboutSettings> => {
-  const res = await axiosInstance.get("/api/admin/about");
+export const getAboutSettingsAdmin = async (signal?: AbortSignal): Promise<AboutSettings> => {
+  const res = await axiosInstance.get("/api/admin/about", { signal });
   return res.data;
 };
 

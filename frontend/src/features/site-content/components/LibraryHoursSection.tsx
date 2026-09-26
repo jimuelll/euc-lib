@@ -1,7 +1,6 @@
 import { Clock, MapPin, Mail, Phone } from "lucide-react";
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { getSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
+import { useSiteContent } from "../useSiteContent";
 
 const hours = [
   { day: "Monday – Friday", time: "7:00 AM – 9:00 PM", open: true  },
@@ -16,8 +15,7 @@ const contactDetails = [
 ];
 
 const LibraryHoursSection = () => {
-  const [content, setContent] = useState<SiteContent | null>(null);
-  useEffect(() => { getSiteContent().then(setContent).catch(() => undefined); }, []);
+  const { data: content } = useSiteContent();
   const visibleHours = content?.hours || hours;
   const visibleContact = content ? [
     { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },

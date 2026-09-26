@@ -52,20 +52,21 @@ export interface CirculationLogResult {
   summary?: CirculationLogSummary;
 }
 
-export const lookupUser = async (studentEmployeeId: string): Promise<LookupUserResult> => {
+export const lookupUser = async (studentEmployeeId: string, signal?: AbortSignal): Promise<LookupUserResult> => {
   const res = await axiosInstance.get("/api/borrowing/scan/user", {
     params: { student_employee_id: studentEmployeeId },
+    signal,
   });
   return { user: res.data.user, activeBorrows: res.data.activeBorrows ?? [], clearance: res.data.clearance };
 };
 
-export const lookupCopy = async (barcode: string): Promise<BookInfo> => {
-  const res = await axiosInstance.get(`/api/borrowing/scan/copy/${encodeURIComponent(barcode)}`);
+export const lookupCopy = async (barcode: string, signal?: AbortSignal): Promise<BookInfo> => {
+  const res = await axiosInstance.get(`/api/borrowing/scan/copy/${encodeURIComponent(barcode)}`, { signal });
   return res.data;
 };
 
-export const lookupReturnPreview = async (identifier: string): Promise<ReturnPreview> => {
-  const res = await axiosInstance.get<ReturnPreview>(`/api/borrowing/scan/return-preview/${encodeURIComponent(identifier)}`);
+export const lookupReturnPreview = async (identifier: string, signal?: AbortSignal): Promise<ReturnPreview> => {
+  const res = await axiosInstance.get<ReturnPreview>(`/api/borrowing/scan/return-preview/${encodeURIComponent(identifier)}`, { signal });
   return res.data;
 };
 
@@ -88,9 +89,10 @@ export const processReturn = async (copyBarcode: string) => {
 };
 
 export const getCirculationLog = async (
-  filters: CirculationLogFilters = {}
+  filters: CirculationLogFilters = {},
+  signal?: AbortSignal
 ): Promise<CirculationLogResult> => {
-  const res = await axiosInstance.get("/api/borrowing/admin/borrows", { params: filters });
+  const res = await axiosInstance.get("/api/borrowing/admin/borrows", { params: filters, signal });
   return res.data;
 };
 
@@ -106,11 +108,11 @@ export const restoreBorrowing = async (id: number): Promise<void> => {
 
 export type CirculationCatalogResult = { id: number; title: string; author?: string; material_type?: string };
 export type CirculationCopyResult = { id: number; barcode: string; accession_number?: string | null; accession_voided?: number | boolean; borrow_eligible?: number | boolean; needs_policy?: number | boolean; is_active: number; status?: string };
-export const searchCirculationBooks = async (query: string): Promise<CirculationCatalogResult[]> => {
-  const response = await axiosInstance.get<CirculationCatalogResult[]>("/api/admin/books", { params: { query } });
+export const searchCirculationBooks = async (query: string, signal?: AbortSignal): Promise<CirculationCatalogResult[]> => {
+  const response = await axiosInstance.get<CirculationCatalogResult[]>("/api/admin/books", { params: { query }, signal });
   return response.data;
 };
-export const fetchCirculationBookCopies = async (bookId: number): Promise<CirculationCopyResult[]> => {
-  const response = await axiosInstance.get<CirculationCopyResult[]>(`/api/admin/books/${bookId}/copies`);
+export const fetchCirculationBookCopies = async (bookId: number, signal?: AbortSignal): Promise<CirculationCopyResult[]> => {
+  const response = await axiosInstance.get<CirculationCopyResult[]>(`/api/admin/books/${bookId}/copies`, { signal });
   return response.data;
 };

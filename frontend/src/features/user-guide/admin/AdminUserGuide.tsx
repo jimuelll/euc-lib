@@ -1,6 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { visibleSidebarSections } from "@/features/admin";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, BookOpenCheck, CircleHelp, Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -9,28 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import { getPublishedGuide, type GuideModule } from "@/features/user-guide/api/user-guide.service";
+import { userGuideKeys } from "../user-guide.keys";
 
 export default function AdminUserGuide() {
   const { user } = useAuth();
-  const [modules, setModules] = useState<GuideModule[]>([]);
+  const guideQuery = useQuery({ queryKey: userGuideKeys.published(), queryFn: ({ signal }) => getPublishedGuide(signal) });
+  const modules: GuideModule[] = guideQuery.data ?? [];
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All topics");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      setModules(await getPublishedGuide());
-    } catch (err: any) {
-      setError(err.response?.data?.message || "The user guide could not be loaded.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { void load(); }, []);
+  const loading = guideQuery.isPending;
+  const error = guideQuery.isError ? "The user guide could not be loaded." : "";
+  const load = async () => { await guideQuery.refetch(); };
 
   const categories = useMemo(
     () => ["All topics", ...Array.from(new Set(modules.map((item) => item.category)))],

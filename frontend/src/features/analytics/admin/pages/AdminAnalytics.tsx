@@ -1,9 +1,11 @@
 import { useAdminUrlState } from "@/features/admin";
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { AlertTriangle, BookCopy, BookMarked, Check, CheckCircle2, Coins, Copy, DoorOpen, Globe2, RefreshCcw, Sparkles } from "lucide-react";
 import { getApiErrorCode, getApiErrorMessage } from "@/utils/apiError";
 import { createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse } from "@/features/analytics/api/adminAnalytics.api";
+import { analyticsKeys } from "../../analytics.keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -86,18 +88,24 @@ const formatReportPeriod = (dateFrom: string, dateTo: string) => `${formatReport
 const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total, item) => total + Number(item[key] || 0), 0);
 
 const AdminAnalytics = () => {
-  const [data, setData] = useState<DashboardResponse>(emptyData);
-  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState("");
   const [params, patchParams] = useAdminUrlState();
   const activeTab = (["overview", "circulation", "visitors", "collection", "ai-report"].includes(params.get("tab") ?? "") ? params.get("tab") : "overview") as AnalyticsTab;
   const setActiveTab = (tab: AnalyticsTab) => patchParams({ tab });
   const range = (["7d", "30d", "month", "year"].includes(params.get("range") ?? "") ? params.get("range") : "7d") as AnalyticsRange;
+  const dashboardQuery = useQuery({ queryKey: analyticsKeys.dashboard(range), queryFn: ({ signal }) => fetchAdminDashboard(range, signal), placeholderData: (previousData) => previousData });
+  const data = dashboardQuery.data ?? emptyData;
+  const loading = dashboardQuery.isPending;
+  const refreshing = dashboardQuery.isFetching && !dashboardQuery.isPending;
+  const error = dashboardQuery.isError ? getApiErrorMessage(dashboardQuery.error, "Failed to load analytics.") : "";
+  const loadDashboard = async (_mode?: "refresh") => { await dashboardQuery.refetch(); };
   const setRange = (range: AnalyticsRange) => patchParams({ range }); const [reportQuestion, setReportQuestion] = useState("");
   const [reportRange, setReportRange] = useState<ReportRange>("7d");
   const initialReportDates = useMemo(() => reportDatesFor("7d"), []);
   const [customDateFrom, setCustomDateFrom] = useState(initialReportDates.dateFrom);
   const [customDateTo, setCustomDateTo] = useState(initialReportDates.dateTo);
-  const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null); const [reportLoading, setReportLoading] = useState(false);
+  const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null);
+  const reportMutation = useMutation({ mutationFn: createAiAnalyticsReport });
+  const reportLoading = reportMutation.isPending;
   const [answeredQuestion, setAnsweredQuestion] = useState("");
   const [reportError, setReportError] = useState(""); const [reportNotice, setReportNotice] = useState<ReportNotice>(null); const [copied, setCopied] = useState(false);
   const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
@@ -107,12 +115,6 @@ const AdminAnalytics = () => {
     attendance: sum(data.charts.attendanceTrend, "entry_exit_count") + sum(data.charts.attendanceTrend, "borrowing_count"),
     visitors: sum(data.charts.visitTrend, "unique_visitors"),
   }), [data]);
-  const loadDashboard = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    mode === "initial" ? setLoading(true) : setRefreshing(true); setError("");
-    try { setData(await fetchAdminDashboard(range)); } catch (loadError: unknown) { setError(getApiErrorMessage(loadError, "Failed to load analytics.")); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [range]);
-  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
   const clearReportResult = () => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false); };
   const selectReportRange = (nextRange: ReportRange) => { setReportRange(nextRange); clearReportResult(); };
   const updateCustomDate = (field: "from" | "to", value: string) => {
@@ -128,9 +130,9 @@ const AdminAnalytics = () => {
       if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportNotice(null); return; }
       if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportNotice(null); return; }
     }
-    setReportLoading(true); setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false);
+    setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false);
     try {
-      const nextReport = await createAiAnalyticsReport(reportRange === "all-time" ? { allTime: true, question: question || undefined } : { ...reportDates, question: question || undefined });
+      const nextReport = await reportMutation.mutateAsync(reportRange === "all-time" ? { allTime: true, question: question || undefined } : { ...reportDates, question: question || undefined });
       setReport(nextReport);
       setAnsweredQuestion(nextReport.mode === "answer" ? question : "");
     } catch (reportFailure: unknown) {
@@ -138,7 +140,6 @@ const AdminAnalytics = () => {
       setReportNotice(errorCode === "AI_REPORT_PRIVACY_RESTRICTED" ? "privacy" : errorCode === "AI_REPORT_IRRELEVANT_QUESTION" ? "scope" : errorCode === "AI_REPORT_DATE_NOT_RECORDED" || errorCode === "AI_REPORT_DATE_OUTSIDE_RANGE" ? "date" : null);
       setReportError(getApiErrorMessage(reportFailure, "Unable to generate the performance brief. Try again."));
     }
-    finally { setReportLoading(false); }
   };
   const copyReport = async () => {
     if (!report) return;

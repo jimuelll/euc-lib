@@ -1,6 +1,7 @@
 import { useAdminFilters } from "@/features/admin";
 import { useAdminUrlState } from "@/features/admin";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +17,8 @@ import {
 } from "@/components/ui/select";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
 import { useAttendanceLogs } from "./useAttendanceLogs";
-import { fetchAttendanceHistory, type AttendanceHistoryResponse, type AttendanceHistoryRow } from "./attendance.api";
+import { fetchAttendanceHistory } from "./attendance.api";
+import { attendanceKeys } from "./attendance.keys";
 import {
   EmptyState,
   ErrorState,
@@ -69,57 +71,30 @@ const AdminAttendanceLogs = () => {
     handleLoadMore,
   } = useAttendanceLogs();
 
-  const [historyRows, setHistoryRows] = useState<AttendanceHistoryRow[]>([]);
   const { applied: appliedHistory, setApplied: applyHistory, page: historyPage, setPage: setHistoryPage } = useAdminFilters("attendance", emptyHistoryFilters);
   const [historyFilters, setHistoryFilters] = useState(appliedHistory);
   useEffect(() => { setHistoryFilters(appliedHistory); }, [appliedHistory]);
-  const [historySummary, setHistorySummary] = useState(emptyHistorySummary);
-  const [historyPagination, setHistoryPagination] = useState({
-    page: 1,
-    limit: 25,
-    total: 0,
-    totalPages: 1,
+  const historyQuery = useQuery({
+    queryKey: attendanceKeys.historyPage({ page: historyPage, ...appliedHistory }),
+    queryFn: ({ signal }) => fetchAttendanceHistory({
+      page: historyPage,
+      limit: 25,
+      search: appliedHistory.search || undefined,
+      type: appliedHistory.type,
+      purpose: appliedHistory.purpose,
+      dateFrom: appliedHistory.dateFrom || undefined,
+      dateTo: appliedHistory.dateTo || undefined,
+    }, signal),
+    enabled: mode === "history",
+    placeholderData: (previousData) => previousData,
   });
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [historyRefreshing, setHistoryRefreshing] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const [historySessions, setHistorySessions] = useState<AttendanceHistoryResponse["sessions"]>([]);
-
-  const loadHistoryLogs = useCallback(async (
-    loadMode: "initial" | "refresh",
-    nextPage: number,
-    nextFilters: typeof emptyHistoryFilters,
-  ) => {
-    if (loadMode === "initial") setHistoryLoading(true);
-    if (loadMode === "refresh") setHistoryRefreshing(true);
-    setHistoryError("");
-
-    try {
-      const result = await fetchAttendanceHistory({
-        page: nextPage,
-        limit: 25,
-        search: nextFilters.search || undefined,
-        type: nextFilters.type,
-        purpose: nextFilters.purpose,
-        dateFrom: nextFilters.dateFrom || undefined,
-        dateTo: nextFilters.dateTo || undefined,
-      });
-
-      setHistoryRows(result.rows);
-      setHistorySummary(result.summary ?? emptyHistorySummary);
-      setHistoryPagination(result.pagination);
-      setHistorySessions(result.sessions ?? []);
-    } catch (err: any) {
-      setHistoryError(err.response?.data?.message || err.message || "Failed to load attendance history");
-    } finally {
-      if (loadMode === "initial") setHistoryLoading(false);
-      if (loadMode === "refresh") setHistoryRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (mode === "history") void loadHistoryLogs("initial", historyPage, appliedHistory);
-  }, [loadHistoryLogs, mode, historyPage, appliedHistory]);
+  const historyRows = historyQuery.data?.rows ?? [];
+  const historySummary = historyQuery.data?.summary ?? emptyHistorySummary;
+  const historyPagination = historyQuery.data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 1 };
+  const historySessions = historyQuery.data?.sessions ?? [];
+  const historyLoading = historyQuery.isPending;
+  const historyRefreshing = historyQuery.isFetching && !historyQuery.isPending;
+  const historyError = historyQuery.isError ? (historyQuery.error as any)?.response?.data?.message || "Failed to load attendance history" : "";
 
   const isFiltered = Boolean(search || filter !== "all");
   const showLoadMore = !fetchState.loading && !fetchState.error && fetchState.hasMore && visible.length > 0 && !search && filter === "all";
@@ -139,7 +114,7 @@ const AdminAttendanceLogs = () => {
       return;
     }
 
-    applyHistory({ ...historyFilters });
+    void historyQuery.refetch();
   };
 
   return (

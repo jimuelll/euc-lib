@@ -6,7 +6,6 @@ import { fetchMyLibraryBarcode } from "../api";
 export default function MyLibraryBarcode() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -14,7 +13,6 @@ export default function MyLibraryBarcode() {
     let objectUrl: string | null = null;
 
     setImageUrl(null);
-    setFailed(false);
     setLoading(true);
 
     fetchMyLibraryBarcode(controller.signal)
@@ -23,9 +21,7 @@ export default function MyLibraryBarcode() {
         objectUrl = URL.createObjectURL(blob);
         setImageUrl(objectUrl);
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
-      })
+      .catch(() => undefined)
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });

@@ -7,8 +7,8 @@ import type {
 
 // ─── Fetch all ────────────────────────────────────────────────────────────────
 
-export async function fetchSubscriptions(page = 1): Promise<{ rows: Subscription[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
-  const res = await axiosInstance.get("/api/admin/subscriptions", { params: { page, limit: 25 } });
+export async function fetchSubscriptions(page = 1, signal?: AbortSignal): Promise<{ rows: Subscription[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  const res = await axiosInstance.get("/api/admin/subscriptions", { params: { page, limit: 25 }, signal });
   const data = res.data.data;
   return Array.isArray(data) ? { rows: data, pagination: { page: 1, limit: data.length, total: data.length, totalPages: 1 } } : { rows: data.rows ?? [], pagination: data.pagination };
 }

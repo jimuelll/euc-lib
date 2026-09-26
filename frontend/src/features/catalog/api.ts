@@ -17,12 +17,13 @@ export interface PublicCatalogSearchResponse {
   pagination: { page: number; limit: number; total: number; totalPages: number };
   facets: PublicCatalogFacets;
 }
-export const fetchPublicCatalogSchema = async (): Promise<PublicCatalogSchemaField[]> => (await axiosInstance.get<PublicCatalogSchemaField[]>("/api/catalogue/schema")).data;
+export const fetchPublicCatalogSchema = async (signal?: AbortSignal): Promise<PublicCatalogSchemaField[]> => (await axiosInstance.get<PublicCatalogSchemaField[]>("/api/catalogue/schema", { signal })).data;
 export interface PublicCatalogSearchParams {
   query?: string; title?: string; author?: string; isbn?: string; format?: string;
   availability?: string; category?: string; sort?: string; page?: number;
 }
-export const searchPublicCatalogue = async (params: PublicCatalogSearchParams): Promise<PublicCatalogSearchResponse> =>
+export const searchPublicCatalogue = async (params: PublicCatalogSearchParams, signal?: AbortSignal): Promise<PublicCatalogSearchResponse> =>
   (await axiosInstance.get<PublicCatalogSearchResponse>("/api/catalogue/search", {
     params: { ...params, query: params.query?.trim() ?? "", page: params.page ?? 1, limit: 20 },
+    signal,
   })).data;

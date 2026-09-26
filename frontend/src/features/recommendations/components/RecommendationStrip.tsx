@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { dismissRecommendation, fetchRecommendations } from "../api";
+import { dismissRecommendation, fetchRecommendations, type RecommendationsResponse } from "../api";
+import { recommendationsKeys } from "../recommendations.keys";
 
 export type Recommendation = { id: number; title: string; author?: string | null; image_url?: string | null; material_type: "book" | "thesis"; available?: number; needs_policy?: boolean; availability_status?: "available" | "checked_out" | "reserved" | "unavailable" | "reference_only"; reason: string; source: "rule" | "ai" };
 
@@ -18,26 +20,34 @@ function RecommendationCover({ book }: { book: Recommendation }) {
   return <img src={src} alt={alt} onError={() => setFailedImageKey(imageKey)} className="h-[124px] w-[82px] shrink-0 border border-border bg-muted/20 object-contain sm:h-[144px] sm:w-[96px] 2xl:h-[132px] 2xl:w-[88px]" />;
 }
 export function RecommendationStrip({ materialType, seedBookId, personal = false, title }: { materialType: "book" | "thesis"; seedBookId?: number | null; personal?: boolean; title?: string }) {
-  const [rows, setRows] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(Boolean(seedBookId || personal));
+  const queryClient = useQueryClient();
   const [pageIndex, setPageIndex] = useState(0);
   const [cardsPerPage, setCardsPerPage] = useState(() => typeof window === "undefined" ? 1 : cardsPerPageForWidth(window.innerWidth));
   const sectionRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    const load = async () => {
-      setPageIndex(0);
-      if (!personal && !seedBookId) { setRows([]); setLoading(false); return; }
-      setLoading(true);
-      try {
-        const response = await fetchRecommendations({ materialType, seedBookId, personal, signal: controller.signal });
-        setRows(response.rows || []);
-        setPageIndex(0);
-      } catch (error: any) { if (error.name !== "CanceledError") setRows([]); }
-      finally { if (!controller.signal.aborted) setLoading(false); }
-    };
-    void load(); return () => controller.abort();
-  }, [materialType, personal, seedBookId]);
+  const query = useQuery({
+    queryKey: personal ? recommendationsKeys.personalType(materialType) : recommendationsKeys.related(seedBookId ?? 0, materialType),
+    queryFn: ({ signal }) => fetchRecommendations({ materialType, seedBookId, personal, signal }),
+    enabled: Boolean(personal || seedBookId),
+  });
+  const rows = query.data?.rows ?? [];
+  const loading = query.isPending && Boolean(personal || seedBookId);
+  useEffect(() => setPageIndex(0), [materialType, personal, seedBookId]);
+  const dismissMutation = useMutation({
+    mutationFn: dismissRecommendation,
+    onMutate: async (bookId) => {
+      await queryClient.cancelQueries({ queryKey: recommendationsKeys.personal() });
+      const snapshot = queryClient.getQueriesData<RecommendationsResponse>({ queryKey: recommendationsKeys.personal() });
+      snapshot.forEach(([key, result]) => {
+        if (result) queryClient.setQueryData<RecommendationsResponse>(key, { ...result, rows: result.rows.filter((book) => book.id !== bookId) });
+      });
+      return snapshot;
+    },
+    onError: (_error, _bookId, snapshot: Array<[QueryKey, RecommendationsResponse | undefined]> | undefined) => {
+      snapshot?.forEach(([key, result]) => { if (result) queryClient.setQueryData(key, result); });
+      toast.error("We could not save that preference. Please try again.");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: recommendationsKeys.personal() }),
+  });
   useEffect(() => {
     const element = sectionRef.current;
     if (!element) return;
@@ -58,11 +68,7 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
   useEffect(() => {
     setPageIndex((current) => Math.min(current, Math.max(0, Math.ceil(rows.length / cardsPerPage) - 1)));
   }, [rows.length, cardsPerPage]);
-  const dismiss = async (bookId: number) => {
-    setRows((current) => current.filter((book) => book.id !== bookId));
-    try { await dismissRecommendation(bookId); }
-    catch { toast.error("We could not save that preference. Please try again."); }
-  };
+  const dismiss = async (bookId: number) => { try { await dismissMutation.mutateAsync(bookId); } catch { /* The mutation restores the cache and shows the error. */ } };
   if (!loading && !rows.length) return null;
   const heading = title || (personal ? (materialType === "book" ? "Recommended for you" : "Theses to explore") : (materialType === "book" ? "Similar books" : "Related theses"));
   const pageCount = Math.max(1, Math.ceil(rows.length / cardsPerPage));

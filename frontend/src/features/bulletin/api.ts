@@ -8,10 +8,10 @@ export interface BulletinLikeResponse { liked: boolean; total: number; }
 export interface BulletinLiker { id: number; name: string; role: string; created_at: string; }
 export interface BulletinEvent { id: number; title: string; starts_at: string; ends_at?: string | null; }
 
-export const fetchBulletinPosts = async (params: Record<string, unknown> = {}): Promise<BulletinListResponse> =>
-  (await axiosInstance.get<BulletinListResponse>("/api/bulletin", { params })).data;
-export const fetchBulletinPost = async (postId: number): Promise<BulletinDetailResponse> =>
-  (await axiosInstance.get<BulletinDetailResponse>(`/api/bulletin/${postId}`)).data;
+export const fetchBulletinPosts = async (params: Record<string, unknown> = {}, signal?: AbortSignal): Promise<BulletinListResponse> =>
+  (await axiosInstance.get<BulletinListResponse>("/api/bulletin", { params, signal })).data;
+export const fetchBulletinPost = async (postId: number, signal?: AbortSignal): Promise<BulletinDetailResponse> =>
+  (await axiosInstance.get<BulletinDetailResponse>(`/api/bulletin/${postId}`, { signal })).data;
 export const toggleBulletinLike = async (postId: number): Promise<BulletinLikeResponse> =>
   (await axiosInstance.post<BulletinLikeResponse>(`/api/bulletin/${postId}/like`)).data;
 export const setBulletinPinned = async (postId: number, pinned: boolean): Promise<void> => {
@@ -24,5 +24,5 @@ export const createBulletinPost = async (payload: { title: string; content: stri
 export const createBulletinComment = async (postId: number, text: string): Promise<ApiComment> =>
   (await axiosInstance.post<ApiComment>(`/api/bulletin/${postId}/comments`, { text })).data;
 export const deleteBulletinComment = async (postId: number, commentId: number): Promise<void> => { await axiosInstance.delete(`/api/bulletin/${postId}/comments/${commentId}`); };
-export const fetchBulletinLikers = async (postId: number): Promise<BulletinLiker[]> =>
-  (await axiosInstance.get<{ data?: BulletinLiker[] }>(`/api/bulletin/${postId}/likes`)).data.data ?? [];
+export const fetchBulletinLikers = async (postId: number, signal?: AbortSignal): Promise<BulletinLiker[]> =>
+  (await axiosInstance.get<{ data?: BulletinLiker[] }>(`/api/bulletin/${postId}/likes`, { signal })).data.data ?? [];

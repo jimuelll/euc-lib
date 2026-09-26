@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,9 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchManualBookMetadata, fetchManualMetadataBooks, saveManualBookMetadata, type ManualBookMetadata, type ManualMetadataBook } from "./catalog.api";
 import { Check, CircleAlert, LoaderCircle, Search, Sparkles } from "lucide-react";
+import { catalogKeys } from "../catalog.keys";
+import { useDebounce } from "@/hooks/use-debounce";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 const statusLabel: Record<ManualMetadataBook["metadataStatus"], string> = {
   missing: "Needs details",
@@ -23,18 +27,27 @@ const statusClass: Record<ManualMetadataBook["metadataStatus"], string> = {
   manual: "border-success/25 bg-success/5 text-success",
 };
 
+const synopsisLabel: Record<ManualMetadataBook["synopsisStatus"], string> = {
+  present: "Synopsis added",
+  not_checked: "Synopsis not checked",
+  no_description: "No online synopsis",
+  lookup_failed: "Synopsis lookup failed",
+  missing: "Synopsis missing",
+};
+
+const synopsisClass: Record<ManualMetadataBook["synopsisStatus"], string> = {
+  present: "border-success/25 bg-success/5 text-success",
+  not_checked: "border-warning/30 bg-warning/5 text-warning-foreground",
+  no_description: "border-warning/30 bg-warning/5 text-warning-foreground",
+  lookup_failed: "border-destructive/25 bg-destructive/5 text-destructive",
+  missing: "border-warning/30 bg-warning/5 text-warning-foreground",
+};
+
 const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: number }) => {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [books, setBooks] = useState<ManualMetadataBook[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loadingBooks, setLoadingBooks] = useState(true);
-  const [listError, setListError] = useState("");
   const [selectedBook, setSelectedBook] = useState<ManualMetadataBook | null>(null);
-  const [details, setDetails] = useState<ManualBookMetadata | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [summary, setSummary] = useState("");
   const [subjectsText, setSubjectsText] = useState("");
   const [publisher, setPublisher] = useState("");
@@ -43,30 +56,52 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
   const [pageCountText, setPageCountText] = useState("");
   const [publishedDate, setPublishedDate] = useState("");
   const [formError, setFormError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const debouncedQuery = useDebounce(query.trim(), 220);
+  const booksQuery = useQuery({
+    queryKey: catalogKeys.manualMetadataBooks({ query: debouncedQuery, needsAttention: !debouncedQuery, page }),
+    queryFn: ({ signal }) => fetchManualMetadataBooks({ query: debouncedQuery, needsAttention: !debouncedQuery, page }, signal),
+    placeholderData: keepPreviousData,
+  });
+  const detailsQuery = useQuery({
+    queryKey: catalogKeys.manualBookMetadata(selectedBook?.id ?? 0),
+    queryFn: ({ signal }) => fetchManualBookMetadata(selectedBook!.id, signal),
+    enabled: Boolean(selectedBook),
+  });
+  const books = booksQuery.data?.rows ?? [];
+  const total = booksQuery.data?.pagination.total ?? 0;
+  const totalPages = booksQuery.data?.pagination.totalPages ?? 1;
+  const loadingBooks = booksQuery.isFetching;
+  const listError = booksQuery.isError ? getApiErrorMessage(booksQuery.error, "Books could not be loaded. Try again.") : "";
+  const details = detailsQuery.data ?? null;
+  const loadingDetails = detailsQuery.isPending;
+  const saveMutation = useMutation({
+    mutationFn: ({ bookId, payload }: { bookId: number; payload: Parameters<typeof saveManualBookMetadata>[1] }) => saveManualBookMetadata(bookId, payload),
+    onSuccess: async (_result, variables) => {
+      await queryClient.invalidateQueries({ queryKey: catalogKeys.embeddings() });
+      await queryClient.invalidateQueries({ queryKey: catalogKeys.manualBookMetadata(variables.bookId) });
+    },
+  });
+  const saving = saveMutation.isPending;
   const searchingAllBooks = Boolean(query.trim());
 
   useEffect(() => {
-    let active = true;
-    setLoadingBooks(true);
-    setListError("");
-    const timer = window.setTimeout(() => {
-      void fetchManualMetadataBooks({ query, needsAttention: !query.trim(), page }).then((result) => {
-        if (!active) return;
-        setBooks(result.rows);
-        setTotal(result.pagination.total);
-        setTotalPages(result.pagination.totalPages);
-      }).catch((error: any) => {
-        if (!active) return;
-        setListError(error.response?.data?.message || "Books could not be loaded. Try again.");
-      }).finally(() => { if (active) setLoadingBooks(false); });
-    }, query.trim() ? 220 : 0);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [query, page, refreshKey, backfillRevision]);
+    if (backfillRevision > 0) void queryClient.invalidateQueries({ queryKey: catalogKeys.embeddings() });
+  }, [backfillRevision, queryClient]);
 
-  const openBook = async (book: ManualMetadataBook) => {
+  useEffect(() => {
+    const result = detailsQuery.data;
+    if (!result || result.book.id !== selectedBook?.id) return;
+    setSummary(result.summary);
+    setSubjectsText(result.subjects.join("\n"));
+    setPublisher(result.additionalDetails.publisher);
+    setCategoriesText(result.additionalDetails.categories.join("\n"));
+    setLanguage(result.additionalDetails.language);
+    setPageCountText(result.additionalDetails.pageCount == null ? "" : String(result.additionalDetails.pageCount));
+    setPublishedDate(result.additionalDetails.publishedDate);
+  }, [detailsQuery.data, selectedBook?.id]);
+
+  const openBook = (book: ManualMetadataBook) => {
     setSelectedBook(book);
-    setDetails(null);
     setSummary("");
     setSubjectsText("");
     setPublisher("");
@@ -75,26 +110,11 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
     setPageCountText("");
     setPublishedDate("");
     setFormError("");
-    setLoadingDetails(true);
-    try {
-      const result = await fetchManualBookMetadata(book.id);
-      setDetails(result);
-      setSummary(result.summary);
-      setSubjectsText(result.subjects.join("\n"));
-      setPublisher(result.additionalDetails.publisher);
-      setCategoriesText(result.additionalDetails.categories.join("\n"));
-      setLanguage(result.additionalDetails.language);
-      setPageCountText(result.additionalDetails.pageCount == null ? "" : String(result.additionalDetails.pageCount));
-      setPublishedDate(result.additionalDetails.publishedDate);
-    } catch (error: any) {
-      setFormError(error.response?.data?.message || "Book details could not be loaded. Close this panel and try again.");
-    } finally { setLoadingDetails(false); }
   };
 
   const closeEditor = () => {
     if (saving) return;
     setSelectedBook(null);
-    setDetails(null);
     setFormError("");
   };
 
@@ -111,13 +131,12 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
       setFormError("Page count must be a whole number from 1 to 100,000.");
       return;
     }
-    setSaving(true);
     setFormError("");
     try {
-      const result = await saveManualBookMetadata(selectedBook.id, {
+      const result = await saveMutation.mutateAsync({ bookId: selectedBook.id, payload: {
         summary: summary.trim(), subjects,
         additionalDetails: { publisher: publisher.trim(), categories, language: language.trim(), pageCount: cleanPageCount, publishedDate: publishedDate.trim() },
-      });
+      } });
       setSummary(result.summary);
       setSubjectsText(result.subjects.join("\n"));
       setPublisher(result.additionalDetails.publisher);
@@ -125,22 +144,22 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
       setLanguage(result.additionalDetails.language);
       setPageCountText(result.additionalDetails.pageCount == null ? "" : String(result.additionalDetails.pageCount));
       setPublishedDate(result.additionalDetails.publishedDate);
-      setRefreshKey((value) => value + 1);
       if (result.embeddingStatus === "ready") {
-        toast.success("Book details saved and AI recommendations updated.");
+        if (summary.trim()) toast.success("Book details saved and AI recommendations updated.");
+        else toast.warning("Book details saved. The AI synopsis is still missing.");
         setSelectedBook(null);
-        setDetails(null);
       } else {
         const message = `Your book details were saved, but AI recommendations could not be updated: ${result.embeddingError || "Please try again later."}`;
         setFormError(message);
         toast.error("Details saved; AI update needs attention.");
       }
-    } catch (error: any) {
-      setFormError(error.response?.data?.message || "Details could not be saved. Check your connection and try again.");
-    } finally { setSaving(false); }
+    } catch (error: unknown) {
+      setFormError(getApiErrorMessage(error, "Details could not be saved. Check your connection and try again."));
+    }
   };
 
   const metadataStatus = details?.metadataStatus || selectedBook?.metadataStatus;
+  const currentSynopsisStatus = details?.synopsisStatus || selectedBook?.synopsisStatus;
   return (
     <>
       <section aria-labelledby="manual-ai-details-heading" className="rounded-md border border-border bg-card">
@@ -158,11 +177,11 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
             <Input aria-label="Search books by title, author, or ISBN" className="pl-9" placeholder="Search any book by title, author, or ISBN" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} />
           </div>
           <p className="text-xs leading-5 text-muted-foreground" aria-live="polite">
-            {searchingAllBooks ? "Search results include books with and without AI details." : "Showing active books missing useful details or a ready AI embedding. Search above to open any active book."}
+            {searchingAllBooks ? "Search results include books with and without AI details." : "Showing active books missing a synopsis, useful details, or a ready embedding. Search above to open any active book."}
           </p>
 
-          {loadingBooks ? <div className="space-y-2" aria-label="Loading books">{[0, 1, 2].map((item) => <div key={item} className="h-[68px] animate-pulse rounded-md bg-muted/60" />)}</div> : listError ? (
-            <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription className="flex flex-wrap items-center justify-between gap-3">{listError}<Button size="sm" variant="outline" onClick={() => setRefreshKey((value) => value + 1)}>Try again</Button></AlertDescription></Alert>
+          {loadingBooks && !booksQuery.data ? <div className="space-y-2" aria-label="Loading books">{[0, 1, 2].map((item) => <div key={item} className="h-[68px] animate-pulse rounded-md bg-muted/60" />)}</div> : listError && !booksQuery.data ? (
+            <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription className="flex flex-wrap items-center justify-between gap-3">{listError}<Button size="sm" variant="outline" onClick={() => void booksQuery.refetch()}>Try again</Button></AlertDescription></Alert>
           ) : books.length ? (
             <>
               <ul className="divide-y divide-border rounded-md border border-border" aria-label={searchingAllBooks ? "Book search results" : "Books needing an AI update"}>
@@ -172,9 +191,10 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
                       <span className="block truncate text-sm font-medium text-foreground">{book.title}</span>
                       <span className="mt-1 block truncate text-xs text-muted-foreground">{book.author || "Author not listed"}{book.isbn ? ` · ISBN ${book.isbn}` : " · No ISBN"}</span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs font-medium ${statusClass[book.metadataStatus]}`}>{statusLabel[book.metadataStatus]}</span>
-                      <span className="text-xs text-muted-foreground">{book.embeddingStatus === "ready" ? "AI ready" : "AI update needed"}</span>
+                    <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs font-medium ${statusClass[book.metadataStatus]}`}>{book.metadataStatus === "ready" ? "Other details found" : statusLabel[book.metadataStatus]}</span>
+                      <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs font-medium ${synopsisClass[book.synopsisStatus]}`}>{synopsisLabel[book.synopsisStatus]}</span>
+                      <span className="text-xs text-muted-foreground">{book.embeddingStatus === "ready" ? "Embedding ready" : "Embedding update needed"}</span>
                     </span>
                   </button>
                 </li>)}
@@ -192,7 +212,7 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
             <div className="rounded-md border border-dashed border-border px-5 py-8 text-center">
               <Check className="mx-auto size-5 text-success" />
               <p className="mt-2 text-sm font-medium text-foreground">{searchingAllBooks ? "No books found" : "No books need an AI update"}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{searchingAllBooks ? "Try another title, author, or ISBN." : "All active books have useful details and a ready AI embedding. Search above to review a book."}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{searchingAllBooks ? "Try another title, author, or ISBN." : "All active books have a synopsis, useful details, and a ready AI embedding. Search above to review a book."}</p>
             </div>
           )}
         </div>
@@ -204,13 +224,17 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
             <SheetTitle className="text-primary-foreground">Add AI details</SheetTitle>
             <SheetDescription className="text-primary-foreground/80">{selectedBook?.title || "Book"}{selectedBook?.author ? ` · ${selectedBook.author}` : ""}</SheetDescription>
           </SheetHeader>
-          {loadingDetails ? <div className="space-y-4 p-6" aria-label="Loading book details"><div className="h-5 w-2/3 animate-pulse rounded bg-muted" /><div className="h-28 animate-pulse rounded bg-muted" /><div className="h-24 animate-pulse rounded bg-muted" /></div> : (
+          {loadingDetails ? <div className="space-y-4 p-6" aria-label="Loading book details"><div className="h-5 w-2/3 animate-pulse rounded bg-muted" /><div className="h-28 animate-pulse rounded bg-muted" /><div className="h-24 animate-pulse rounded bg-muted" /></div> : detailsQuery.isError ? <div role="alert" className="m-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(detailsQuery.error, "Book details could not be loaded.")}<Button type="button" variant="outline" size="sm" className="ml-3" onClick={() => void detailsQuery.refetch()}>Try again</Button></div> : (
             <div className="flex min-h-0 flex-col overflow-y-auto">
               <div className="flex-1 space-y-5 px-6 py-5">
                 {selectedBook?.isbn ? <p className="text-xs text-muted-foreground">ISBN {selectedBook.isbn}</p> : <p className="text-xs text-muted-foreground">No ISBN is recorded. You can still add details below.</p>}
                 {metadataStatus === "failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The online details lookup failed{details?.metadataError ? `: ${details.metadataError}` : "."} This is separate from its AI embedding status. You can still add details below.</AlertDescription></Alert> : null}
-                {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Some details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
+                {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Other book details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
                 {metadataStatus === "manual" ? <Alert><Check className="size-4" /><AlertDescription>These details were added by library staff. You can update them here.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "lookup_failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The synopsis lookup failed{details?.synopsisError ? `: ${details.synopsisError}` : ". You can retry Backfill later or add the synopsis manually."}</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "no_description" ? <Alert><Sparkles className="size-4" /><AlertDescription>Google Books was checked but did not provide a synopsis. Add one manually if available.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Backfill can check Google Books for this ISBN.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "missing" ? <Alert><CircleAlert className="size-4" /><AlertDescription>No AI synopsis is recorded. You can add one manually below.</AlertDescription></Alert> : null}
 
                 <section aria-labelledby="other-book-details-heading" className="space-y-4 rounded-md border border-border bg-muted/20 p-4">
                   <div>

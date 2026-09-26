@@ -1,36 +1,38 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchMyLibraryAttendance, fetchMyLibraryHistory } from "../api";
-import type { AttendanceSession, MyLibraryHistoryItem, MyLibraryPage } from "../types";
+import { myLibraryKeys } from "../my-library.keys";
 
 export function useMyLibraryActivity(enabled: boolean) {
-  const [historyPage, setHistoryPage] = useState<MyLibraryPage<MyLibraryHistoryItem> | null>(null);
-  const [attendancePage, setAttendancePage] = useState<MyLibraryPage<AttendanceSession> | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [historyPageNumber, setHistoryPageNumber] = useState(1);
+  const [attendancePageNumber, setAttendancePageNumber] = useState(1);
+  const historyQuery = useQuery({
+    queryKey: myLibraryKeys.history(historyPageNumber),
+    queryFn: ({ signal }) => fetchMyLibraryHistory(historyPageNumber, signal),
+    enabled,
+    placeholderData: (previousData) => previousData,
+  });
+  const attendanceQuery = useQuery({
+    queryKey: myLibraryKeys.attendance(attendancePageNumber),
+    queryFn: ({ signal }) => fetchMyLibraryAttendance(attendancePageNumber, signal),
+    enabled,
+    placeholderData: (previousData) => previousData,
+  });
+  const loadHistory = async (page = 1) => {
+    if (page === historyPageNumber) await historyQuery.refetch();
+    else setHistoryPageNumber(page);
+  };
+  const loadAttendance = async (page = 1) => {
+    if (page === attendancePageNumber) await attendanceQuery.refetch();
+    else setAttendancePageNumber(page);
+  };
 
-  const loadHistory = useCallback(async (page = 1) => {
-    setHistoryLoading(true);
-    try {
-      setHistoryPage(await fetchMyLibraryHistory(page));
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
-  const loadAttendance = useCallback(async (page = 1) => {
-    setAttendanceLoading(true);
-    try {
-      setAttendancePage(await fetchMyLibraryAttendance(page));
-    } finally {
-      setAttendanceLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) return;
-    void loadHistory(1);
-    void loadAttendance(1);
-  }, [enabled, loadAttendance, loadHistory]);
-
-  return { attendanceLoading, attendancePage, historyLoading, historyPage, loadAttendance, loadHistory };
+  return {
+    attendanceLoading: attendanceQuery.isFetching,
+    attendancePage: attendanceQuery.data ?? null,
+    historyLoading: historyQuery.isFetching,
+    historyPage: historyQuery.data ?? null,
+    loadAttendance,
+    loadHistory,
+  };
 }

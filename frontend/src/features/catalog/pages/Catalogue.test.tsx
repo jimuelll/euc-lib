@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Link, MemoryRouter } from "react-router-dom";
+import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
 const { fetchPublicCatalogSchema, searchPublicCatalogue } = vi.hoisted(() => ({
   fetchPublicCatalogSchema: vi.fn(),
@@ -27,12 +28,13 @@ beforeEach(() => {
 });
 
 const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catalogue", includeRecommendationLink = false) => {
+  const QueryWrapper = createTestQueryClientWrapper();
   searchPublicCatalogue.mockResolvedValue({
     rows: [{ id: 14, title: "Sample catalogue title", author: "Test Author", material_type: materialType, available: 1, registered_copies: 1 }],
     pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     facets: { format: { all: 1, book: materialType === "book" ? 1 : 0, thesis: materialType === "thesis" ? 1 : 0 }, availability: { all: 1, available: 1, unavailable: 0 }, categories: [] },
   });
-  render(<MemoryRouter initialEntries={[initialEntry]}><Catalogue />{includeRecommendationLink ? <Link to="/catalogue?q=Recommended%20title">Recommended book</Link> : null}</MemoryRouter>);
+  render(<QueryWrapper><MemoryRouter initialEntries={[initialEntry]}><Catalogue />{includeRecommendationLink ? <Link to="/catalogue?q=Recommended%20title">Recommended book</Link> : null}</MemoryRouter></QueryWrapper>);
 };
 
 describe("catalogue recommendation action", () => {
@@ -75,6 +77,6 @@ describe("catalogue recommendation action", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Search the public catalogue")).toHaveValue("Recommended title"));
     await waitFor(() => expect(searchPublicCatalogue).toHaveBeenCalledTimes(1));
-    expect(searchPublicCatalogue).toHaveBeenCalledWith(expect.objectContaining({ query: "Recommended title" }));
+    expect(searchPublicCatalogue).toHaveBeenCalledWith(expect.objectContaining({ query: "Recommended title" }), expect.any(AbortSignal));
   }, 20000);
 });

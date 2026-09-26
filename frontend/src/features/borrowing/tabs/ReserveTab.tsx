@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { BookMarked, Clock, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,13 +35,15 @@ const ReserveTab = ({
 }: ReserveTabProps) => {
   const [reservingId, setReservingId]   = useState<number | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const reserveMutation = useMutation({ mutationFn: reserveBook });
+  const cancelMutation = useMutation({ mutationFn: cancelReservation });
 
   const reservedBookTitles = new Set(activeReservations.map((r) => r.title));
 
   const handleReserve = async (book: CatalogBook) => {
     setReservingId(book.id);
     try {
-      const res = await reserveBook(book.id);
+      const res = await reserveMutation.mutateAsync(book.id);
       toast.success(`"${book.title}" reserved — pick up before ${
         res.expiresAt
           ? new Date(res.expiresAt).toLocaleString()
@@ -66,7 +69,7 @@ const ReserveTab = ({
   const handleCancel = async (reservationId: number, title: string) => {
     setCancellingId(reservationId);
     try {
-      await cancelReservation(reservationId);
+      await cancelMutation.mutateAsync(reservationId);
       toast.success(`Reservation for "${title}" cancelled`);
       onCancelSuccess(reservationId);
     } catch (err: any) {

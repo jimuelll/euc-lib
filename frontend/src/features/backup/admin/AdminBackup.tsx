@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { backupKeys } from "../backup.keys";
 import { ArchiveRestore, DatabaseBackup, Download, FileDown, Loader2, ShieldAlert, Upload } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -48,36 +50,22 @@ async function readBackupText(file: File, maxBytes: number) {
 
 const AdminBackup = () => {
   const { logout } = useAuth();
+  const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
-  const [savingSnapshot, setSavingSnapshot] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
-  const [loadingSnapshots, setLoadingSnapshots] = useState(true);
+  const snapshotsQuery = useQuery({ queryKey: backupKeys.snapshots(), queryFn: ({ signal }) => fetchBackupSnapshots(signal) });
+  const statusQuery = useQuery({ queryKey: backupKeys.status(), queryFn: ({ signal }) => fetchBackupStatus(signal), refetchInterval: 30_000 });
+  const snapshots: Snapshot[] = snapshotsQuery.data ?? [];
+  const loadingSnapshots = snapshotsQuery.isPending;
+  const snapshotMutation = useMutation({ mutationFn: createBackupSnapshot, onSuccess: () => queryClient.invalidateQueries({ queryKey: backupKeys.snapshots() }) });
+  const savingSnapshot = snapshotMutation.isPending;
   const [snapshotToRestore, setSnapshotToRestore] = useState<Snapshot | null>(null);
   const [snapshotCompatibility, setSnapshotCompatibility] = useState<Compatibility | null>(null);
   const [checkingCompatibility, setCheckingCompatibility] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState<"normal" | "restoring">("normal");
-  const [maxImportBytes, setMaxImportBytes] = useState(50 * 1024 * 1024);
+  const maintenanceMode = statusQuery.data?.mode ?? "normal";
+  const maxImportBytes = statusQuery.data?.maxImportBytes ?? 50 * 1024 * 1024;
   const [lastBackup, setLastBackup] = useState<{ name: string; size: number; createdAt: string } | null>(null);
-
-  const loadSnapshots = async () => {
-    setLoadingSnapshots(true);
-    try {
-      setSnapshots(await fetchBackupSnapshots());
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not load saved snapshots.");
-    } finally {
-      setLoadingSnapshots(false);
-    }
-  };
-
-  useEffect(() => { void loadSnapshots(); }, []);
-  useEffect(() => {
-    fetchBackupStatus()
-      .then((data) => { setMaintenanceMode(data.mode); if (data.maxImportBytes) setMaxImportBytes(data.maxImportBytes); })
-      .catch(() => undefined);
-  }, []);
 
   const handleExport = async () => {
     setExporting(true);
@@ -102,15 +90,11 @@ const AdminBackup = () => {
   };
 
   const handleCreateSnapshot = async () => {
-    setSavingSnapshot(true);
     try {
-      await createBackupSnapshot();
+      await snapshotMutation.mutateAsync();
       toast.success("Snapshot saved securely.");
-      await loadSnapshots();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Could not save the snapshot.");
-    } finally {
-      setSavingSnapshot(false);
     }
   };
 
@@ -135,6 +119,7 @@ const AdminBackup = () => {
     setRestoring(true);
     try {
       await restoreBackupSnapshot(snapshotToRestore.id);
+      queryClient.clear();
       toast.success("Snapshot restored. All sessions, including yours, are ending now.");
       setSnapshotToRestore(null);
       await logout();
@@ -161,6 +146,7 @@ const AdminBackup = () => {
       if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
       setRestoring(true);
       await restoreBackup(backup);
+      queryClient.clear();
       toast.success("Database restored. All sessions, including yours, are ending now.");
       await logout();
     } catch (error: any) {
@@ -177,7 +163,7 @@ const AdminBackup = () => {
     setCheckingCompatibility(true);
     setSnapshotCompatibility(null);
     try {
-      const data = await fetchSnapshotCompatibility(snapshot.id);
+      const data = await queryClient.fetchQuery({ queryKey: backupKeys.compatibility(snapshot.id), queryFn: ({ signal }) => fetchSnapshotCompatibility(snapshot.id, signal) });
       setSnapshotToRestore(snapshot);
       setSnapshotCompatibility(data);
     } catch (error: any) {
@@ -226,6 +212,7 @@ const AdminBackup = () => {
         title="Saved snapshots"
         description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point, then signs out all users; incompatible snapshots remain available to download."
       >
+        {snapshotsQuery.isError ? <p role="alert" className="mb-3 text-sm text-destructive">Could not load saved snapshots. <Button type="button" variant="outline" size="sm" onClick={() => void snapshotsQuery.refetch()}>Try again</Button></p> : null}
         {loadingSnapshots ? (
           <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading saved snapshots...</div>
         ) : snapshots.length ? (

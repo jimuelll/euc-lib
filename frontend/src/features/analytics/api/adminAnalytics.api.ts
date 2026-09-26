@@ -61,18 +61,18 @@ export interface AuditMetaResponse {
 }
 
 /** Typed boundary for the admin dashboard contract. */
-export async function fetchAdminDashboard(range: AnalyticsRange): Promise<DashboardResponse> {
-  return (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range } })).data;
+export async function fetchAdminDashboard(range: AnalyticsRange, signal?: AbortSignal): Promise<DashboardResponse> {
+  return (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range }, signal })).data;
 }
 
 export async function createAiAnalyticsReport(input: { dateFrom?: string; dateTo?: string; allTime?: boolean; question?: string }): Promise<AiAnalyticsReportResponse> {
   return (await axiosInstance.post<AiAnalyticsReportResponse>("/api/admin/dashboard/ai-report", input)).data;
 }
 
-export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string }): Promise<AuditResponse> {
-  return (await axiosInstance.get<AuditResponse>("/api/admin/dashboard/audit", { params })).data;
+export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string }, signal?: AbortSignal): Promise<AuditResponse> {
+  return (await axiosInstance.get<AuditResponse>("/api/admin/dashboard/audit", { params, signal })).data;
 }
 
-export async function fetchAuditMeta(): Promise<AuditMetaResponse> {
-  return (await axiosInstance.get<AuditMetaResponse>("/api/admin/dashboard/audit/meta")).data;
+export async function fetchAuditMeta(signal?: AbortSignal): Promise<AuditMetaResponse> {
+  return (await axiosInstance.get<AuditMetaResponse>("/api/admin/dashboard/audit/meta", { signal })).data;
 }

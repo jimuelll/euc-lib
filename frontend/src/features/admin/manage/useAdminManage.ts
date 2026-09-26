@@ -1,11 +1,15 @@
 import { useAdminUrlState, queryPage } from "@/features/admin/hooks/useAdminUrlState";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
+import { invalidateServerState } from "@/app/server-state";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import type { User, UserFormState, QrTarget } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
+import { manageKeys } from "./manage.keys";
 
 export type { AcademicProgram, AcademicTerm, Department } from "./api";
 
@@ -55,43 +59,40 @@ interface UseAdminManageReturn {
 
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [params, patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
 
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
   const [loading,       setLoading]       = useState(false);
-  const [allowedRoles,  setAllowedRoles]  = useState<string[]>([]);
-  const [programs,      setPrograms]      = useState<AcademicProgram[]>([]);
-  const [terms,         setTerms]         = useState<AcademicTerm[]>([]);
-  const [departments,   setDepartments]   = useState<Department[]>([]);
   const searchQuery = params.get("q") ?? "";
+  const debouncedSearch = useDebounce(searchQuery, 180);
   const setSearchQuery = (value: string) => patchParams({ q: value, page: null }, true);
   const roleFilter = params.get("role") ?? "all";
   const setRoleFilter = (value: string) => patchParams({ role: value, page: null }, false);
   const statusFilter = params.get("status") ?? "all";
   const setStatusFilter = (value: string) => patchParams({ status: value, page: null }, false);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [userPagination, setUserPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
-
-  useEffect(() => {
-    if (!user) return;
-    setAllowedRoles(getAllowedRoles(user.role));
-  }, [user]);
-  useEffect(() => { if (user) void fetchDepartments().then(setDepartments).catch(() => setDepartments([])); }, [user]);
-
-  useEffect(() => { if (!user) return; void fetchAcademicTerms().then(setTerms).catch(() => setTerms([])); }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    void fetchAcademicPrograms()
-      .then(setPrograms)
-      .catch(() => setPrograms([]));
-  }, [user]);
+  const allowedRoles = user ? getAllowedRoles(user.role) : [];
+  const departmentsQuery = useQuery({ queryKey: manageKeys.departments(), queryFn: ({ signal }) => fetchDepartments(signal), enabled: Boolean(user) });
+  const termsQuery = useQuery({ queryKey: manageKeys.terms(), queryFn: ({ signal }) => fetchAcademicTerms(signal), enabled: Boolean(user) });
+  const programsQuery = useQuery({ queryKey: manageKeys.programs(), queryFn: ({ signal }) => fetchAcademicPrograms(signal), enabled: Boolean(user) });
+  const departments: Department[] = departmentsQuery.data ?? [];
+  const terms: AcademicTerm[] = termsQuery.data ?? [];
+  const programs: AcademicProgram[] = programsQuery.data ?? [];
+  const filters = { query: debouncedSearch, role: roleFilter, status: statusFilter, archived: showArchived, page: currentPage };
+  const usersQuery = useQuery({ queryKey: manageKeys.userSearch(filters), queryFn: ({ signal }) => searchUsers(filters, signal), enabled: Boolean(user), placeholderData: (previousData) => previousData });
+  const searchResults: User[] = usersQuery.data?.rows ?? [];
+  const userPagination = usersQuery.data?.pagination ?? { page: currentPage, limit: 25, total: 0, totalPages: 1 };
+  const invalidateUsers = () => invalidateServerState(queryClient, "user");
+  const createMutation = useMutation({ mutationFn: createUser, onSuccess: invalidateUsers });
+  const updateMutation = useMutation({ mutationFn: ({ id, form }: { id: string; form: UserFormState }) => updateUser(id, form), onSuccess: invalidateUsers });
+  const archiveMutation = useMutation({ mutationFn: archiveUser, onSuccess: invalidateUsers });
+  const restoreMutation = useMutation({ mutationFn: restoreUser, onSuccess: invalidateUsers });
 
   // ── Form helpers ───────────────────────────────────────────────────────────
   const setField = <K extends keyof UserFormState>(key: K, value: string) =>
@@ -122,12 +123,11 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
     setLoading(true);
     try {
-      const response = await createUser({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
+      const response = await createMutation.mutateAsync({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
       toast.success(response.message);
       const identifier = form.libraryCardNumber || form.employeeNumber || form.username;
       setQrTarget({ studentId: identifier, name: fullName });
       resetForm();
-      await handleSearchUsers();
       return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to create user");
@@ -141,27 +141,13 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const handleSearchUsers = async (page = currentPage) => {
     if (page !== currentPage) { patchParams({ page }); return; }
     const trimmedQuery = searchQuery.trim();
-
-    setLoading(true);
-    try {
-      const result = await searchUsers({ query: trimmedQuery, role: roleFilter, status: statusFilter, archived: showArchived, page });
-      setSearchResults(result.rows);
-      setUserPagination(result.pagination);
-      if (!result.rows.length) {
+    const result = await usersQuery.refetch();
+    if (result.isSuccess) {
+      if (!result.data.rows.length) {
         toast.info(trimmedQuery ? "No users found" : `No ${showArchived ? "archived" : "active"} users found`);
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Search failed");
-    } finally {
-      setLoading(false);
-    }
+    } else toast.error((result.error as any)?.response?.data?.message || "Search failed");
   };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => { if (user) void handleSearchUsers(currentPage); }, 180);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, searchQuery, roleFilter, statusFilter, showArchived, currentPage]);
 
   const selectUserForEdit = (u: User) => {
     setSelectedUser(u);
@@ -193,12 +179,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
     setLoading(true);
     try {
-      const response = await updateUser(selectedUser.student_employee_id, {
-        ...form,
-      });
+      const response = await updateMutation.mutateAsync({ id: selectedUser.student_employee_id, form: { ...form } });
       toast.success(response.message);
       resetForm();
-      await handleSearchUsers();
       return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Update failed");
@@ -221,10 +204,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!shouldArchive) return false;
     setLoading(true);
     try {
-      const response = await archiveUser(selectedUser.student_employee_id);
+      const response = await archiveMutation.mutateAsync(selectedUser.student_employee_id);
       toast.success(response.message || "User archived");
       resetForm();
-      await handleSearchUsers();
       return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Archive failed");
@@ -246,10 +228,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!shouldRestore) return false;
     setLoading(true);
     try {
-      const response = await restoreUser(selectedUser.student_employee_id);
+      const response = await restoreMutation.mutateAsync(selectedUser.student_employee_id);
       toast.success(response.message || "User restored");
       resetForm();
-      await handleSearchUsers();
       return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Restore failed");
@@ -282,7 +263,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     setArchivedView,
     selectedUser,
     selectUserForEdit,
-    loading,
+    loading: loading || usersQuery.isPending,
     handleCreateUser,
     handleUpdateUser,
     handleArchiveUser,

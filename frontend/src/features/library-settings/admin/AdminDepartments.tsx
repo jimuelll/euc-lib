@@ -1,4 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateServerState } from "@/app/server-state";
+import { librarySettingsKeys } from "../library-settings.keys";
 import { Archive, Loader2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,29 +11,24 @@ import { createDepartment, deleteDepartment, fetchDepartments, restoreDepartment
 const messageOf = (error: unknown) => (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Something went wrong. Try again.";
 
 export default function AdminDepartments() {
-  const [items, setItems] = useState<Department[]>([]);
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<"active" | "archived">("active");
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    try { setItems(await fetchDepartments(status)); }
-    catch (error) { toast.error(messageOf(error)); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { void load(); }, [status]);
+  const departmentsQuery = useQuery({ queryKey: librarySettingsKeys.departments(status), queryFn: ({ signal }) => fetchDepartments(status, signal), placeholderData: (previousData) => previousData });
+  const items: Department[] = departmentsQuery.data ?? [];
+  const loading = departmentsQuery.isFetching;
+  const mutation = useMutation({ mutationFn: (operation: () => Promise<any>) => operation(), onSuccess: () => invalidateServerState(queryClient, "settings") });
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setPending(true);
     try {
-      if (editing) await updateDepartment(editing, name);
-      else await createDepartment(name);
+      if (editing) await mutation.mutateAsync(() => updateDepartment(editing, name));
+      else await mutation.mutateAsync(() => createDepartment(name));
       toast.success(editing ? "Department updated" : "Department added");
-      setName(""); setEditing(null); await load();
+      setName(""); setEditing(null);
     } catch (error) { toast.error(messageOf(error)); }
     finally { setPending(false); }
   };
@@ -42,16 +40,15 @@ export default function AdminDepartments() {
     if (!window.confirm(`${action} “${item.name}”?${usage}`)) return;
     setPending(true);
     try {
-      const result = await deleteDepartment(item.id);
+      const result = await mutation.mutateAsync(() => deleteDepartment(item.id));
       toast.success(result.action === "archived" ? "Department archived; employee records keep their reference" : "Unused department deleted");
-      await load();
     } catch (error) { toast.error(messageOf(error)); }
     finally { setPending(false); }
   };
 
   const restore = async (item: Department) => {
     setPending(true);
-    try { await restoreDepartment(item.id); toast.success("Department restored"); await load(); }
+    try { await mutation.mutateAsync(() => restoreDepartment(item.id)); toast.success("Department restored"); }
     catch (error) { toast.error(messageOf(error)); }
     finally { setPending(false); }
   };

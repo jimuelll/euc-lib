@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
 import { CreatePostModal } from "@/features/bulletin";
 import { archiveBulletinPost, fetchBulletinPosts, restoreBulletinPost, setBulletinPinned, type BulletinPostRecord } from "@/features/bulletin/api";
+import { bulletinKeys } from "../bulletin.keys";
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
@@ -26,50 +28,48 @@ const STATUS_FILTERS = [
 ] as const;
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
+const EMPTY_POSTS: BulletinPostRecord[] = [];
+const EMPTY_MONTHS: string[] = [];
 
 const AdminBulletin = () => {
-  const [posts, setPosts] = useState<BulletinPostRecord[]>([]);
-  const [totalPosts, setTotalPosts] = useState(0);
+  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  const loadPosts = useCallback(async (requestedPage = 1) => {
-    setLoading(true);
-    setError("");
-    try {
-      const fetchPage = (page: number) => fetchBulletinPosts({
-          page,
-          limit: 20,
-          scope: statusFilter === "all" ? "all" : undefined,
-          archived: statusFilter === "archived" ? true : undefined,
-          month: selectedMonth === "all" ? undefined : selectedMonth,
-        });
-      let result = await fetchPage(requestedPage);
-      if (requestedPage > 1 && result.totalPages > 0 && requestedPage > result.totalPages) {
-        result = await fetchPage(result.totalPages);
-      }
-      setPosts(result.data ?? []);
-      setTotalPosts(result.total ?? 0);
-      setCurrentPage(result.page ?? requestedPage);
-      setTotalPages(result.totalPages ?? 0);
-      setAvailableMonths(result.months ?? []);
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to load bulletin posts");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedMonth, statusFilter]);
-
+  const listQuery = useQuery({
+    queryKey: bulletinKeys.list({ page: currentPage, limit: 20, scope: statusFilter === "all" ? "all" : undefined, archived: statusFilter === "archived", month: selectedMonth === "all" ? undefined : selectedMonth }),
+    queryFn: ({ signal }) => fetchBulletinPosts({
+      page: currentPage,
+      limit: 20,
+      scope: statusFilter === "all" ? "all" : undefined,
+      archived: statusFilter === "archived" ? true : undefined,
+      month: selectedMonth === "all" ? undefined : selectedMonth,
+    }, signal),
+    placeholderData: (previousData) => previousData,
+  });
+  const posts = listQuery.data?.data ?? EMPTY_POSTS;
+  const totalPosts = listQuery.data?.total ?? 0;
+  const totalPages = listQuery.data?.totalPages ?? 0;
+  const availableMonths = listQuery.data?.months ?? EMPTY_MONTHS;
+  const loading = listQuery.isPending;
+  const error = actionError || (listQuery.isError ? "Failed to load bulletin posts" : "");
+  const loadPosts = async (requestedPage = 1) => {
+    setActionError("");
+    if (requestedPage === currentPage) await listQuery.refetch();
+    else setCurrentPage(requestedPage);
+  };
+  useEffect(() => setCurrentPage(1), [selectedMonth, statusFilter]);
   useEffect(() => {
-    void loadPosts(1);
-  }, [loadPosts]);
+    if (totalPages > 0 && currentPage > totalPages && !listQuery.isPlaceholderData) setCurrentPage(totalPages);
+  }, [currentPage, listQuery.isPlaceholderData, totalPages]);
+  const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: bulletinKeys.all });
+  const pinMutation = useMutation({ mutationFn: ({ id, pinned }: { id: number; pinned: boolean }) => setBulletinPinned(id, pinned), onSuccess: invalidatePosts });
+  const archiveMutation = useMutation({ mutationFn: archiveBulletinPost, onSuccess: invalidatePosts });
+  const restoreMutation = useMutation({ mutationFn: restoreBulletinPost, onSuccess: invalidatePosts });
 
   const monthOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -106,10 +106,9 @@ const AdminBulletin = () => {
   const handlePinToggle = async (postId: number, nextPinned: boolean) => {
     setBusyId(postId);
     try {
-      await setBulletinPinned(postId, nextPinned);
-      await loadPosts(currentPage);
+      await pinMutation.mutateAsync({ id: postId, pinned: nextPinned });
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to update pin status");
+      setActionError(err.response?.data?.message || err.message || "Failed to update pin status");
     } finally {
       setBusyId(null);
     }
@@ -119,13 +118,12 @@ const AdminBulletin = () => {
     setBusyId(post.id);
     try {
       if (post.deleted_at) {
-        await restoreBulletinPost(post.id);
+        await restoreMutation.mutateAsync(post.id);
       } else {
-        await archiveBulletinPost(post.id);
+        await archiveMutation.mutateAsync(post.id);
       }
-      await loadPosts(currentPage);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to update archive status");
+      setActionError(err.response?.data?.message || err.message || "Failed to update archive status");
     } finally {
       setBusyId(null);
     }

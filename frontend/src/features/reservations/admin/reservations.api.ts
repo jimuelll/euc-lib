@@ -8,9 +8,10 @@ import type {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const getAdminReservations = async (
-  filters: ReservationFilters = {}
+  filters: ReservationFilters = {},
+  signal?: AbortSignal
 ): Promise<ReservationsResult> => {
-  const res = await axiosInstance.get("/api/admin/reservations", { params: filters });
+  const res = await axiosInstance.get("/api/admin/reservations", { params: filters, signal });
   return res.data;
 };
 

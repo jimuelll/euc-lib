@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Activity, RefreshCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { fetchAuditLogs, fetchAuditMeta, type AuditItem } from "@/features/analytics/api/adminAnalytics.api";
+import { fetchAuditLogs, fetchAuditMeta } from "@/features/analytics/api/adminAnalytics.api";
+import { analyticsKeys } from "../../analytics.keys";
 
 const emptyFilters = {
   query: "",
@@ -113,69 +115,30 @@ const auditAffectedSummary = (metadata: unknown) => {
 };
 
 const AdminAuditLogs = () => {
-  const [rows, setRows] = useState<AuditItem[]>([]);
   const [filters, setFilters] = useState(emptyFilters);
+  const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
+  const auditQuery = useQuery({
+    queryKey: analyticsKeys.auditPage({ page, ...appliedFilters }),
+    queryFn: ({ signal }) => fetchAuditLogs({
+      page,
+      limit: 10,
+      category: appliedFilters.category,
+      action: appliedFilters.action || undefined,
+      query: appliedFilters.query || undefined,
+      dateFrom: appliedFilters.dateFrom || undefined,
+      dateTo: appliedFilters.dateTo || undefined,
+    }, signal),
+    placeholderData: (previousData) => previousData,
   });
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [actionOptions, setActionOptions] = useState<string[]>([]);
-  const [actionsByCategory, setActionsByCategory] = useState<Record<string, string[]>>({});
-
-  const loadAuditLogs = useCallback(async (
-    mode: "initial" | "refresh",
-    nextPage: number,
-    nextFilters: typeof emptyFilters,
-  ) => {
-    if (mode === "initial") setLoading(true);
-    if (mode === "refresh") setRefreshing(true);
-    setError("");
-
-    try {
-      const result = await fetchAuditLogs({
-        page: nextPage,
-        limit: 10,
-        category: nextFilters.category,
-        action: nextFilters.action || undefined,
-        query: nextFilters.query || undefined,
-        dateFrom: nextFilters.dateFrom || undefined,
-        dateTo: nextFilters.dateTo || undefined,
-      });
-
-      setRows(result.rows);
-      setPagination(result.pagination);
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to load audit log");
-    } finally {
-      if (mode === "initial") setLoading(false);
-      if (mode === "refresh") setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadAuditLogs("initial", 1, emptyFilters);
-  }, [loadAuditLogs]);
-
-  useEffect(() => {
-    const loadMeta = async () => {
-      try {
-        const result = await fetchAuditMeta();
-        setActionOptions(result.actions);
-        setActionsByCategory(result.actionsByCategory ?? {});
-      } catch {
-        setActionOptions([]);
-        setActionsByCategory({});
-      }
-    };
-
-    void loadMeta();
-  }, []);
+  const metaQuery = useQuery({ queryKey: analyticsKeys.auditMeta(), queryFn: ({ signal }) => fetchAuditMeta(signal), staleTime: 5 * 60_000 });
+  const rows = auditQuery.data?.rows ?? [];
+  const pagination = auditQuery.data?.pagination ?? { page: 1, limit: 10, total: 0, totalPages: 1 };
+  const loading = auditQuery.isPending;
+  const refreshing = auditQuery.isFetching && !auditQuery.isPending;
+  const error = auditQuery.isError ? (auditQuery.error as any)?.response?.data?.message || "Failed to load audit log" : "";
+  const actionOptions = metaQuery.data?.actions ?? [];
+  const actionsByCategory = metaQuery.data?.actionsByCategory ?? {};
 
   const handleFilterChange = (key: keyof typeof emptyFilters) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFilters((current) => ({ ...current, [key]: event.target.value }));
@@ -196,18 +159,17 @@ const AdminAuditLogs = () => {
 
   const applyFilters = () => {
     setPage(1);
-    void loadAuditLogs("refresh", 1, filters);
+    setAppliedFilters({ ...filters });
   };
 
   const resetFilters = () => {
     setFilters(emptyFilters);
     setPage(1);
-    void loadAuditLogs("refresh", 1, emptyFilters);
+    setAppliedFilters(emptyFilters);
   };
 
   const goToPage = (nextPage: number) => {
     setPage(nextPage);
-    void loadAuditLogs("refresh", nextPage, filters);
   };
 
   return (
@@ -220,7 +182,7 @@ const AdminAuditLogs = () => {
           type="button"
           variant="outline"
           className="rounded-md"
-          onClick={() => void loadAuditLogs("refresh", page, filters)}
+          onClick={() => void auditQuery.refetch()}
           disabled={loading || refreshing}
         >
           <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />

@@ -1,8 +1,10 @@
+import { useMemo } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdminUrlState } from "@/features/admin";
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttendanceLog, FetchState, FilterType } from "./AdminAttendanceLogs.types";
 import { PAGE_SIZE, applyFilters, deriveStats } from "./AdminAttendanceLogs.data";
 import { fetchTodayAttendance } from "./attendance.api";
+import { attendanceKeys } from "./attendance.keys";
 
 interface UseAttendanceLogsReturn {
   logs: AttendanceLog[];
@@ -18,79 +20,35 @@ interface UseAttendanceLogsReturn {
 }
 
 export const useAttendanceLogs = (): UseAttendanceLogsReturn => {
-  const [logs,        setLogs]        = useState<AttendanceLog[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error,       setError]       = useState<string | null>(null);
-  const [hasMore,     setHasMore]     = useState(true);
+  const queryClient = useQueryClient();
   const [params, patchParams] = useAdminUrlState();
   const search = params.get("q") ?? "";
   const filter: FilterType = params.get("type") === "check_in" ? "check_in" : params.get("type") === "check_out" ? "check_out" : "all";
-  const setSearch = (q: string) => patchParams({ q }, true);
-  const setFilter = (type: FilterType) => patchParams({ type });
-
-  const lastIdRef = useRef<number | null>(null);
-
-  // ── Core fetch ─────────────────────────────────────────────────────────────
-  const fetchLogs = useCallback(async (cursor: number | null = null) => {
-    try {
-      const params: Record<string, string | number> = { limit: PAGE_SIZE };
-      if (cursor) params.lastId = cursor;
-
-      const rows: AttendanceLog[] = await fetchTodayAttendance(params);
-
-      setLogs((prev) => (cursor ? [...prev, ...rows] : rows));
-
-      if (rows.length < PAGE_SIZE) {
-        setHasMore(false);
-      } else {
-        lastIdRef.current = rows[rows.length - 1].id;
-      }
-
-      setError(null);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Failed to load attendance logs");
-    }
-  }, []);
-
-  // ── Initial load ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    setLoading(true);
-    lastIdRef.current = null;
-    setHasMore(true);
-    fetchLogs(null).finally(() => setLoading(false));
-  }, [fetchLogs]);
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-  const handleRefresh = () => {
-    setLoading(true);
-    lastIdRef.current = null;
-    setHasMore(true);
-    setLogs([]);
-    fetchLogs(null).finally(() => setLoading(false));
-  };
-
-  const handleLoadMore = async () => {
-    if (!hasMore || loadingMore) return;
-    setLoadingMore(true);
-    await fetchLogs(lastIdRef.current);
-    setLoadingMore(false);
-  };
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const stats   = deriveStats(logs);
-  const visible = applyFilters(logs, filter, search);
+  const query = useInfiniteQuery({
+    queryKey: attendanceKeys.today(),
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam, signal }) => fetchTodayAttendance({ limit: PAGE_SIZE, ...(pageParam ? { lastId: pageParam } : {}) }, signal),
+    getNextPageParam: (lastPage) => lastPage.length < PAGE_SIZE ? undefined : lastPage[lastPage.length - 1]?.id,
+  });
+  const logs = useMemo(() => query.data?.pages.flat() ?? [], [query.data]);
+  const visible = useMemo(() => applyFilters(logs, filter, search), [logs, filter, search]);
+  const stats = useMemo(() => deriveStats(logs), [logs]);
 
   return {
     logs,
     visible,
-    fetchState: { loading, loadingMore, error, hasMore },
+    fetchState: {
+      loading: query.isPending,
+      loadingMore: query.isFetchingNextPage,
+      error: query.isError ? (query.error as any)?.response?.data?.message ?? "Failed to load attendance logs" : null,
+      hasMore: Boolean(query.hasNextPage),
+    },
     stats,
     search,
     filter,
-    setSearch,
-    setFilter,
-    handleRefresh,
-    handleLoadMore,
+    setSearch: (value) => patchParams({ q: value }, true),
+    setFilter: (value) => patchParams({ type: value }),
+    handleRefresh: () => { void queryClient.resetQueries({ queryKey: attendanceKeys.today() }); },
+    handleLoadMore: () => { if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage(); },
   };
 };

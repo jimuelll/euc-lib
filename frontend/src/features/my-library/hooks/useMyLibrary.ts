@@ -1,40 +1,18 @@
-import { useEffect, useState } from "react";
-import { getApiErrorMessage, isRequestCancelled } from "@/utils/apiError";
+import { useQuery } from "@tanstack/react-query";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { fetchMyLibraryDashboard } from "../api";
-import type { MyLibraryDashboard } from "../types";
+import { myLibraryKeys } from "../my-library.keys";
 
 export function useMyLibrary(enabled = true) {
-  const [data, setData] = useState<MyLibraryDashboard | null>(null);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: myLibraryKeys.dashboard(),
+    queryFn: ({ signal }) => fetchMyLibraryDashboard(signal),
+    enabled,
+  });
 
-  useEffect(() => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const next = await fetchMyLibraryDashboard(controller.signal);
-        setData(next);
-      } catch (error: unknown) {
-        if (isRequestCancelled(error) || (error instanceof DOMException && error.name === "AbortError")) return;
-        setError(getApiErrorMessage(error, "Failed to load your library dashboard"));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    run();
-
-    return () => controller.abort();
-  }, [enabled]);
-
-  return { data, loading, error };
+  return {
+    data: query.data ?? null,
+    loading: enabled && query.isPending,
+    error: query.isError ? getApiErrorMessage(query.error, "Failed to load your library dashboard") : null,
+  };
 }

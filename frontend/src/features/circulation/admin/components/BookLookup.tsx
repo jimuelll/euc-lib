@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, AlertCircle, Search } from "lucide-react";
 import BarcodeInput from "./BarcodeInput";
 import type { BookInfo, ActiveBorrow, TransactionType } from "../circulation.types";
 import { fetchCirculationBookCopies, searchCirculationBooks } from "../circulation.api";
+import { circulationKeys } from "../circulation.keys";
+import { useDebounce } from "@/hooks/use-debounce";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 interface Props {
   copyBarcode: string;
@@ -22,9 +26,22 @@ const BookLookup = ({
   foundCopy, matchedBorrow, type,
 }: Props) => {
   const [catalogQuery, setCatalogQuery] = useState("");
-  const [results, setResults] = useState<{ id: number; title: string; author?: string; material_type?: string }[]>([]);
-  const [copies, setCopies] = useState<{ id: number; barcode: string; accession_number?: string | null; accession_voided?: boolean | number; borrow_eligible?: boolean | number; needs_policy?: boolean | number; is_active: number; status?: string }[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
+  const debouncedCatalogQuery = useDebounce(catalogQuery.trim(), 180);
+  const resultsQuery = useQuery({
+    queryKey: circulationKeys.catalogSearch(debouncedCatalogQuery),
+    queryFn: ({ signal }) => searchCirculationBooks(debouncedCatalogQuery, signal),
+    enabled: debouncedCatalogQuery.length >= 2,
+  });
+  const copiesQuery = useQuery({
+    queryKey: circulationKeys.bookCopies(selectedBookId ?? 0, type),
+    queryFn: ({ signal }) => fetchCirculationBookCopies(selectedBookId!, signal),
+    enabled: selectedBookId !== null,
+    select: (data) => data.filter((copy) => copy.is_active && (type === "return" ? copy.status === "borrowed" : copy.status !== "borrowed")),
+  });
+  const results = selectedBookId === null ? resultsQuery.data ?? [] : [];
+  const copies = copiesQuery.data ?? [];
+  const searching = resultsQuery.isFetching || copiesQuery.isFetching;
   const borrowEligibility = foundCopy
     ? !foundCopy.is_active
       ? { label: "Inactive copy · unavailable for checkout", eligible: false }
@@ -45,26 +62,9 @@ const BookLookup = ({
               : { label: "Eligible for checkout", eligible: true }
     : null;
 
-  useEffect(() => {
-    const query = catalogQuery.trim();
-    if (query.length < 2) { setResults([]); return; }
-    let active = true;
-    const timer = window.setTimeout(async () => {
-      setSearching(true);
-      try { const data = await searchCirculationBooks(query); if (active) setResults(data.slice(0, 6)); }
-      catch { if (active) setResults([]); }
-      finally { if (active) setSearching(false); }
-    }, 180);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [catalogQuery]);
-
-  const chooseBook = async (book: { id: number; material_type?: string }) => {
+  const chooseBook = (book: { id: number; material_type?: string }) => {
     if (book.material_type === "thesis") return;
-    setResults([]); setCopies([]); setSearching(true);
-    try {
-      const data = await fetchCirculationBookCopies(book.id);
-      setCopies(data.filter((copy) => copy.is_active && (type === "return" ? copy.status === "borrowed" : copy.status !== "borrowed")));
-    } finally { setSearching(false); }
+    setSelectedBookId(book.id);
   };
 
   return <div className="space-y-2">
@@ -93,8 +93,10 @@ const BookLookup = ({
         <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by title, author, or ISBN" className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
         {searching && <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />}
       </div>
-      {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => void chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-xs  text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
-      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => { const eligibility = copy.status === "borrowed" ? "Borrowed copy" : copy.status === "reserved" ? "Reserved copy" : copy.accession_voided ? "Accession voided" : copy.needs_policy ? "Needs loan policy" : !copy.accession_number ? "Needs accession" : copy.borrow_eligible === false || copy.borrow_eligible === 0 ? "Not lendable" : "Available copy"; return <button type="button" key={copy.id} onClick={() => { setCopies([]); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="min-w-0"><span className="block font-mono text-xs text-foreground">{copy.barcode}</span><span className="mt-1 block text-xs text-muted-foreground">{copy.accession_number ? `Accession ${copy.accession_number}` : "No accession number"}</span></span><span className={`shrink-0 text-xs font-bold ${eligibility.includes("Borrowed") ? "text-info" : eligibility === "Available copy" ? "text-success" : "text-warning"}`}>{eligibility}</span></button>; })}</div>}
+      {resultsQuery.isError ? <p role="alert" className="mt-2 text-sm text-destructive">{getApiErrorMessage(resultsQuery.error, "Could not search the catalog.")} <button type="button" className="underline" onClick={() => void resultsQuery.refetch()}>Try again</button></p> : null}
+      {results.length > 0 && <div className="divide-y divide-border border border-t-0 border-border bg-card">{results.map((book) => <button type="button" key={book.id} onClick={() => chooseBook(book)} disabled={book.material_type === "thesis"} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"><span className="min-w-0"><span className="block truncate text-sm font-medium">{book.title}</span><span className="block truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</span></span><span className="text-xs  text-muted-foreground">{book.material_type === "thesis" ? "Reference only" : "Select"}</span></button>)}</div>}
+      {copiesQuery.isError ? <p role="alert" className="mt-2 text-sm text-destructive">{getApiErrorMessage(copiesQuery.error, "Could not load copies. Try another search.")} <button type="button" className="underline" onClick={() => void copiesQuery.refetch()}>Try again</button></p> : null}
+      {copies.length > 0 && <div className="mt-2 divide-y divide-border border border-border bg-card">{copies.map((copy) => { const eligibility = copy.status === "borrowed" ? "Borrowed copy" : copy.status === "reserved" ? "Reserved copy" : copy.accession_voided ? "Accession voided" : copy.needs_policy ? "Needs loan policy" : !copy.accession_number ? "Needs accession" : copy.borrow_eligible === false || copy.borrow_eligible === 0 ? "Not lendable" : "Available copy"; return <button type="button" key={copy.id} onClick={() => { setSelectedBookId(null); setCatalogQuery(""); onSelectCopy(copy.barcode); }} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-muted/40"><span className="min-w-0"><span className="block font-mono text-xs text-foreground">{copy.barcode}</span><span className="mt-1 block text-xs text-muted-foreground">{copy.accession_number ? `Accession ${copy.accession_number}` : "No accession number"}</span></span><span className={`shrink-0 text-xs font-bold ${eligibility.includes("Borrowed") ? "text-info" : eligibility === "Available copy" ? "text-success" : "text-warning"}`}>{eligibility}</span></button>; })}</div>}
     </div>
 
     {/* Found copy card */}

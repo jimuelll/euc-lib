@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BellRing, Check, RefreshCw, Send, User, Users, Waves, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,9 @@ import {
 } from "@/components/ui/select";
 import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
 import { createAdminNotification, fetchAdminNotifications, searchNotificationRecipients, type AdminNotification, type AdminNotificationStats, type AudienceType, type NotificationRecipient } from "./api";
+import { notificationKeys } from "../notifications.keys";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { invalidateServerState } from "@/app/server-state";
 
 const emptyStats: AdminNotificationStats = {
   total_notifications: 0,
@@ -49,57 +53,43 @@ const linkOptions = [
 ];
 
 const AdminNotifications = () => {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(defaultForm);
-  const [stats, setStats] = useState<AdminNotificationStats>(emptyStats);
-  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [recipientQuery, setRecipientQuery] = useState("");
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [selectedRecipient, setSelectedRecipient] = useState<NotificationRecipient | null>(null);
-  const [recipientResults, setRecipientResults] = useState<NotificationRecipient[]>([]);
-  const [recipientLoading, setRecipientLoading] = useState(false);
-  const [recipientError, setRecipientError] = useState("");
-  const debouncedRecipientQuery = useDebounce(recipientQuery.trim(), 300);
-
-  const loadData = async (page = 1) => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await fetchAdminNotifications(page);
-      setStats(result.stats);
-      setNotifications(result.notifications);
-      setPagination(result.pagination);
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to load notifications");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (form.audienceType !== "user" || debouncedRecipientQuery.length < 2 || selectedRecipient) {
-      setRecipientResults([]);
-      setRecipientLoading(false);
-      setRecipientError("");
-      return;
-    }
-
-    let cancelled = false;
-    setRecipientLoading(true);
-    setRecipientError("");
-    searchNotificationRecipients(debouncedRecipientQuery)
-      .then((recipients) => { if (!cancelled) setRecipientResults(recipients); })
-      .catch((err: any) => { if (!cancelled) setRecipientError(err.response?.data?.message || "Could not search accounts. Try again."); })
-      .finally(() => { if (!cancelled) setRecipientLoading(false); });
-    return () => { cancelled = true; };
-  }, [debouncedRecipientQuery, form.audienceType, selectedRecipient]);
+  const debouncedRecipientQuery = useDebounce(recipientSearch.trim(), 300);
+  const notificationsQuery = useQuery({
+    queryKey: notificationKeys.adminList(page),
+    queryFn: ({ signal }) => fetchAdminNotifications(page, signal),
+    placeholderData: keepPreviousData,
+  });
+  const recipientQuery = useQuery({
+    queryKey: notificationKeys.recipientSearch(debouncedRecipientQuery),
+    queryFn: ({ signal }) => searchNotificationRecipients(debouncedRecipientQuery, signal),
+    enabled: form.audienceType === "user" && debouncedRecipientQuery.length >= 2 && !selectedRecipient,
+  });
+  const stats: AdminNotificationStats = notificationsQuery.data?.stats ?? emptyStats;
+  const notifications: AdminNotification[] = notificationsQuery.data?.notifications ?? [];
+  const pagination = notificationsQuery.data?.pagination ?? { page, limit: 20, total: 0, totalPages: 1 };
+  const recipientResults = recipientQuery.data ?? [];
+  const loading = notificationsQuery.isFetching;
+  const recipientLoading = recipientQuery.isFetching;
+  const recipientError = recipientQuery.isError ? getApiErrorMessage(recipientQuery.error, "Could not search accounts. Try again.") : "";
+  const createMutation = useMutation({
+    mutationFn: createAdminNotification,
+    onSuccess: async () => {
+      setSuccess("Notification sent successfully.");
+      setForm(defaultForm);
+      setRecipientSearch("");
+      setSelectedRecipient(null);
+      setPage(1);
+      await invalidateServerState(queryClient, "notifications");
+    },
+    onError: (failure) => setError(getApiErrorMessage(failure, "Failed to send notification")),
+  });
 
   const audienceHelp = useMemo(() => {
     if (form.audienceType === "user") return "Send this notification to one selected account.";
@@ -109,12 +99,11 @@ const AdminNotifications = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setSaving(true);
     setError("");
     setSuccess("");
 
     try {
-      await createAdminNotification({
+      await createMutation.mutateAsync({
         type: form.type.trim() || "announcement",
         title: form.title,
         body: form.body,
@@ -125,16 +114,7 @@ const AdminNotifications = () => {
         expiresAt: form.expiresAt || null,
       });
 
-      setSuccess("Notification sent successfully.");
-      setForm(defaultForm);
-      setRecipientQuery("");
-      setSelectedRecipient(null);
-      await loadData();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to send notification");
-    } finally {
-      setSaving(false);
-    }
+    } catch { /* Mutation state and the inline error preserve the existing feedback. */ }
   };
 
   return (
@@ -144,7 +124,7 @@ const AdminNotifications = () => {
       description="Send real-time notifications to all users, a role, or a single account and review recently sent messages."
       contentWidth="wide"
       actions={
-        <Button type="button" variant="outline" onClick={() => void loadData()} disabled={loading || saving}>
+        <Button type="button" variant="outline" onClick={() => void notificationsQuery.refetch()} disabled={loading || createMutation.isPending}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -186,7 +166,7 @@ const AdminNotifications = () => {
                 <label className="text-sm font-medium text-foreground">Audience</label>
                 <Select
                   value={form.audienceType}
-                  onValueChange={(value: AudienceType) => { setForm((prev) => ({ ...prev, audienceType: value })); setRecipientQuery(""); setSelectedRecipient(null); }}
+                  onValueChange={(value: AudienceType) => { setForm((prev) => ({ ...prev, audienceType: value })); setRecipientSearch(""); setSelectedRecipient(null); }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select audience" />
@@ -282,25 +262,25 @@ const AdminNotifications = () => {
                       <p className="truncate text-sm font-medium text-foreground">{selectedRecipient.name}</p>
                       <p className="text-xs text-muted-foreground">Account ID {selectedRecipient.id} · {selectedRecipient.username || selectedRecipient.student_employee_id} · {selectedRecipient.role}</p>
                     </div>
-                    <Button type="button" size="icon" variant="ghost" aria-label="Clear selected recipient" onClick={() => { setSelectedRecipient(null); setRecipientQuery(""); }}><X /></Button>
+                    <Button type="button" size="icon" variant="ghost" aria-label="Clear selected recipient" onClick={() => { setSelectedRecipient(null); setRecipientSearch(""); }}><X /></Button>
                   </div>
                 ) : (
                   <>
                 <Input
                   id="notification-recipient-search"
-                  value={recipientQuery}
-                  onChange={(e) => { setRecipientQuery(e.target.value); setSelectedRecipient(null); setRecipientResults([]); setRecipientError(""); }}
+                  value={recipientSearch}
+                  onChange={(e) => { setRecipientSearch(e.target.value); setSelectedRecipient(null); }}
                   placeholder="Search by name, account ID, or username"
                   autoComplete="off"
                   aria-describedby="notification-recipient-help"
                 />
                 <p id="notification-recipient-help" className="text-xs text-muted-foreground">Enter at least 2 characters, then select the matching account.</p>
-                {recipientQuery.trim().length >= 2 ? (
+                {recipientSearch.trim().length >= 2 ? (
                   <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-background" aria-label="Matching accounts" aria-live="polite" aria-busy={recipientLoading}>
                     {recipientLoading ? <p className="px-3 py-4 text-sm text-muted-foreground">Searching accounts…</p>
                       : recipientError ? <p className="px-3 py-4 text-sm text-destructive">{recipientError}</p>
                         : recipientResults.length ? recipientResults.map((recipient) => (
-                          <button key={recipient.id} type="button" aria-label={`Select ${recipient.name}, account ID ${recipient.id}, ${recipient.username || recipient.student_employee_id}`} className="flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left last:border-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { setSelectedRecipient(recipient); setRecipientQuery(""); setRecipientResults([]); }}>
+                          <button key={recipient.id} type="button" aria-label={`Select ${recipient.name}, account ID ${recipient.id}, ${recipient.username || recipient.student_employee_id}`} className="flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left last:border-0 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { setSelectedRecipient(recipient); setRecipientSearch(""); }}>
                             <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{recipient.name}</span><span className="block truncate text-xs text-muted-foreground">ID {recipient.id} · {recipient.username || recipient.student_employee_id} · {recipient.role}</span></span>
                             <Check className="mt-1 size-4 shrink-0 text-muted-foreground" />
                           </button>
@@ -328,9 +308,9 @@ const AdminNotifications = () => {
               </div>
             ) : null}
 
-            <Button type="submit" disabled={saving || (form.audienceType === "user" && !selectedRecipient)}>
+            <Button type="submit" disabled={createMutation.isPending || (form.audienceType === "user" && !selectedRecipient)}>
               <Send className="mr-2 h-4 w-4" />
-              {saving ? "Sending..." : "Send notification"}
+              {createMutation.isPending ? "Sending..." : "Send notification"}
             </Button>
           </form>
         </AdminPanel>
@@ -340,7 +320,7 @@ const AdminNotifications = () => {
           description="The latest notifications stored in the database and available for live delivery."
         >
           <div className="space-y-3">
-            {loading ? <div className="space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-24 w-full rounded-md" />)}</div> : notifications.length > 0 ? notifications.map((notification) => (
+            {loading && !notificationsQuery.data ? <div className="space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((row) => <Skeleton key={row} className="h-24 w-full rounded-md" />)}</div> : notificationsQuery.isError && !notificationsQuery.data ? <div role="alert" className="border border-destructive/30 bg-destructive/5 px-4 py-6 text-sm text-destructive">{getApiErrorMessage(notificationsQuery.error, "Failed to load notifications")}<Button type="button" variant="link" className="ml-2 h-auto p-0" onClick={() => void notificationsQuery.refetch()}>Try again</Button></div> : notifications.length > 0 ? notifications.map((notification) => (
               <div key={notification.id} className="border border-border/80 bg-background px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1.5">
@@ -371,7 +351,7 @@ const AdminNotifications = () => {
                 No notifications have been sent yet.
               </div>
             )}
-            {!loading && notifications.length > 0 ? <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-sm text-muted-foreground"><Button type="button" variant="outline" disabled={pagination.page <= 1} onClick={() => void loadData(pagination.page - 1)}>Previous</Button><span>Page {pagination.page} of {pagination.totalPages}</span><Button type="button" variant="outline" disabled={pagination.page >= pagination.totalPages} onClick={() => void loadData(pagination.page + 1)}>Next</Button></div> : null}
+            {!loading && notifications.length > 0 ? <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-sm text-muted-foreground"><Button type="button" variant="outline" disabled={pagination.page <= 1} onClick={() => setPage(pagination.page - 1)}>Previous</Button><span>Page {pagination.page} of {pagination.totalPages}</span><Button type="button" variant="outline" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage(pagination.page + 1)}>Next</Button></div> : null}
           </div>
         </AdminPanel>
       </div>

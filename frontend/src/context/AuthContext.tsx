@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   setAuthFailureHandler,
   setAuthRefreshHandler,
@@ -59,12 +60,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const authenticatedUserId = useRef<number | null>(null);
 
   const applyAccessToken = useCallback((token: string | null) => {
+    const nextUser = token ? decodeAccessToken(token) : null;
+    if (authenticatedUserId.current !== (nextUser?.id ?? null)) {
+      queryClient.clear();
+      authenticatedUserId.current = nextUser?.id ?? null;
+    }
+
     setAccessToken(token);
     setInMemoryToken(token);
-    setUser(token ? decodeAccessToken(token) : null);
-  }, []);
+    setUser(nextUser);
+  }, [queryClient]);
 
   const clearSession = useCallback(() => {
     applyAccessToken(null);

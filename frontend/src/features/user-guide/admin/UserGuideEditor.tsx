@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Loader2, Plus, Save, Send, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   type GuideContent,
   type GuideRole,
 } from "@/features/user-guide/api/user-guide.service";
+import { userGuideKeys } from "../user-guide.keys";
 
 const blankGuide = (): GuideContent => ({
   slug: "", title: "", category: "General", summary: "", overview: "", target_path: "/admin",
@@ -42,28 +44,53 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 );
 
 export default function UserGuideEditor() {
-  const [modules, setModules] = useState<EditableGuideModule[]>([]);
+  const queryClient = useQueryClient();
+  const guideQuery = useQuery({ queryKey: userGuideKeys.editor(), queryFn: ({ signal }) => getGuideForEditing(signal) });
+  const modules = guideQuery.data ?? [];
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<GuideContent>(blankGuide());
-  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [pending, setPending] = useState("");
   const { upload, uploading, progress, error: uploadError, reset: resetUpload } = useCloudinaryUpload("library/user-guide");
   const selected = modules.find((item) => item.id === selectedId) || null;
+  const invalidateGuide = () => queryClient.invalidateQueries({ queryKey: userGuideKeys.all });
+  const createMutation = useMutation({ mutationFn: createGuideDraft, onSuccess: invalidateGuide });
+  const updateMutation = useMutation({ mutationFn: ({ id, draft }: { id: number; draft: GuideContent }) => updateGuideDraft(id, draft), onSuccess: invalidateGuide });
+  const publishMutation = useMutation({ mutationFn: publishGuideDraft, onSuccess: invalidateGuide });
+  const unpublishMutation = useMutation({ mutationFn: unpublishGuideModule, onSuccess: invalidateGuide });
+  const archiveMutation = useMutation({ mutationFn: archiveGuideModule, onSuccess: invalidateGuide });
+  const reorderMutation = useMutation({
+    mutationFn: reorderGuideModules,
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: userGuideKeys.editor() });
+      const previous = queryClient.getQueryData<EditableGuideModule[]>(userGuideKeys.editor());
+      queryClient.setQueryData<EditableGuideModule[]>(userGuideKeys.editor(), (current) => ids.flatMap((id) => current?.find((item) => item.id === id) ?? []));
+      return previous;
+    },
+    onError: (_error, _ids, previous) => { if (previous) queryClient.setQueryData(userGuideKeys.editor(), previous); },
+    onSettled: invalidateGuide,
+  });
+
+  useEffect(() => {
+    if (initialized || !guideQuery.data) return;
+    const first = guideQuery.data[0] ?? null;
+    setSelectedId(first?.id ?? null);
+    setDraft(first ? asDraft(first) : blankGuide());
+    setInitialized(true);
+  }, [guideQuery.data, initialized]);
 
   const load = async (preferredId?: number) => {
-    setLoading(true);
     try {
-      const items = await getGuideForEditing();
-      setModules(items);
+      const result = await guideQuery.refetch();
+      if (result.isError) throw result.error;
+      const items = result.data ?? [];
       const next = items.find((item) => item.id === preferredId) || items[0] || null;
       setSelectedId(next?.id ?? null);
       setDraft(next ? asDraft(next) : blankGuide());
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Could not load the user guide editor.");
-    } finally { setLoading(false); }
+    }
   };
-
-  useEffect(() => { void load(); }, []);
 
   const choose = (item: EditableGuideModule) => {
     setSelectedId(item.id);
@@ -81,8 +108,8 @@ export default function UserGuideEditor() {
     setPending("save");
     try {
       const saved = selectedId
-        ? await updateGuideDraft(selectedId, draft)
-        : await createGuideDraft(draft);
+        ? await updateMutation.mutateAsync({ id: selectedId, draft })
+        : await createMutation.mutateAsync(draft);
       await load(saved.id);
       if (!quiet) toast.success("Draft saved. Published readers still see the previous version.");
       return saved;
@@ -98,7 +125,7 @@ export default function UserGuideEditor() {
     if (!saved) return;
     setPending("publish");
     try {
-      await publishGuideDraft(saved.id);
+      await publishMutation.mutateAsync(saved.id);
       await load(saved.id);
       toast.success("Guide module published.");
     } catch (err: any) {
@@ -109,7 +136,7 @@ export default function UserGuideEditor() {
   const unpublish = async () => {
     if (!selected || !window.confirm(`Hide “${selected.title}” from the user guide? Its draft will be kept.`)) return;
     setPending("unpublish");
-    try { await unpublishGuideModule(selected.id); await load(selected.id); toast.success("Module hidden from readers."); }
+    try { await unpublishMutation.mutateAsync(selected.id); await load(selected.id); toast.success("Module hidden from readers."); }
     catch (err: any) { toast.error(err.response?.data?.message || "Could not hide this module."); }
     finally { setPending(""); }
   };
@@ -117,7 +144,7 @@ export default function UserGuideEditor() {
   const archive = async () => {
     if (!selected || !window.confirm(`Archive “${selected.title}”? It will no longer appear in the editor or guide.`)) return;
     setPending("archive");
-    try { await archiveGuideModule(selected.id); await load(); toast.success("Guide module archived."); }
+    try { await archiveMutation.mutateAsync(selected.id); await load(); toast.success("Guide module archived."); }
     catch (err: any) { toast.error(err.response?.data?.message || "Could not archive this module."); }
     finally { setPending(""); }
   };
@@ -125,12 +152,10 @@ export default function UserGuideEditor() {
   const move = async (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= modules.length) return;
-    const previous = modules;
     const reordered = [...modules];
     [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    setModules(reordered);
-    try { await reorderGuideModules(reordered.map((item) => item.id)); toast.success("Guide order updated."); }
-    catch (err: any) { setModules(previous); toast.error(err.response?.data?.message || "Could not change the guide order."); }
+    try { await reorderMutation.mutateAsync(reordered.map((item) => item.id)); toast.success("Guide order updated."); }
+    catch (err: any) { toast.error(err.response?.data?.message || "Could not change the guide order."); }
   };
 
   const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -141,7 +166,8 @@ export default function UserGuideEditor() {
     event.target.value = "";
   };
 
-  if (loading) return <AdminPanel><p className="py-10 text-center text-sm text-muted-foreground">Loading guide editor…</p></AdminPanel>;
+  if (guideQuery.isPending) return <AdminPanel><p className="py-10 text-center text-sm text-muted-foreground">Loading guide editor…</p></AdminPanel>;
+  if (guideQuery.isError) return <AdminPanel><p className="py-4 text-sm text-destructive">Could not load the user guide editor.</p><Button variant="outline" onClick={() => void guideQuery.refetch()}>Try again</Button></AdminPanel>;
 
   return (
     <div className="grid min-w-0 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">

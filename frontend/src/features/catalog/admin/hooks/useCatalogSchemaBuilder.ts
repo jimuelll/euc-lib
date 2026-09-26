@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { FieldType, FieldScope, FormField } from "../AdminCatalog.types";
 import { saveCatalogSchema } from "../catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { SYSTEM_LOCKED_KEYS, toKey } from "../components/CatalogBuilderConstants";
+import { catalogKeys } from "../../catalog.keys";
 
 type Props = {
   fields: FormField[];
@@ -12,6 +14,7 @@ type Props = {
 };
 
 export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
+  const queryClient = useQueryClient();
   const [newFieldLabel,     setNewFieldLabel]     = useState("");
   const [newFieldType,      setNewFieldType]      = useState<FieldType>("text");
   const [newFieldOptions,   setNewFieldOptions]   = useState("");
@@ -23,9 +26,13 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
   const [editingLabel,      setEditingLabel]      = useState("");
   const [editingOptionsKey, setEditingOptionsKey] = useState<string | null>(null);
   const [editingOptions,    setEditingOptions]    = useState("");
-  const [saving,            setSaving]            = useState(false);
   const [showArchivedPanel, setShowArchivedPanel] = useState(false);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
+  const saveMutation = useMutation({
+    mutationFn: ({ updated, baseFields }: { updated: FormField[]; baseFields: FormField[] }) => saveCatalogSchema(updated, baseFields),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: catalogKeys.adminSchema() }),
+  });
+  const saving = saveMutation.isPending;
 
   // Keep this count for administrators' reference. Catalog fields are unlimited.
   const activeCustomFields = fields.filter((f) => !f.locked && !f.archived);
@@ -37,17 +44,14 @@ export const useCatalogSchemaBuilder = ({ fields, onFieldsChange }: Props) => {
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   const saveSchema = async (updated: FormField[]) => {
-    setSaving(true);
     try {
-      await saveCatalogSchema(updated, fields);
+      await saveMutation.mutateAsync({ updated, baseFields: fields });
       toast.success("Schema saved");
       onFieldsChange(updated);
       return true;
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Failed to save schema"));
       return false;
-    } finally {
-      setSaving(false);
     }
   };
 
