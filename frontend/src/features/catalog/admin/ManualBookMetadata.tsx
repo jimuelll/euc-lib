@@ -37,10 +37,10 @@ const synopsisLabel: Record<ManualMetadataBook["synopsisStatus"], string> = {
 
 const synopsisClass: Record<ManualMetadataBook["synopsisStatus"], string> = {
   present: "border-success/25 bg-success/5 text-success",
-  not_checked: "border-warning/30 bg-warning/5 text-warning-foreground",
-  no_description: "border-warning/30 bg-warning/5 text-warning-foreground",
+  not_checked: "border-warning/45 bg-warning/10 text-foreground",
+  no_description: "border-warning/45 bg-warning/10 text-foreground",
   lookup_failed: "border-destructive/25 bg-destructive/5 text-destructive",
-  missing: "border-warning/30 bg-warning/5 text-warning-foreground",
+  missing: "border-warning/45 bg-warning/10 text-foreground",
 };
 
 const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: number }) => {
@@ -232,8 +232,8 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
                 {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Other book details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
                 {metadataStatus === "manual" ? <Alert><Check className="size-4" /><AlertDescription>These details were added by library staff. You can update them here.</AlertDescription></Alert> : null}
                 {currentSynopsisStatus === "lookup_failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The synopsis lookup failed{details?.synopsisError ? `: ${details.synopsisError}` : ". You can retry Backfill later or add the synopsis manually."}</AlertDescription></Alert> : null}
-                {currentSynopsisStatus === "no_description" ? <Alert><Sparkles className="size-4" /><AlertDescription>Google Books was checked but did not provide a synopsis. Add one manually if available.</AlertDescription></Alert> : null}
-                {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Backfill can check Google Books for this ISBN.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "no_description" ? <Alert><Sparkles className="size-4" /><AlertDescription>The available online sources did not provide a synopsis. Add one manually if available.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Backfill checks Open Library first, then Google Books, and Hardcover when configured.</AlertDescription></Alert> : null}
                 {currentSynopsisStatus === "missing" ? <Alert><CircleAlert className="size-4" /><AlertDescription>No AI synopsis is recorded. You can add one manually below.</AlertDescription></Alert> : null}
 
                 <section aria-labelledby="other-book-details-heading" className="space-y-4 rounded-md border border-border bg-muted/20 p-4">

@@ -57,7 +57,7 @@ describe("AI recommendation backfill dialog", () => {
 
     const dialog = await screen.findByRole("alertdialog");
     expect(await within(dialog).findByRole("heading", { name: "Backfill complete" })).toBeInTheDocument();
-    expect(within(dialog).getByText("Added synopses to 1 book; Google Books returned no description for 1 book; embeddings are ready for 2.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Added synopses to 1 book; online sources returned no description for 1 book; embeddings are ready for 2.")).toBeInTheDocument();
     expect(within(dialog).getByText("2 / 2 books processed")).toBeInTheDocument();
     expect(screen.getByTestId("metadata-refresh-revision")).toHaveTextContent("1");
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeEnabled();

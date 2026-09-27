@@ -14,11 +14,12 @@ const isbnMetadataLookup = require("../catalog/isbn-metadata.lookup") as {
     description: string; subjects: string[]; categories: string[]; publisher: string; language: string;
     pageCount: string | number | null; publishedDate: string; errors: string[];
     descriptionSource: "openlibrary" | "googlebooks" | "hardcover" | null; synopsisChecked: boolean; synopsisErrors: string[];
+    synopsisAttempts: string[];
     googleBooksResponded: boolean; googleBooksStatus: number | null; googleBooksRetryAfterMs: number | null; googleBooksRateLimited: boolean;
   }>;
   lookupBookSynopsis: (isbn: string, options?: { retryRateLimit?: boolean }) => Promise<{
     description: string; source: "openlibrary" | "googlebooks" | "hardcover" | null;
-    responded: boolean; checked: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
+    responded: boolean; checked: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean; attempts: string[];
   }>;
   lookupGoogleBooksSynopsis: (isbn: string, options?: { retryRateLimit?: boolean }) => Promise<{
     description: string; responded: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
@@ -68,6 +69,7 @@ interface EnrichmentOutcome {
   lookupErrors: string[];
   rateLimited: boolean;
   retryAfterMs: number | null;
+  providerAttempts?: string[];
 }
 
 interface ServiceError extends Error {
@@ -397,7 +399,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
       const lookupError = publicMetadataError(lookup.errors.join("; ") || "Synopsis providers did not return a usable response");
       const enrichment: Enrichment = { ...savedEnrichment, synopsisLastError: lookupError };
       await repository.saveEnrichment(bookId, enrichment);
-      return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: lookup.errors.length ? lookup.errors.map(publicMetadataError) : [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs };
+      return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: lookup.errors.length ? lookup.errors.map(publicMetadataError) : [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs, providerAttempts: lookup.attempts };
     }
     const enrichment: Enrichment = {
       ...savedEnrichment,
@@ -418,6 +420,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
       lookupErrors: lookup.errors.map(publicMetadataError),
       rateLimited: lookup.rateLimited,
       retryAfterMs: lookup.retryAfterMs,
+      providerAttempts: lookup.attempts,
     };
   }
 
@@ -463,6 +466,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     lookupErrors,
     rateLimited: metadata.googleBooksRateLimited,
     retryAfterMs: metadata.googleBooksRetryAfterMs,
+    providerAttempts: metadata.synopsisAttempts,
   };
 };
 
@@ -541,7 +545,8 @@ const runBackfill = async (books: BackfillBook[]): Promise<void> => {
       if (outcome.descriptionAddedNow) activeBackfill.synopsesAdded += 1;
       if (outcome.lookupFailed) {
         activeBackfill.lookupFailed += 1;
-        addLookupErrors(outcome.lookupErrors, book.title);
+        const sourcePath = outcome.providerAttempts?.length ? `Synopsis source path: ${outcome.providerAttempts.join(" → ")}` : "";
+        addLookupErrors([[...outcome.lookupErrors, sourcePath].filter(Boolean).join("; ")], book.title);
       }
     } catch (error: unknown) {
       activeBackfill.lookupFailed += 1;

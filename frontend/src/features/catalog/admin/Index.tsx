@@ -137,7 +137,7 @@ const AdminCatalog = () => {
               <AdminStatCard label="Missing synopses" value={embeddingStatus ? String(embeddingStatus.missingSynopses) : "—"} icon={<CircleAlert className="h-5 w-5" />} helperText="Blank AI summaries, including books that need staff input." />
             </div>
             <AdminPanel title="AI recommendation backfill" actions={<Button size="sm" disabled={backfilling} onClick={() => setBackfillDialogOpen(true)}>{backfilling ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Updating…</> : <><Sparkles className="mr-2 h-4 w-4" />Backfill AI recommendations</>}</Button>}>
-              <div className="max-w-3xl space-y-3 text-sm leading-6 text-muted-foreground"><p>This processes active books that are missing useful details, a ready AI embedding, or a Google Books synopsis check. A ready embedding does not mean a synopsis is present. Older automatically enriched books get one targeted Google Books check; embeddings are reused when their source text and model are current.</p><p>Saved useful details, including details entered by staff, are reused. Blank synopses remain in Needs attention for staff review even when no automatic lookup is available.</p>{embeddingStatus?.errors?.length ? <p className="text-destructive">Recent embedding issue: {embeddingStatus.errors[0].message}</p> : null}</div>
+              <div className="max-w-3xl space-y-3 text-sm leading-6 text-muted-foreground"><p>This processes active books that are missing useful details, a ready AI embedding, or an online synopsis check. A ready embedding does not mean a synopsis is present. Synopses are checked from Open Library first, then Google Books, then Hardcover when configured; other metadata lookups may run concurrently. Embeddings are reused when their source text and model are current.</p><p>Saved useful details, including details entered by staff, are reused. Blank synopses remain in Needs attention for staff review even when no automatic lookup is available.</p>{embeddingStatus?.errors?.length ? <p className="text-destructive">Recent embedding issue: {embeddingStatus.errors[0].message}</p> : null}</div>
             </AdminPanel>
             <ManualBookMetadata backfillRevision={backfillRevision} />
       </div>}
@@ -161,7 +161,7 @@ const AdminCatalog = () => {
                       : isRateLimited
                         ? `Processed ${completed} of ${total} books; ${backfillProgress?.deferred || 0} deferred, ${backfillProgress?.lookupFailed || 0} lookup failures, and ${backfillProgress?.failed || 0} embedding failures. Wait before retrying Google Books${backfillProgress?.rateLimitRetryAt ? ` (after ${new Date(backfillProgress.rateLimitRetryAt).toLocaleTimeString()})` : ""}.`
                       : isComplete
-                        ? `Added synopses to ${backfillProgress?.synopsesAdded || 0} book${backfillProgress?.synopsesAdded === 1 ? "" : "s"}; Google Books returned no description for ${backfillProgress?.synopsesNotFound || 0} book${backfillProgress?.synopsesNotFound === 1 ? "" : "s"}; embeddings are ready for ${backfillProgress?.embedded || 0}.`
+                        ? `Added synopses to ${backfillProgress?.synopsesAdded || 0} book${backfillProgress?.synopsesAdded === 1 ? "" : "s"}; online sources returned no description for ${backfillProgress?.synopsesNotFound || 0} book${backfillProgress?.synopsesNotFound === 1 ? "" : "s"}; embeddings are ready for ${backfillProgress?.embedded || 0}.`
                         : `Processed ${completed} of ${total} eligible books; added ${backfillProgress?.synopsesAdded || 0} synopses, found no description for ${backfillProgress?.synopsesNotFound || 0}, and had ${backfillProgress?.lookupFailed || 0} lookup and ${backfillProgress?.failed || 0} embedding failures.`}
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -173,7 +173,7 @@ const AdminCatalog = () => {
               {progressUnavailable && isRunning ? <p role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm leading-5 text-foreground">Progress is temporarily unavailable. The backfill may still be running; checking again automatically.</p> : null}
               {backfillProgress?.lookupFailed ? <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm leading-5 text-foreground">
                 <p>Provider lookups failed for {backfillProgress.lookupFailed} book{backfillProgress.lookupFailed === 1 ? "" : "s"}. This is separate from embedding failures. You can retry Backfill or add details manually.</p>
-                {!isRunning && backfillProgress.lookupErrors?.length ? <div className="mt-2 border-t border-warning/30 pt-2"><p className="font-medium">Provider response</p><ul className="mt-1 list-disc space-y-1 pl-5">{backfillProgress.lookupErrors.map((message) => <li key={message} className="break-words">{message}</li>)}</ul></div> : null}
+                {!isRunning && backfillProgress.lookupErrors?.length ? <div className="mt-2 border-t border-warning/30 pt-2"><p className="font-medium">Lookup details and synopsis source path</p><ul className="mt-1 list-disc space-y-1 pl-5">{backfillProgress.lookupErrors.map((message) => <li key={message} className="break-words">{message}</li>)}</ul></div> : null}
               </div> : null}
               {backfillProgress?.failed && backfillProgress.errors.length ? <div role="alert" className="max-h-32 space-y-2 overflow-y-auto rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm leading-5 text-destructive">
                 <p className="font-medium">Embedding errors</p>
@@ -186,7 +186,7 @@ const AdminCatalog = () => {
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2"><Sparkles className="size-5 text-warning" /> Backfill AI recommendations?</AlertDialogTitle>
-                <AlertDialogDescription className="leading-6">This checks active books missing useful details, a ready AI embedding, or a one-time Google Books synopsis check. It updates embeddings only when needed.</AlertDialogDescription>
+                <AlertDialogDescription className="leading-6">This checks active books missing useful details, a ready AI embedding, or an online synopsis check. Synopsis sources run Open Library first, then Google Books, then Hardcover when configured. It updates embeddings only when needed.</AlertDialogDescription>
               </AlertDialogHeader>
               <p className="rounded-md bg-muted px-3 py-2 text-sm leading-6 text-muted-foreground">Useful saved details are reused. Staff-entered details are preserved.</p>
               <AlertDialogFooter>

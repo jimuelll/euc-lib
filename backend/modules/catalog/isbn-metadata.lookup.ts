@@ -14,6 +14,7 @@ interface IsbnMetadataLookup {
   descriptionSource: "openlibrary" | "googlebooks" | "hardcover" | null;
   synopsisChecked: boolean;
   synopsisErrors: string[];
+  synopsisAttempts: string[];
   language: string;
   pageCount: string | number | null;
   publishedDate: string;
@@ -54,6 +55,7 @@ interface SynopsisLookup {
   status: number | null;
   retryAfterMs: number | null;
   rateLimited: boolean;
+  attempts: string[];
 }
 
 let openLibraryQueue = Promise.resolve();
@@ -236,10 +238,11 @@ const openLibraryWorkKey = (value: unknown): string => {
   return match ? `/works/${match[1]}` : "";
 };
 
-const lookupOpenLibrarySynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[] }> => {
+const lookupOpenLibrarySynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[]; attempts: string[] }> => {
   const isbnParam = encodeURIComponent(isbn);
   const errors: string[] = [];
   const workKeys: string[] = [];
+  const attempts: string[] = [];
   let responded = false;
 
   try {
@@ -275,7 +278,10 @@ const lookupOpenLibrarySynopsis = async (isbn: string): Promise<{ description: s
       const work = toRecord(await fetchOpenLibraryJson(`https://openlibrary.org${key}.json`));
       responded = true;
       const description = cleanDescription(textValue(work.description));
-      if (description) return { description, responded, errors };
+      if (description) {
+        attempts.push("Open Library Work: synopsis found");
+        return { description, responded, errors, attempts };
+      }
     } catch (error) {
       const status = (error as Error & { status?: number })?.status;
       if (status === 404) responded = true;
@@ -283,12 +289,13 @@ const lookupOpenLibrarySynopsis = async (isbn: string): Promise<{ description: s
     }
   }
 
-  return { description: "", responded, errors };
+  attempts.push(errors.length ? "Open Library Work: lookup failed" : "Open Library Work: no synopsis");
+  return { description: "", responded, errors, attempts };
 };
 
-const lookupHardcoverSynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[] }> => {
+const lookupHardcoverSynopsis = async (isbn: string): Promise<{ description: string; responded: boolean; errors: string[]; configured: boolean }> => {
   const token = String(process.env.HARDCOVER_API_TOKEN || "").trim();
-  if (!token) return { description: "", responded: false, errors: [] };
+  if (!token) return { description: "", responded: false, errors: [], configured: false };
   const query = `query SynopsisByIsbn($isbn: String!) {
     editions(where: {_or: [{isbn_10: {_eq: $isbn}}, {isbn_13: {_eq: $isbn}}]}, limit: 1) {
       book { description }
@@ -303,36 +310,38 @@ const lookupHardcoverSynopsis = async (isbn: string): Promise<{ description: str
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
-      return { description: "", responded: false, errors: [`Hardcover: Metadata source failed (${response.status})`] };
+      return { description: "", responded: false, errors: [`Hardcover: Metadata source failed (${response.status})`], configured: true };
     }
     const payload = toRecord(await response.json());
     const graphQLErrors = asArray(payload.errors);
     if (graphQLErrors.length) {
-      return { description: "", responded: true, errors: [`Hardcover: ${textValue(toRecord(graphQLErrors[0]).message) || "GraphQL lookup failed"}`] };
+      return { description: "", responded: true, errors: [`Hardcover: ${textValue(toRecord(graphQLErrors[0]).message) || "GraphQL lookup failed"}`], configured: true };
     }
     const data = toRecord(payload.data);
     const edition = toRecord(asArray(data.editions)[0]);
     const book = toRecord(edition.book);
-    return { description: cleanDescription(textValue(book.description)), responded: true, errors: [] };
+    return { description: cleanDescription(textValue(book.description)), responded: true, errors: [], configured: true };
   } catch (error) {
-    return { description: "", responded: false, errors: [`Hardcover: ${error instanceof Error ? error.message : String(error)}`] };
+    return { description: "", responded: false, errors: [`Hardcover: ${error instanceof Error ? error.message : String(error)}`], configured: true };
   }
 };
 
 const lookupBookSynopsis = async (isbn: string, options: SynopsisLookupOptions = {}): Promise<SynopsisLookup> => {
   const openLibrary = await lookupOpenLibrarySynopsis(isbn);
   if (openLibrary.description) {
-    return { description: openLibrary.description, source: "openlibrary", responded: true, checked: true, errors: openLibrary.errors, status: null, retryAfterMs: null, rateLimited: false };
+    return { description: openLibrary.description, source: "openlibrary", responded: true, checked: true, errors: openLibrary.errors, status: null, retryAfterMs: null, rateLimited: false, attempts: openLibrary.attempts };
   }
 
   const googleBooks = await lookupGoogleBooksSynopsis(isbn, options);
   const errors = [...openLibrary.errors, ...googleBooks.errors];
+  const attempts = [...openLibrary.attempts, googleBooks.description ? "Google Books: synopsis found" : googleBooks.rateLimited ? "Google Books: rate limited" : googleBooks.errors.length ? "Google Books: lookup failed" : "Google Books: no synopsis"];
   if (googleBooks.description) {
-    return { description: googleBooks.description, source: "googlebooks", responded: true, checked: true, errors, status: googleBooks.status, retryAfterMs: googleBooks.retryAfterMs, rateLimited: googleBooks.rateLimited };
+    return { description: googleBooks.description, source: "googlebooks", responded: true, checked: true, errors, status: googleBooks.status, retryAfterMs: googleBooks.retryAfterMs, rateLimited: googleBooks.rateLimited, attempts };
   }
 
   const hardcover = await lookupHardcoverSynopsis(isbn);
   errors.push(...hardcover.errors);
+  attempts.push(hardcover.description ? "Hardcover: synopsis found" : hardcover.configured ? hardcover.errors.length ? "Hardcover: lookup failed" : "Hardcover: no synopsis" : "Hardcover: skipped (HARDCOVER_API_TOKEN is not configured)");
   return {
     description: hardcover.description,
     source: hardcover.description ? "hardcover" : null,
@@ -342,6 +351,7 @@ const lookupBookSynopsis = async (isbn: string, options: SynopsisLookupOptions =
     status: googleBooks.status,
     retryAfterMs: googleBooks.retryAfterMs,
     rateLimited: googleBooks.rateLimited,
+    attempts,
   };
 };
 
@@ -364,17 +374,26 @@ const lookupIsbnMetadata = async (isbn: string, options: IsbnLookupOptions = {})
   let openLibraryDescription = cleanDescription(textValue(open.description) || textValue(toRecord(open.details).description));
   let openLibrarySynopsisResponded = openLibrary.responded;
   let synopsisErrors: string[] = [];
+  let synopsisAttempts: string[] = [];
   if (!openLibraryDescription) {
     const synopsis = await lookupOpenLibrarySynopsis(isbn);
     openLibraryDescription = synopsis.description;
     openLibrarySynopsisResponded = openLibrarySynopsisResponded || synopsis.responded;
     synopsisErrors = synopsis.errors;
+    synopsisAttempts = synopsis.attempts;
+  } else {
+    synopsisAttempts = ["Open Library: synopsis found"];
   }
   let description = openLibraryDescription;
   let descriptionSource: SynopsisLookup["source"] = description ? "openlibrary" : null;
   if (!description && !options.skipGoogleBooks) {
     description = cleanDescription(google.description);
+    synopsisAttempts.push(description ? "Google Books: synopsis found" : googleBooks.rateLimited ? "Google Books: rate limited" : googleBooks.errors.length ? "Google Books: lookup failed" : "Google Books: no synopsis");
     if (description) descriptionSource = "googlebooks";
+  } else if (!description && options.skipGoogleBooks) {
+    synopsisAttempts.push("Google Books: skipped (previously checked)");
+  } else if (description && googleBooks.errors.length) {
+    synopsisAttempts.push(googleBooks.rateLimited ? "Google Books metadata lookup: rate limited (synopsis already found in Open Library)" : "Google Books metadata lookup: failed (synopsis already found in Open Library)");
   }
   let hardcoverResponded = false;
   if (!description) {
@@ -382,6 +401,7 @@ const lookupIsbnMetadata = async (isbn: string, options: IsbnLookupOptions = {})
     description = hardcover.description;
     hardcoverResponded = hardcover.responded;
     synopsisErrors.push(...hardcover.errors);
+    synopsisAttempts.push(hardcover.description ? "Hardcover: synopsis found" : hardcover.configured ? hardcover.errors.length ? "Hardcover: lookup failed" : "Hardcover: no synopsis" : "Hardcover: skipped (HARDCOVER_API_TOKEN is not configured)");
     if (description) descriptionSource = "hardcover";
   }
   const synopsisErrorsForBook = uniqueText([...synopsisErrors, ...googleBooks.errors]);
@@ -406,6 +426,7 @@ const lookupIsbnMetadata = async (isbn: string, options: IsbnLookupOptions = {})
     descriptionSource,
     synopsisChecked,
     synopsisErrors: synopsisErrorsForBook,
+    synopsisAttempts,
     language: firstText(openLanguages[0], open.language, google.language),
     pageCount,
     publishedDate,
