@@ -13,7 +13,12 @@ const isbnMetadataLookup = require("../catalog/isbn-metadata.lookup") as {
   lookupIsbnMetadata: (isbn: string, options?: { retryRateLimit?: boolean; skipGoogleBooks?: boolean }) => Promise<{
     description: string; subjects: string[]; categories: string[]; publisher: string; language: string;
     pageCount: string | number | null; publishedDate: string; errors: string[];
+    descriptionSource: "openlibrary" | "googlebooks" | "hardcover" | null; synopsisChecked: boolean; synopsisErrors: string[];
     googleBooksResponded: boolean; googleBooksStatus: number | null; googleBooksRetryAfterMs: number | null; googleBooksRateLimited: boolean;
+  }>;
+  lookupBookSynopsis: (isbn: string, options?: { retryRateLimit?: boolean }) => Promise<{
+    description: string; source: "openlibrary" | "googlebooks" | "hardcover" | null;
+    responded: boolean; checked: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
   }>;
   lookupGoogleBooksSynopsis: (isbn: string, options?: { retryRateLimit?: boolean }) => Promise<{
     description: string; responded: boolean; errors: string[]; status: number | null; retryAfterMs: number | null; rateLimited: boolean;
@@ -78,6 +83,7 @@ const BOOK_RULE_LIMIT = 3;
 const BOOK_AI_LIMIT = BOOK_LIMIT - BOOK_RULE_LIMIT;
 const embeddingModel = () => process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 const GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION = 1;
+const SYNOPSIS_PROVIDER_CHECK_VERSION = 1;
 let activeBackfill: BackfillState = { status: "idle", total: 0, completed: 0, missingSynopses: 0, embedded: 0, synopsesAdded: 0, synopsesNotFound: 0, failed: 0, lookupFailed: 0, deferred: 0, rateLimitRetryAt: null, currentTitle: null, errors: [], lookupErrors: [] };
 
 const normalized = (value: unknown): string => String(value || "").toLowerCase().trim();
@@ -98,11 +104,11 @@ const hasUsefulMetadata = (enrichment: Enrichment | null | undefined): boolean =
   || String(enrichment?.publishedDate || "").trim()
 );
 const hasDescription = (enrichment: Enrichment | null | undefined): boolean => Boolean(String(enrichment?.description || "").trim());
-const hasSynopsisCheck = (enrichment: Enrichment | null | undefined): boolean => Number(enrichment?.googleBooksSynopsisCheckVersion || 0) >= GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION;
+const hasSynopsisCheck = (enrichment: Enrichment | null | undefined): boolean => Number(enrichment?.synopsisProviderCheckVersion || 0) >= SYNOPSIS_PROVIDER_CHECK_VERSION;
 const synopsisStatus = (isbn: string | null | undefined, source: string | null | undefined, enrichment: Enrichment): SynopsisStatus => {
   if (hasDescription(enrichment)) return "present";
   if (!isbn || source === "manual") return "missing";
-  if (String(enrichment.googleBooksSynopsisLastError || "").trim()) return "lookup_failed";
+  if (String(enrichment.synopsisLastError || enrichment.googleBooksSynopsisLastError || "").trim()) return "lookup_failed";
   if (hasSynopsisCheck(enrichment)) return "no_description";
   return "not_checked";
 };
@@ -303,7 +309,7 @@ const getManualMetadata = async (bookId: number) => {
     metadataStatus: record.metadata_status === "failed" ? "failed" : hasUsefulMetadata(enrichment) ? (record.metadata_source === "manual" ? "manual" : "ready") : "missing",
     metadataError: record.metadata_status === "failed" && record.metadata_error ? publicMetadataError(record.metadata_error) : null,
     synopsisStatus: synopsisStatus(record.isbn, record.metadata_source, enrichment),
-    synopsisError: enrichment.googleBooksSynopsisLastError ? publicMetadataError(enrichment.googleBooksSynopsisLastError) : null,
+    synopsisError: enrichment.synopsisLastError || enrichment.googleBooksSynopsisLastError ? publicMetadataError(enrichment.synopsisLastError || enrichment.googleBooksSynopsisLastError) : null,
     embeddingStatus: record.embedding_status || "missing",
     embeddingError: record.embedding_error ? publicEmbeddingError(record.embedding_error) : null,
   };
@@ -355,6 +361,8 @@ const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload
     }
   }
   const enrichment = { ...existing, description: summary, subjects, publisher, categories, language, pageCount, publishedDate };
+  delete enrichment.synopsisLastError;
+  delete enrichment.descriptionSource;
   delete enrichment.googleBooksSynopsisLastError;
   if (!hasUsefulMetadata(enrichment)) throw createServiceError("Add at least one book detail before saving", 400);
   await repository.saveManualEnrichment(bookId, enrichment);
@@ -384,15 +392,21 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     if (hasDescription(savedEnrichment) || hasSynopsisCheck(savedEnrichment)) {
       return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(isbnRecord.isbn, existing.source, savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
     }
-    const lookup = await isbnMetadataLookup.lookupGoogleBooksSynopsis(isbnRecord.isbn, { retryRateLimit });
-    if (!lookup.responded || lookup.errors.length) {
-      const lookupError = publicMetadataError(lookup.errors.join("; ") || "Google Books did not return a usable response");
-      const enrichment: Enrichment = { ...savedEnrichment, googleBooksSynopsisLastError: lookupError };
+    const lookup = await isbnMetadataLookup.lookupBookSynopsis(isbnRecord.isbn, { retryRateLimit });
+    if (!lookup.checked) {
+      const lookupError = publicMetadataError(lookup.errors.join("; ") || "Synopsis providers did not return a usable response");
+      const enrichment: Enrichment = { ...savedEnrichment, synopsisLastError: lookupError };
       await repository.saveEnrichment(bookId, enrichment);
-      return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs };
+      return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: lookup.errors.length ? lookup.errors.map(publicMetadataError) : [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs };
     }
-    const enrichment: Enrichment = { ...savedEnrichment, googleBooksSynopsisCheckVersion: GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION };
+    const enrichment: Enrichment = {
+      ...savedEnrichment,
+      synopsisProviderCheckVersion: SYNOPSIS_PROVIDER_CHECK_VERSION,
+      googleBooksSynopsisCheckVersion: GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION,
+    };
+    if (lookup.source) enrichment.descriptionSource = lookup.source;
     delete enrichment.googleBooksSynopsisLastError;
+    delete enrichment.synopsisLastError;
     if (lookup.description) enrichment.description = lookup.description;
     await repository.saveEnrichment(bookId, enrichment);
     return {
@@ -400,16 +414,15 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
       synopsisStatus: lookup.description ? "present" : "no_description",
       synopsisCheckedNow: true,
       descriptionAddedNow: Boolean(lookup.description),
-      lookupFailed: false,
-      lookupErrors: [],
-      rateLimited: false,
-      retryAfterMs: null,
+      lookupFailed: lookup.errors.length > 0,
+      lookupErrors: lookup.errors.map(publicMetadataError),
+      rateLimited: lookup.rateLimited,
+      retryAfterMs: lookup.retryAfterMs,
     };
   }
 
   const markerAlreadySet = hasSynopsisCheck(savedEnrichment);
   const metadata = await isbnMetadataLookup.lookupIsbnMetadata(isbnRecord.isbn, { retryRateLimit, skipGoogleBooks: markerAlreadySet });
-  const googleError = metadata.errors.find((error) => error.startsWith("Google Books:"));
   const enrichment: Enrichment = {
     ...savedEnrichment,
     description: metadata.description || String(savedEnrichment.description || ""),
@@ -420,12 +433,17 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     pageCount: metadata.pageCount ?? savedEnrichment.pageCount ?? null,
     publishedDate: metadata.publishedDate || savedEnrichment.publishedDate || "",
   };
-  const synopsisCheckedNow = metadata.googleBooksResponded && !googleError;
+  if (metadata.descriptionSource) enrichment.descriptionSource = metadata.descriptionSource;
+  const synopsisCheckedNow = metadata.synopsisChecked;
   if (synopsisCheckedNow) {
+    enrichment.synopsisProviderCheckVersion = SYNOPSIS_PROVIDER_CHECK_VERSION;
     enrichment.googleBooksSynopsisCheckVersion = GOOGLE_BOOKS_SYNOPSIS_CHECK_VERSION;
+    delete enrichment.synopsisLastError;
     delete enrichment.googleBooksSynopsisLastError;
-  } else if (googleError) {
-    enrichment.googleBooksSynopsisLastError = publicMetadataError(googleError);
+  } else if (metadata.synopsisErrors.length) {
+    const synopsisError = publicMetadataError(metadata.synopsisErrors.join("; "));
+    enrichment.synopsisLastError = synopsisError;
+    enrichment.googleBooksSynopsisLastError = synopsisError;
   }
   const usefulMetadataFound = hasUsefulMetadata(enrichment);
   const lookupFailed = metadata.errors.length > 0;
@@ -440,7 +458,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     enrichment,
     synopsisStatus: synopsisStatus(isbnRecord.isbn, "openlibrary_googlebooks", enrichment),
     synopsisCheckedNow,
-    descriptionAddedNow: synopsisCheckedNow && Boolean(metadata.description) && !hasDescription(savedEnrichment),
+    descriptionAddedNow: Boolean(metadata.description) && !hasDescription(savedEnrichment),
     lookupFailed,
     lookupErrors,
     rateLimited: metadata.googleBooksRateLimited,

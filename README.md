@@ -189,6 +189,7 @@ Open <http://localhost:8080>. The API listens on <http://localhost:4000>.
 | `SNAPSHOT_UPLOAD_TIMEOUT_MS` | No | Snapshot upload timeout; defaults to 120000 ms |
 | `OPEN_LIBRARY_CONTACT_EMAIL` | No | Contact identity used for Open Library ISBN lookups |
 | `GOOGLE_BOOKS_API_KEY` | No | Enables authenticated Google Books metadata lookups |
+| `HARDCOVER_API_TOKEN` | No | Enables Hardcover synopsis fallback lookups |
 | `AI_EMBEDDING_PROVIDER` | No | Set to `gemini` to enable semantic recommendation embeddings |
 | `GEMINI_API_KEY` | Feature-specific | Gemini embeddings and/or report generation |
 | `GEMINI_EMBEDDING_MODEL` | No | Defaults to `gemini-embedding-001` |

@@ -95,6 +95,9 @@ export interface EmbeddingStatusRecord extends RowDataPacket {
 
 export interface Enrichment {
   description?: string;
+  descriptionSource?: "openlibrary" | "googlebooks" | "hardcover";
+  synopsisProviderCheckVersion?: number;
+  synopsisLastError?: string;
   googleBooksSynopsisCheckVersion?: number;
   googleBooksSynopsisLastError?: string;
   subjects?: string[];

@@ -278,7 +278,7 @@ async function findBooksForBackfill(): Promise<BackfillBook[]> {
            AND enrichment.status = 'ready'
            AND bk.isbn IS NOT NULL AND TRIM(bk.isbn) <> ''
            AND COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.description'))), ''), '') = ''
-           AND CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.googleBooksSynopsisCheckVersion')), ''), '0') AS UNSIGNED) < 1
+           AND CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.synopsisProviderCheckVersion')), ''), '0') AS UNSIGNED) < 1
          )
        )
      ORDER BY bk.id`
