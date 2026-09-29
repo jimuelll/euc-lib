@@ -9,6 +9,7 @@
 
 @layer base {
   :root {
+    --public-header-height: calc(3.5rem + 4px);
     --font-heading: "DM Sans", system-ui, sans-serif;
     --font-body: "DM Sans", system-ui, sans-serif;
 
@@ -148,14 +149,14 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
     min-width: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
     background-image: none;
     background-attachment: scroll;
   }
 
   #root {
     min-width: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   ::selection {
@@ -236,5 +237,40 @@
     letter-spacing: 0.26em;
     line-height: 1.25;
     text-transform: uppercase;
+  }
+}
+
+/* Height-aware hero rules override its mobile spacing utilities. */
+@media (min-width: 1024px) {
+  .homepage-hero {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-height: min(48rem, calc(100svh - var(--public-header-height)));
+  }
+
+  .homepage-hero-image {
+    display: flex;
+  }
+
+  .homepage-hero-content {
+    min-height: 0;
+    padding-block: clamp(1.5rem, 5svh, 4rem);
+  }
+
+  .homepage-hero-title {
+    margin-top: clamp(1rem, 2.5svh, 1.5rem);
+    font-size: clamp(3.25rem, min(6vw, 9svh), 5.25rem);
+  }
+
+  .homepage-hero-description {
+    margin-top: clamp(0.75rem, 2svh, 1.25rem);
+  }
+
+  .homepage-hero-search {
+    margin-top: clamp(1rem, 3svh, 2rem);
+  }
+
+  .homepage-hero-stats {
+    padding-block: clamp(0.75rem, 2svh, 1.25rem);
   }
 }

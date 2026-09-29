@@ -21,8 +21,8 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="border-b border-border bg-card">
-      <div className="relative isolate overflow-hidden bg-[#180908] text-white">
+    <section className="homepage-hero border-b border-border bg-card">
+      <div className="homepage-hero-image relative isolate overflow-hidden bg-[#180908] text-white">
         <img
           src={content?.hero_image_url || "/hero.jpg"}
           alt="Bookshelves inside the Enverga-Candelaria Library"
@@ -30,7 +30,7 @@ const HeroSection = () => {
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(113,0,0,0.95)_0%,rgba(113,0,0,0.85)_39%,rgba(64,7,7,0.40)_72%,rgba(24,5,5,0.50)_100%)]" />
 
-        <div className="container relative z-10 flex min-h-[35rem] items-center px-5 py-14 sm:px-8 sm:py-16 lg:min-h-[37rem] lg:px-12 xl:px-16">
+        <div className="homepage-hero-content container relative z-10 flex min-h-[35rem] items-center px-5 py-14 sm:px-8 sm:py-16 lg:px-12 xl:px-16">
           <div className="relative w-full max-w-[46rem]">
             <p className="relative flex max-w-xl items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-white/85">
               <span className="h-px w-7 shrink-0 bg-[#f5c66b]" aria-hidden="true" />
@@ -41,17 +41,17 @@ const HeroSection = () => {
               LIBRARY
             </div>
 
-            <h1 className="relative mt-6 max-w-[12ch] text-[clamp(3.25rem,6vw,5.25rem)] font-bold leading-[0.94] tracking-[-0.055em] sm:max-w-[10ch]">
+            <h1 className="homepage-hero-title relative mt-6 max-w-[12ch] text-[clamp(3.25rem,6vw,5.25rem)] font-bold leading-[0.94] tracking-[-0.055em] sm:max-w-[10ch]">
               {content?.hero_title || "Enverga-Candelaria"}
               <span className="mt-1 block tracking-[-0.035em] text-[#f5c66b]">{content?.hero_highlight || "Library"}</span>
             </h1>
 
-            <p className="relative mt-5 max-w-[35rem] text-base leading-7 text-white/90 sm:text-lg">
+            <p className="homepage-hero-description relative mt-5 max-w-[35rem] text-base leading-7 text-white/90 sm:text-lg">
               {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
             </p>
 
             <form
-              className="relative mt-8 flex h-12 max-w-[35rem] items-center overflow-hidden rounded-md border border-white/55 bg-black/20 text-white focus-within:ring-2 focus-within:ring-[#f5c66b] focus-within:ring-offset-2 focus-within:ring-offset-[#710000]"
+              className="homepage-hero-search relative mt-8 flex h-12 max-w-[35rem] items-center overflow-hidden rounded-md border border-white/55 bg-black/20 text-white focus-within:ring-2 focus-within:ring-[#f5c66b] focus-within:ring-offset-2 focus-within:ring-offset-[#710000]"
               onSubmit={(event) => { event.preventDefault(); submitSearch(); }}
               role="search"
             >
@@ -83,7 +83,7 @@ const HeroSection = () => {
         </div>
       </div>
 
-      <div className="container grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-8 lg:px-12 xl:px-16">
+      <div className="homepage-hero-stats container grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-8 lg:px-12 xl:px-16">
         {stats.map((stat) => (
           <div key={stat.label} className="min-w-0 px-3 first:pl-0 sm:px-6 sm:first:pl-0">
             <p className="text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">{stat.value}</p>

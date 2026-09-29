@@ -21,6 +21,8 @@ const navLinks: NavigationLink[] = [
   { label: "Bulletin",  to: "/bulletin",  matchPrefix: true  },
 ];
 
+const myLibraryLink: NavigationLink = { label: "My Library", to: "/my-library", matchPrefix: true };
+
 const AuthSkeleton = () => (
   <div className="h-8 w-8 bg-primary/20 animate-pulse" />
 );
@@ -124,12 +126,12 @@ const Navbar = () => {
           </Link>
 
           {/* Vertical separator */}
-          <div className="hidden md:block h-6 w-px bg-primary-foreground/15 mx-2 shrink-0" />
+          <div className="hidden xl:block h-6 w-px bg-primary-foreground/15 mx-2 shrink-0" />
 
           {/* Desktop nav */}
           <DesktopNav links={navLinks} isNavActive={isNavActive} showMyLibrary={showMyLibrary} />
 
-          <div className="flex-1 hidden md:block" />
+          <div className="flex-1 hidden xl:block" />
 
           {/* ── Right controls ── */}
           {/*
@@ -149,7 +151,7 @@ const Navbar = () => {
             ) : isLoggedIn ? (
               <>
                 {/* Bell — visible on both mobile and desktop */}
-                <div className="hidden md:block">
+                <div className="hidden xl:block">
                   <NotificationsDropdown
                     notifications={notifications}
                     unreadCount={unreadCount}
@@ -158,7 +160,7 @@ const Navbar = () => {
                     onMarkAllAsRead={markAllAsRead}
                   />
                 </div>
-                <div className="md:hidden">
+                <div className="xl:hidden">
                   <NotificationsDropdown
                     notifications={notifications}
                     unreadCount={unreadCount}
@@ -168,7 +170,7 @@ const Navbar = () => {
                   />
                 </div>
                 {/* User dropdown — desktop only, never takes mobile space */}
-                <div className="hidden md:block ml-1">
+                <div className="hidden xl:block ml-1">
                   <UserDropdown
                     name={user?.name}
                     role={role}
@@ -181,7 +183,7 @@ const Navbar = () => {
               </>
             ) : (
               /* Login button — desktop only */
-              <div className="hidden md:block ml-2">
+              <div className="hidden xl:block ml-2">
                 <Link to="/login">
                   <button
                     className="px-4 py-1.5 text-xs font-bold tracking-[0.15em] uppercase border border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
@@ -196,7 +198,7 @@ const Navbar = () => {
             {/* Burger — fixed dimensions, always last, can never be squeezed */}
             <button
               ref={menuButtonRef}
-              className="md:hidden flex items-center justify-center h-11 w-11 shrink-0 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+              className="xl:hidden flex items-center justify-center h-11 w-11 shrink-0 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
@@ -212,7 +214,7 @@ const Navbar = () => {
       {mobileOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            className="fixed inset-0 z-40 bg-black/50 xl:hidden"
             onClick={closeMobile}
             aria-hidden="true"
           />
@@ -221,8 +223,8 @@ const Navbar = () => {
             ref={menuRef}
             id="mobile-navigation"
             aria-label="Mobile navigation"
-            className="fixed left-0 right-0 top-[calc(3px+3.5rem)] z-40 overflow-y-auto border-b border-primary-foreground/10 bg-primary md:hidden"
-            style={{ maxHeight: "calc(100dvh - 3px - 3.5rem)" }}
+            className="fixed left-0 right-0 top-[var(--public-header-height)] z-40 overflow-y-auto border-b border-primary-foreground/10 bg-primary xl:hidden"
+            style={{ maxHeight: "calc(100dvh - var(--public-header-height))" }}
           >
             {/* User identity band */}
             {isLoggedIn && (
@@ -258,7 +260,7 @@ const Navbar = () => {
                 </MobileNavLink>
               ))}
               {showMyLibrary && (
-                <MobileNavLink to="/my-library" onClick={closeMobile} gold>
+                <MobileNavLink to="/my-library" active={isNavActive(myLibraryLink)} onClick={closeMobile} gold>
                   My Library
                 </MobileNavLink>
               )}
@@ -321,17 +323,18 @@ const DesktopNav = ({
   isNavActive: (link: typeof navLinks[number]) => boolean;
   showMyLibrary: boolean;
 }) => (
-  <nav className="hidden items-center md:flex">
+  <nav className="hidden items-center xl:flex">
     {links.map((link) => {
       const active = isNavActive(link);
       return (
         <Link
           key={link.to}
           to={link.to}
-          className={`relative flex h-14 items-center border-b-2 px-4 text-[11px] font-semibold tracking-[0.1em] uppercase transition-colors duration-200 focus-visible:ring-inset ${
+          aria-current={active ? "page" : undefined}
+          className={`relative flex h-14 items-center px-4 text-[11px] font-semibold tracking-[0.1em] uppercase transition-colors duration-200 focus-visible:ring-inset after:absolute after:bottom-2 after:left-4 after:right-4 after:h-0.5 after:bg-warning after:transition-opacity ${
             active
-              ? "text-primary-foreground border-warning"
-              : "text-primary-foreground/60 hover:text-primary-foreground border-transparent hover:border-primary-foreground/20"
+              ? "text-primary-foreground after:opacity-100"
+              : "text-primary-foreground/60 hover:text-primary-foreground after:opacity-0 hover:after:opacity-30"
           }`}
           style={{ fontFamily: "var(--font-heading)" }}
         >
@@ -342,7 +345,12 @@ const DesktopNav = ({
     {showMyLibrary && (
       <Link
         to="/my-library"
-        className="relative px-4 h-14 flex items-center text-[11px] font-semibold tracking-[0.1em] uppercase text-warning/90 hover:text-warning border-b-2 border-transparent hover:border-warning/50 transition-colors"
+        aria-current={isNavActive(myLibraryLink) ? "page" : undefined}
+        className={`relative px-4 h-14 flex items-center text-[11px] font-semibold tracking-[0.1em] uppercase transition-colors after:absolute after:bottom-2 after:left-4 after:right-4 after:h-0.5 after:bg-warning after:transition-opacity ${
+          isNavActive(myLibraryLink)
+            ? "text-primary-foreground after:opacity-100"
+            : "text-warning/90 hover:text-warning after:opacity-0 hover:after:opacity-30"
+        }`}
         style={{ fontFamily: "var(--font-heading)" }}
       >
         My Library
@@ -366,7 +374,7 @@ const NotificationsDropdown = ({
   onMarkAsRead: (notificationId: number) => Promise<void>;
   onMarkAllAsRead: () => Promise<void>;
 }) => (
-  <DropdownMenu>
+  <DropdownMenu modal={false}>
     <DropdownMenuTrigger asChild>
       <button aria-label="Open notifications" className="relative flex h-11 w-11 items-center justify-center text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
         <Bell className="h-4 w-4" />
@@ -377,7 +385,7 @@ const NotificationsDropdown = ({
         )}
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-md border-border/60 p-0 shadow-lg">
+    <DropdownMenuContent align="end" sideOffset={12} className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-md border-border/60 p-0 shadow-lg">
       <div className="border-b border-border/30 bg-primary px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -496,7 +504,7 @@ const UserDropdown = ({
         <ChevronDown className="h-3 w-3 text-primary-foreground/40" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="rounded-md border-border/60 shadow-lg min-w-[200px]">
+    <DropdownMenuContent align="end" sideOffset={12} className="rounded-md border-border/60 shadow-lg min-w-[200px]">
       <div className="px-3 py-2.5 bg-primary border-b border-border/30">
         <p
           className="text-[12px] font-bold tracking-[0.1em] uppercase text-primary-foreground"
@@ -553,6 +561,7 @@ const MobileNavLink = ({
   <Link
     to={to}
     onClick={onClick}
+    aria-current={active ? "page" : undefined}
     className={`flex min-h-11 items-center px-4 text-xs font-bold tracking-[0.14em] uppercase transition-colors border-l-2 ${
       active
         ? "border-warning text-primary-foreground bg-primary-foreground/[0.08]"
