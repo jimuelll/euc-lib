@@ -1,4 +1,5 @@
 import copyEligibility = require("./copyEligibility");
+const { normalizePagination } = require("../../middlewares/numericInput");
 
 const { availableToBorrow } = copyEligibility;
 
@@ -37,6 +38,7 @@ function normalizePublicCatalogFilters(options: PublicCatalogOptions = {}): Publ
   const materialType = options.format ?? options.materialType;
   const availability = options.availability;
   const sort = options.sort;
+  const pagination = normalizePagination(options.page, options.limit, 20, 50);
   return {
     query: cleanText(options.query),
     title: cleanText(options.title),
@@ -46,8 +48,8 @@ function normalizePublicCatalogFilters(options: PublicCatalogOptions = {}): Publ
     availability: availability === "available" || availability === "unavailable" ? availability : "all",
     category: cleanText(options.category),
     sort: sort === "title_asc" || sort === "title_desc" || sort === "newest" ? sort : "relevance",
-    page: Math.max(1, Number.parseInt(String(options.page ?? ""), 10) || 1),
-    limit: Math.min(50, Math.max(1, Number.parseInt(String(options.limit ?? ""), 10) || 20)),
+    page: pagination.safePage,
+    limit: pagination.safeLimit,
   };
 }
 

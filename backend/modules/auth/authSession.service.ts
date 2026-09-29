@@ -18,10 +18,10 @@ const getActiveRefreshSession = (userId: number, jti: string) => repository.getA
 const revokeRefreshSession = (userId: number, jti: string) => repository.revokeRefreshSession(userId, jti);
 
 async function rotateRefreshSession(userId: number, oldJti: string, nextExpiresAt: Date, rememberMe = false): Promise<string> {
-  const session = await getActiveRefreshSession(userId, oldJti);
-  if (!session) throw Object.assign(new Error("Invalid refresh token"), { status: 401 });
-  await revokeRefreshSession(userId, oldJti);
-  return issueRefreshSession(userId, nextExpiresAt, rememberMe);
+  const jti = randomUUID();
+  const rotated = await repository.rotateRefreshSession(userId, oldJti, jti, toMySqlDateTime(nextExpiresAt));
+  if (!rotated) throw Object.assign(new Error("Invalid refresh token"), { status: 401 });
+  return auth.signRefreshToken({ id: userId, jti, remember_me: Boolean(rememberMe) });
 }
 
 const revokeAllRefreshSessionsForUser = (userId: number) => repository.revokeAllRefreshSessionsForUser(userId);

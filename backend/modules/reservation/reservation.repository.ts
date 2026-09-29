@@ -15,6 +15,7 @@ import type {
   ReservationRow,
   ExpiredReservationRow,
 } from "./reservation.types";
+const { normalizePagination } = require("../../middlewares/numericInput");
 
 const db = require("../../db") as Pool;
 const outboxRepository = require("../delivery-outbox/outbox.repository");
@@ -111,9 +112,7 @@ async function findActiveReservations(userId: number): Promise<RowDataPacket[]> 
 }
 
 async function findReservationHistory(userId: number, { page, limit }: ReservationHistoryOptions = {}): Promise<RowDataPacket[] | { rows: RowDataPacket[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const { paged, safePage, safeLimit, offset } = normalizePagination(page, limit, 20, 100);
   const [countRows] = paged
     ? await db.query<Array<RowDataPacket & { total: number | string }>>(
       `SELECT COUNT(*) AS total FROM reservations
@@ -132,7 +131,7 @@ async function findReservationHistory(userId: number, { page, limit }: Reservati
        AND r.status IN ('cancelled', 'expired', 'fulfilled')
        AND r.deleted_at IS NULL
      ORDER BY r.reserved_at DESC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [userId, safeLimit, (safePage - 1) * safeLimit] : [userId]
+    paged ? [userId, safeLimit, offset] : [userId]
   );
   return paged
     ? {
@@ -149,9 +148,7 @@ async function findReservationHistory(userId: number, { page, limit }: Reservati
 
 async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = true }: CatalogueSearchOptions = {}): Promise<RowDataPacket[] | { rows: RowDataPacket[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
   const like = `%${query}%`;
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const { paged, safePage, safeLimit, offset } = normalizePagination(page, limit, 20, 100);
   const visibilityFilter = showUnheldInOpac ? "" : `AND EXISTS (
     SELECT 1 FROM book_copies held_bc
      WHERE held_bc.book_id = bk.id AND held_bc.deleted_at IS NULL AND held_bc.is_active = 1
@@ -197,7 +194,7 @@ async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = 
        ${visibilityFilter}
      GROUP BY bk.id
      ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like]
+    paged ? [like, like, like, safeLimit, offset] : [like, like, like]
   );
   return paged
     ? {

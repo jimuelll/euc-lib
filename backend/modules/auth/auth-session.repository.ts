@@ -49,6 +49,35 @@ const revokeRefreshSession = async (userId: number, jti: string): Promise<void> 
   );
 };
 
+const rotateRefreshSession = async (userId: number, oldJti: string, nextJti: string, expiresAt: string): Promise<boolean> => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [result] = await connection.query<ResultSetHeader>(
+      `UPDATE auth_refresh_sessions
+          SET revoked_at = UTC_TIMESTAMP()
+        WHERE user_id = ? AND jti = ? AND revoked_at IS NULL AND expires_at > UTC_TIMESTAMP()`,
+      [userId, oldJti],
+    );
+    if (result.affectedRows !== 1) {
+      await connection.rollback();
+      return false;
+    }
+    await connection.query(
+      `INSERT INTO auth_refresh_sessions (user_id, jti, expires_at)
+       VALUES (?, ?, ?)`,
+      [userId, nextJti, expiresAt],
+    );
+    await connection.commit();
+    return true;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 const revokeAllRefreshSessionsForUser = async (userId: number): Promise<void> => {
   await db.query(
     `UPDATE auth_refresh_sessions
@@ -91,6 +120,7 @@ export = {
   createRefreshSession,
   getActiveRefreshSession,
   revokeRefreshSession,
+  rotateRefreshSession,
   revokeAllRefreshSessionsForUser,
   purgeStaleRefreshSessions,
   invalidateAllSessionsAfterRestore,

@@ -1,5 +1,6 @@
 import type { Request, RequestHandler, Response } from "express";
 import service = require("./adminReservation.service");
+const { normalizePagination, parsePositiveSafeInteger } = require("../../middlewares/numericInput");
 
 const { logError } = require("../../logger") as { logError: (...values: unknown[]) => void };
 
@@ -11,12 +12,11 @@ const sendError = (res: Response, error: unknown, fallback: string): void => {
   res.status(requestError?.status ?? 500).json({ message: requestError?.message ?? fallback });
 };
 
-const reservationId = (req: Request): number => Number.parseInt(String(req.params.reservationId), 10);
+const reservationId = (req: Request): number | null => parsePositiveSafeInteger(req.params.reservationId);
 
 const getAdminReservations: RequestHandler = async (req, res) => {
   try {
-    const page = Math.max(1, Number.parseInt(String(req.query.page || ""), 10) || 1);
-    const limit = Math.min(50, Number.parseInt(String(req.query.limit || ""), 10) || 15);
+    const { safePage: page, safeLimit: limit } = normalizePagination(req.query.page, req.query.limit, 15, 50);
     const search = String(req.query.search ?? "");
     const status = String(req.query.status ?? "all");
     const dateFrom = String(req.query.dateFrom ?? "");
@@ -32,7 +32,7 @@ const getAdminReservations: RequestHandler = async (req, res) => {
 const markReservationReady: RequestHandler = async (req, res) => {
   try {
     const id = reservationId(req);
-    if (Number.isNaN(id) || id < 1) return void res.status(400).json({ message: "Invalid reservation ID" });
+    if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
     await service.markReservationReady(id, user.user.id);
     res.locals.auditEnqueued = true;
@@ -50,7 +50,7 @@ const fulfillReservation: RequestHandler = async (_req, res) => {
 const cancelReservationAdmin: RequestHandler = async (req, res) => {
   try {
     const id = reservationId(req);
-    if (Number.isNaN(id) || id < 1) return void res.status(400).json({ message: "Invalid reservation ID" });
+    if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
     await service.cancelReservationAdmin(id, user.user.id);
     res.locals.auditEnqueued = true;
@@ -64,7 +64,7 @@ const cancelReservationAdmin: RequestHandler = async (req, res) => {
 const deleteReservationAdmin: RequestHandler = async (req, res) => {
   try {
     const id = reservationId(req);
-    if (Number.isNaN(id) || id < 1) return void res.status(400).json({ message: "Invalid reservation ID" });
+    if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
     await service.archiveReservation(id, user.user.id);
     res.locals.auditEnqueued = true;
@@ -78,7 +78,7 @@ const deleteReservationAdmin: RequestHandler = async (req, res) => {
 const restoreReservationAdmin: RequestHandler = async (req, res) => {
   try {
     const id = reservationId(req);
-    if (Number.isNaN(id) || id < 1) return void res.status(400).json({ message: "Invalid reservation ID" });
+    if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
     await service.restoreReservation(id, user.user.id);
     res.locals.auditEnqueued = true;

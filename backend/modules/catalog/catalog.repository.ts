@@ -1,4 +1,5 @@
 const db: any = require("../../db");
+const { normalizePagination } = require("../../middlewares/numericInput");
 const { availableToBorrow, hasAccession, hasActiveBookPolicy } = require("./copyEligibility");
 const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
 const { buildPublicCatalogWhere, extractPublicCategories, normalizePublicCatalogFilters, publicCatalogOrder } = require("./catalog.public-search");
@@ -337,9 +338,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
   const deletedFilter = showArchived ? "IS NOT NULL" : "IS NULL";
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
   const materialParams = ["book", "thesis"].includes(materialType) ? [materialType] : [];
-  const paged = Number.isFinite(Number(page));
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const { paged, safePage, safeLimit, offset } = normalizePagination(page, limit, 20, 100);
   const baseParams = [like, like, like, like, ...materialParams];
 
   if (publicOnly) {
@@ -374,7 +373,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
          ${opacVisibilityFilter}
        GROUP BY bk.id
        ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-      paged ? [like, like, like, like, safeLimit, (safePage - 1) * safeLimit] : [like, like, like, like]
+      paged ? [like, like, like, like, safeLimit, offset] : [like, like, like, like]
     );
     return { rows, total: Number(total), paged, page: safePage, limit: safeLimit };
   }
@@ -469,8 +468,7 @@ async function searchPublicCatalogue(options: Record<string, any> = {}) {
 }
 
 async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", page = 1, limit = 25 }: BookPageOptions = {}) {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+  const { safePage, safeLimit, offset } = normalizePagination(page, limit, 25, 100);
   const like = `%${String(query).trim()}%`;
   const safeStatus = ["active", "archived", "all"].includes(status) ? status : "active";
   const deletedFilter = safeStatus === "all" ? "1 = 1" : `bk.deleted_at ${safeStatus === "archived" ? "IS NOT NULL" : "IS NULL"}`;
@@ -492,7 +490,7 @@ async function searchBooksPage({ query = "", status = "active", materialType = "
      LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL AND (rr.expires_at IS NULL OR rr.expires_at > NOW())
      ${where}
      GROUP BY bk.id ORDER BY bk.title ASC LIMIT ? OFFSET ?`,
-    [...params, safeLimit, (safePage - 1) * safeLimit]
+    [...params, safeLimit, offset]
   );
   return { rows, total: Number(total), page: safePage, limit: safeLimit };
 }

@@ -29,6 +29,7 @@ test("AI backfill selects books with missing, stale, or failed embeddings", asyn
 
 test("AI backfill reuses useful saved metadata when only an embedding needs repair", async () => {
   const originalFindEnrichment = repository.findEnrichment;
+  const originalFindBookIsbn = repository.findBookIsbn;
   const originalFetch = global.fetch;
   const savedMetadata = { description: "Existing book summary", subjects: ["History"] };
   try {
@@ -37,6 +38,7 @@ test("AI backfill reuses useful saved metadata when only an embedding needs repa
       status: "ready",
       enrichment_json: JSON.stringify(savedMetadata),
     });
+    repository.findBookIsbn = async () => { throw new Error("Saved synopsis should not need another ISBN lookup"); };
     global.fetch = async () => { throw new Error("Unexpected online lookup"); };
 
     const metadata = await service.enrichBook(123);
@@ -44,6 +46,7 @@ test("AI backfill reuses useful saved metadata when only an embedding needs repa
     assert.deepEqual(metadata, savedMetadata);
   } finally {
     repository.findEnrichment = originalFindEnrichment;
+    repository.findBookIsbn = originalFindBookIsbn;
     global.fetch = originalFetch;
   }
 });
@@ -55,6 +58,7 @@ test("online metadata lookup failures are tracked separately from embedding fail
     markEnrichmentFailed: repository.markEnrichmentFailed,
     fetch: global.fetch,
     googleKey: process.env.GOOGLE_BOOKS_API_KEY,
+    hardcoverKey: process.env.HARDCOVER_API_TOKEN,
   };
   let savedFailure = null;
   try {
@@ -62,13 +66,14 @@ test("online metadata lookup failures are tracked separately from embedding fail
     repository.findBookIsbn = async () => ({ id: 124, isbn: "9781234567890" });
     repository.markEnrichmentFailed = async (_bookId, message) => { savedFailure = message; };
     delete process.env.GOOGLE_BOOKS_API_KEY;
+    delete process.env.HARDCOVER_API_TOKEN;
     global.fetch = async () => ({ ok: false, status: 503 });
 
     const result = await service.enrichBook(124);
 
     assert.deepEqual(result, {
       __lookupFailed: true,
-      __lookupError: "Open Library: Metadata source failed (503); Open Library search: Metadata source failed (503); Google Books: Metadata source failed (503)",
+      __lookupError: "Open Library: Metadata source failed (503); Open Library search: Metadata source failed (503); Google Books: Metadata source failed (503); Open Library synopsis: Metadata source failed (503); Open Library synopsis search: Metadata source failed (503)",
     });
     assert.equal(savedFailure, result.__lookupError);
   } finally {
@@ -78,6 +83,8 @@ test("online metadata lookup failures are tracked separately from embedding fail
     global.fetch = originals.fetch;
     if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
     else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
+    if (originals.hardcoverKey === undefined) delete process.env.HARDCOVER_API_TOKEN;
+    else process.env.HARDCOVER_API_TOKEN = originals.hardcoverKey;
   }
 });
 
@@ -159,7 +166,7 @@ test("Open Library ISBN search enriches books without a Google Books key", async
     assert.equal(result.pageCount, 248);
     assert.equal(result.publishedDate, "2024");
     assert.deepEqual(savedMetadata, result);
-    assert.equal(requests.length, 3);
+    assert.ok(requests.length >= 3, "metadata and synopsis fallback may make additional provider requests");
   } finally {
     repository.findEnrichment = originals.findEnrichment;
     repository.findBookIsbn = originals.findBookIsbn;
@@ -421,6 +428,7 @@ test("a 429 retries once then pauses the batch and leaves remaining books deferr
     fetch: global.fetch,
     model: process.env.GEMINI_EMBEDDING_MODEL,
     googleKey: process.env.GOOGLE_BOOKS_API_KEY,
+    hardcoverKey: process.env.HARDCOVER_API_TOKEN,
   };
   const books = [401, 402, 403].map((id) => ({ id, title: `Book ${id}`, author: "A. Writer", material_type: "book", metadata: "{}" }));
   const saved = new Map();
@@ -442,10 +450,13 @@ test("a 429 retries once then pauses the batch and leaves remaining books deferr
     };
     process.env.GEMINI_EMBEDDING_MODEL = "backfill-test-model";
     delete process.env.GOOGLE_BOOKS_API_KEY;
+    delete process.env.HARDCOVER_API_TOKEN;
     global.fetch = async (url) => {
-      assert.match(String(url), /^https:\/\/www\.googleapis\.com\/books\/v1\/volumes/);
-      googleRequests += 1;
-      return { ok: false, status: 429, headers: { get: () => "0" } };
+      if (String(url).startsWith("https://www.googleapis.com/books/v1/volumes")) {
+        googleRequests += 1;
+        return { ok: false, status: 429, headers: { get: () => "0" } };
+      }
+      return { ok: true, json: async () => ({ docs: [] }) };
     };
 
     const started = await service.startBackfill();
@@ -464,7 +475,7 @@ test("a 429 retries once then pauses the batch and leaves remaining books deferr
     assert.equal(progress.failed, 0);
     assert.equal(googleRequests, 2, "Google Books is retried once after a 429");
     assert.ok(progress.rateLimitRetryAt);
-    assert.match(saved.get(401).googleBooksSynopsisLastError, /429/);
+    assert.match(saved.get(401).synopsisLastError, /429/);
     assert.equal(saved.has(402), false);
     assert.equal(saved.has(403), false);
   } finally {
@@ -480,6 +491,8 @@ test("a 429 retries once then pauses the batch and leaves remaining books deferr
     else process.env.GEMINI_EMBEDDING_MODEL = originals.model;
     if (originals.googleKey === undefined) delete process.env.GOOGLE_BOOKS_API_KEY;
     else process.env.GOOGLE_BOOKS_API_KEY = originals.googleKey;
+    if (originals.hardcoverKey === undefined) delete process.env.HARDCOVER_API_TOKEN;
+    else process.env.HARDCOVER_API_TOKEN = originals.hardcoverKey;
   }
 });
 

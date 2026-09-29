@@ -386,18 +386,28 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
   if (existing?.source === "manual") {
     return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(null, "manual", savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
   }
+  if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment) && hasDescription(savedEnrichment)) {
+    return { enrichment: savedEnrichment, synopsisStatus: "present", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
+  }
   const isbnRecord = await repository.findBookIsbn(bookId);
   if (!isbnRecord?.isbn) {
     return { enrichment: Object.keys(savedEnrichment).length ? savedEnrichment : null, synopsisStatus: "missing", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
   }
   if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) {
-    if (hasDescription(savedEnrichment) || hasSynopsisCheck(savedEnrichment)) {
+    if (hasSynopsisCheck(savedEnrichment)) {
       return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(isbnRecord.isbn, existing.source, savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
     }
     const lookup = await isbnMetadataLookup.lookupBookSynopsis(isbnRecord.isbn, { retryRateLimit });
     if (!lookup.checked) {
-      const lookupError = publicMetadataError(lookup.errors.join("; ") || "Synopsis providers did not return a usable response");
-      const enrichment: Enrichment = { ...savedEnrichment, synopsisLastError: lookupError };
+      const orderedErrors = lookup.rateLimited
+        ? [...lookup.errors.filter((error) => /\b429\b/.test(error)), ...lookup.errors.filter((error) => !/\b429\b/.test(error))]
+        : lookup.errors;
+      const lookupError = publicMetadataError(orderedErrors.join("; ") || "Synopsis providers did not return a usable response");
+      const enrichment: Enrichment = {
+        ...savedEnrichment,
+        synopsisLastError: lookupError,
+        ...(lookup.rateLimited ? { googleBooksSynopsisLastError: lookupError } : {}),
+      };
       await repository.saveEnrichment(bookId, enrichment);
       return { enrichment, synopsisStatus: "lookup_failed", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: true, lookupErrors: lookup.errors.length ? lookup.errors.map(publicMetadataError) : [lookupError], rateLimited: lookup.rateLimited, retryAfterMs: lookup.retryAfterMs, providerAttempts: lookup.attempts };
     }

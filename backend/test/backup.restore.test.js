@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { payloadChecksum, upgradeBackup } = require("../modules/backup/snapshot.transforms");
+const registry = require("../modules/backup/snapshot.registry");
 
 test("restore upgrades the previous snapshot version and adds newly registered tables", () => {
   const backup = {
@@ -95,4 +96,26 @@ test("restore upgrades v12 loan provenance and preserves outbox, holdings, setti
   assert.deepEqual(upgraded.tables.notifications, backup.tables.notifications);
   assert.deepEqual(upgraded.tables.copy_holdings, backup.tables.copy_holdings);
   assert.deepEqual(upgraded.tables.catalog_settings, backup.tables.catalog_settings);
+});
+
+test("restore preflight rejects malformed rows before restore can begin", async () => {
+  const repository = require("../modules/backup/backup.repository");
+  const snapshot = require("../modules/backup/snapshot.service");
+  const originalListTables = repository.listApplicationTables;
+  const originalSchemaManifest = repository.getSchemaManifest;
+  repository.listApplicationTables = async () => [...registry.APPLICATION_TABLES];
+  repository.getSchemaManifest = async () => Object.fromEntries(
+    registry.APPLICATION_TABLES.map((table) => [table, { columns: [] }]),
+  );
+  const tables = Object.fromEntries(registry.APPLICATION_TABLES.map((table) => [table, []]));
+  tables.books = [null];
+  try {
+    await assert.rejects(
+      snapshot.preflightRestore({ tables }),
+      (error) => error.status === 400 && /invalid row for books/i.test(error.message),
+    );
+  } finally {
+    repository.listApplicationTables = originalListTables;
+    repository.getSchemaManifest = originalSchemaManifest;
+  }
 });

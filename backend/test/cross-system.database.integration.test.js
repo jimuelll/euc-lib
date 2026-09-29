@@ -206,6 +206,51 @@ test("database: pending reservations keep a preparation copy and preparation loc
   await borrowingTransactions.returnBook(firstCheckout.borrowingId, fixture.userId, { actorId: 1 });
 });
 
+test("database: checkout racing reservation preparation cannot take the last committed copy", {
+  skip: enabled ? false : "requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test",
+}, async () => {
+  const fixture = await createFixture("checkout-prepare-race", { copyCount: 1, accessionCount: 1 });
+  const [otherUser] = await db.query(
+    "INSERT INTO users (student_employee_id, name, password_hash, role, is_active, must_change_password) VALUES (?, ?, 'integration-test-hash', 'student', 1, 0)",
+    [`O-${fixture.runId}`, `Other ${fixture.runId}`],
+  );
+  const reservation = await reservationService.reserveBook(fixture.userId, fixture.bookId);
+  const outcomes = await Promise.allSettled([
+    reservationService.markReservationReady(reservation.reservationId, 1),
+    borrowingTransactions.borrowBook(otherUser.insertId, fixture.bookId, 1),
+  ]);
+  assert.equal(outcomes[0].status, "fulfilled", "staff must be able to prepare the reserved copy");
+  assert.equal(outcomes[1].status, "rejected", "a normal checkout must preserve the last reserved copy");
+  assert.equal(outcomes[1].reason.status, 409);
+
+  const [[ready]] = await db.query("SELECT status, reserved_copy_id FROM reservations WHERE id = ?", [reservation.reservationId]);
+  assert.equal(ready.status, "ready");
+  const checkout = await borrowingTransactions.borrowBook(
+    fixture.userId,
+    fixture.copies[0].barcode,
+    1,
+    { isCopyBarcode: true, reservationId: reservation.reservationId },
+  );
+  assert.equal(checkout.copyId, Number(ready.reserved_copy_id));
+  await borrowingTransactions.returnBook(checkout.borrowingId, fixture.userId, { actorId: 1 });
+});
+
+test("database: cancelling an expired reservation races expiry synchronization to one terminal state", {
+  skip: enabled ? false : "requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test",
+}, async () => {
+  const fixture = await createFixture("cancel-expiry-race");
+  const reservation = await reservationService.reserveBook(fixture.userId, fixture.bookId);
+  await db.query("UPDATE reservations SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?", [reservation.reservationId]);
+  const outcomes = await Promise.allSettled([
+    reservationService.cancelReservation(reservation.reservationId, fixture.userId),
+    reservationService.syncExpired(),
+  ]);
+  const cancellation = outcomes[0];
+  if (cancellation.status === "rejected") assert.equal(cancellation.reason.status, 409);
+  const [[state]] = await db.query("SELECT status FROM reservations WHERE id = ?", [reservation.reservationId]);
+  assert.ok(["cancelled", "expired"].includes(state.status));
+});
+
 test("database: OPAC, recommendations, inventory, and history follow the copy lifecycle", {
   skip: enabled ? false : "requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test",
 }, async () => {

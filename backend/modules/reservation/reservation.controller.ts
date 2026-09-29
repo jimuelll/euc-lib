@@ -1,5 +1,6 @@
 import type { Request, RequestHandler, Response } from "express";
 import service = require("./reservation.service");
+const { parsePositiveSafeInteger } = require("../../middlewares/numericInput");
 
 const { logError } = require("../../logger") as { logError: (...values: unknown[]) => void };
 
@@ -45,8 +46,8 @@ const getReservationHistory: RequestHandler = async (req, res) => {
 
 const reserveBook: RequestHandler = async (req, res) => {
   try {
-    const bookId = Number.parseInt(String(req.params.bookId), 10);
-    if (Number.isNaN(bookId) || bookId < 1) return void res.status(400).json({ message: "Invalid book ID" });
+    const bookId = parsePositiveSafeInteger(req.params.bookId);
+    if (bookId === null) return void res.status(400).json({ message: "Invalid book ID" });
     const user = req as AuthenticatedRequest;
     const result = await service.reserveBook(user.user.id, bookId);
     res.locals.auditEnqueued = true;
@@ -59,8 +60,8 @@ const reserveBook: RequestHandler = async (req, res) => {
 
 const cancelReservation: RequestHandler = async (req, res) => {
   try {
-    const id = Number.parseInt(String(req.params.reservationId), 10);
-    if (Number.isNaN(id) || id < 1) return void res.status(400).json({ message: "Invalid reservation ID" });
+    const id = parsePositiveSafeInteger(req.params.reservationId);
+    if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
     await service.cancelReservation(id, user.user.id);
     res.locals.auditEnqueued = true;

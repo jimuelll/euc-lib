@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 
 const { validate, createValidationError } = require("../../middlewares/validate");
 const { getSchema, getCatalogRecordForValidation } = require("./catalog.service");
+const { parsePositiveSafeInteger } = require("../../middlewares/numericInput");
 
 interface CatalogRecord extends Record<string, any> {
   material_type: string;
@@ -214,8 +215,8 @@ const validateSchemaPayload = validate((req: CatalogRequest) => {
 });
 
 const validateBookId = (req: CatalogRequest, res: Response, next: NextFunction): Response | void => {
-  const id = parseInt(String(req.params.id), 10);
-  if (isNaN(id) || id < 1) {
+  const id = parsePositiveSafeInteger(req.params.id);
+  if (id === null) {
     return res.status(400).json({ message: "Invalid book ID" });
   }
   (req.params as any).id = id;
