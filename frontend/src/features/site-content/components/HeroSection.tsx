@@ -24,6 +24,7 @@ const HeroSection = () => {
   const navigate = useNavigate();
   const { isLoggedIn, loading } = useAuth();
   const imageSource = content?.hero_image_url || "/hero.jpg";
+  const highlight = content?.hero_highlight || "Library";
 
   const submitSearch = () => {
     const term = query.trim();
@@ -54,7 +55,17 @@ const HeroSection = () => {
           </p>
           <h1 className="homepage-hero-title">
             {content?.hero_title || "Enverga-Candelaria"}{" "}
-            <span>{content?.hero_highlight || "Library"}</span>
+            <span className={highlight === "Library" ? "homepage-hero-library-lettering" : undefined}>
+              {highlight}
+              {highlight === "Library" && (
+                <svg className="homepage-hero-book-mark" viewBox="0 0 72 76" fill="none" aria-hidden="true">
+                  <path d="M36 31C28 24 17 21 6 23V57C17 55 28 58 36 65C44 58 55 55 66 57V23C55 21 44 24 36 31Z" stroke="currentColor" strokeWidth="2" />
+                  <path d="M36 32V65M12 64C21 63 29 66 36 71C43 66 51 63 60 64M15 32C21 32 26 34 30 37M15 40C21 40 26 42 30 45M42 37C46 34 51 32 57 32M42 45C46 42 51 40 57 40" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M36 3L41 10L36 17L31 10Z" fill="currentColor" />
+                  <path d="M20 10L23 17M52 10L49 17" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              )}
+            </span>
           </h1>
           <p className="homepage-hero-description">
             {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
@@ -94,6 +105,9 @@ const HeroSection = () => {
               )}
             </div>
           </div>
+          <svg className="homepage-hero-mobile-accent" viewBox="0 0 320 12" fill="none" aria-hidden="true">
+            <path d="M0 6H144M176 6H320M153 6L160 1L167 6L160 11Z" stroke="currentColor" />
+          </svg>
         </div>
       </div>
 
