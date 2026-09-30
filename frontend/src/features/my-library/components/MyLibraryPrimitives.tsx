@@ -1,203 +1,219 @@
 import { Link } from "react-router-dom";
-import { ExternalLink, GraduationCap, Search } from "lucide-react";
+import { ExternalLink, GraduationCap } from "lucide-react";
 import type { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
-import { formatDate } from "./MyLibrary.formatters";
-import type { AttendanceSession, DashboardSubscription } from "../types";
+import { Button } from "@/components/ui/button";
+import type { DashboardSubscription } from "../types";
 
-const Surface = ({
+export function Surface({
   title,
+  count,
+  id,
   actions,
   children,
 }: {
   title: string;
+  count?: number;
+  id?: string;
   actions?: ReactNode;
   children: ReactNode;
-}) => (
-  <section className="overflow-hidden border border-border/80 bg-card/95">
-    <div className="h-[2px] w-full bg-[linear-gradient(90deg,hsl(var(--warning)),transparent_78%)]" />
-    <div className="flex flex-col gap-3 border-b border-border/70 bg-[linear-gradient(180deg,hsl(var(--primary)/0.05),transparent)] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h2
-          className="text-base font-semibold tracking-[-0.01em] text-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
+}) {
+  return (
+    <section
+      id={id}
+      aria-label={title}
+      className="min-w-0 scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-5 sm:px-6">
+        <h2 className="flex items-center gap-3 text-lg font-semibold tracking-tight">
           {title}
+          {count !== undefined && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-sm font-medium tabular-nums text-muted-foreground">
+              {count}
+            </span>
+          )}
         </h2>
+        {actions}
       </div>
-      {actions ? <div className="shrink-0">{actions}</div> : null}
-    </div>
-    <div>{children}</div>
-  </section>
-);
+      {children}
+    </section>
+  );
+}
 
-const MetricCard = ({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string | number;
-  hint: string;
-}) => (
-  <div className="border border-border/80 bg-card px-4 py-4">
-    <p
-      className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {label}
-    </p>
-    <p
-      className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {value}
-    </p>
-    <p className="mt-2 text-xs leading-5 text-muted-foreground">{hint}</p>
-  </div>
-);
-
-const EmptyPanel = ({ message }: { message: string }) => (
-  <div className="px-5 py-10 text-sm leading-6 text-muted-foreground">{message}</div>
-);
-
-const PanelList = ({ children }: { children: ReactNode }) => (
-  <div className="divide-y divide-border/70">{children}</div>
-);
-
-const SnapshotRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center justify-between gap-4 px-5 py-3.5">
-    <span
-      className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {label}
-    </span>
-    <span className="text-sm text-foreground">{value}</span>
-  </div>
-);
-
-const QuickAccessRow = ({
-  icon: Icon,
+export function EmptyPanel({
+  message,
   to,
-  label,
+  action,
 }: {
-  icon: typeof Search;
-  to: string;
-  label: string;
-}) => (
-  <Link to={to} className="flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/10">
-    <div className="flex items-center gap-3">
-      <Icon className="h-4 w-4 text-muted-foreground/60" />
-      <span
-        className="text-xs font-bold uppercase tracking-[0.12em] text-foreground"
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
-        {label}
-      </span>
-    </div>
-    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/60" />
-  </Link>
-);
-
-const AttendanceRow = ({ session }: { session: AttendanceSession }) => (
-  <tr className="transition-colors hover:bg-muted/10">
-    <td
-      className="px-5 py-3 text-[12px] font-bold text-foreground"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {formatDate(session.date)}
-    </td>
-    <td
-      className="px-5 py-3 text-[12px] text-success"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {formatDate(session.time_in, "h:mm a")}
-    </td>
-    <td className="px-5 py-3 text-[12px] text-muted-foreground">
-      {formatDate(session.time_out, "h:mm a")}
-    </td>
-  </tr>
-);
-
-const HistoryItem = ({
-  title,
-  subtitle,
-  meta,
-  badgeLabel,
-}: {
-  title: string;
-  subtitle: string;
-  meta: string;
-  badgeLabel: string;
-}) => (
-  <div className="flex items-start justify-between gap-3 px-5 py-4">
-    <div className="min-w-0">
-      <p
-        className="truncate text-[13px] font-bold text-foreground"
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
-        {title}
+  message: string;
+  to?: string;
+  action?: string;
+}) {
+  return (
+    <div className="px-5 py-8 sm:px-6">
+      <p className="max-w-prose text-sm leading-6 text-muted-foreground">
+        {message}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-      <p className="mt-1.5 text-xs text-muted-foreground/70">{meta}</p>
-    </div>
-    <Badge
-      variant="outline"
-      className="text-xs font-bold uppercase tracking-[0.08em]"
-      style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
-    >
-      {badgeLabel}
-    </Badge>
-  </div>
-);
-
-const SubscriptionItem = ({ subscription }: { subscription: DashboardSubscription }) => (
-  <a
-    href={subscription.url}
-    target="_blank"
-    rel="noreferrer"
-    className="flex items-start gap-4 px-5 py-4 transition-colors hover:bg-muted/10"
-  >
-    <div className="flex h-12 w-12 items-center justify-center overflow-hidden border border-border bg-muted shrink-0">
-      {subscription.image_url ? (
-        <img src={subscription.image_url} alt={subscription.title} className="h-full w-full object-cover" />
-      ) : (
-        <GraduationCap className="h-5 w-5 text-muted-foreground" />
+      {to && action && (
+        <Button asChild variant="outline" className="mt-4 min-h-11">
+          <Link to={to}>{action}</Link>
+        </Button>
       )}
     </div>
-    <div className="min-w-0 flex-1">
-      <div className="flex items-center justify-between gap-3">
-        <p
-          className="truncate text-[13px] font-bold text-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {subscription.title}
-        </p>
-        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      </div>
-      <p className="mt-1.5 text-[12px] leading-6 text-muted-foreground">
-        {subscription.description || "Academic resource for online research and study."}
-      </p>
-      {subscription.category ? (
-        <p className="mt-1.5 text-xs uppercase tracking-[0.12em] text-muted-foreground/70">
-          {subscription.category}
-        </p>
-      ) : null}
+  );
+}
+
+export function PanelList({ children }: { children: ReactNode }) {
+  return <div className="divide-y divide-border">{children}</div>;
+}
+
+export function LoadingPanel({
+  label = "Loading library activity",
+  rows = 3,
+}: {
+  label?: string;
+  rows?: number;
+}) {
+  return (
+    <div
+      role="status"
+      aria-label={label}
+      className="space-y-5 rounded-xl border border-border bg-card p-6"
+    >
+      <span className="sr-only">{label}</span>
+      <div className="h-6 w-36 animate-pulse rounded bg-muted" />
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="space-y-3 border-t border-border pt-5">
+          <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+        </div>
+      ))}
     </div>
-  </a>
-);
+  );
+}
 
+export function RetryNotice({
+  message,
+  onRetry,
+  retrying = false,
+}: {
+  message: string;
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+    >
+      <p className="min-w-0 flex-1 text-sm leading-6 text-foreground">
+        {message}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={onRetry}
+        disabled={retrying}
+      >
+        {retrying ? "Retrying…" : "Try again"}
+      </Button>
+    </div>
+  );
+}
 
+export function Pagination({
+  page,
+  totalPages,
+  busy,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  busy: boolean;
+  onPage: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <nav
+      aria-label="Activity pages"
+      className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-4 sm:px-6"
+    >
+      <span
+        aria-live="polite"
+        className="text-sm tabular-nums text-muted-foreground"
+      >
+        Page {page} of {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          className="min-h-11"
+          disabled={busy || page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          className="min-h-11"
+          disabled={busy || page >= totalPages}
+          onClick={() => onPage(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    </nav>
+  );
+}
 
-export {
-  Surface,
-  MetricCard,
-  EmptyPanel,
-  PanelList,
-  SnapshotRow,
-  QuickAccessRow,
-  AttendanceRow,
-  HistoryItem,
-  SubscriptionItem,
-};
+export function SubscriptionItem({
+  subscription,
+}: {
+  subscription: DashboardSubscription;
+}) {
+  return (
+    <a
+      href={subscription.url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex min-h-11 items-start gap-4 px-5 py-5 transition-colors hover:bg-muted/40 sm:px-6"
+    >
+      <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+        {subscription.image_url ? (
+          <img
+            src={subscription.image_url}
+            alt=""
+            className="size-full object-cover"
+          />
+        ) : (
+          <GraduationCap
+            className="size-5 text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="break-words text-sm font-semibold">
+            {subscription.title}
+          </p>
+          <ExternalLink
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+          />
+        </div>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {subscription.description ||
+            "Academic resource for online research and study."}
+        </p>
+        {subscription.category && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {subscription.category}
+          </p>
+        )}
+        <span className="sr-only"> (opens in a new tab)</span>
+      </div>
+    </a>
+  );
+}

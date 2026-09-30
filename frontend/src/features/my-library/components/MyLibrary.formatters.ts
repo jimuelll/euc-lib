@@ -1,20 +1,33 @@
-import {
-  CalendarDays,
-  GraduationCap,
-  Search,
-  UserRound,
-} from "lucide-react";
+import { CalendarDays, GraduationCap, Search, UserRound } from "lucide-react";
 import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
 import type { ActiveBorrow, ActiveReservation } from "../types";
 
-const borrowStatusConfig: Record<ActiveBorrow["status"], { label: string; className: string }> = {
-  borrowed: { label: "Borrowed", className: "bg-info/10 text-info border-info/20" },
-  overdue: { label: "Overdue", className: "bg-destructive/10 text-destructive border-destructive/20" },
+const borrowStatusConfig: Record<
+  ActiveBorrow["status"],
+  { label: string; className: string }
+> = {
+  borrowed: {
+    label: "Borrowed",
+    className: "bg-info/10 text-info border-info/20",
+  },
+  overdue: {
+    label: "Overdue",
+    className: "bg-destructive/10 text-destructive border-destructive/20",
+  },
 };
 
-const reservationStatusConfig: Record<ActiveReservation["status"], { label: string; className: string }> = {
-  pending: { label: "Pending", className: "bg-info/10 text-info border-info/20" },
-  ready: { label: "Ready", className: "bg-success/10 text-success border-success/20" },
+const reservationStatusConfig: Record<
+  ActiveReservation["status"],
+  { label: string; className: string }
+> = {
+  pending: {
+    label: "Pending",
+    className: "bg-info/10 text-info border-info/20",
+  },
+  ready: {
+    label: "Ready",
+    className: "bg-success/10 text-success border-success/20",
+  },
 };
 
 const notificationStyles: Record<string, string> = {
@@ -31,18 +44,21 @@ const currencyFormatter = new Intl.NumberFormat("en-PH", {
 });
 
 const formatDate = (value?: string | null, pattern = "MMM d, yyyy") => {
-  if (!value) return "-";
+  if (!value) return "Date unavailable";
   const parsed = parseISO(value);
-  return isValid(parsed) ? format(parsed, pattern) : "-";
+  return isValid(parsed) ? format(parsed, pattern) : "Date unavailable";
 };
 
 const relativeTime = (value?: string | null) => {
-  if (!value) return "Recently";
+  if (!value) return "Date unavailable";
   const parsed = parseISO(value);
-  return isValid(parsed) ? formatDistanceToNowStrict(parsed, { addSuffix: true }) : "Recently";
+  return isValid(parsed)
+    ? formatDistanceToNowStrict(parsed, { addSuffix: true })
+    : "Date unavailable";
 };
 
-const dueLabel = (value: string) => {
+const dueLabel = (value?: string | null) => {
+  if (!value) return "Due date unavailable";
   const parsed = parseISO(value);
   if (!isValid(parsed)) return "Due date unavailable";
   const now = new Date();
@@ -50,15 +66,57 @@ const dueLabel = (value: string) => {
   return `Due in ${formatDistanceToNowStrict(parsed)}`;
 };
 
-const formatCurrency = (value?: number | null) => currencyFormatter.format(Number(value || 0));
+const formatCurrency = (value?: number | null) =>
+  currencyFormatter.format(Number(value || 0));
+
+export const deadlineLabel = (
+  value: string | null,
+  prefix: string,
+  unavailable: string,
+) => {
+  const date = formatDate(value, "MMM d, yyyy · h:mm a");
+  return date === "Date unavailable" ? unavailable : `${prefix} ${date}`;
+};
+
+const dateOrder = (value: string | null) => {
+  const timestamp = value ? Date.parse(value) : NaN;
+  return Number.isFinite(timestamp) ? timestamp : Infinity;
+};
+
+export const isDueSoon = (book: ActiveBorrow, now = Date.now()) => {
+  const due = dateOrder(book.due_date);
+  return (
+    book.status !== "overdue" &&
+    Number.isFinite(due) &&
+    due >= now &&
+    due - now <= 3 * 24 * 60 * 60 * 1000
+  );
+};
+
+export const sortBorrows = (books: ActiveBorrow[]) =>
+  [...books].sort(
+    (a, b) =>
+      Number(b.status === "overdue") - Number(a.status === "overdue") ||
+      dateOrder(a.due_date) - dateOrder(b.due_date),
+  );
+
+export const sortReservations = (items: ActiveReservation[]) =>
+  [...items].sort(
+    (a, b) =>
+      Number(b.status === "ready") - Number(a.status === "ready") ||
+      dateOrder(a.expires_at) - dateOrder(b.expires_at),
+  );
 
 const quickLinks = [
   { to: "/catalogue", icon: Search, label: "Browse Catalogue" },
   { to: "/services/borrowing", icon: CalendarDays, label: "Reservations" },
-  { to: "/services/subscriptions", icon: GraduationCap, label: "Digital Resources" },
+  {
+    to: "/services/subscriptions",
+    icon: GraduationCap,
+    label: "Digital Resources",
+  },
   { to: "/edit-profile", icon: UserRound, label: "Edit Profile" },
 ];
-
 
 export {
   borrowStatusConfig,

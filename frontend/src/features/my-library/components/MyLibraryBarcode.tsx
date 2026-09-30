@@ -1,79 +1,62 @@
-import { useEffect, useState } from "react";
-import { Download, QrCode } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchMyLibraryBarcode } from "../api";
+import type { useMyLibraryBarcode } from "../hooks/useMyLibraryBarcode";
 
-export default function MyLibraryBarcode() {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let objectUrl: string | null = null;
-
-    setImageUrl(null);
-    setLoading(true);
-
-    fetchMyLibraryBarcode(controller.signal)
-      .then((blob) => {
-        if (controller.signal.aborted) return;
-        objectUrl = URL.createObjectURL(blob);
-        setImageUrl(objectUrl);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [attempt]);
-
-  const download = () => {
-    if (!imageUrl) return;
-    const link = document.createElement("a");
-    link.href = imageUrl;
-    link.download = "my-library-qr.png";
-    link.click();
-  };
-
+export default function MyLibraryBarcode({
+  qr,
+  large = false,
+}: {
+  qr: ReturnType<typeof useMyLibraryBarcode>;
+  large?: boolean;
+}) {
+  const size = large ? "w-64" : "w-32";
   return (
-    <section aria-labelledby="library-qr-heading" className="mt-8 border border-border/80 bg-card">
-      <div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div className="max-w-lg">
-          <div className="flex items-center gap-2 text-foreground">
-            <QrCode aria-hidden="true" className="h-5 w-5 text-primary" />
-            <h2 id="library-qr-heading" className="text-base font-semibold">Your library QR code</h2>
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Show this code to library staff to look up your account. You can save it to your phone for quick access.
+    <div className="flex min-w-0 flex-col items-center gap-4">
+      {qr.imageUrl ? (
+        <img
+          src={qr.imageUrl}
+          alt="Your library account QR code"
+          className={`${size} aspect-square h-auto max-w-full rounded-lg bg-white object-contain p-2`}
+        />
+      ) : qr.loading ? (
+        <div
+          role="status"
+          aria-label="Loading your QR code"
+          className={`${size} aspect-square max-w-full animate-pulse rounded-lg bg-muted`}
+        />
+      ) : (
+        <div role="alert" className="w-full space-y-3 text-center">
+          <p className="text-sm text-destructive">
+            Your QR code couldn’t be loaded.
           </p>
+          <Button
+            variant="outline"
+            className="min-h-11"
+            onClick={() => void qr.retry()}
+            disabled={qr.retrying}
+          >
+            {qr.retrying ? "Retrying…" : "Try again"}
+          </Button>
         </div>
-
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          {loading ? (
-            <div role="status" aria-label="Loading your QR code" className="h-40 w-40 animate-pulse border border-border bg-muted" />
-          ) : imageUrl ? (
-            <img src={imageUrl} alt="Your library account QR code" className="h-40 w-40 border border-border bg-white p-1" />
-          ) : (
-            <div role="alert" className="flex min-h-40 w-52 flex-col items-center justify-center gap-3 border border-destructive/30 px-3 text-center">
-              <p className="text-sm text-destructive">Your QR code couldn’t be loaded.</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => setAttempt((value) => value + 1)}>
-                Try again
-              </Button>
-            </div>
-          )}
-          {imageUrl ? (
-            <Button type="button" variant="outline" onClick={download}>
-              <Download aria-hidden="true" />
-              Download PNG
-            </Button>
-          ) : null}
-        </div>
-      </div>
-    </section>
+      )}
+      {qr.imageUrl && large && (
+        <Button variant="outline" className="min-h-11" onClick={qr.download}>
+          <Download aria-hidden="true" className="size-4" />
+          Download PNG
+        </Button>
+      )}
+      {qr.imageUrl && qr.error && (
+        <p role="alert" className="text-sm text-destructive">
+          The QR code could not be refreshed.{" "}
+          <button
+            className="min-h-11 underline underline-offset-4"
+            onClick={() => void qr.retry()}
+            disabled={qr.retrying}
+          >
+            Try again
+          </button>
+        </p>
+      )}
+    </div>
   );
 }

@@ -1,120 +1,143 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, ExternalLink, LibraryBig, Search } from "lucide-react";
-import { TabsContent } from "@/components/ui/tabs";
+import { ArrowUpRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   EmptyPanel,
+  LoadingPanel,
   PanelList,
-  QuickAccessRow,
-  SubscriptionItem,
+  RetryNotice,
   Surface,
 } from "./MyLibraryPrimitives";
-import {
-  notificationStyles,
-  relativeTime,
-} from "./MyLibrary.formatters";
-import type { MyLibraryDashboard, DashboardNotification } from "../types";
+import { relativeTime } from "./MyLibrary.formatters";
+import type { DashboardNotification } from "../types";
 
 type Props = {
-  data: MyLibraryDashboard | null;
   notifications: DashboardNotification[];
   unreadCount: number;
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  state: {
+    loading: boolean;
+    refreshing: boolean;
+    error: string | null;
+    retry: () => Promise<unknown>;
+  };
 };
-
-const MyLibraryUpdatesPanel = ({ data, notifications, unreadCount, markAsRead, markAllAsRead }: Props) => (
-                <TabsContent value="updates" className="mt-0 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-                  <Surface
-                    title="Notifications"
-                    actions={
-                      notifications.length > 0 && unreadCount > 0 ? (
-                        <button
-                          onClick={() => void markAllAsRead()}
-                          className="text-xs font-bold uppercase tracking-[0.12em] text-primary"
-                          style={{ fontFamily: "var(--font-heading)" }}
-                        >
-                          Mark all as read
-                        </button>
-                      ) : null
-                    }
+export default function MyLibraryUpdatesPanel({
+  notifications,
+  unreadCount,
+  markAsRead,
+  markAllAsRead,
+  state,
+}: Props) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const readAll = async () => {
+    setPending(true);
+    setError(null);
+    try {
+      await markAllAsRead();
+    } catch {
+      setError("Updates could not be marked as read. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-semibold">Updates</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Notices about your account and the library.
+        </p>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {state.error && (
+        <RetryNotice
+          message={
+            notifications.length
+              ? "Updates could not be refreshed. Previously loaded notices are shown."
+              : state.error
+          }
+          onRetry={() => void state.retry()}
+          retrying={state.refreshing}
+        />
+      )}
+      {state.loading && !notifications.length ? (
+        <LoadingPanel label="Loading updates" />
+      ) : (
+        (notifications.length > 0 || !state.error) && (
+          <Surface
+            title="Notifications"
+            count={notifications.length}
+            actions={
+              unreadCount > 0 && notifications.length > 0 ? (
+                <Button
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={pending}
+                  onClick={() => void readAll()}
+                >
+                  {pending ? "Marking as read…" : "Mark all as read"}
+                </Button>
+              ) : undefined
+            }
+          >
+            {notifications.length ? (
+              <PanelList>
+                {notifications.map((notification) => (
+                  <Link
+                    key={notification.id}
+                    to={notification.href || "/my-library?view=updates"}
+                    onClick={() => {
+                      if (!notification.is_read)
+                        void markAsRead(notification.id).catch(() =>
+                          setError(
+                            "This update could not be marked as read. Please try again.",
+                          ),
+                        );
+                    }}
+                    className="block px-5 py-5 transition-colors hover:bg-muted/40 sm:px-6"
                   >
-                    {notifications.length ? (
-                      <PanelList>
-                        {notifications.map((notification) => (
-                          <Link
-                            key={notification.id}
-                            to={notification.href || "/my-library"}
-                            className="block"
-                            onClick={() => {
-                              if (!notification.is_read) {
-                                void markAsRead(notification.id);
-                              }
-                            }}
-                          >
-                            <div className={`flex gap-0 transition-colors hover:bg-muted/10 ${notification.is_read ? "opacity-75" : ""}`}>
-                              <div className={`w-[3px] shrink-0 ${notificationStyles[notification.type] ?? "bg-info/50"}`} />
-                              <div className="flex-1 px-5 py-4">
-                                <div className="flex items-start justify-between gap-3">
-                                  <p
-                                    className="text-[12px] font-bold uppercase tracking-[0.12em] text-foreground"
-                                    style={{ fontFamily: "var(--font-heading)" }}
-                                  >
-                                    {notification.title}
-                                  </p>
-                                  <span className="shrink-0 text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                                    {relativeTime(notification.created_at)}
-                                  </span>
-                                </div>
-                                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                  {notification.body}
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
-                      </PanelList>
-                    ) : (
-                      <EmptyPanel message="No urgent updates right now." />
-                    )}
-                  </Surface>
-
-                  <div className="space-y-5">
-                    <Surface title="Digital Resources">
-                      {data?.subscriptions.length ? (
-                        <PanelList>
-                          {data.subscriptions.slice(0, 4).map((subscription) => (
-                            <SubscriptionItem key={subscription.id} subscription={subscription} />
-                          ))}
-                        </PanelList>
-                      ) : (
-                        <EmptyPanel message="No academic subscriptions are available yet." />
+                    <div className="flex items-start gap-3">
+                      {!notification.is_read && (
+                        <span
+                          className="mt-2 size-2 shrink-0 rounded-full bg-action"
+                          aria-label="Unread"
+                        />
                       )}
-
-                      {data?.subscriptions.length ? (
-                        <div className="border-t border-border/70 px-5 py-4">
-                          <Link
-                            to="/services/subscriptions"
-                            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-primary"
-                            style={{ fontFamily: "var(--font-heading)" }}
-                          >
-                            View all resources
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <h3 className="break-words text-base font-semibold">
+                            {notification.title}
+                          </h3>
+                          <span className="text-sm text-muted-foreground">
+                            {relativeTime(notification.created_at)}
+                          </span>
                         </div>
-                      ) : null}
-                    </Surface>
-
-                    <Surface title="Quick Access">
-                      <div className="grid gap-0 divide-y divide-border/70">
-                        <QuickAccessRow icon={Search} to="/catalogue" label="Search the catalogue" />
-                        <QuickAccessRow icon={CalendarDays} to="/services/borrowing" label="Check reservation options" />
-                        <QuickAccessRow icon={LibraryBig} to="/services/subscriptions" label="Open subscription list" />
+                        <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">
+                          {notification.body}
+                        </p>
                       </div>
-                    </Surface>
-                  </div>
-                </TabsContent>
-);
-
-export default MyLibraryUpdatesPanel;
-
-
+                      <ArrowUpRight
+                        className="mt-1 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </Link>
+                ))}
+              </PanelList>
+            ) : (
+              <EmptyPanel message="You're all caught up. Library notices and account updates will appear here." />
+            )}
+          </Surface>
+        )
+      )}
+    </div>
+  );
+}

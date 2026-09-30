@@ -1,0 +1,19 @@
+/* Scope accessibility adjustments to the account workspace. */
+.my-library-workspace {
+  --warning: 35 88% 30%;
+}
+
+.dark .my-library-workspace {
+  --warning: 39 85% 67%;
+}
+
+.my-library-discover button[aria-label^="Not interested in"] {
+  display: grid;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+}
+
+.my-library-discover article > a {
+  padding-right: 3.5rem;
+}

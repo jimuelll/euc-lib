@@ -19,7 +19,12 @@ export interface DashboardSummary {
   attendance_logs: number;
 }
 
-export interface ActiveBorrow {
+interface LibraryCoverFields {
+  image_url?: string | null;
+  material_type?: "book" | "thesis";
+}
+
+export interface ActiveBorrow extends LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -35,7 +40,7 @@ export interface ActiveBorrow {
   hours_overdue: number;
 }
 
-export interface BorrowHistoryItem {
+export interface BorrowHistoryItem extends LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -48,7 +53,7 @@ export interface BorrowHistoryItem {
   accession_number: string | null;
 }
 
-export interface ActiveReservation {
+export interface ActiveReservation extends LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -59,7 +64,7 @@ export interface ActiveReservation {
   notes: string | null;
 }
 
-export interface ReservationHistoryItem {
+export interface ReservationHistoryItem extends LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -76,7 +81,7 @@ export interface AttendanceSession {
   time_out: string | null;
 }
 
-export interface MyLibraryHistoryItem {
+export interface MyLibraryHistoryItem extends LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -93,7 +98,12 @@ export interface MyLibraryHistoryItem {
 
 export interface MyLibraryPage<T> {
   rows: T[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface DashboardSubscription {

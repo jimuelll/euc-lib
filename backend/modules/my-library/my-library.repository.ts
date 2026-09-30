@@ -49,6 +49,8 @@ const findActiveBorrows = async (userId: number): Promise<ActiveBorrowRow[]> => 
        b.id,
        bk.title,
        bk.author,
+       bk.image_url,
+       bk.material_type,
        ${metadataValue("bk", "category")},
        h.location,
        b.borrowed_at,
@@ -75,6 +77,8 @@ const findBorrowHistory = async (userId: number): Promise<BorrowHistoryRow[]> =>
        b.id,
        bk.title,
        bk.author,
+       bk.image_url,
+       bk.material_type,
        b.borrowed_at,
        b.returned_at,
        b.due_date,
@@ -102,6 +106,8 @@ const findActiveReservations = async (userId: number): Promise<ActiveReservation
        r.id,
        bk.title,
        bk.author,
+       bk.image_url,
+       bk.material_type,
        h.location,
        r.status,
        r.reserved_at,
@@ -125,6 +131,8 @@ const findReservationHistory = async (userId: number): Promise<ReservationHistor
        r.id,
        bk.title,
        bk.author,
+       bk.image_url,
+       bk.material_type,
        r.status,
        r.reserved_at,
        r.expires_at,
@@ -164,7 +172,7 @@ const getHistory = async (userId: number, page: number, limit: number) => {
   );
   const [rows] = await db.query<HistoryItemRow[]>(
     `SELECT * FROM (
-       SELECT b.id, bk.title, bk.author, 'borrowing' AS kind, b.status,
+       SELECT b.id, bk.title, bk.author, bk.image_url, bk.material_type, 'borrowing' AS kind, b.status,
               b.returned_at AS occurred_at, b.borrowed_at, b.returned_at, NULL AS reserved_at,
               bc.id AS copy_id, bc.barcode AS copy_barcode, h.accession_number
        FROM borrowings b
@@ -173,7 +181,7 @@ const getHistory = async (userId: number, page: number, limit: number) => {
        LEFT JOIN copy_holdings h ON h.copy_id = bc.id
        WHERE b.user_id = ? AND b.status = 'returned' AND b.deleted_at IS NULL
        UNION ALL
-       SELECT r.id, bk.title, bk.author, 'reservation' AS kind, r.status,
+       SELECT r.id, bk.title, bk.author, bk.image_url, bk.material_type, 'reservation' AS kind, r.status,
               COALESCE(r.fulfilled_at, r.cancelled_at, r.reserved_at) AS occurred_at,
               NULL AS borrowed_at, NULL AS returned_at, r.reserved_at,
               NULL AS copy_id, NULL AS copy_barcode, NULL AS accession_number

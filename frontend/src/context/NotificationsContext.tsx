@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchNotifications,
@@ -12,12 +20,15 @@ interface NotificationsContextValue {
   notifications: NotificationItem[];
   unreadCount: number;
   loading: boolean;
+  error: string | null;
   markAsRead: (notificationId: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
-const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
+const NotificationsContext = createContext<
+  NotificationsContextValue | undefined
+>(undefined);
 
 const getWebSocketUrl = (baseUrl: string, token: string) => {
   const url = new URL(baseUrl);
@@ -27,17 +38,21 @@ const getWebSocketUrl = (baseUrl: string, token: string) => {
   return url.toString();
 };
 
-export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { user, loading: authLoading, getToken } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const refreshRef = useRef<() => Promise<void>>(async () => {});
 
   const refresh = useCallback(async () => {
+    setError(null);
     if (!user?.id) {
       setNotifications([]);
       setUnreadCount(0);
@@ -53,6 +68,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       ]);
       setNotifications(items);
       setUnreadCount(unread);
+    } catch {
+      setError("Library updates could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -82,7 +99,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       const token = getToken();
       if (!token || cancelled) return;
 
-      const socket = new WebSocket(getWebSocketUrl(import.meta.env.VITE_BASE_URL, token));
+      const socket = new WebSocket(
+        getWebSocketUrl(import.meta.env.VITE_BASE_URL, token),
+      );
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -107,7 +126,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
           if (payload.type === "notification.created" && payload.notification) {
             setNotifications((current) => {
-              const deduped = current.filter((notification) => notification.id !== payload.notification.id);
+              const deduped = current.filter(
+                (notification) => notification.id !== payload.notification.id,
+              );
               return [payload.notification, ...deduped].slice(0, 20);
             });
             setUnreadCount(payload.unreadCount ?? 0);
@@ -179,9 +200,13 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === notificationId
-          ? { ...notification, is_read: true, read_at: new Date().toISOString() }
-          : notification
-      )
+          ? {
+              ...notification,
+              is_read: true,
+              read_at: new Date().toISOString(),
+            }
+          : notification,
+      ),
     );
     setUnreadCount((count) => Math.max(0, count - 1));
   };
@@ -193,7 +218,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         ...notification,
         is_read: true,
         read_at: notification.read_at ?? new Date().toISOString(),
-      }))
+      })),
     );
     setUnreadCount(0);
   };
@@ -203,11 +228,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       notifications,
       unreadCount,
       loading,
+      error,
       markAsRead,
       markAllAsRead,
       refresh,
     }),
-    [notifications, unreadCount, loading, refresh]
+    [notifications, unreadCount, loading, error, refresh],
   );
 
   return (
@@ -219,6 +245,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useNotifications = () => {
   const context = useContext(NotificationsContext);
-  if (!context) throw new Error("useNotifications must be used within NotificationsProvider");
+  if (!context)
+    throw new Error(
+      "useNotifications must be used within NotificationsProvider",
+    );
   return context;
 };

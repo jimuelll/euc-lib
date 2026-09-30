@@ -11,7 +11,12 @@ export interface UserProfileRow extends RowDataPacket {
   contact: string | null;
 }
 
-export interface ActiveBorrowRow extends RowDataPacket {
+interface LibraryCoverFields {
+  image_url?: string | null;
+  material_type?: "book" | "thesis";
+}
+
+export interface ActiveBorrowRow extends RowDataPacket, LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -25,7 +30,7 @@ export interface ActiveBorrowRow extends RowDataPacket {
   fine_amount?: number | string | null;
 }
 
-export interface BorrowHistoryRow extends RowDataPacket {
+export interface BorrowHistoryRow extends RowDataPacket, LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -38,7 +43,7 @@ export interface BorrowHistoryRow extends RowDataPacket {
   accession_number: string | null;
 }
 
-export interface ActiveReservationRow extends RowDataPacket {
+export interface ActiveReservationRow extends RowDataPacket, LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -49,7 +54,7 @@ export interface ActiveReservationRow extends RowDataPacket {
   notes: string | null;
 }
 
-export interface ReservationHistoryRow extends RowDataPacket {
+export interface ReservationHistoryRow extends RowDataPacket, LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
@@ -66,7 +71,7 @@ export interface AttendanceLogRow extends RowDataPacket {
   timestamp: Date | string;
 }
 
-export interface HistoryItemRow extends RowDataPacket {
+export interface HistoryItemRow extends RowDataPacket, LibraryCoverFields {
   id: number;
   title: string;
   author: string | null;
