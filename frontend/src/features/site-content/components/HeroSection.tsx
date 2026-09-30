@@ -1,17 +1,39 @@
-import { useState } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSiteContent } from "../useSiteContent";
 
+const HeroPhotograph = ({ source }: { source: string }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(source);
+  return (
+    <div className="homepage-hero-image">
+      <div className="homepage-hero-photo-print">
+        {imageUrl && <img src={imageUrl} alt="Bookshelves inside the Enverga-Candelaria Library" onError={() => setImageUrl(imageUrl === "/hero.jpg" ? null : "/hero.jpg")} />}
+      </div>
+    </div>
+  );
+};
+
 const HeroSection = () => {
   const [query, setQuery] = useState("");
+  const [searchError, setSearchError] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchId = useId();
   const { data: content } = useSiteContent();
   const navigate = useNavigate();
   const { isLoggedIn, loading } = useAuth();
+  const imageSource = content?.hero_image_url || "/hero.jpg";
 
   const submitSearch = () => {
-    if (query.trim()) navigate(`/catalogue?q=${encodeURIComponent(query.trim())}`);
+    const term = query.trim();
+    if (!term) {
+      setSearchError(true);
+      inputRef.current?.focus();
+      return;
+    }
+    setSearchError(false);
+    navigate(`/catalogue?q=${encodeURIComponent(term)}`);
   };
 
   const stats = content?.hero_stats || [
@@ -21,60 +43,52 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="homepage-hero border-b border-border bg-card">
-      <div className="homepage-hero-image relative isolate overflow-hidden bg-[#180908] text-white">
-        <img
-          src={content?.hero_image_url || "/hero.jpg"}
-          alt="Bookshelves inside the Enverga-Candelaria Library"
-          className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(113,0,0,0.95)_0%,rgba(113,0,0,0.85)_39%,rgba(64,7,7,0.40)_72%,rgba(24,5,5,0.50)_100%)]" />
-
-        <div className="homepage-hero-content container relative z-10 flex min-h-[35rem] items-center px-5 py-14 sm:px-8 sm:py-16 lg:px-12 xl:px-16">
-          <div className="relative w-full max-w-[46rem]">
-            <p className="relative flex max-w-xl items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-white/85">
-              <span className="h-px w-7 shrink-0 bg-[#f5c66b]" aria-hidden="true" />
-              {content?.hero_kicker || "Manuel S. Enverga University Foundation — Candelaria Inc."}
-            </p>
-
-            <div className="pointer-events-none absolute -left-5 top-8 hidden select-none text-[clamp(5rem,12vw,10rem)] font-bold leading-none tracking-[-0.07em] text-white/10 lg:block" aria-hidden="true">
-              LIBRARY
-            </div>
-
-            <h1 className="homepage-hero-title relative mt-6 max-w-[12ch] text-[clamp(3.25rem,6vw,5.25rem)] font-bold leading-[0.94] tracking-[-0.055em] sm:max-w-[10ch]">
-              {content?.hero_title || "Enverga-Candelaria"}
-              <span className="mt-1 block tracking-[-0.035em] text-[#f5c66b]">{content?.hero_highlight || "Library"}</span>
-            </h1>
-
-            <p className="homepage-hero-description relative mt-5 max-w-[35rem] text-base leading-7 text-white/90 sm:text-lg">
-              {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
-            </p>
-
-            <form
-              className="homepage-hero-search relative mt-8 flex h-12 max-w-[35rem] items-center overflow-hidden rounded-md border border-white/55 bg-black/20 text-white focus-within:ring-2 focus-within:ring-[#f5c66b] focus-within:ring-offset-2 focus-within:ring-offset-[#710000]"
-              onSubmit={(event) => { event.preventDefault(); submitSearch(); }}
-              role="search"
-            >
-              <Search className="ml-4 h-4 w-4 shrink-0 text-white/80" aria-hidden="true" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }}
-                placeholder="Search the catalogue"
-                aria-label="Search the catalogue"
-                className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-white/80"
-              />
-              <button type="submit" aria-label="Search catalogue" className="flex h-full w-12 shrink-0 items-center justify-center text-[#f5c66b] transition-colors hover:bg-white/10">
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+    <section
+      className="homepage-hero"
+      style={{ "--hero-photograph": `url(${JSON.stringify(imageSource)})` } as CSSProperties}
+    >
+      <div className="homepage-hero-introduction">
+        <div className="homepage-hero-copy">
+          <p className="homepage-hero-institution">
+            {content?.hero_kicker || "Manuel S. Enverga University Foundation — Candelaria Inc."}
+          </p>
+          <h1 className="homepage-hero-title">
+            {content?.hero_title || "Enverga-Candelaria"}{" "}
+            <span>{content?.hero_highlight || "Library"}</span>
+          </h1>
+          <p className="homepage-hero-description">
+            {content?.hero_description || "Discover, reserve, and access the university’s academic collection."}
+          </p>
+          <form className="homepage-hero-search" role="search" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>
+            <label htmlFor={searchId} className="homepage-hero-search-label">Search the catalogue</label>
+            <div className="homepage-hero-search-controls">
+              <div className="homepage-hero-search-field">
+                <Search className="h-5 w-5 shrink-0 homepage-hero-search-icon" aria-hidden="true" />
+                <input
+                  id={searchId}
+                  ref={inputRef}
+                  value={query}
+                  onChange={(event) => { setQuery(event.target.value); setSearchError(false); }}
+                  onKeyDown={(event) => { if (event.key === "Escape") { setQuery(""); setSearchError(false); } }}
+                  placeholder="Search the catalogue"
+                  aria-invalid={searchError || undefined}
+                  aria-describedby={searchError ? `${searchId}-error` : undefined}
+                  className="homepage-hero-search-input"
+                />
+              </div>
+              <button type="submit" className="homepage-hero-search-submit">
+                Search <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>
-            </form>
-
-            <div className="relative mt-4 flex flex-wrap gap-3">
-              <Link to="/catalogue" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#f5c66b] px-5 text-sm font-bold text-[#25180f] transition-colors hover:bg-[#ffda94]">
-                Browse Catalogue <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              {!loading && (
-                <Link to={isLoggedIn ? "/my-library" : "/login"} className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#f5c66b]/80 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10">
+            </div>
+            {searchError && <p id={`${searchId}-error`} role="alert" className="homepage-hero-search-error">Enter a search term.</p>}
+          </form>
+          <div className="homepage-hero-actions">
+            <Link to="/services" className="homepage-hero-services">
+              Explore library services <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </Link>
+            <div className="homepage-hero-member">
+              {loading ? <span className="homepage-hero-member-placeholder" aria-hidden="true" /> : (
+                <Link to={isLoggedIn ? "/my-library" : "/login"}>
                   {isLoggedIn ? "Go to My Library" : "Login for Reservation"}
                 </Link>
               )}
@@ -83,13 +97,17 @@ const HeroSection = () => {
         </div>
       </div>
 
-      <div className="homepage-hero-stats container grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-8 lg:px-12 xl:px-16">
-        {stats.map((stat) => (
-          <div key={stat.label} className="min-w-0 px-3 first:pl-0 sm:px-6 sm:first:pl-0">
-            <p className="text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-2xl">{stat.value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
-          </div>
-        ))}
+      <HeroPhotograph key={imageSource} source={imageSource} />
+
+      <div className="homepage-hero-statistics">
+        <dl className="homepage-hero-stats">
+          {stats.map((stat, index) => (
+            <div key={index} className="homepage-hero-stat">
+              <dt className="text-sm text-muted-foreground">{stat.label}</dt>
+              <dd className="text-foreground">{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );
