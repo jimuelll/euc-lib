@@ -9,6 +9,9 @@ interface AuthTokenPayload {
   [claim: string]: unknown;
 }
 type AuthenticatedRequest = Request & { user?: AuthTokenPayload };
+type RefreshLimitRequest = Request & { rateLimitUserId?: number; cookies?: Record<string, string | undefined> };
+
+const cookies = require("./auth.cookies") as { getRefreshTokenFromCookies: (req: RefreshLimitRequest) => string | null };
 
 const { isAccessTokenCurrent, isUserAccessActive } = require("./authSession.service") as {
   isAccessTokenCurrent: (payload: AuthTokenPayload) => Promise<boolean>;
@@ -70,4 +73,30 @@ function optionalAuthMiddleware(): RequestHandler {
   };
 }
 
-export = { authMiddleware, optionalAuthMiddleware };
+// A correctly signed refresh token lets the refresh-account limiter key by
+// account without trusting an unsigned cookie claim. Session validity and
+// rotation remain the responsibility of the refresh controller.
+const createRefreshIdentityMiddleware = (
+  verifyRefreshToken: (token: string) => AuthTokenPayload,
+  getRefreshToken: (req: RefreshLimitRequest) => string | null,
+): RequestHandler => (req, _res, next) => {
+  const refreshToken = getRefreshToken(req as RefreshLimitRequest);
+  if (refreshToken) {
+    try {
+      const payload = verifyRefreshToken(refreshToken);
+      if (Number.isSafeInteger(payload.id) && payload.id > 0) {
+        (req as RefreshLimitRequest).rateLimitUserId = payload.id;
+      }
+    } catch {
+      // Invalid tokens continue through the IP limit and normal refresh error path.
+    }
+  }
+  next();
+};
+
+const identifyRefreshLimitAccount = createRefreshIdentityMiddleware(
+  (token) => auth.verifyRefreshToken(token) as AuthTokenPayload,
+  cookies.getRefreshTokenFromCookies,
+);
+
+export = { authMiddleware, optionalAuthMiddleware, identifyRefreshLimitAccount, createRefreshIdentityMiddleware };

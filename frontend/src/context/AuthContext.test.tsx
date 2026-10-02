@@ -2,17 +2,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { createTestQueryClient } from "@/test-utils/query-client";
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
+const { post, refreshAccessToken, toastError } = vi.hoisted(() => ({ post: vi.fn(), refreshAccessToken: vi.fn(), toastError: vi.fn() }));
 vi.mock("@/utils/AxiosInstance", () => ({
   default: { post },
   setAuthFailureHandler: vi.fn(),
   setAuthRefreshHandler: vi.fn(),
   setInMemoryToken: vi.fn(),
+  refreshAccessToken,
 }));
-vi.mock("@/components/ui/sonner", () => ({ toast: { warning: vi.fn(), success: vi.fn() } }));
+vi.mock("@/components/ui/sonner", () => ({ toast: { warning: vi.fn(), success: vi.fn(), error: toastError } }));
 
 import { AuthProvider, useAuth } from "./AuthContext";
 
@@ -41,6 +43,7 @@ beforeEach(() => {
     }
     return Promise.resolve({ data: {} });
   });
+  refreshAccessToken.mockResolvedValue(makeToken(1, "Account A"));
 });
 
 afterEach(cleanup);
@@ -66,5 +69,24 @@ describe("auth query-cache isolation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));
     await waitFor(() => expect(client.getQueryData(["sensitive"])).toBeUndefined());
     expect(await screen.findByText("Signed out")).toBeTruthy();
+  });
+
+  it("preserves the active session when bootstrap refresh is rate limited", async () => {
+    refreshAccessToken
+      .mockResolvedValueOnce(makeToken(1, "Account A"))
+      .mockRejectedValueOnce({ response: { status: 429, data: { message: "Retry in one minute." } } });
+
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter>
+          <StrictMode><AuthProvider><AuthProbe /></AuthProvider></StrictMode>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText("Account A")).toBeTruthy();
+    await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Account A")).toBeTruthy();
+    expect(toastError).toHaveBeenCalledWith("Retry in one minute.");
   });
 });

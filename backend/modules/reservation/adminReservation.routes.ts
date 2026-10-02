@@ -2,6 +2,7 @@ const express    = require("express");
 const router     = express.Router();
 const controller = require("./adminReservation.controller");
 const { authMiddleware } = require("../auth/auth.middleware");
+const { limiters } = require("../../middlewares/rateLimiter");
 
 // Mounted at /api/admin in app.js — mirrors how circulation.routes.js works
 // Full paths become: /api/admin/reservations, /api/admin/reservations/:id/ready, etc.
@@ -9,9 +10,9 @@ const { authMiddleware } = require("../auth/auth.middleware");
 const adminOnly = authMiddleware(["admin", "super_admin", "staff"]);
 
 router.get ("/reservations",                              adminOnly, controller.getAdminReservations);
-router.post("/reservations/:reservationId/ready",         adminOnly, controller.markReservationReady);
-router.post("/reservations/:reservationId/fulfill",       adminOnly, controller.fulfillReservation);
-router.post("/reservations/:reservationId/cancel",        adminOnly, controller.cancelReservationAdmin);
+router.post("/reservations/:reservationId/ready",         adminOnly, limiters.deskTransaction, controller.markReservationReady);
+router.post("/reservations/:reservationId/fulfill",       adminOnly, limiters.deskTransaction, controller.fulfillReservation);
+router.post("/reservations/:reservationId/cancel",        adminOnly, limiters.deskTransaction, controller.cancelReservationAdmin);
 router.delete("/reservations/:reservationId",             adminOnly, controller.deleteReservationAdmin);
 router.patch("/reservations/:reservationId/restore",      adminOnly, controller.restoreReservationAdmin);
 

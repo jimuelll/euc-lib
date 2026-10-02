@@ -1,12 +1,13 @@
 const router = require("express").Router();
 const controller = require("./recommendations.controller");
 const { requireSuperAdminRole } = require("../catalog/catalog.middleware");
-router.get("/recommendations/me", controller.mine);
+const { limiters } = require("../../middlewares/rateLimiter");
+router.get("/recommendations/me", limiters.authenticatedCatalogue, controller.mine);
 router.post("/recommendations/:bookId/dismiss", controller.dismiss);
 router.get("/admin/recommendations/books", requireSuperAdminRole, controller.metadataBooks);
 router.get("/admin/recommendations/books/:bookId/metadata", requireSuperAdminRole, controller.getBookMetadata);
 router.put("/admin/recommendations/books/:bookId/metadata", requireSuperAdminRole, controller.saveBookMetadata);
 router.get("/admin/recommendations/embeddings/status", requireSuperAdminRole, controller.status);
-router.post("/admin/recommendations/embeddings/backfill", requireSuperAdminRole, controller.backfill);
+router.post("/admin/recommendations/embeddings/backfill", requireSuperAdminRole, limiters.embeddingBackfill, controller.backfill);
 router.get("/admin/recommendations/embeddings/backfill/progress", requireSuperAdminRole, controller.backfillProgress);
 module.exports = router;

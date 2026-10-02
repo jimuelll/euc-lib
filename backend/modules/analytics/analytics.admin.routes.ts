@@ -1,5 +1,6 @@
 const express = require("express");
 const { authMiddleware } = require("../auth/auth.middleware");
+const { limiters } = require("../../middlewares/rateLimiter");
 const { handleGetAuditLog, handleGetAuditLogMeta, handleGetDashboardOverview, handleCreateAiAnalyticsReport } = require("./analytics.controller");
 
 const router = express.Router();
@@ -13,6 +14,7 @@ router.get(
 router.post(
   "/dashboard/ai-report",
   authMiddleware(["staff", "admin", "super_admin"]),
+  limiters.aiReport,
   handleCreateAiAnalyticsReport
 );
 

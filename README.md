@@ -279,6 +279,44 @@ Database integration tests are guarded to prevent accidental use against a norma
 - Snapshot backup/restore and server-managed catalogue images require all three server-side Cloudinary variables.
 - Run both backend and frontend test suites before deployment.
 
+### API rate limits
+
+The API uses independent fixed-window counters for the following policies. The
+first admitted request starts the window. Account budgets are shared across
+resource IDs and aliases listed together. The current memory store is for the
+single backend instance; counts reset when that process restarts.
+
+| Policy | Covered requests | Budget | Key |
+| --- | --- | ---: | --- |
+| API baseline | All `/api` requests except CORS preflight | 1,500/minute | IP |
+| Login | `POST /api/auth/login` | 5/15 minutes | IP |
+| Password change | `POST /api/auth/change-password` | 5/15 minutes | Account |
+| Refresh flood | Every `POST /api/auth/refresh` | 300/minute | IP |
+| Refresh sessions | Refresh with a valid signed cookie | 30/minute | Verified account |
+| Bulletin posts | `POST /api/bulletin` | 10/10 minutes | Account |
+| Bulletin comments | `POST /api/bulletin/:postId/comments` | 20/5 minutes | Account |
+| Bulletin likes | `POST /api/bulletin/:postId/like` | 60/minute | Account |
+| Visit tracking | `POST /api/analytics/visit` | 120/minute | IP |
+| Notifications | `POST /api/admin/notifications` | 20/10 minutes | Account |
+| Public catalogue | Public catalogue schema/search and seed-book recommendations | 300/minute | IP |
+| Authenticated catalogue | Borrowing/reservation searches and personal recommendations | 120/minute | Account |
+| Student transactions | Self-service borrowing/returning and reservation/cancellation | 30/minute | Account |
+| Desk transactions | Scanner and circulation borrow/return/renew; reservation ready/fulfill/cancel | 120/minute | Operator account |
+| Attendance scans | `POST /api/attendance/scan` | 120/minute | Operator account |
+| AI reports | `POST /api/analytics/dashboard/ai-report` | 10/10 minutes | Account |
+| ISBN lookup | `GET /api/admin/books/isbn/:isbn` | 60/minute | Account |
+| Catalogue image upload | `POST /api/admin/books/:id/image` | 30/10 minutes | Account |
+| Embedding backfill | `POST /api/admin/recommendations/embeddings/backfill` | 10/15 minutes | Account |
+| Report exports | Query and report CSV exports | 30/10 minutes | Account |
+| Backup work | Export, compatibility checks, snapshot save/download, and restore | 20/15 minutes | Account |
+
+Rate-limited responses use HTTP 429 with `code: "RATE_LIMITED"`, a
+`retryAfterSeconds` value, and standard rate-limit headers. The browser client
+shares concurrent refresh requests and observes the refresh cooldown without
+clearing the current session. Verify `trust proxy` against the deployed
+forwarding chain before release; incorrect proxy settings can group visitors
+under the wrong IP address. Use a shared store before adding backend instances.
+
 ## Security notes
 
 - Do not commit `.env` files, database dumps containing private data, JWT secrets, or Cloudinary/API credentials.

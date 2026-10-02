@@ -1,4 +1,5 @@
 const router = require("express").Router();
 const controller = require("./recommendations.controller");
-router.get("/catalogue/books/:bookId/recommendations", controller.forBook);
+const { limiters } = require("../../middlewares/rateLimiter");
+router.get("/catalogue/books/:bookId/recommendations", limiters.publicCatalogue, controller.forBook);
 module.exports = router;

@@ -35,6 +35,7 @@ const {
 } = require("./modules");
 const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
+const { limiters, rateLimitExposedHeaders } = require("./middlewares/rateLimiter");
 
 const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
@@ -60,12 +61,16 @@ app.use(cors({
     }
   },
   credentials: true,
+  exposedHeaders: rateLimitExposedHeaders,
 }));
 app.use(helmet());
 app.use(morgan("dev", {
   // Keep successful traffic out of production logs; 5xx requests remain visible.
   skip: (_req: Request, res: Response) => process.env.NODE_ENV === "production" && res.statusCode < 500,
 }));
+// Bound all API traffic before parsing request bodies. CORS handles preflight
+// requests above this middleware, so OPTIONS requests do not consume quota.
+app.use("/api", limiters.api);
 app.use(cookieParser());
 app.use(express.json({ limit: `${backupBodyLimit}b` }));
 app.use(express.urlencoded({ extended: true }));

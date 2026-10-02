@@ -2,6 +2,7 @@ const { after } = require("node:test");
 const db = require("../db");
 
 require("./analytics.helpers.test");
+require("./rate-limit.test");
 require("./auth-session.test");
 require("./auth-session.database.integration.test");
 require("./audit.policy.test");

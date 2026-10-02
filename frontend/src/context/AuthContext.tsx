@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
+import axiosInstance, {
   setAuthFailureHandler,
   setAuthRefreshHandler,
   setInMemoryToken,
+  refreshAccessToken,
 } from "@/utils/AxiosInstance";
-import axiosInstance from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -80,9 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [applyAccessToken]);
 
   const refreshSession = useCallback(async () => {
-    const res = await axiosInstance.post("/api/auth/refresh", {});
-
-    const token = res.data.accessToken;
+    const token = await refreshAccessToken();
     applyAccessToken(token);
     return token;
   }, [applyAccessToken]);
@@ -109,8 +107,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       try {
         await refreshSession();
-      } catch {
-        if (!cancelled) clearSession();
+      } catch (refreshError: unknown) {
+        if (!cancelled) {
+          // A throttled refresh is temporary; keep any active in-memory session.
+          // Invalid/expired sessions continue to clear as before.
+          const response = (refreshError as { response?: { status?: number; data?: { message?: string } } } | null)?.response;
+          if (response?.status === 429) toast.error(response.data?.message || "Too many requests. Try again later.");
+          else clearSession();
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

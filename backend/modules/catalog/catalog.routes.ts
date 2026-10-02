@@ -4,6 +4,7 @@ const express    = require("express");
 const router     = express.Router();
 const controller = require("./catalog.controller");
 const { parseCatalogImage } = require("./catalog.image.middleware");
+const { limiters } = require("../../middlewares/rateLimiter");
 const {
   requireSuperAdminRole,
   requireCatalogRole,
@@ -32,9 +33,9 @@ router.delete("/book-types/:id", requireSuperAdminRole, validateBookTypeId, cont
 router.put   ("/catalog-schema", requireSuperAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",          requireCatalogRole,                       controller.getBooks);
-router.get   ("/books/isbn/:isbn", requireCatalogRole, controller.lookupIsbn);
+router.get   ("/books/isbn/:isbn", requireCatalogRole, limiters.isbnLookup, controller.lookupIsbn);
 router.post  ("/books",          requireCatalogRole, validateCreateBookPayload,           controller.createBook);
-router.post  ("/books/:id/image", requireCatalogRole, validateBookId, parseCatalogImage, controller.uploadBookImage);
+router.post  ("/books/:id/image", requireCatalogRole, limiters.imageUpload, validateBookId, parseCatalogImage, controller.uploadBookImage);
 router.delete("/books/:id/image", requireCatalogRole, validateBookId, controller.removeBookImage);
 router.put   ("/books/:id",      requireCatalogRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireCatalogRole, validateBookId,        controller.deleteBook);
@@ -52,7 +53,7 @@ router.get   ("/copies/:barcode/barcode-png", requireCatalogRole, validateBarcod
 router.get   ("/copies/:barcode",             requireCatalogRole, validateBarcode, controller.getCopyByBarcode);
 router.patch ("/copies/:copyId", requireCatalogRole, validateCopyIdParam, controller.updateCopyCondition);
 
-router.get("/catalogue/search", (req: Request & { publicCatalogue?: boolean }, _res: unknown, next: () => void) => {
+router.get("/catalogue/search", limiters.authenticatedCatalogue, (req: Request & { publicCatalogue?: boolean }, _res: unknown, next: () => void) => {
   req.publicCatalogue = true;
   next();
 }, controller.getBooks);

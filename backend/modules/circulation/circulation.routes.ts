@@ -2,6 +2,7 @@ const express = require("express");
 const router  = express.Router();
 const ctrl    = require("./circulation.controller");
 const { authMiddleware } = require("../auth/auth.middleware");
+const { limiters } = require("../../middlewares/rateLimiter");
 
 // Mounted at /api/admin in app.js
 // These endpoints expose patron records and can alter borrowing state, so they
@@ -12,8 +13,8 @@ router.get ("/users/lookup",         ctrl.lookupUser);
 router.get ("/books/lookup",         ctrl.lookupBook);
 
 router.get ("/circulation/log",      ctrl.getCirculationLog);
-router.post("/circulation/borrow",   ctrl.processBorrow);
-router.post("/circulation/return",   ctrl.processReturn);
-router.post("/circulation/renew",    ctrl.processRenew);
+router.post("/circulation/borrow",   limiters.deskTransaction, ctrl.processBorrow);
+router.post("/circulation/return",   limiters.deskTransaction, ctrl.processReturn);
+router.post("/circulation/renew",    limiters.deskTransaction, ctrl.processRenew);
 
 module.exports = router;
