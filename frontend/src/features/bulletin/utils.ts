@@ -18,12 +18,15 @@ export function getInitials(name: string): string {
 }
 
 export function toPost(raw: ApiPost): BulletinPost {
+  let gallery:{url:string;alt:string}[]=[];try{gallery=typeof raw.gallery==="string"?JSON.parse(raw.gallery):raw.gallery||[];}catch{}
   return {
     id:            raw.id,
     title:         raw.title,
     date:          formatDate(raw.created_at),
     content:       raw.content,
     image_url:     raw.image_url,
+    image_alt: raw.image_alt,
+    gallery: Array.isArray(gallery)?gallery:[],
     likes:         raw.likes,
     liked_by_me:   Boolean(raw.liked_by_me),
     comment_count: raw.comment_count,

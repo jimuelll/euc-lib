@@ -1,0 +1,9 @@
+# Website Content publishing
+
+Apply `db/migrations/2026-10-08-website-publishing.sql` before running this release against an existing database. Then apply `db/migrations/2026-10-08-website-editor-scopes.sql` for item publication metadata, image descriptions and galleries. Fresh installations include both migrations. The local development database has been migrated.
+
+The administrator-only `/api/admin/publishing` API covers homepage, about, bulletin, events, subscriptions and guide. GET returns the saved draft or editable source, the published baseline, revision, baseline digest and recorded timestamps. PUT `/:section/draft` saves incomplete private edits. POST `/:section/publish` validates and updates public records. Add `itemKey` to save, publish or discard one list item while retaining the others. Omit it for a whole section. POST `/publish-all` takes `{documents:[{section,revision,baseVersion,payload}]}` and commits the sections together. DELETE `/:section/draft` discards private edits. Mutations require the revision and baseline digest returned by GET.
+
+Publication and its audit entry commit together. Revision and source checks reject concurrent changes with HTTP 409. Whole collection snapshots retain baseline IDs; deletions must be explicit. The website's public read APIs continue to use their existing tables and never read private drafts. Existing unpublished guide changes remain publishable. Backup snapshot version 17 includes item metadata and image descriptions/galleries; older snapshots gain empty/default fields. Published guide slugs are immutable.
+
+Run `node -r ts-node/register --test test/publishing.test.js` for validation, isolation, discard, conflict and rollback tests. Local repository writes were checked inside a rolled-back transaction. Browser checks use synthetic records, without publishing real content.

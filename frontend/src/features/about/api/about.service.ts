@@ -1,8 +1,8 @@
 import axiosInstance from "@/utils/AxiosInstance";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-export interface StaffMember  { name: string; role: string; image_url?: string } // ← added
-export interface LibrarySpace { name: string; description: string; image_url: string }
+export interface StaffMember  { name: string; role: string; image_alt?:string; image_url?: string } // ← added
+export interface LibrarySpace { name: string; description: string; image_alt?:string; image_url: string }
 
 export interface AboutSettings {
   library_name:  string;

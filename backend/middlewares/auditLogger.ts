@@ -57,7 +57,7 @@ const AUDIT_ROUTE_POLICIES = [
 ];
 
 function getAuditPolicy(method: string, path: string): any {
-  if (!new Set(["POST", "PUT", "PATCH", "DELETE"]).has(method) || ignoredPaths.has(path) || excludedMutationPaths.has(path)) return null;
+  if (!new Set(["POST", "PUT", "PATCH", "DELETE"]).has(method) || ignoredPaths.has(path) || excludedMutationPaths.has(path) || path.startsWith("/api/admin/publishing/")) return null;
   return AUDIT_ROUTE_POLICIES.filter((policy) => path.startsWith(policy.prefix) && policy.methods.includes(method) && !policy.exclude?.test(path)).sort((a, b) => b.prefix.length - a.prefix.length)[0] ?? null;
 }
 

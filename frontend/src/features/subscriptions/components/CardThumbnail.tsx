@@ -2,11 +2,12 @@ import { BookOpen } from "lucide-react";
 
 interface CardThumbnailProps {
   imageUrl: string | null;
+  alt?:string;
   title: string;
   index: number;
 }
 
-export const CardThumbnail = ({ imageUrl, title, index }: CardThumbnailProps) => (
+export const CardThumbnail = ({ imageUrl, title, index,alt }: CardThumbnailProps) => (
   <div className="relative flex items-center justify-center h-24 bg-muted/40 border-b border-border overflow-hidden">
     {/* Ghost index number */}
     <span
@@ -20,7 +21,7 @@ export const CardThumbnail = ({ imageUrl, title, index }: CardThumbnailProps) =>
     {imageUrl ? (
       <img
         src={imageUrl}
-        alt={title}
+        alt={alt??title}
         className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).style.display = "none";

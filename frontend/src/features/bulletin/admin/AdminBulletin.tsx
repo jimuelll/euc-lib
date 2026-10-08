@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArchiveRestore, CalendarRange, Newspaper, Pin, RefreshCw, Archive, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
+import { AdminPage, AdminPanel } from "@/features/admin";
 import { CreatePostModal } from "@/features/bulletin";
 import { archiveBulletinPost, fetchBulletinPosts, restoreBulletinPost, setBulletinPinned, type BulletinPostRecord } from "@/features/bulletin/api";
 import { bulletinKeys } from "../bulletin.keys";
@@ -148,12 +148,11 @@ const AdminBulletin = () => {
         </div>
       )}
     >
-      <AdminStatGrid>
-        <AdminStatCard label="Matching posts" value={loading ? "-" : String(totalPosts)} icon={<Newspaper className="h-4 w-4" />} />
-        <AdminStatCard label="Current page" value={loading ? "-" : `${currentPage} / ${Math.max(1, totalPages)}`} icon={<Pin className="h-4 w-4" />} />
-        <AdminStatCard label="View" value={STATUS_FILTERS.find((item) => item.value === statusFilter)?.label ?? "All posts"} icon={<ArchiveRestore className="h-4 w-4" />} />
-        <AdminStatCard label="Month Groups" value={loading ? "-" : String(monthOptions.length)} icon={<CalendarRange className="h-4 w-4" />} />
-      </AdminStatGrid>
+      <dl className="content-record-summary" aria-label="Bulletin summary">
+        <div><dt>Matching posts</dt><dd>{loading || (listQuery.isError && !listQuery.data) ? "—" : totalPosts}</dd></div>
+        <div><dt>Current page</dt><dd>{loading || (listQuery.isError && !listQuery.data) ? "—" : `${currentPage} / ${Math.max(1, totalPages)}`}</dd></div>
+        <div><dt>Month groups</dt><dd>{loading || (listQuery.isError && !listQuery.data) ? "—" : monthOptions.length}</dd></div>
+      </dl>
 
       {error ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

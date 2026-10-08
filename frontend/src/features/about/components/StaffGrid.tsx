@@ -28,7 +28,7 @@ const StaffGrid = ({ staff }: StaffGridProps) => (
             {member.image_url ? (
               <img
                 src={member.image_url}
-                alt={member.name}
+                alt={member.image_alt??member.name}
                 className="h-24 w-24 object-cover border border-border"
               />
             ) : (

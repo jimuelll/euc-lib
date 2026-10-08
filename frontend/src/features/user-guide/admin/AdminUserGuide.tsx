@@ -102,7 +102,7 @@ export default function AdminUserGuide() {
                 </AccordionTrigger>
                 <AccordionContent className="pb-7">
                   <article className="max-w-3xl space-y-6 border-t border-border/70 pt-6">
-                    {item.image_url ? <img src={item.image_url} alt={`Example screen for ${item.title}`} className="max-h-[26rem] w-full border border-border object-contain" /> : null}
+                    {item.image_url ? <img src={item.image_url} alt={item.image_alt??`Example screen for ${item.title}`} className="max-h-[26rem] w-full border border-border object-contain" /> : null}
                     <p className="max-w-[70ch] text-sm leading-7 text-foreground/90">{item.overview}</p>
 
                     {item.before_you_begin.length > 0 ? (

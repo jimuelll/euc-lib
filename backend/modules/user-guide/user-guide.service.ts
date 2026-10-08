@@ -63,6 +63,7 @@ const normalizeContent = (value: unknown = {}): GuideContent => {
         })
         .filter((item: GuideTroubleshootingItem) => item.problem && item.solution)
       : [],
+    image_alt: String(input.image_alt || "").trim(),
     image_url: input.image_url ? String(input.image_url).trim() : null,
     image_public_id: input.image_public_id ? String(input.image_public_id).trim() : null,
   };
@@ -178,4 +179,4 @@ const reorder = async (ids: unknown, userId: number): Promise<void> => {
   await repository.reorder(orderedIds, userId);
 };
 
-export = { listPublished, listForAdmin, createDraft, updateDraft, publish, unpublish, archive, reorder };
+export = { listPublished, listForAdmin, createDraft, updateDraft, publish, unpublish, archive, reorder, normalizeContent, validateContent };

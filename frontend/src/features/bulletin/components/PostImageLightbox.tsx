@@ -26,7 +26,7 @@ const PostImageLightbox = ({ post, open, onOpenChange, imgRef, zoom, origin, han
           <img
             ref={imgRef}
             src={post.image_url}
-            alt={post.title}
+            alt={post.image_alt??post.title}
             onClick={handleImageClick}
             className="max-h-[90dvh] max-w-[92vw] object-contain select-none"
             style={{

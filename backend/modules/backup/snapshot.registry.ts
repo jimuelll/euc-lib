@@ -12,7 +12,7 @@ const APPLICATION_TABLES: readonly string[] = Object.freeze([
   "bulletin_comments", "bulletin_likes", "bulletin_posts", "catalog_schema", "clearance_transaction_items",
   "clearance_transactions", "delivery_outbox", "fine_accounts", "fine_ledger_entries", "library_circulation_settings", "library_events", "library_holidays", "notification_reads",
   "notifications", "recommendation_feedback", "reservations", "site_content_settings", "site_daily_visits", "users",
-  "user_guide_modules",
+  "user_guide_modules", "website_content_drafts",
 ]);
 
 export = { SNAPSHOT_TABLE, SYSTEM_TABLES, APPLICATION_TABLES };

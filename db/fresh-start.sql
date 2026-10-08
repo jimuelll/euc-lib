@@ -1564,3 +1564,17 @@ BEGIN
   END IF;
 END//
 DELIMITER ;
+-- Section drafts stay private until publication updates the public records.
+CREATE TABLE IF NOT EXISTS website_content_drafts (
+  section varchar(32) NOT NULL PRIMARY KEY,
+  draft_json longtext DEFAULT NULL CHECK (draft_json IS NULL OR json_valid(draft_json)),
+  base_json longtext DEFAULT NULL CHECK (base_json IS NULL OR json_valid(base_json)),
+  revision int unsigned NOT NULL DEFAULT 0,
+  saved_at datetime DEFAULT NULL,
+  published_at datetime DEFAULT NULL,
+  updated_by bigint unsigned DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE website_content_drafts ADD COLUMN IF NOT EXISTS item_meta_json longtext DEFAULT NULL CHECK (item_meta_json IS NULL OR json_valid(item_meta_json));
+ALTER TABLE site_content_settings ADD COLUMN IF NOT EXISTS hero_image_alt varchar(500) DEFAULT NULL;
+ALTER TABLE academic_subscriptions ADD COLUMN IF NOT EXISTS image_alt varchar(500) DEFAULT NULL;
+ALTER TABLE bulletin_posts ADD COLUMN IF NOT EXISTS image_alt varchar(500) DEFAULT NULL, ADD COLUMN IF NOT EXISTS gallery longtext DEFAULT NULL CHECK (gallery IS NULL OR json_valid(gallery));

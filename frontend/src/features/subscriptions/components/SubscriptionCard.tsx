@@ -17,7 +17,7 @@ export const SubscriptionCard = ({ subscription: sub, index }: SubscriptionCardP
     {/* Gold left accent on hover */}
     <div className="absolute left-0 inset-y-0 w-[3px] bg-transparent group-hover:bg-warning transition-colors z-10" />
 
-    <CardThumbnail imageUrl={sub.image_url} title={sub.title} index={index} />
+    <CardThumbnail imageUrl={sub.image_url} alt={sub.image_alt} title={sub.title} index={index} />
 
     <div className="flex-1 px-5 pt-4 pb-5">
       <div className="flex items-start justify-between gap-2 mb-2">

@@ -13,7 +13,7 @@ test("restore upgrades the previous snapshot version and adds newly registered t
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 15);
+  assert.equal(upgraded.version, 17);
   assert.deepEqual(upgraded.tables.user_guide_modules, []);
   assert.deepEqual(upgraded.tables.departments, []);
   assert.deepEqual(upgraded.tables.fine_accounts, []);
@@ -36,7 +36,7 @@ test("restore upgrades v11 with holdings defaults and preserves tables that alre
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 15);
+  assert.equal(upgraded.version, 17);
   assert.deepEqual(upgraded.tables.copy_holdings, []);
   assert.deepEqual(upgraded.tables.catalog_settings, [{ id: 1, show_unheld_in_opac: 1, updated_by: null }]);
   assert.deepEqual(upgraded.tables.delivery_outbox, []);
@@ -89,7 +89,7 @@ test("restore upgrades v12 loan provenance and preserves outbox, holdings, setti
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 15);
+  assert.equal(upgraded.version, 17);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_id_snapshot, null);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_name_snapshot, "Unknown historical policy");
   assert.deepEqual(upgraded.tables.delivery_outbox, backup.tables.delivery_outbox);

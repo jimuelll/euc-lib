@@ -2,6 +2,9 @@ import type { ReactNode, SVGProps } from "react";
 
 const gold = "var(--admin-icon-accent, currentColor)";
 const drawings = {
+  eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>,
+  home: <><path d="m3 10 9-7 9 7v11H3zM9 21v-8h6v8" /></>,
+  information: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6" /><circle cx="12" cy="7" r=".7" fill="currentColor" /></>,
   dashboard: <><path d="M3 3h7v7H3zM14 14h7v7h-7zM3 14h7v7H3z" /><path d="M14 3h7v7h-7z" fill={gold} stroke={gold} /></>,
   circulation: <><path d="M4 5h7v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM5 16h6M14 6h7m-3-3 3 3-3 3" /><path d="M21 17h-7m3-3-3 3 3 3" stroke={gold} /></>,
   reservations: <><path d="M20 13V5H3v16h10M3 9h17M7 3v4M16 3v4" /><path d="M15 13h6v9l-3-2-3 2z" stroke={gold} /></>,

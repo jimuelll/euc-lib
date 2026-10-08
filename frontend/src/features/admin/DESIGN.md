@@ -1,5 +1,17 @@
 # Admin interface baseline
 
+## Website Content
+
+Website Content uses the Library desk’s compact headings, distinct icons, neutral panels and underline-only tabs. Load all six documents on entry so tab counts appear before visiting each section. Dots represent unsaved local edits; counted badges represent saved drafts, upcoming events or hidden resources. Keep the section in the URL and use one horizontal tab row on mobile.
+
+Homepage and About use a pinned, scoped footer: section name, unsaved change count, publication timestamp or —, Discard, Save draft and Publish section. List tabs have no page footer. Events, Bulletin and Subscriptions use item drawers with scoped publishing controls; User guide places the module footer within its editor. Item actions preserve other drafts. Offer Publish all when multiple sections or records have changes; validate and commit the batch atomically. Status wording is Published / Draft saved. Disabled buttons use the same neutral state; enabled publication uses a bright action fill in dark theme.
+
+Let the main page scroll. Avoid nested page/editor/module-list scrollbars. Keep the desktop guide module list and About side navigation sticky. About uses navigation underlines, shows one section at a time, and exposes Add staff member only in Staff directory. Homepage has a dismissible publishing tip and an image uploader. View on site is an outline button; Preview uses an eye icon. Events links to the public Upcoming events anchor.
+
+All record filters place All last. Events uses Drafts / All and groups Upcoming, Past and Unscheduled drafts with end time, duration and relative dates. Bulletin uses Published / Pinned / Archived / Drafts / All, search and month groups; rows include cover thumbnails or neutral placeholders, status badges and clamped body text. Subscriptions uses aligned neutral rows with resource, category, visibility and actions. Guide uses audience chips, module status, a named footer, ordering controls and a slug locked after first publication on both client and server.
+
+The shared image uploader validates type, size and decoded dimensions, supports keyboard-accessible crop selection and image descriptions, and previews the uploaded result. Persist descriptions through public views. Bulletin supports an optional gallery of up to eight images. Crop/upload errors retain the previous image. Dates share one calendar/time picker and display format. Deletes confirm and remove only that item; publication, audit and draft retention share a transaction.
+
 The dashboard and shared administration shell establish a compact interface for library staff performing daily operations. This guide applies to admin surfaces only; existing content pages opt into these patterns during later redesigns.
 
 ## Visual system
@@ -11,6 +23,8 @@ The dashboard and shared administration shell establish a compact interface for 
 - The opt-in compact tokens are 16px internal gaps/padding, 24px between content sections, and 40px desktop controls. Mobile controls and links use at least 44px targets. The expanded sidebar is 240px, its collapsed rail is 64px, and the top bar is 56px.
 
 ## Patterns and hierarchy
+
+- Admin page tabs share a soft action-colored selection background, a 3px underline and a heavier label through `admin-theme.css`. `aria-selected` is the state source, including custom tab controls. Shared desk tab rows wrap on narrow screens; the styling also applies to portalled record drawers. Borrow/Return and queue filter buttons retain their filled selected state.
 
 - `CompactAdmin.tsx` provides panels, section headers, actions, totals, and explicit text links. Import `compact-admin.css` on adopted surfaces; do not apply these content styles to legacy layouts.
 - Order operational dashboards by actions, outstanding items, daily totals, recent transactions, then secondary reference metrics.

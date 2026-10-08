@@ -65,7 +65,7 @@ const getPosts = async ({ userId, page, limit, archiveScope, search, month, post
   );
   const queryParams = userId ? [userId, ...filterParams, limit, offset] : [...filterParams, limit, offset];
   const [rows] = await db.query<BulletinPostRow[]>(
-    `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.post_type, bp.event_starts_at, bp.event_ends_at,
+    `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.image_alt, bp.gallery, bp.post_type, bp.event_starts_at, bp.event_ends_at,
        bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at, bp.deleted_at,
        u.id AS author_id, u.name AS author_name, u.role AS author_role,
        (SELECT COUNT(*) FROM bulletin_likes WHERE post_id = bp.id) AS likes,
@@ -88,7 +88,7 @@ const getPosts = async ({ userId, page, limit, archiveScope, search, month, post
 
 const findPost = async (postId: number, userId: number | null, includeArchived = false): Promise<BulletinPostRow | null> => {
   const [[post]] = await db.query<BulletinPostRow[]>(
-    `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.post_type, bp.event_starts_at, bp.event_ends_at,
+    `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.image_alt, bp.gallery, bp.post_type, bp.event_starts_at, bp.event_ends_at,
        bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at,
        u.id AS author_id, u.name AS author_name, u.role AS author_role,
        (SELECT COUNT(*) FROM bulletin_likes WHERE post_id = bp.id) AS likes,

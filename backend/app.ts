@@ -32,6 +32,7 @@ const {
   siteContentRoutes,
   userGuideRoutes,
   queryRoutes,
+  publishingRoutes,
 } = require("./modules");
 const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
@@ -113,6 +114,7 @@ app.use("/api", notificationsRoutes);
 app.use("/api/admin", librarySettingsRoutes);
 app.use("/api/admin", backupRoutes);
 app.use("/api/admin", clearanceRoutes);
+app.use("/api/admin/publishing", publishingRoutes);
 app.use("/api", userGuideRoutes);
 
 export = app;

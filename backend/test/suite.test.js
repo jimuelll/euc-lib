@@ -14,6 +14,7 @@ require("./architecture.test");
 require("./backup.restore.test");
 require("./backup.accession.restore.test");
 require("./backup.transforms.test");
+require("./publishing.test");
 require("./borrowing.helpers.test");
 require("./borrowing.desk-preview.test");
 require("./reservation.admin-queue.test");

@@ -6,6 +6,8 @@ export interface BulletinPost {
   date: string;
   content: string;
   image_url?: string;
+  image_alt?:string;
+  gallery?:{url:string;alt:string}[];
   likes: number;
   liked_by_me: boolean;
   comment_count: number;
@@ -36,6 +38,8 @@ export interface ApiPost {
   title: string;
   content: string;
   image_url?: string;
+  image_alt?:string;
+  gallery?:string|{url:string;alt:string}[];
   is_pinned: number;
   created_at: string;
   author_id: number;

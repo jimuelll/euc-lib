@@ -213,10 +213,8 @@
 .admin-desk-status[data-tone=blue] { background:hsl(var(--admin-tone-blue)/.1); }
 .admin-desk-status svg { width:16px; height:16px; }
 .admin-desk-tabs { display:grid; gap:16px; min-width:0; }
-.admin-desk-tabs > .admin-desk-page-tabs { display:flex; align-items:stretch; justify-content:flex-start; width:100%; height:auto; gap:24px; padding:0; border-radius:0; border-bottom:1px solid hsl(var(--border)); background:none; }
+.admin-desk-tabs > .admin-desk-page-tabs { display:flex; align-items:stretch; justify-content:flex-start; flex-wrap:wrap; width:100%; height:auto; gap:4px 8px; padding:0; border-radius:0; border-bottom:1px solid hsl(var(--border)); background:none; }
 .admin-desk-page-tabs [role=tab] { min-height:44px; gap:8px; padding:10px 0; margin-bottom:-1px; border-bottom:2px solid transparent; border-radius:0; background:none; box-shadow:none; color:hsl(var(--muted-foreground)); }
-.admin-desk-page-tabs [role=tab][data-state=active] { background:none; color:hsl(var(--foreground)); border-color:hsl(var(--primary)); box-shadow:none; }
-.dark .admin-desk-page-tabs [role=tab][data-state=active] { border-color:hsl(var(--admin-tone-red)); }
 .admin-desk-page-tabs [role=tab]:hover { color:hsl(var(--foreground)); }
 .admin-desk-tabs > [role=tabpanel] { margin-top:0; }
 .admin-desk-page-tabs svg { width:18px; height:18px; }
@@ -234,7 +232,7 @@
 .admin-desk-empty>svg { width:24px; height:24px; color:hsl(var(--muted-foreground)); }
 .admin-desk-drawer { overflow-y:auto; font-family:var(--font-body); }
 :is(.admin-desk-tile,.admin-desk-filter-chips button,.admin-desk-selection input):focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
-@media(max-width:760px) { .admin-desk-header-actions>span { flex-basis:100%; } .admin-desk-header-actions { gap:8px; } .admin-desk-filter-chips button { min-height:44px; } .admin-desk-tabs > .admin-desk-page-tabs { gap:16px; } }
+@media(max-width:760px) { .admin-desk-header-actions>span { flex-basis:100%; } .admin-desk-header-actions { gap:8px; } .admin-desk-filter-chips button { min-height:44px; } .admin-desk-tabs > .admin-desk-page-tabs { gap:4px; } }
 
 /* Shared record drawers: one fixed header/footer and an independently scrolling body. */
 .admin-desk-drawer { display:flex; flex-direction:column; gap:0; width:100%; max-width:640px; padding:0; overflow:hidden; }
@@ -255,6 +253,4 @@
 
 .admin-record-footer :is(.circulation-inline-actions,.reservation-actions) { display:flex; gap:8px; flex-wrap:wrap; margin:0; }
 
-.admin-workspace .admin-desk-page-tabs [role=tab][data-state=active], .admin-desk-drawer .admin-desk-page-tabs [role=tab][data-state=active] { background:transparent; color:hsl(var(--foreground)); border-bottom:2px solid hsl(var(--primary)); box-shadow:none; }
-.dark .admin-workspace .admin-desk-page-tabs [role=tab][data-state=active], .dark .admin-desk-drawer .admin-desk-page-tabs [role=tab][data-state=active] { border-bottom-color:hsl(var(--admin-tone-red)); }
 .admin-desk-filter-chips button[data-tone=amber]:not([aria-pressed=true]) { background:hsl(var(--admin-tone-amber)/.1); border-color:hsl(var(--admin-tone-amber)/.5); color:hsl(var(--admin-tone-amber)); }

@@ -24,6 +24,7 @@ export type GuideContent = {
   steps: GuideStep[];
   warnings: string[];
   troubleshooting: GuideTroubleshootingItem[];
+  image_alt?:string;
   image_url: string | null;
   image_public_id: string | null;
 };

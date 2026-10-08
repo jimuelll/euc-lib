@@ -80,7 +80,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           >
             <img
               src={post.image_url!}
-              alt={post.title}
+              alt={post.image_alt??post.title}
               className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03]"
               loading="lazy"
             />

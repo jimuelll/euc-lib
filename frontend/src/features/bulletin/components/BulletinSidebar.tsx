@@ -38,7 +38,7 @@ export function BulletinSidebar() {
     <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
 
       {/* ── Upcoming Events ── */}
-      <div className="border border-border">
+      <div id="upcoming-events" className="border border-border">
 
         {/* Section header — same primary-band grammar as page header, compressed */}
         <div className="bg-primary px-4 py-3 flex items-center gap-3 border-b border-primary-foreground/10">

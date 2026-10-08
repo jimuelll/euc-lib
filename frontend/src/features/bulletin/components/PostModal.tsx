@@ -117,7 +117,7 @@ export function PostModal(props: PostModalProps) {
             >
               <img
                 src={post.image_url}
-                alt={post.title}
+                alt={post.image_alt??post.title}
                 className="w-full object-contain"
                 style={{ maxHeight: "48vh" }}
                 loading="eager"
@@ -144,6 +144,7 @@ export function PostModal(props: PostModalProps) {
             </div>
           )}
 
+          {Boolean(post.gallery?.length)&&<div className="grid grid-cols-2 gap-3 p-5" aria-label="Post gallery">{post.gallery?.map((image,index)=><img key={index} src={image.url} alt={image.alt} className="w-full object-contain" loading="lazy"/>)}</div>}
           <div className="divide-y divide-border">
             <div className="px-5 sm:px-6 py-5">
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">

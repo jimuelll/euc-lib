@@ -195,7 +195,11 @@ body.admin-workspace {
 .admin-workspace :is(input, textarea)::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
 .admin-workspace [role="tablist"] { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
 .admin-workspace [role="tab"] { flex-shrink: 0; min-height: 40px; }
-.admin-workspace [role="tab"][data-state="active"] { background: hsl(var(--primary)); color: white; border-color: hsl(var(--primary)); }
+/* Page navigation: selection remains legible in both themes and wrapped rows. */
+body.admin-workspace [role="tablist"] [role="tab"] { margin-bottom:0; padding:10px 12px; border-radius:6px 6px 0 0; border-bottom:3px solid transparent; background:transparent; color:hsl(var(--muted-foreground)); box-shadow:none; }
+body.admin-workspace [role="tablist"] [role="tab"][aria-selected="true"] { background:transparent; color:hsl(var(--action)); border-bottom-color:hsl(var(--action)); font-weight:650; box-shadow:none; }
+body.admin-workspace [role="tablist"] [role="tab"]:hover { background:hsl(var(--action)/.06); color:hsl(var(--action)); }
+body.admin-workspace [role="tablist"] [role="tab"][aria-selected="true"]:hover { background:transparent; }
 @media (max-width: 639px) {
   .admin-workspace .admin-action-table th:last-child,
   .admin-workspace .admin-action-table td:last-child {

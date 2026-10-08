@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
+import { AdminPage, AdminPanel } from "@/features/admin";
 import { EMPTY_FORM } from "./subscriptions.types";
 import { FONT } from "./subscriptions.styles";
 import { useAdminSubscriptions } from "./hooks/useAdminSubscriptions";
@@ -59,19 +59,16 @@ const AdminSubscriptions = () => {
           </Button>
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Add New
+            Add resource
           </Button>
         </>
       }
     >
-      <AdminStatGrid>
-        <AdminStatCard label="Total" value={loading ? "-" : String(subs.length)} />
-        <AdminStatCard label="Active" value={loading ? "-" : String(activeCount)} />
-        <AdminStatCard
-          label="Hidden"
-          value={loading ? "-" : String(subs.length - activeCount)}
-        />
-      </AdminStatGrid>
+      <dl className="content-record-summary" aria-label="Subscriptions on this page">
+        <div><dt>Resources on this page</dt><dd>{loading || error ? "—" : subs.length}</dd></div>
+        <div><dt>Active</dt><dd>{loading || error ? "—" : activeCount}</dd></div>
+        <div><dt>Hidden</dt><dd>{loading || error ? "—" : subs.length - activeCount}</dd></div>
+      </dl>
 
       <AdminPanel
         title="Subscription records"

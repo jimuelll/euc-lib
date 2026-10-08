@@ -6,6 +6,7 @@ const {
   encodeValue,
   payloadChecksum,
   validateBackup,
+  upgradeBackup,
 } = require("../modules/backup/snapshot.transforms");
 
 test("backup values preserve buffers and normalize JSON for restore", () => {
@@ -13,6 +14,16 @@ test("backup values preserve buffers and normalize JSON for restore", () => {
   assert.equal(decodeValue(encoded).toString(), "snapshot");
   assert.equal(decodeValue({ enabled: true }, "json"), '{"enabled":true}');
   assert.throws(() => decodeValue("{broken", "json"), /invalid JSON/i);
+});
+
+test("version 15 snapshots upgrade with empty private drafts and a verified checksum", () => {
+  const backup = {format:"euc-library-backup",version:15,tables:{books:[]}};
+  backup.integrity={algorithm:"sha256",checksum:payloadChecksum(backup)};
+  const upgraded=upgradeBackup(backup);
+  assert.equal(upgraded.version,17);
+  assert.deepEqual(upgraded.tables.website_content_drafts,[]);
+  assert.ok(upgraded.tableManifest.includes("website_content_drafts"));
+  assert.equal(upgraded.integrity.checksum,payloadChecksum(upgraded));
 });
 
 test("backup validation and checksums reject malformed payloads", () => {

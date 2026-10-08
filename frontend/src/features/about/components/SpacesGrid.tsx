@@ -20,7 +20,7 @@ const SpacesGrid = ({ spaces }: SpacesGridProps) => (
             <div className="relative h-40 overflow-hidden">
               <img
                 src={space.image_url}
-                alt={space.name}
+                alt={space.image_alt??space.name}
                 className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 loading="lazy"
               />

@@ -24,4 +24,5 @@ export = {
   siteContentRoutes: require("./site-content/site-content.routes"),
   userGuideRoutes: require("./user-guide/user-guide.routes"),
   queryRoutes: require("./query/query.routes"),
+  publishingRoutes: require("./publishing/publishing.routes"),
 };

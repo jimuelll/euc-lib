@@ -1,6 +1,5 @@
 import { AlertTriangle, Globe } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FONT, LABEL_CLS } from "../subscriptions.styles";
 import type { Subscription } from "../subscriptions.types";
 import { SubscriptionRow } from "./SubscriptionRow";
 
@@ -27,14 +26,13 @@ export const SubscriptionTable = ({
   onEdit,
   onDelete,
 }: SubscriptionTableProps) => (
-  <div className="border border-border overflow-hidden">
+  <div className="content-subscription-table overflow-hidden">
 
     {/* Table header */}
-    <div className="bg-primary">
-      <div className="h-[2px] w-full bg-warning" />
-      <div className="grid grid-cols-[auto_auto_1fr_auto_auto_auto] px-4 sm:px-6 py-3 gap-4 items-center">
-        {["", "Image", "Database", "Category", "Status", "Actions"].map((h) => (
-          <span key={h} className={`${LABEL_CLS} text-primary-foreground/40`} style={FONT}>
+    <div className="content-subscription-header">
+      <div>
+        {["Image", "Database", "Category", "Status", "Actions"].map((h) => (
+          <span key={h} className="text-xs font-medium text-muted-foreground">
             {h}
           </span>
         ))}
@@ -54,11 +52,12 @@ export const SubscriptionTable = ({
     )}
 
     {!loading && !error && subs.length === 0 && (
-      <div className="flex flex-col items-center justify-center gap-2 py-20 bg-background">
-        <Globe className="h-8 w-8 text-muted-foreground/20" />
-        <p className={`${LABEL_CLS} text-muted-foreground/30`} style={FONT}>
+      <div className="flex flex-col items-center justify-center gap-2 py-8">
+        <Globe className="h-6 w-6 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">
           No subscriptions yet
         </p>
+        <p className="text-sm text-muted-foreground">Add a resource to make it available on the library website.</p>
       </div>
     )}
 
@@ -83,7 +82,6 @@ export const SubscriptionTable = ({
       <div className="border-t border-border bg-muted/10 px-4 sm:px-6 py-3">
         <p
           className="text-xs text-muted-foreground "
-          style={FONT}
         >
           {subs.length} {subs.length === 1 ? "record" : "records"} · {activeCount} active
         </p>

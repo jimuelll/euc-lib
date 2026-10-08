@@ -4,12 +4,12 @@ import { ArrowRight, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useSiteContent } from "../useSiteContent";
 
-const HeroPhotograph = ({ source }: { source: string }) => {
+const HeroPhotograph = ({ source,alt }: { source: string;alt?:string }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(source);
   return (
     <div className="homepage-hero-image">
       <div className="homepage-hero-photo-print">
-        {imageUrl && <img src={imageUrl} alt="Bookshelves inside the Enverga-Candelaria Library" onError={() => setImageUrl(imageUrl === "/hero.jpg" ? null : "/hero.jpg")} />}
+        {imageUrl && <img src={imageUrl} alt={alt??"Bookshelves inside the Enverga-Candelaria Library"} onError={() => setImageUrl(imageUrl === "/hero.jpg" ? null : "/hero.jpg")} />}
       </div>
     </div>
   );

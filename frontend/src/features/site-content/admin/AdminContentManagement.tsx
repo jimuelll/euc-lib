@@ -1,86 +1,78 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
-import { BookOpenCheck, BookOpenText, CalendarDays, FileText, Globe2, Loader2, Plus, Trash2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { AdminPage, AdminPanel } from "@/features/admin";
-import { AdminAbout } from "@/features/about";
-import { AdminBulletin } from "@/features/bulletin";
-import { AdminSubscriptions } from "@/features/subscriptions";
-import { UserGuideEditor } from "@/features/user-guide";
-import { updateSiteContent as saveSiteContent, type SiteContent } from "@/features/site-content/site-content.service";
-import { createEvent, deleteEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
-import { useSiteContent } from "../useSiteContent";
-import { siteContentKeys } from "../site-content.keys";
-
-type Event = SiteEvent;
-const HomeContent = () => {
-  const [form, setForm] = useState<SiteContent | null>(null); const [saving, setSaving] = useState(false); const [message, setMessage] = useState("");
-  const queryClient = useQueryClient();
-  const contentQuery = useSiteContent();
-  const saveMutation = useMutation({ mutationFn: saveSiteContent, onSuccess: (content) => { queryClient.setQueryData(siteContentKeys.home(), content); } });
-  const updateSiteContent = (content: SiteContent) => saveMutation.mutateAsync(content);
-  useEffect(() => { if (contentQuery.data && !form) setForm(contentQuery.data); }, [contentQuery.data, form]);
-  if (contentQuery.isError && !form) return <p className="py-8 text-sm text-destructive">Could not load site content. <Button variant="outline" onClick={() => void contentQuery.refetch()}>Try again</Button></p>;
-  if (!form) return <p className="py-8 text-sm text-muted-foreground">Loading homepage content…</p>;
-  const set = <K extends keyof SiteContent>(key: K, value: SiteContent[K]) => setForm({ ...form, [key]: value });
-  return <AdminPanel title="Homepage content" description="Changes publish directly to the public homepage."><form className="space-y-5" onSubmit={async (e) => { e.preventDefault(); setSaving(true); try { setForm(await updateSiteContent(form)); setMessage("Homepage content saved."); } catch (err: any) { setMessage(err.response?.data?.message || "Could not save changes."); } finally { setSaving(false); } }}><div className="grid gap-4 md:grid-cols-2"><Field label="Institution line"><Input value={form.hero_kicker} onChange={(e) => set("hero_kicker", e.target.value)} /></Field><Field label="Hero image URL"><Input value={form.hero_image_url || ""} onChange={(e) => set("hero_image_url", e.target.value || null)} placeholder="Leave blank for the default image" /></Field><Field label="Hero title"><Input value={form.hero_title} onChange={(e) => set("hero_title", e.target.value)} /></Field><Field label="Highlighted word"><Input value={form.hero_highlight} onChange={(e) => set("hero_highlight", e.target.value)} /></Field></div><Field label="Hero description"><Textarea rows={3} value={form.hero_description} onChange={(e) => set("hero_description", e.target.value)} /></Field><div className="border-y border-border py-5"><p className="mb-4 text-sm font-semibold">Hero statistics</p><p className="mb-4 text-xs text-muted-foreground">These are intentionally customizable rather than tied to private inventory figures.</p><div className="grid gap-3 md:grid-cols-3">{form.hero_stats.map((stat, index) => <div className="space-y-2" key={index}><Input aria-label={`Statistic ${index + 1} value`} value={stat.value} placeholder="Value" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, value: e.target.value } : item))} /><Input aria-label={`Statistic ${index + 1} label`} value={stat.label} placeholder="Label" onChange={(e) => set("hero_stats", form.hero_stats.map((item, i) => i === index ? { ...item, label: e.target.value } : item))} /></div>)}</div></div><div className="border-b border-border pb-5"><p className="mb-4 text-sm font-semibold">Operating hours</p><div className="space-y-3">{form.hours.map((row, index) => <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]" key={index}><Input value={row.day} aria-label="Day" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, day: e.target.value } : h))} /><Input value={row.time} aria-label="Hours" onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, time: e.target.value } : h))} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={row.open} onChange={(e) => set("hours", form.hours.map((h, i) => i === index ? { ...h, open: e.target.checked } : h))} /> Open</label><Button type="button" variant="ghost" size="icon" aria-label="Remove hours row" onClick={() => set("hours", form.hours.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}</div><Button type="button" variant="outline" className="mt-4" onClick={() => set("hours", [...form.hours, { day: "", time: "", open: true }])}><Plus className="mr-2 h-4 w-4" />Add hours</Button></div><div className="grid gap-4 md:grid-cols-3"><Field label="Address"><Input value={form.address} onChange={(e) => set("address", e.target.value)} /></Field><Field label="Email"><Input type="email" value={form.contact_email} onChange={(e) => set("contact_email", e.target.value)} /></Field><Field label="Phone"><Input value={form.contact_phone} onChange={(e) => set("contact_phone", e.target.value)} /></Field></div>{message && <p className="text-sm text-muted-foreground">{message}</p>}<Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save homepage content"}</Button></form></AdminPanel>;
-};
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-2"><Label>{label}</Label>{children}</div>;
-const Events = () => {
-  const queryClient = useQueryClient();
-  const eventsQuery = useQuery({ queryKey: siteContentKeys.eventList(true), queryFn: ({ signal }) => fetchEvents(true, signal) });
-  const events: Event[] = eventsQuery.data ?? [];
-  const invalidateEvents = () => queryClient.invalidateQueries({ queryKey: siteContentKeys.events() });
-  const createMutation = useMutation({ mutationFn: createEvent, onSuccess: invalidateEvents });
-  const deleteMutation = useMutation({ mutationFn: deleteEvent, onSuccess: invalidateEvents });
-  const [title, setTitle] = useState("");
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const addEvent = async () => {
-    setPending("add"); setError("");
-    try { await createMutation.mutateAsync({ title, starts_at: starts, ends_at: ends || null }); setTitle(""); setStarts(""); setEnds(""); }
-    catch (err: any) { setError(err.response?.data?.message || "Could not add event."); }
-    finally { setPending(null); }
-  };
-  const removeEvent = async (event: Event) => {
-    if (!window.confirm(`Delete ${event.title}?`)) return;
-    setPending(`delete-${event.id}`); setError("");
-    try { await deleteMutation.mutateAsync(event.id); }
-    catch (err: any) { setError(err.response?.data?.message || "Could not delete event."); }
-    finally { setPending(null); }
-  };
-  return <AdminPanel title="Upcoming events" description="Manage the events shown alongside the public bulletin."><div className="mb-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Event title" disabled={Boolean(pending)} /><Input type="datetime-local" value={starts} onChange={(event) => setStarts(event.target.value)} disabled={Boolean(pending)} aria-label="Event start" /><Input type="datetime-local" value={ends} min={starts || undefined} onChange={(event) => setEnds(event.target.value)} disabled={Boolean(pending)} aria-label="Event end" /><Button disabled={!title.trim() || !starts || Boolean(pending)} onClick={() => void addEvent()}>{pending === "add" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding…</> : <><Plus className="mr-2 h-4 w-4" />Add event</>}</Button></div><p className="mb-6 text-xs text-muted-foreground">Add an end date for a multi-day event; leave it blank for a single start time.</p>{error && <p className="mb-4 text-sm text-destructive">{error}</p>}<div className="divide-y divide-border border-y border-border">{events.map((event) => <div className="flex items-center justify-between gap-4 py-3" key={event.id}><div><p className="font-medium">{event.title}</p><p className="text-sm text-muted-foreground">{new Date(event.starts_at).toLocaleString()}{event.ends_at ? ` – ${new Date(event.ends_at).toLocaleString()}` : ""}</p></div><Button variant="ghost" size="icon" aria-label={`Delete ${event.title}`} disabled={Boolean(pending)} onClick={() => void removeEvent(event)}>{pending === `delete-${event.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</Button></div>)}{!events.length && <p className="py-6 text-sm text-muted-foreground">No upcoming events.</p>}</div></AdminPanel>;
-};
-const CMS_TABS = {
-  homepage: { label: "Homepage", description: "Manage the hero, operating hours, and contact details shown on the public homepage.", icon: Globe2 },
-  about: { label: "About", description: "Maintain the library story, staff, spaces, and public information.", icon: BookOpenText },
-  bulletin: { label: "Bulletin", description: "Publish announcements and keep the public bulletin organized.", icon: FileText },
-  events: { label: "Events", description: "Schedule events displayed beside the public bulletin.", icon: CalendarDays },
-  subscriptions: { label: "Subscriptions", description: "Curate academic resources available through the library.", icon: BookOpenText },
-  guide: { label: "User guide", description: "Write role-specific help, save unfinished work as a draft, and publish it when it is ready.", icon: BookOpenCheck },
-} as const;
-export default function AdminContentManagement() {
-  const [params, setParams] = useSearchParams();
-  const requested = params.get("tab") || "homepage";
-  const tab = requested in CMS_TABS ? requested as keyof typeof CMS_TABS : "homepage";
-  const current = CMS_TABS[tab];
-  const CurrentIcon = current.icon;
-  const select = (value: string) => setParams(previous => { const next = new URLSearchParams(previous); next.set("tab", value); return next; });
-  return <AdminPage title="Website Content" description="Edit public library information, announcements, resources, and published help." contentWidth="wide"><Tabs value={tab} onValueChange={select}>
-    <div className="border-y border-border bg-muted/20 px-2 py-2 sm:px-3"><TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-md bg-transparent p-0"><TabsTrigger value="homepage" className="gap-2 rounded-sm px-3 py-2 text-xs"><Globe2 className="h-4 w-4" />Homepage</TabsTrigger><TabsTrigger value="about" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />About</TabsTrigger><TabsTrigger value="bulletin" className="gap-2 rounded-sm px-3 py-2 text-xs"><FileText className="h-4 w-4" />Bulletin</TabsTrigger><TabsTrigger value="events" className="gap-2 rounded-sm px-3 py-2 text-xs"><CalendarDays className="h-4 w-4" />Events</TabsTrigger><TabsTrigger value="subscriptions" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenText className="h-4 w-4" />Subscriptions</TabsTrigger><TabsTrigger value="guide" className="gap-2 rounded-sm px-3 py-2 text-xs"><BookOpenCheck className="h-4 w-4" />Edit user guide</TabsTrigger></TabsList></div>
-    <div className="flex items-start gap-3 border-b border-border py-5"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground"><CurrentIcon className="h-4 w-4" /></div><div><h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{current.label}</h2><p className="mt-1 text-sm text-muted-foreground">{current.description}</p></div></div>
-    <TabsContent value="homepage" className="mt-5"><HomeContent /></TabsContent>
-    <TabsContent value="about" className="mt-5 [&>div>header]:hidden"><AdminAbout /></TabsContent>
-    <TabsContent value="bulletin" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>div:first-child]:hidden"><AdminBulletin /></TabsContent>
-    <TabsContent value="events" className="mt-5"><Events /></TabsContent>
-    <TabsContent value="subscriptions" className="mt-5 [&>div]:gap-5 [&>div>header]:items-center [&>div>header]:border-none [&>div>header]:pb-0 [&>div>header>div:first-child]:hidden"><AdminSubscriptions /></TabsContent>
-    <TabsContent value="guide" className="mt-5"><UserGuideEditor /></TabsContent>
-  </Tabs></AdminPage>;
+import {useCallback,useEffect,useState} from "react";
+import {useQueries,useQueryClient} from "@tanstack/react-query";
+import {Link,useSearchParams} from "react-router-dom";
+import {Button} from "@/components/ui/button";
+import {TabsContent} from "@/components/ui/tabs";
+import {AdminIcon,AdminPageHeader,AdminPageTabs,AdminDetailDrawer,useUnsavedChanges,useAdminConfirmDialog,type AdminIconName} from "@/features/admin";
+import {getPublishingDocument,savePublishingDocument,publishAllDocuments,publishingKeys,type ContentSection,type ContentPayload,type PublishingDocument} from "../publishing.service";
+import {HomepageEditor,AboutEditor} from "./PublishingPages";
+import {EventsEditor,SubscriptionsEditor,BulletinEditor,GuideEditor,RecordFields,recordKey} from "./PublishingCollections";
+import {UploadActivityContext} from "./PublishingFields";
+import PublishingFooter,{type PublishingFooterProps} from "./PublishingFooter";
+import PublishingPreview from "./PublishingPreview";
+import "@/features/admin/compact-admin.css";
+import "./website-content.css";
+const CMS_TABS={
+ homepage:{label:"Homepage",description:"Shape the introduction, hours, and contact details visitors see first.",icon:"home",href:"/",add:"Add hours"},
+ about:{label:"About",description:"Tell the library’s story and keep staff, spaces, and policies current.",icon:"information",href:"/about",add:"Add staff member"},
+ bulletin:{label:"Bulletin",description:"Write announcements, organize posts by month, and manage the archive.",icon:"notifications",href:"/bulletin",add:"Add post"},
+ events:{label:"Events",description:"Schedule upcoming events and keep a record of past activities.",icon:"reservations",href:"/bulletin#upcoming-events",add:"Add event"},
+ subscriptions:{label:"Subscriptions",description:"Curate academic resources and choose what appears on the website.",icon:"catalog",href:"/services/subscriptions",add:"Add resource"},
+ guide:{label:"User guide",description:"Write role-specific help and preview it before publishing.",icon:"help",href:"/admin/user-guide",add:"Add module"},
+} satisfies Record<ContentSection,{label:string;description:string;icon:AdminIconName;href:string;add:string}>;
+const sections=Object.keys(CMS_TABS) as ContentSection[];
+interface Session{server:PublishingDocument;working:ContentPayload;}
+const equal=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
+const changes=(a:any,b:any):number=>{if(equal(a,b))return 0;if(a&&b&&typeof a==="object"&&typeof b==="object")return [...new Set([...Object.keys(a),...Object.keys(b)])].reduce((sum,key)=>sum+changes(a[key],b[key]),0);return 1;};
+const dirty=(session?:Session)=>Boolean(session&&!equal(session.working,session.server.payload));
+export function unsavedCount(session?:Session){if(!session)return 0;const {working,server}=session;if(working.items)return working.items.filter((item:ContentPayload)=>!equal(item,server.payload.items?.find((row:ContentPayload)=>recordKey(row)===recordKey(item)))).length;return changes(working,server.payload);}
+export default function AdminContentManagement(){
+ const [params,setParams]=useSearchParams(),client=useQueryClient();const requested=params.get("tab")||"homepage";const tab:ContentSection=Object.prototype.hasOwnProperty.call(CMS_TABS,requested)?requested as ContentSection:"homepage",current=CMS_TABS[tab];
+ const documents=useQueries({queries:sections.map(kind=>({queryKey:publishingKeys.document(kind),queryFn:({signal}:{signal:AbortSignal})=>getPublishingDocument(kind,signal)}))});const query=documents[sections.indexOf(tab)];
+ const [sessions,setSessions]=useState<Partial<Record<ContentSection,Session>>>({});const session=sessions[tab];
+ useEffect(()=>{setSessions(previous=>{let next=previous;documents.forEach((query,index)=>{const kind=sections[index];if(query.data&&!previous[kind])next={...next,[kind]:{server:query.data,working:structuredClone(query.data.payload)}};});return next;});},[documents.map(query=>query.dataUpdatedAt).join(",")]);
+ const [pending,setPending]=useState(""),[feedback,setFeedback]=useState<{section:ContentSection;key?:string;text:string;error:boolean}|null>(null);
+ const [drawerKey,setDrawerKey]=useState<string|null>(null),[guideKey,setGuideKey]=useState<string|null>(null),[preview,setPreview]=useState(false),[role,setRole]=useState("all"),[aboutSection,setAboutSection]=useState("identity");
+ const [uploads,setUploads]=useState<Set<string>>(()=>new Set());const reportUpload=useCallback((id:string,active:boolean)=>setUploads(previous=>{if(previous.has(id)===active)return previous;const next=new Set(previous);if(active)next.add(id);else next.delete(id);return next;}),[]);
+ const anyDirty=Object.values(sessions).some(dirty),guard=useUnsavedChanges(sessions,true,"website-content",anyDirty);const {confirm,confirmDialog}=useAdminConfirmDialog();const busy=pending||(uploads.size?"upload":"");
+ const update=(working:ContentPayload)=>{setSessions(previous=>previous[tab]?{...previous,[tab]:{...previous[tab]!,working}}:previous);setFeedback(null);};
+ const updateItem=(item:ContentPayload)=>setSessions(previous=>{const state=previous[tab];return state?{...previous,[tab]:{...state,working:{...state.working,items:state.working.items.map((row:ContentPayload)=>recordKey(row)===recordKey(item)?item:row)}}}:previous;});
+ const items:ContentPayload[]=(session?.working.items||[]).filter((item:ContentPayload)=>!item.deleted);
+ const selected=items.find(item=>recordKey(item)===drawerKey);
+ const guideItems=[...items].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).filter(item=>role==="all"||item.audience_roles?.includes(role));const guideItem=guideItems.find(item=>recordKey(item)===guideKey)||guideItems[0];
+ const editingItem=tab==="guide"?guideItem:selected;const editingKey=editingItem?recordKey(editingItem):undefined;const isForm=tab==="homepage"||tab==="about";
+ const accept=(result:PublishingDocument,key?:string)=>{setSessions(previous=>{const state=previous[result.section];let working=structuredClone(result.payload);if(key&&state?.working.items){const unsaved=state.working.items.filter((item:ContentPayload)=>recordKey(item)!==key&&!equal(item,state.server.payload.items?.find((old:ContentPayload)=>recordKey(old)===recordKey(item))));for(const item of unsaved){working.items=working.items.filter((row:ContentPayload)=>recordKey(row)!==recordKey(item));working.items.push(item);}}return {...previous,[result.section]:{server:result,working}};});client.setQueryData(publishingKeys.document(result.section),result);};
+ const perform=async(action:"draft"|"publish"|"discard",key=editingKey,payload=session?.working)=>{
+  if(!session||busy||!payload)return;
+  const name=key?(payload.items||[]).find((item:ContentPayload)=>recordKey(item)===key)?.title||"Untitled item":current.label;
+  if(action==="discard"&&!payload._confirmedDiscard&&!await confirm({title:`Discard changes to ${name}?`,description:"Only this editor’s unpublished changes will be removed.",actionLabel:"Discard changes",cancelLabel:"Keep editing",tone:"danger"}))return;
+  setPending(action);setFeedback(null);
+  try{const result=await savePublishingDocument(tab,action,session.server,payload,key);accept(result,key);if(action==="publish")void client.invalidateQueries({predicate:query=>query.queryKey[0]!=="publishing"});if(key){if(tab==="guide")setGuideKey(result.resolvedKey||key);else setDrawerKey(result.resolvedKey||key);}setFeedback({section:tab,key:result.resolvedKey||key,text:action==="draft"?"Draft saved":action==="publish"?"Published":"Draft discarded",error:false});}
+  catch(error:any){setFeedback({section:tab,key,text:error.response?.data?.message||"Could not save. Your edits are retained; try again.",error:true});}finally{setPending("");}
+ };
+ const add=()=>{if(!session||busy)return;if(tab==="homepage"){update({...session.working,hours:[...(session.working.hours||[]),{day:"",time:"",open:true}]});requestAnimationFrame(()=>document.querySelector<HTMLInputElement>(".content-hours-row:last-child input")?.focus());return;}if(tab==="about"){update({...session.working,staff:[...(session.working.staff||[]),{name:"",role:"",image_url:null,image_alt:""}]});return;}
+ const item:ContentPayload={_key:crypto.randomUUID(),title:""};if(tab==="events")Object.assign(item,{starts_at:"",ends_at:null});if(tab==="subscriptions")Object.assign(item,{url:"",description:"",category:"",image_url:null,image_alt:"",image_public_id:null,is_active:true,sort_order:items.length+1});if(tab==="bulletin")Object.assign(item,{content:"",image_url:null,image_alt:"",gallery:[],image_public_id:null,post_type:"announcement",event_starts_at:null,event_ends_at:null,event_location:"",event_registration_url:"",is_pinned:false,archived:false});if(tab==="guide")Object.assign(item,{slug:"",category:"General",summary:"",overview:"",target_path:"/admin",audience_roles:role==="all"?["staff","admin","super_admin"]:[role],before_you_begin:[],steps:[{title:"",body:""}],warnings:[],troubleshooting:[],image_url:null,image_alt:"",image_public_id:null,sort_order:items.length+1,is_published:true});update({...session.working,items:[...(session.working.items||[]),item]});if(tab==="guide")setGuideKey(recordKey(item));else setDrawerKey(recordKey(item));};
+ const deleteItem=async(item:ContentPayload)=>{if(!session||busy)return;if(!await confirm({title:`Delete ${item.title||"this item"}?`,description:item.id?"This removes only this item from the website. Other drafts are kept.":"This removes the unpublished item. Other drafts are kept.",actionLabel:"Delete item",cancelLabel:"Keep item",tone:"danger"}))return;if(!item.id){const saved=session.server.payload.items?.some((row:ContentPayload)=>recordKey(row)===recordKey(item));if(saved)await perform("discard",recordKey(item),{...session.working,_confirmedDiscard:true});else update({...session.working,items:session.working.items.filter((row:ContentPayload)=>recordKey(row)!==recordKey(item))});}else await perform("publish",recordKey(item),{...session.working,items:session.working.items.map((row:ContentPayload)=>recordKey(row)===recordKey(item)?{...item,deleted:true}:row)});setDrawerKey(null);};
+ const reload=async()=>{if(!await confirm({title:"Load the latest version?",description:"Unsaved edits in this section will be replaced by the latest saved version.",actionLabel:"Reload latest",cancelLabel:"Keep editing"}))return;setPending("reload");try{const result=await client.fetchQuery({queryKey:publishingKeys.document(tab),queryFn:({signal})=>getPublishingDocument(tab,signal),staleTime:0});accept(result);setFeedback(null);}catch{setFeedback({section:tab,text:"Could not reload. Your edits are retained.",error:true});}finally{setPending("");}};
+ const changedSections=sections.filter(kind=>dirty(sessions[kind])||sessions[kind]?.server.hasDraft);
+ const bulkAvailable=changedSections.length>1||(!isForm&&unsavedCount(session)+(session?.server.draftCount||0)>1);
+ const publishAll=async()=>{if(busy||!changedSections.length)return;if(!await confirm({title:"Publish all changes?",description:`Publish ${changedSections.map(kind=>CMS_TABS[kind].label).join(", ")}. All sections are validated together before anything is published.`,actionLabel:"Publish all",cancelLabel:"Keep editing"}))return;setPending("publish-all");try{const results=await publishAllDocuments(changedSections.map(kind=>({section:kind,revision:sessions[kind]!.server.revision,baseVersion:sessions[kind]!.server.baseVersion,payload:sessions[kind]!.working})));results.forEach(result=>accept(result));setFeedback({section:tab,text:"Published",error:false});void client.invalidateQueries({predicate:query=>query.queryKey[0]!=="publishing"});}catch(error:any){setFeedback({section:tab,text:error.response?.data?.message||"Could not publish all. No changes were published.",error:true});}finally{setPending("");}};
+ const count=editingKey?editingItem&&!equal(editingItem,session?.server.payload.items?.find((row:ContentPayload)=>recordKey(row)===editingKey))?1:0:unsavedCount(session);
+ const savedItem=editingKey?session?.server.payload.items?.find((row:ContentPayload)=>recordKey(row)===editingKey):undefined,liveItem=editingKey?session?.server.published.items?.find((row:ContentPayload)=>recordKey(row)===editingKey):undefined;
+ const itemMeta=editingKey?session?.server.itemMeta?.[editingKey]:undefined;
+ const footerProps:PublishingFooterProps={scope:editingItem?.title|| (editingKey?"Untitled item":current.label),unsavedCount:count,dirty:count>0,hasDraft:editingKey?Boolean(savedItem&&(!equal(savedItem,liveItem)||savedItem.has_unpublished_changes)):session?.server.hasDraft||false,savedAt:itemMeta?.savedAt||session?.server.savedAt||null,hasPublished:editingKey?Boolean(liveItem?.id):Boolean(session?.server.published),lastPublished:editingKey?itemMeta?.lastPublished||liveItem?.published_at||null:session?.server.lastPublished||null,busy,message:feedback?.section===tab&&(!feedback.key||feedback.key===editingKey)?feedback.text:"",error:feedback?.section===tab?feedback.error:false,onDiscard:()=>void perform("discard"),onSave:()=>void perform("draft"),onPublish:()=>void perform("publish"),disabled:!session,publishLabel:editingKey?`Publish ${tab==="guide"?"module":tab==="events"?"event":tab==="bulletin"?"post":"resource"}`:`Publish ${current.label.toLowerCase()}`};
+ const collection={items:session?.working.items||[],published:session?.server.published.items||[],onEdit:(item:ContentPayload)=>setDrawerKey(recordKey(item)),onDelete:(item:ContentPayload)=>void deleteItem(item),onChange:(item:ContentPayload)=>{updateItem(item);setDrawerKey(recordKey(item));setFeedback(null);},onAdd:add};
+ return <UploadActivityContext.Provider value={reportUpload}><div className={`admin-content-workspace publishing-workspace ${isForm?"publishing-form-workspace":""}`}>
+ <AdminPageHeader title="Website Content" subtitle="Save private drafts, preview your changes, and publish when ready." actions={bulkAvailable?<Button className="publishing-primary" disabled={Boolean(busy)} onClick={()=>void publishAll()}>Publish all ({changedSections.length} sections)</Button>:undefined}/>
+ <AdminPageTabs value={tab} onChange={value=>{if(busy)return;setDrawerKey(null);setParams(previous=>{const next=new URLSearchParams(previous);next.set("tab",value);return next;});}} label="Website content sections" items={sections.map(kind=>{const state=sessions[kind];const draftCount=state?.server.draftCount||0;const count=draftCount||(kind==="events"?(state?.working.items||[]).filter((item:ContentPayload)=>!item.deleted&&new Date(item.ends_at||item.starts_at).getTime()>=Date.now()).length:kind==="subscriptions"?(state?.working.items||[]).filter((item:ContentPayload)=>!item.deleted&&!item.is_active).length:0);return {value:kind,label:CMS_TABS[kind].label,icon:CMS_TABS[kind].icon,badge:state?count:undefined,badgeDescription:draftCount?"drafts":kind==="events"?"upcoming events":kind==="subscriptions"?"hidden resources":"drafts",descriptionId:`content-tab-${kind}-status`,unsaved:dirty(state)};})}>
+ <div className="content-section-intro publishing-title-row"><div><h2>{current.label}</h2><p>{current.description}</p></div><div className="publishing-title-actions"><Button asChild variant="outline"><Link to={current.href} target="_blank" rel="noopener noreferrer"><AdminIcon name="external"/>{tab==="guide"?"View published guide":"View on site"}</Link></Button><Button variant="outline" disabled={!session||Boolean(busy)} onClick={()=>setPreview(true)}><AdminIcon name="eye"/>Preview</Button>{(tab!=="about"||aboutSection==="staff")&&<Button className="publishing-primary" disabled={!session||Boolean(busy)} onClick={add}><AdminIcon name="plus"/>{current.add}</Button>}</div></div>
+ <TabsContent value={tab} key={tab} className="content-tab publishing-pane"><div className="publishing-editor-scroll">{!session?query.isError?<div className="content-notice" role="alert">Could not load this section. <Button variant="outline" onClick={()=>void query.refetch()}>Try again</Button></div>:<div className="content-loading" role="status"><div/><div/></div>:<fieldset disabled={Boolean(busy)} className="publishing-editor-fields">
+ {tab==="homepage"&&<HomepageEditor value={session.working} onChange={update}/>}{tab==="about"&&<AboutEditor value={session.working} onChange={update} active={aboutSection} onActiveChange={setAboutSection}/>}{tab==="events"&&<EventsEditor {...collection}/>} {tab==="subscriptions"&&<SubscriptionsEditor {...collection}/>} {tab==="bulletin"&&<BulletinEditor {...collection}/>}
+ {tab==="guide"&&<GuideEditor items={session.working.items||[]} published={session.server.published.items||[]} onChange={item=>{updateItem(item);setFeedback(null);}} onAdd={add} onDelete={item=>void deleteItem(item)} selected={guideItem?recordKey(guideItem):null} onSelect={key=>{setGuideKey(key);setFeedback(null);}} role={role} onRoleChange={setRole} onReorder={next=>update({...session.working,items:next})} footer={guideItem?<PublishingFooter {...footerProps}/>:undefined}/>}
+ </fieldset>}</div></TabsContent></AdminPageTabs>
+ {footerProps.error&&<div className="content-notice" role="alert">{footerProps.message}<Button variant="outline" disabled={Boolean(busy)} onClick={()=>void reload()}>Reload latest</Button></div>}
+ {isForm&&<PublishingFooter {...footerProps}/>}
+ <AdminDetailDrawer className="publishing-record-drawer" open={Boolean(selected)} onClose={()=>{if(!busy)setDrawerKey(null);}} title={selected?.title||current.add} description={`Save and publish this ${tab==="events"?"event":tab==="bulletin"?"post":"resource"}. Other drafts are kept.`} headerActions={<><Button variant="outline" onClick={()=>setPreview(true)}><AdminIcon name="eye"/>Preview</Button>{footerProps.error&&<Button variant="outline" disabled={Boolean(busy)} onClick={()=>void reload()}>Reload latest</Button>}</>} footer={selected?<PublishingFooter {...footerProps}/>:undefined}>{selected&&<fieldset disabled={Boolean(busy)} className="publishing-editor-fields"><RecordFields section={tab} value={selected} onChange={item=>{updateItem(item);setFeedback(null);}}/></fieldset>}</AdminDetailDrawer>
+ {session&&<PublishingPreview open={preview} onClose={()=>setPreview(false)} section={tab} value={session.working} role={role} onRoleChange={setRole}/>}{confirmDialog}{guard.discardDialog}
+ </div></UploadActivityContext.Provider>;
 }
