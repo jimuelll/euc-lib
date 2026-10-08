@@ -13,6 +13,7 @@ export interface User {
   program_course?:     string | null;
   library_card_number?: string | null; student_number?: string | null; employee_number?: string | null; username?: string | null;
   email?: string | null; year_level?: string | null; department_id?: number | null; department_name?: string | null; remarks?: string | null;
+  active_loans?: number; overdue_loans?: number; unpaid_fines?: number; active_reservations?: number; inactive_reason?: string | null;
   is_active?:          number;
   deleted_at?:         string | null;   // ← new: present when user is archived
 }
@@ -38,3 +39,5 @@ export interface QrTarget {
   studentId: string;
   name:      string;
 }
+
+export type UsersSummary = { total: number; active: number; needsAttention: number; statuses: Record<string, number>; roles: Record<string, number> };

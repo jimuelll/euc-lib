@@ -82,7 +82,7 @@ const normaliseHolding = async (body: HoldingBody = {}, conn: PoolConnection, ex
 };
 
 const getBookHoldings = async (bookId: number): Promise<CopyRow[]> => repository.getBookHoldings(bookId);
-const searchHoldings = async (options: Record<string, any> = {}): Promise<{ rows: CopyRow[]; total: number; page: number; limit: number }> => repository.searchHoldings(options);
+const searchHoldings = async (options: Record<string, any> = {}): Promise<{ rows: CopyRow[]; total: number; page: number; limit: number; summary: Record<string,number> }> => repository.searchHoldings(options);
 
 const updateHolding = async (copyId: number, body: HoldingBody = {}, userId: number): Promise<{ auditEnqueued: boolean }> => {
   if (!Number.isSafeInteger(copyId) || copyId < 1) throw Object.assign(new Error("Invalid copy ID"), { status: 400 });

@@ -2,6 +2,7 @@ import overdue = require("./overdue.helper");
 import clearance = require("../clearance/clearance.service");
 import pagination = require("./borrowing.helpers");
 import catalogSettings = require("../catalog/catalog.settings.service");
+import loanDuration = require("./loan-duration");
 
 const repository = require("./borrowing.repository");
 
@@ -26,7 +27,13 @@ const searchCatalogueWithAvailability = async (query: string) => {
 };
 
 const resolveUserByBarcode = (scannedValue: string) => repository.findUserByBarcode(scannedValue);
-const resolveCopyByBarcode = (barcode: string) => repository.findCopyByBarcode(barcode);
+const resolveCopyByBarcode = async (barcode: string) => {
+  const copy = await repository.findCopyByBarcode(barcode);
+  if (!copy) return null;
+  return { ...copy, due_date_preview: copy.loan_duration_minutes && copy.loan_duration_unit
+    ? await loanDuration.calculateLoanDueDate(new Date(), { minutes: copy.loan_duration_minutes, unit: copy.loan_duration_unit })
+    : null };
+};
 const getActiveBorrowingByCopyBarcode = (barcode: string) => repository.findActiveBorrowingByCopyBarcode(barcode);
 const getReturnPreviewByIdentifier = async (identifier: string) => {
   await overdue.syncOverdueBorrowings();

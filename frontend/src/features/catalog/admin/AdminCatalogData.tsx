@@ -1,14 +1,14 @@
-import { useUnsavedChanges } from "@/features/admin";
+import { useUnsavedChanges, AdminDetailDrawer, AdminPageTabs } from "@/features/admin";
+import CatalogRecords from "./components/CatalogRecords";
+import "@/features/admin/compact-admin.css";
+import "./catalog.css";
 import { useAdminUrlState, queryPage } from "@/features/admin";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import { invalidateServerState } from "@/app/server-state";
 import { catalogKeys } from "../catalog.keys";
-import {
-  Input,
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui";
+
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "@/features/admin";
@@ -17,16 +17,14 @@ import { archiveCatalogBook, createCatalogBook, fetchBookTypes, lookupBookIsbn, 
 import { getApiErrorMessage } from "@/utils/apiError";
 import CatalogCreateForm from "./components/CatalogCreateForm";
 import CatalogEditForm from "./components/CatalogEditForm";
-import BookCopiesModal from "./components/BookCopiesModal";
-import { BookOpen, FileText, Loader2, Search, ArchiveRestore, Archive, Plus, MoreHorizontal, PanelsTopLeft } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import BookHoldingsEditor from "./components/BookHoldingsEditor";
+import BookCopiesWorkspace from "./components/BookCopiesWorkspace";
+
+
+import { TabsContent } from "@/components/ui/tabs";
+
+
 import CatalogImageEditor from "./components/CatalogImageEditor";
-import CatalogHoldingsView from "./components/CatalogHoldingsView";
-import CatalogLendingStatusCell from "./components/CatalogLendingStatusCell";
+
 import type { CatalogHolding, CatalogSearchResponse } from "./catalog.api";
 
 type Props = { fields: FormField[]; isSuperAdmin: boolean };
@@ -34,56 +32,31 @@ type ApiFieldError = { response?: { data?: { fields?: Record<string, string> } }
 const getServerFieldErrors = (error: unknown): Record<string, string> =>
   (error as ApiFieldError)?.response?.data?.fields ?? {};
 
-function CatalogBookThumbnail({ book }: { book: Book }) {
-  const isThesis = book.material_type === "thesis";
-  const fallback = isThesis ? "/thesis-cover-fallback.svg" : "/book-cover-fallback.svg";
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => setFailed(false), [book.image_url, book.material_type]);
-
-  return (
-    <span aria-hidden="true" className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted/20 p-0.5">
-      <img
-        src={isThesis || failed || !book.image_url ? fallback : book.image_url}
-        alt=""
-        onError={() => setFailed(true)}
-        className="h-full w-full object-contain"
-      />
-    </span>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const queryClient = useQueryClient();
-  const [params, patchParams] = useAdminUrlState();
+  const [params,patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
   const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | null>(null);
-  const [sheetSection,  setSheetSection]  = useState<"details" | "image" | "copies" | "holdings">("details");
+  const [sheetSection,  setSheetSection]  = useState<"details" | "image" | "copies">("details");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
   const [coverFile,     setCoverFile]     = useState<File | null>(null);
   const [loading,       setLoading]       = useState(false);
   const searchQuery = params.get("q") ?? "";
   const debouncedSearch = useDebounce(searchQuery, 180);
-  const setSearchQuery = (q: string) => patchParams({ q, page: null }, true);
   const catalogFilter = params.get("material") === "book" ? "book" : params.get("material") === "thesis" ? "thesis" : "all";
-  const setCatalogFilter = (material: string) => patchParams({ material, ...(material === "thesis" ? { policy: null } : {}), page: null });
   const [selectedBook,  setSelectedBook]  = useState<Book | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const catalogStatus = params.get("status") === "archived" ? "archived" : params.get("status") === "all" ? "all" : "active";
-  const setCatalogStatus = (status: string) => patchParams({ status, page: null });
+  const statusParam = params.get("filter") ?? params.get("status");
+  const catalogStatus = statusParam === "archived" ? "archived" : statusParam === "all" ? "all" : "active";
   const policyStatus = params.get("policy") === "needs" ? "needs_policy" : "all";
-  const setPolicyStatus = (status: "all" | "needs_policy") => patchParams({ policy: status === "needs_policy" ? "needs" : null, page: null });
-  const [viewMode, setViewMode] = useState<"catalog" | "holdings">("catalog");
   const [initialHoldingCopyId, setInitialHoldingCopyId] = useState<number | null>(null);
   const holdingGuardRef = useRef<(() => Promise<boolean>) | null>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
-  const searchFilters: Parameters<typeof searchCatalogBooks>[0] = { query: debouncedSearch, materialType: catalogFilter, page: currentPage, status: catalogStatus, policyStatus };
+  const searchFilters: Parameters<typeof searchCatalogBooks>[0] = { query: debouncedSearch, materialType: catalogFilter, page: currentPage, status: catalogStatus, policyStatus, holdingStatus: ["needs_holdings","needs-holdings"].includes(statusParam??"") ? "needs" : "all" };
   const catalogQuery = useQuery({ queryKey: catalogKeys.adminSearch(searchFilters), queryFn: ({ signal }) => searchCatalogBooks(searchFilters, signal), placeholderData: (previousData) => previousData });
-  const searchResults = catalogQuery.data?.rows ?? [];
-  const catalogPagination = catalogQuery.data?.pagination ?? { page: currentPage, limit: 25, total: 0, totalPages: 1 };
   const bookTypesQuery = useQuery({ queryKey: catalogKeys.bookTypes(), queryFn: ({ signal }) => fetchBookTypes(signal) });
   const bookTypes: BookType[] = bookTypesQuery.data?.filter((type) => Number(type.is_active ?? 1) === 1) ?? [];
   const invalidateCatalog = () => invalidateServerState(queryClient, "catalog");
@@ -94,7 +67,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const isbnLookupMutation = useMutation({ mutationFn: lookupBookIsbn });
   const isbnLookup = isbnLookupMutation.isPending;
 
-  const { confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
+  const { dirty, confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
   const requestClose = async () => {
     if (loading || !await confirmDiscard()) return;
     if (holdingGuardRef.current && !await holdingGuardRef.current()) return;
@@ -145,7 +118,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     const errors: Record<string, string> = {};
     if (type === "book" && requirePolicy && !String(formValues.book_type_id ?? "").trim()) errors.book_type_id = "Select a loan policy.";
     for (const field of fieldsForMaterial(type)) {
-      if (field.required && !String(formValues[field.key] ?? "").trim()) {
+      if (field.key !== "copies" && field.required && !String(formValues[field.key] ?? "").trim()) {
         errors[field.key] = `${field.label} is required.`;
       }
     }
@@ -181,26 +154,13 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     } finally { setLoading(false); }
   };
 
-  const handleSearchBooks = async (_statusOverride?: "active" | "archived" | "all", _materialOverride?: "all" | "book" | "thesis", pageOverride = currentPage) => {
-    if (pageOverride !== currentPage) { patchParams({ page: pageOverride }); return; }
-    const result = await catalogQuery.refetch();
-    if (result.isSuccess) {
-      if (!result.data.rows.length) {
-        toast.info(
-          searchQuery.trim()
-            ? "No catalogue records match the current filters"
-            : `No ${catalogStatus === "all" ? "" : `${catalogStatus} `}catalogue records are available`
-        );
-      }
-    } else toast.error(getApiErrorMessage(result.error, "Search failed"));
-  };
-
   const handleUpdateBook = async () => {
     const selectedMaterial = selectedBook?.material_type === "thesis" ? "thesis" : "book";
     if (!selectedBook || !validateRequired(selectedMaterial, selectedMaterial !== "book" || !selectedBook.needs_policy)) return;
     setLoading(true);
     try {
       const updateValues: CatalogFormValues = { ...formValues, material_type: selectedMaterial };
+      delete updateValues.copies;
       if (selectedMaterial === "book" && selectedBook.needs_policy && !String(updateValues.book_type_id ?? "").trim()) delete updateValues.book_type_id;
       const result = await updateMutation.mutateAsync({ id: selectedBook.id, values: updateValues });
       toast.success(result.message); closeSheet();
@@ -214,7 +174,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     if (!selectedBook) return;
     const shouldDelete = await confirm({
       title: `Archive "${selectedBook.title}"?`,
-      description: `The ${selectedBook.material_type === "thesis" ? "thesis" : "book"} will be hidden from active catalog management until it is restored.`,
+      description: `This record and its physical copies will be hidden until restored. Active loans, unreturned copies, active reservations and unpaid fines block archival. The server checks them again before saving.`,
       actionLabel: `Archive ${selectedBook.material_type === "thesis" ? "Thesis" : "Book"}`,
       tone: "danger",
     });
@@ -247,9 +207,10 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   };
 
   const selectBookForEdit = (b: Book) => {
+    setInitialHoldingCopyId(null);
     setSelectedBook(b);
     const vals: CatalogFormValues = {};
-    fieldsForMaterial(b.material_type === "thesis" ? "thesis" : "book").forEach((f) => { vals[f.key] = (b[f.key] as CatalogFormValue) ?? ""; });
+    fieldsForMaterial(b.material_type === "thesis" ? "thesis" : "book").filter(f=>f.key!=="copies").forEach((f) => { vals[f.key] = (b[f.key] as CatalogFormValue) ?? b.metadata?.[f.key] ?? ""; });
     vals.book_type_id = b.needs_policy ? "" : b.book_type_id ?? "";
     setFormValues(vals);
     setSheetMode("edit");
@@ -262,90 +223,28 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
     void invalidateCatalog();
   };
   const openCopies = (book: Book) => { selectBookForEdit(book); setSheetSection("copies"); };
-  const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("holdings"); };
-  const handleOpenHolding = (holding: CatalogHolding) => openHoldings({ id: holding.book_id, title: holding.title, author: holding.author ?? undefined, isbn: holding.isbn ?? undefined, material_type: "book", needs_policy: holding.needs_policy }, holding.copy_id);
+  const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("copies"); };
+  const handleOpenHolding = async (holding: CatalogHolding) => { try { const result = await searchCatalogBooks({query:"",materialType:"all",status:"all",page:1,bookId:holding.book_id}); const record=result.rows.find(row=>row.id===holding.book_id); if(!record)throw new Error("Record not found"); openHoldings(record,holding.copy_id); } catch(error){toast.error(getApiErrorMessage(error,"Could not load this record"));} };
   const openCreate = () => { setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setCoverFile(null); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
-  const changeSheetSection = async (section: "details" | "image" | "copies" | "holdings") => {
-    if (sheetSection === "holdings" && section !== "holdings" && holdingGuardRef.current && !await holdingGuardRef.current()) return;
+  const changeSheetSection = async (section: "details" | "image" | "copies") => {
+    if (sheetSection === "copies" && section !== "copies" && holdingGuardRef.current && !await holdingGuardRef.current()) return;
     setSheetSection(section);
   };
 
-  return (
-    <>
-      {confirmDialog}
-      {discardDialog}
-      {viewMode === "holdings" ? <CatalogHoldingsView onBack={() => setViewMode("catalog")} onSelect={handleOpenHolding} /> : <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Search catalogue records" className="h-11 rounded-md pl-10" placeholder="Search title, author, or ISBN…" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void handleSearchBooks()} />
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-            <Select value={catalogFilter} onValueChange={(value: "all" | "book" | "thesis") => { setCatalogFilter(value); }}><SelectTrigger className="h-11 rounded-md sm:w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All materials</SelectItem><SelectItem value="book">Books</SelectItem><SelectItem value="thesis">Theses</SelectItem></SelectContent></Select>
-            <Select value={catalogStatus} onValueChange={(value: "active" | "archived" | "all") => { setCatalogStatus(value); setSelectedBook(null); }}><SelectTrigger className="h-11 rounded-md sm:w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="archived">Archived</SelectItem><SelectItem value="all">All statuses</SelectItem></SelectContent></Select>
-            <Select value={policyStatus} onValueChange={(value: "all" | "needs_policy") => { setPolicyStatus(value); setSelectedBook(null); }}><SelectTrigger aria-label="Loan policy filter" className="h-11 rounded-md sm:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All loan policies</SelectItem><SelectItem value="needs_policy" disabled={catalogFilter === "thesis"}>Needs loan policy</SelectItem></SelectContent></Select>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-            <Button className="h-11 w-full rounded-md sm:w-auto" variant="outline" disabled={loading} onClick={() => void handleSearchBooks()}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Search</Button>
-            <Button className="h-11 w-full rounded-md sm:w-auto" variant="outline" onClick={() => setViewMode("holdings")}><PanelsTopLeft className="mr-2 h-4 w-4" />View holdings</Button>
-            <Button className="col-span-2 h-11 w-full rounded-md sm:col-span-1 sm:w-auto" onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add record</Button>
-          </div>
-        </div>
-
-        {catalogStatus === "archived" && <div className="flex items-center gap-2 border border-warning/20 bg-warning/5 px-4 py-3 text-sm text-foreground"><Archive className="h-4 w-4 text-warning" />Archived records are hidden from the public catalogue until restored.</div>}
-
-        <div className="admin-panel-surface admin-etched-border overflow-hidden border border-border bg-card">
-          {loading || catalogQuery.isPending ? <div className="space-y-2 p-4" aria-label="Loading catalogue records">{[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}</div> : searchResults.length ? <>
-            <div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="Catalogue records">{searchResults.map((book) => {
-              const archived = Boolean(book.deleted_at);
-              const identifier = book.material_type === "thesis" ? String(book.accession_number || book.metadata?.accession_number || "—") : (book.isbn || "—");
-              return <article key={book.id} className="min-w-0 space-y-3 p-4">
-                <div className="flex min-w-0 items-start gap-3"><CatalogBookThumbnail book={book} /><div className="min-w-0"><h3 className="break-words text-base font-semibold text-foreground">{book.title}</h3><p className="mt-1 break-words text-sm text-muted-foreground">{book.author || "Unknown author"}</p></div></div>
-                <dl className="grid gap-2 text-sm"><div><dt className="text-muted-foreground">Material</dt><dd>{book.material_type === "thesis" ? "Thesis" : "Book"}{archived ? " · Archived" : ""}</dd></div><div><dt className="text-muted-foreground">{book.material_type === "thesis" ? "Accession" : "ISBN"}</dt><dd className="break-all">{identifier}</dd></div><div><dt className="text-muted-foreground">Lending status</dt><dd><CatalogLendingStatusCell book={book} archived={archived} onAddHoldings={(selectedBook) => openHoldings(selectedBook)} onAssignPolicy={selectBookForEdit} /></dd></div></dl>
-                <div className="flex flex-wrap gap-2">{archived ? <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => void handleRestoreBook(book)}><ArchiveRestore className="mr-2 h-4 w-4" />Restore</Button> : <><Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => selectBookForEdit(book)}>Edit details</Button>{book.material_type !== "thesis" && <Button type="button" variant="outline" className="min-h-11 flex-1" onClick={() => openCopies(book)}>Manage copies</Button>}</>}</div>
-              </article>;
-            })}</div>
-            <div className="admin-desktop-table overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
-              <thead><tr className="border-b border-border bg-muted/30">{["Title and author", "Material", "Identifier", "Lending status", ""].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold text-muted-foreground">{heading}</th>)}</tr></thead>
-              <tbody className="divide-y divide-border">
-                {searchResults.map((book) => {
-                  const archived = Boolean(book.deleted_at);
-                  const identifier = book.material_type === "thesis" ? String(book.accession_number || book.metadata?.accession_number || "—") : (book.isbn || "—");
-                  return <tr key={book.id} tabIndex={archived ? -1 : 0} onClick={() => !archived && selectBookForEdit(book)} onKeyDown={(event) => { if (!archived && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); selectBookForEdit(book); } }} className={`group transition-colors ${archived ? "bg-muted/20 text-muted-foreground" : "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"}`}>
-                    <td className="max-w-[330px] px-4 py-2"><div className="flex min-w-0 items-center gap-3"><CatalogBookThumbnail book={book} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{book.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{book.author || "Unknown author"}</p></div></div></td>
-                    <td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-medium ${book.material_type === "thesis" ? "border-warning/30 bg-warning/5" : "border-border bg-background"}`}>{book.material_type === "thesis" ? <FileText className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}{book.material_type === "thesis" ? "Thesis" : "Book"}</span>{archived && <span className="ml-2 text-xs text-muted-foreground">Archived</span>}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{identifier}</td>
-                    <td className="px-4 py-3 text-sm"><CatalogLendingStatusCell book={book} archived={archived} onAddHoldings={(selectedBook) => openHoldings(selectedBook)} onAssignPolicy={selectBookForEdit} /></td>
-                    <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>{archived ? <Button size="sm" variant="outline" className="rounded-md" onClick={() => void handleRestoreBook(book)}><ArchiveRestore className="mr-2 h-4 w-4" />Restore</Button> : <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => selectBookForEdit(book)}>Edit details</DropdownMenuItem>{book.material_type !== "thesis" && <DropdownMenuItem onClick={() => openCopies(book)}>Manage copies</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</td>
-                  </tr>;
-                })}
-              </tbody>
-            </table>
-          </div></> : <div className="px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground/30" /><p className="mt-3 text-sm font-medium text-foreground">No catalogue records found</p><p className="mt-1 text-sm text-muted-foreground">Adjust the search or filters, or add a new record.</p></div>}
-          <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{catalogPagination.total} record{catalogPagination.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-3"><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page <= 1 || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page - 1)}>Previous</Button><span className="tabular-nums">Page {catalogPagination.page} of {catalogPagination.totalPages}</span><Button type="button" size="sm" variant="outline" className="rounded-md" disabled={catalogPagination.page >= catalogPagination.totalPages || loading} onClick={() => void handleSearchBooks(undefined, undefined, catalogPagination.page + 1)}>Next</Button></div></div>
-        </div>
-      </div>
-      }
-
-      <Sheet open={sheetMode !== null} onOpenChange={(open) => { if (!open && !loading) void requestClose(); }}>
-        <SheetContent side="right" className="admin-edit-sheet grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[640px]">
-          <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
-            <SheetTitle className="text-primary-foreground">{sheetMode === "create" ? "Add catalogue record" : selectedBook?.title || "Catalogue record"}</SheetTitle>
-            <SheetDescription className="text-primary-foreground/70">{sheetMode === "create" ? "Create a book or reference-only thesis using the configured catalogue fields." : `${selectedBook?.material_type === "thesis" ? "Thesis" : "Book"} record and operational details.`}</SheetDescription>
-          </SheetHeader>
-          {sheetMode === "edit" && selectedBook?.material_type !== "thesis" ? <Tabs value={sheetSection} onValueChange={(value) => void changeSheetSection(value as "details" | "image" | "copies" | "holdings")} className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 sm:px-5"><TabsList className="h-auto flex-wrap justify-start rounded-md bg-transparent p-0"><TabsTrigger value="details" className="rounded-sm px-3 py-2 text-xs">Details</TabsTrigger><TabsTrigger value="image" className="rounded-sm px-3 py-2 text-xs">Image</TabsTrigger><TabsTrigger value="copies" className="rounded-sm px-3 py-2 text-xs">Copies</TabsTrigger><TabsTrigger value="holdings" className="rounded-sm px-3 py-2 text-xs">Holdings</TabsTrigger></TabsList></div>
-            <TabsContent value="details" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /></TabsContent>
-            <TabsContent value="image" className="mt-0 min-h-0 overflow-y-auto px-6"><CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage} /></TabsContent>
-            <TabsContent value="copies" className="mt-0 flex min-h-0 overflow-hidden p-5"><BookCopiesModal embedded bookId={selectedBook.id} bookTitle={selectedBook.title} onClose={() => void requestClose()} /></TabsContent>
-            <TabsContent value="holdings" className="mt-0 flex min-h-0 overflow-hidden"><BookHoldingsEditor key={`${selectedBook.id}-${initialHoldingCopyId ?? "first-missing"}`} bookId={selectedBook.id} bookTitle={selectedBook.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} onManageCopies={() => setSheetSection("copies")} isSuperAdmin={isSuperAdmin} /></TabsContent>
-          </Tabs> : <div className="min-h-0 overflow-y-auto px-6">{sheetMode === "create" ? <CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} coverFile={coverFile} onCoverFileChange={setCoverFile} onMaterialChange={(value) => { setMaterialType(value); if (value !== "book") setCoverFile(null); setFieldErrors({}); setFormValues(value === "book" ? { material_type: value, copies: "1" } : { material_type: value }); }} onFieldChange={setField} onLookupIsbn={() => void lookupIsbn()} onSubmit={() => void handleCreateBook()} onClear={() => { setFormValues(materialType === "book" ? { material_type: "book", copies: "1" } : { material_type: "thesis" }); setCoverFile(null); setFieldErrors({}); }} /> : selectedBook ? <CatalogEditForm inSheet book={selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={() => void handleUpdateBook()} onArchive={() => void handleDeleteBook()} onDeselect={() => void requestClose()} /> : null}</div>}
-        </SheetContent>
-      </Sheet>
-    </>
-  );
+  const selectedFilters = {query:"",materialType:"all" as const,status:"all" as const,page:1,bookId:selectedBook?.id};
+  const selectedQuery = useQuery({queryKey:catalogKeys.adminSearch(selectedFilters),queryFn:({signal})=>searchCatalogBooks(selectedFilters,signal),enabled:sheetMode==="edit"&&!!selectedBook});
+  const operationalBook = selectedQuery.data?.rows.find(row=>row.id===selectedBook?.id) ?? selectedBook;
+  const archiveBlocked=Number(operationalBook?.active_loans)>0 || Number(operationalBook?.active_reservations)>0;
+  const archived=Boolean(selectedBook?.deleted_at);
+  const editForm = selectedBook && <fieldset disabled={archived || loading} className="catalog-edit-fields"><CatalogEditForm inSheet book={operationalBook??selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={()=>void handleUpdateBook()} onArchive={()=>void handleDeleteBook()} onDeselect={()=>void requestClose()} onCopies={()=>void changeSheetSection("copies")} archiveBlocked={archiveBlocked} dirty={dirty}/></fieldset>;
+  const viewBookHoldings=async()=>{const id=selectedBook?.id;if(!id)return;if(holdingGuardRef.current&&!await holdingGuardRef.current())return;if(!await confirmDiscard())return;setSheetMode(null);setSelectedBook(null);patchParams({tab:"holdings",bookId:id,hq:null,hstatus:"all",completion:"all",hpage:null});};
+  const metric=(label:string,value?:number)=> <div data-tone={value && label==="Needs accession"?"amber":value && label==="Overdue loans"?"red":undefined}><span>{label}</span><strong>{value===undefined?"—":Number(value).toLocaleString("en-PH")}</strong></div>;
+  return <div className="catalog-page">{confirmDialog}{discardDialog}
+   <CatalogRecords query={catalogQuery} filters={searchFilters} fields={fields} policies={bookTypes} onCreate={openCreate} onEdit={selectBookForEdit} onCopies={openCopies} onHoldings={openHoldings} onHolding={holding=>void handleOpenHolding(holding)} onRestore={book=>void handleRestoreBook(book)} onRefresh={invalidateCatalog}/>
+   <AdminDetailDrawer open={sheetMode!==null} onClose={()=>void requestClose()} title={sheetMode==="create"?"Add catalog record":selectedBook?.title||"Catalog record"} description={sheetMode==="create"?"Create a descriptive record and its initial physical copies.":"Edit the record or manage physical copies and accession details."} className="catalog-record-drawer" footer={<><span role="status" className="catalog-secondary">{dirty?"Unsaved changes":archived?"Archived record":sheetSection==="copies"?"Copy actions are saved separately":"No unsaved changes"}</span><div className="admin-record-footer-actions"><Button variant="outline" disabled={loading} onClick={()=>void requestClose()}>Cancel</Button>{archived&&selectedBook?<Button disabled={loading} onClick={()=>void handleRestoreBook(selectedBook)}>Restore record</Button>:sheetMode==="edit"&&sheetSection==="copies"&&!dirty?null:<Button disabled={loading || (sheetMode==="edit"&&!dirty)} onClick={()=>void(sheetMode==="create"?handleCreateBook():handleUpdateBook())}>{loading?"Saving…":sheetMode==="create"?"Add record":"Save changes"}</Button>}</div></>}>
+    {sheetMode==="edit"&&selectedBook&&<div className="catalog-book-status" aria-label="Book status">{metric("Available",operationalBook?.available)}{metric("Active loans",operationalBook?.active_loans)}{metric("Reservations",operationalBook?.active_reservations)}{Number(operationalBook?.overdue_loans)>0&&metric("Overdue loans",operationalBook?.overdue_loans)}{metric("Needs accession",operationalBook?.unaccessioned_copies===undefined?undefined:Math.max(0,operationalBook.unaccessioned_copies-Number(operationalBook.voided_copies??0)))}</div>}
+    {sheetMode==="edit"&&selectedBook?.material_type!=="thesis"&&!archived?<AdminPageTabs value={sheetSection} onChange={value=>void changeSheetSection(value as "details"|"image"|"copies")} label="Catalog record sections" items={[{value:"details",label:"Details",icon:"transactions"},{value:"image",label:"Image",icon:"image"},{value:"copies",label:"Copies",icon:"copy"}]}><TabsContent value="details" className="catalog-drawer-tab">{editForm}</TabsContent><TabsContent value="image" className="catalog-drawer-tab">{selectedBook&&<CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage}/>}</TabsContent><TabsContent value="copies" className="catalog-drawer-tab"><BookCopiesWorkspace key={`${selectedBook!.id}-${initialHoldingCopyId??"list"}`} bookId={selectedBook!.id} bookTitle={selectedBook!.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} isSuperAdmin={isSuperAdmin} onViewHoldings={()=>void viewBookHoldings()}/></TabsContent></AdminPageTabs>:sheetMode==="create"?<CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} coverFile={coverFile} onCoverFileChange={setCoverFile} onMaterialChange={value=>{setMaterialType(value);if(value!=="book")setCoverFile(null);setFieldErrors({});setFormValues(value==="book"?{material_type:value,copies:"1"}:{material_type:value});}} onFieldChange={setField} onLookupIsbn={()=>void lookupIsbn()} onSubmit={()=>void handleCreateBook()} onClear={clearForm}/>:editForm}
+   </AdminDetailDrawer>
+  </div>;
 };
-
 export default AdminCatalogData;
-

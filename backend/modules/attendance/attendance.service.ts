@@ -9,7 +9,7 @@ import type {
   TodayLogInput,
 } from "./attendance.types";
 
-const recordScan = async ({ scannedId, type, scannedBy, ipAddress }: RecordScanInput) => {
+const recordScan = async ({ scannedId, type, scannedBy, ipAddress,expectedLogId }: RecordScanInput) => {
   if (!scannedId || scannedId === "null") {
     throw Object.assign(new Error("Invalid scanned ID"), { status: 400 });
   }
@@ -18,12 +18,14 @@ const recordScan = async ({ scannedId, type, scannedBy, ipAddress }: RecordScanI
   if (!user) throw Object.assign(new Error("ID not recognised — user not found"), { status: 404 });
 
   const lockName = `att_scan_${user.id}`;
-  if (!(await repository.acquireScanLock(lockName))) {
+  const connection = await repository.acquireScanLock(lockName);
+  if (!connection) {
     throw Object.assign(new Error("Could not acquire scan lock — please try again"), { status: 503 });
   }
 
   try {
-    const lastLog = await repository.getLatestEntryExitLog(user.id);
+    const lastLog = await repository.getLatestEntryExitLog(user.id, connection);
+    if(expectedLogId!==undefined&&lastLog?.id!==expectedLogId)throw Object.assign(new Error("Visit changed since confirmation"),{status:409});
     if (lastLog?.type === type) {
       const isCheckIn = type === "check_in";
       throw Object.assign(
@@ -36,9 +38,9 @@ const recordScan = async ({ scannedId, type, scannedBy, ipAddress }: RecordScanI
         },
       );
     }
-    await repository.insertScan({ userId: user.id, scannedId, type, scannedBy, ipAddress });
+    await repository.insertScan({ userId: user.id, scannedId, type, scannedBy, ipAddress }, connection);
   } finally {
-    await repository.releaseScanLock(lockName);
+    await repository.releaseScanLock(lockName, connection);
   }
 
   return {
@@ -99,4 +101,6 @@ const getMyLogs = async (
     : result;
 };
 
-export = { recordScan, getTodayLogs, getLogs, getSessionsForDate, getMyLogs };
+const timeOutAll=async(cutoff:string,scannedBy:number,ipAddress?:string)=>{const visitors=await repository.getInsideToday(cutoff);let completed=0;let skipped=0;for(const visitor of visitors){try{await recordScan({scannedId:visitor.scanned_id,expectedLogId:visitor.id,type:"check_out",scannedBy,ipAddress});completed++;}catch{skipped++;}}return {completed,skipped};};
+
+export = {getVisits:repository.getVisits,timeOutAll, recordScan, getTodayLogs, getLogs, getSessionsForDate, getMyLogs };

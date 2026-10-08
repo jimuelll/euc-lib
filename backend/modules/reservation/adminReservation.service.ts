@@ -6,8 +6,8 @@ const markReservationReady = async (reservationId: number, actorId: number) => {
   return repository.getReservationNotificationTarget(reservationId);
 };
 
-const cancelReservationAdmin = async (reservationId: number, actorId: number) => {
-  await reservationService.cancelReservationAdmin(reservationId, actorId);
+const cancelReservationAdmin = async (reservationId: number, actorId: number, reason = "") => {
+  await reservationService.cancelReservationAdmin(reservationId, actorId, reason);
   return repository.getReservationNotificationTarget(reservationId);
 };
 

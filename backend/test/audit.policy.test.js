@@ -5,6 +5,7 @@ const { copyLabel, copyAuditDescription, enrichCopyAuditRows } = require("../mod
 
 test("staff and admin mutation routes resolve to an explicit audit policy", () => {
   const routes = [
+    ["POST", "/api/attendance/scan/time-out-all", "affected_records"],
     ["PUT", "/api/about", "field_changes"],
     ["PUT", "/api/site-content", "field_changes"],
     ["PUT", "/api/admin/catalog-settings", "field_changes"],

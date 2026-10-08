@@ -40,6 +40,7 @@ router.delete("/books/:id/image", requireCatalogRole, validateBookId, controller
 router.put   ("/books/:id",      requireCatalogRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireCatalogRole, validateBookId,        controller.deleteBook);
 
+router.post  ("/books/:id/copies", requireCatalogRole, validateBookId, controller.addBookCopies);
 router.get   ("/books/:id/copies",           requireCatalogRole, validateBookId,  controller.getBookCopies);
 router.get   ("/books/:id/holdings",          requireCatalogRole, validateBookId, controller.getBookHoldings);
 router.get   ("/holdings",                    requireCatalogRole, controller.getHoldings);

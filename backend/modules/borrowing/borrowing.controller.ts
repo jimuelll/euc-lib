@@ -144,6 +144,15 @@ const scanBorrow: RequestHandler = async (req, res) => {
  * Body: { copyBarcode }
  * Finds the active borrowing for this copy and marks it returned.
  */
+const undoDeskTransaction: RequestHandler = async (req, res) => {
+  try {
+    if (typeof req.body.undoToken !== "string" || req.body.undoToken.length > 2000) { res.status(400).json({ message: "A valid undo token is required" }); return; }
+    const result = await service.undoDeskTransaction(req.body.undoToken, authUser(req).id);
+    res.locals.auditEnqueued = true;
+    res.json(result);
+  } catch (error) { const caught = requestError(error); res.status(caught.status ?? 500).json({ message: caught.message ?? "Could not undo transaction" }); }
+};
+
 const scanReturn: RequestHandler = async (req, res) => {
   try {
     const { copyBarcode } = req.body;
@@ -160,7 +169,7 @@ const scanReturn: RequestHandler = async (req, res) => {
 
     const result = await service.returnBook(row.id, row.user_id, { auditRoute: "/api/borrowing/scan/return", actorId: authUser(req).id });
     res.locals.auditEnqueued = true;
-    res.json({ message: "Book returned successfully", borrowingId: row.id, returnedAt: result.returnedAt });
+    res.json({ message: "Book returned successfully", ...result });
   } catch (error: unknown) {
     logError("[borrowing] scanReturn:", error);
     const caught = requestError(error);
@@ -232,7 +241,7 @@ const lookupUser: RequestHandler = async (req, res) => {
 const adminGetBorrowings: RequestHandler = async (req, res) => {
   try {
     const page = Math.max(1, parseInteger(req.query.page) || 1);
-    const limit = Math.min(50, parseInteger(req.query.limit) || 20);
+    const limit = Math.max(1, Math.min(50, parseInteger(req.query.limit) || 20));
     const search = req.query.search ?? "";
     const status = req.query.status ?? "all";
     const showArchived = req.query.archived === "true";
@@ -328,6 +337,7 @@ export = {
   returnBook,
   scanBorrow,
   scanReturn,
+  undoDeskTransaction,
   getReturnPreview,
   getCopyByBarcode,
   lookupUser,

@@ -1,4 +1,4 @@
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
 import type {
   AttendanceCountRow,
   AttendanceFilters,
@@ -15,7 +15,7 @@ import type {
 const db = require("../../db") as Pool;
 
 interface LatestLogRow extends RowDataPacket {
-  type: AttendanceType;
+  type: AttendanceType; id:number;
 }
 
 interface AttendanceInsertInput {
@@ -38,30 +38,32 @@ const resolveUser = async (scannedId: string): Promise<AttendanceUser | null> =>
   return user ?? null;
 };
 
-const acquireScanLock = async (lockName: string): Promise<boolean> => {
-  const [[row]] = await db.query<{ acquired: number | null } & RowDataPacket[]>(
-    "SELECT GET_LOCK(?, 5) AS acquired",
-    [lockName],
-  );
-  return Boolean(row?.acquired);
+const acquireScanLock = async (lockName: string): Promise<PoolConnection | null> => {
+  const connection = await db.getConnection();
+  try {
+    const [[row]] = await connection.query<{ acquired: number | null } & RowDataPacket[]>("SELECT GET_LOCK(?, 5) AS acquired", [lockName]);
+    if (row?.acquired) return connection;
+    connection.release();
+    return null;
+  } catch (error) { connection.release(); throw error; }
 };
 
-const getLatestEntryExitLog = async (userId: number): Promise<LatestLogRow | null> => {
-  const [[row]] = await db.query<LatestLogRow[]>(
-    `SELECT type FROM attendance_logs
+const getLatestEntryExitLog = async (userId: number, connection?: PoolConnection): Promise<LatestLogRow | null> => {
+  const [[row]] = await (connection || db).query<LatestLogRow[]>(
+    `SELECT id,type FROM attendance_logs
       WHERE user_id = ?
         AND created_at >= CURDATE()
         AND created_at < CURDATE() + INTERVAL 1 DAY
         AND purpose = 'entry_exit'
-      ORDER BY created_at DESC
+      ORDER BY created_at DESC, id DESC
       LIMIT 1`,
     [userId],
   );
   return row ?? null;
 };
 
-const insertScan = async ({ userId, scannedId, type, scannedBy, ipAddress }: AttendanceInsertInput): Promise<void> => {
-  await db.query(
+const insertScan = async ({ userId, scannedId, type, scannedBy, ipAddress }: AttendanceInsertInput, connection?: PoolConnection): Promise<void> => {
+  await (connection || db).query(
     `INSERT INTO attendance_logs
       (user_id, scanned_id, type, purpose, scanned_by, ip_address)
      VALUES (?, ?, ?, 'entry_exit', ?, ?)`,
@@ -69,7 +71,10 @@ const insertScan = async ({ userId, scannedId, type, scannedBy, ipAddress }: Att
   );
 };
 
-const releaseScanLock = (lockName: string) => db.query("SELECT RELEASE_LOCK(?)", [lockName]);
+const releaseScanLock = async (lockName: string, connection: PoolConnection) => {
+  try { await connection.query("SELECT RELEASE_LOCK(?)", [lockName]); }
+  finally { connection.release(); }
+};
 
 const getTodayLogs = async ({ limit, lastId = null }: Required<Pick<TodayLogInput, "limit">> & Pick<TodayLogInput, "lastId">): Promise<AttendanceLogRow[]> => {
   const params: unknown[] = [];
@@ -186,7 +191,24 @@ const getMyLogs = async (userId: number, { paged, limit, offset }: MyLogsOptions
   return { rows, total: Number(total) };
 };
 
-export = {
+const getVisits=async({page=1,limit=25,search="",type="all",purpose="all",dateFrom="",dateTo=""}:AttendanceFilters)=>{
+ const derived=`WITH events AS (SELECT al.*, LEAD(type) OVER(PARTITION BY user_id,purpose ORDER BY created_at,id) AS next_type, LEAD(created_at) OVER(PARTITION BY user_id,purpose ORDER BY created_at,id) AS next_time, LAG(type) OVER(PARTITION BY user_id,purpose ORDER BY created_at,id) AS previous_type, LAG(created_at) OVER(PARTITION BY user_id,purpose ORDER BY created_at,id) AS previous_time FROM attendance_logs al), visits AS (SELECT e.id,e.user_id,e.scanned_id,e.purpose,e.type, e.created_at AS timestamp,CASE WHEN e.type='check_in' THEN e.created_at END AS checked_in_at,CASE WHEN e.type='check_out' THEN e.created_at WHEN e.next_type='check_out' AND DATE(e.next_time)=DATE(e.created_at) THEN e.next_time END AS checked_out_at,u.name,u.student_employee_id,u.role,scanner.name AS scanned_by_name FROM events e JOIN users u ON u.id=e.user_id LEFT JOIN users scanner ON scanner.id=e.scanned_by WHERE e.type='check_in' OR e.purpose='borrowing' OR e.previous_type IS NULL OR e.previous_type<>'check_in' OR DATE(e.previous_time)<>DATE(e.created_at))`;
+ const where:string[]=[];const params:unknown[]=[];
+ if(search.trim()){where.push("(name LIKE ? OR student_employee_id LIKE ? OR scanned_id LIKE ?)");const like=`%${search.trim()}%`;params.push(like,like,like);}
+ if(purpose!=="all"){where.push("purpose = ?");params.push(purpose);}
+ if(dateFrom){where.push("timestamp >= ?");params.push(dateFrom);}
+ if(dateTo){where.push("timestamp < DATE_ADD(?,INTERVAL 1 DAY)");params.push(dateTo);}
+ const base=where.length?`WHERE ${where.join(" AND ")}`:"";
+ const [[summary]]=await db.query<RowDataPacket[]>(`${derived} SELECT COUNT(*) AS total,COUNT(DISTINCT user_id) AS unique_users,SUM(checked_in_at IS NOT NULL AND purpose='entry_exit') AS arrivals,SUM(checked_out_at IS NOT NULL AND purpose='entry_exit') AS departures,SUM(checked_in_at IS NOT NULL AND checked_out_at IS NULL AND purpose='entry_exit' AND DATE(timestamp)=CURDATE()) AS inside FROM visits ${base}`,params);
+ const extra=type==="inside"?"purpose='entry_exit' AND checked_in_at IS NOT NULL AND checked_out_at IS NULL AND DATE(timestamp)=CURDATE()":type==="arrivals"?"checked_in_at IS NOT NULL AND purpose='entry_exit'":type==="departures"?"checked_out_at IS NOT NULL AND purpose='entry_exit'":"";
+ const filtered=extra?`${base} ${base?"AND":"WHERE"} ${extra}`:base;
+ const [[count]]=await db.query<RowDataPacket[]>(`${derived} SELECT COUNT(*) AS total FROM visits ${filtered}`,params);
+ const [rows]=await db.query<RowDataPacket[]>(`${derived} SELECT *,TIMESTAMPDIFF(MINUTE,checked_in_at,checked_out_at) AS duration_minutes FROM visits ${filtered} ORDER BY timestamp DESC,id DESC LIMIT ? OFFSET ?`,[...params,limit,(page-1)*limit]);
+ return {rows,summary:{total_visits:Number(summary.total || 0),unique_users:Number(summary.unique_users || 0),arrivals:Number(summary.arrivals || 0),departures:Number(summary.departures || 0),inside:Number(summary.inside || 0)},pagination:{page,limit,total:Number(count.total),totalPages:Math.max(1,Math.ceil(Number(count.total)/limit))}};
+};
+const getInsideToday=async(cutoff:string)=>{const[rows]=await db.query<RowDataPacket[]>(`SELECT al.id,al.user_id,al.scanned_id FROM attendance_logs al WHERE al.purpose='entry_exit' AND al.type='check_in' AND al.created_at>=CURDATE() AND UNIX_TIMESTAMP(al.created_at)<=? AND NOT EXISTS(SELECT 1 FROM attendance_logs newer WHERE newer.user_id=al.user_id AND newer.purpose='entry_exit' AND (newer.created_at>al.created_at OR (newer.created_at=al.created_at AND newer.id>al.id)))`,[Math.floor(Date.parse(cutoff)/1000)]);return rows;};
+
+export = { getVisits,getInsideToday,
   resolveUser,
   acquireScanLock,
   getLatestEntryExitLog,

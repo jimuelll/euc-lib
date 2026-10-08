@@ -72,6 +72,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("useReservations query state", () => {
+  it("keeps the successful timestamp and cached rows when Refresh fails", async () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReservations(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.updatedAt).toBeGreaterThan(0));
+    const updatedAt = result.current.updatedAt;
+    api.getAdminReservations.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => { await result.current.fetchReservations(); });
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+    expect(result.current.loading).toBe(false);
+    expect(result.current.updatedAt).toBe(updatedAt);
+    expect(result.current.data?.rows).toHaveLength(1);
+  });
   it("loads reservations and retries manually after a failed request", async () => {
     api.getAdminReservations
       .mockRejectedValueOnce(new Error("offline"))
@@ -124,6 +136,25 @@ describe("useReservations query state", () => {
 });
 
 describe("useReservations mutations", () => {
+  it("does not cancel when confirmation is declined", async () => {
+    confirm.mockResolvedValueOnce(false);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReservations(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    await act(async () => { await result.current.handleCancel(1, "Book 1"); });
+    expect(api.cancelReservationAdmin).not.toHaveBeenCalled();
+  });
+  it("reports partial bulk preparation and keeps processing later records", async () => {
+    api.markReservationReady.mockRejectedValueOnce(new Error("No copy available"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReservations(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    await act(async () => { await result.current.handleBulk("ready", [reservation(1), reservation(2)]); });
+    expect(api.markReservationReady).toHaveBeenCalledWith(2);
+    expect(toast.success).toHaveBeenCalledWith("1 reservation marked ready");
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Failed record IDs: 1"));
+    expect(result.current.bulkBusy).toBe(false);
+  });
   it.each([
     ["mark ready", "handleMarkReady", "markReservationReady", '"Book 1" marked as ready for pickup'],
     ["cancel", "handleCancel", "cancelReservationAdmin", 'Reservation for "Book 1" cancelled'],

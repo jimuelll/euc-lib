@@ -24,6 +24,8 @@ export type Book = {
   edition?: string;
   publication_year?: number;
   copies?: number;
+  active_loans?: number; overdue_loans?: number;
+  active_reservations?: number;
   accessioned_copies?: number;
   unaccessioned_copies?: number;
   voided_copies?: number;

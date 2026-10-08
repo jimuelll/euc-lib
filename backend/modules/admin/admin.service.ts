@@ -9,7 +9,7 @@ const { enqueueTransactionalAudit } = require("../analytics/transactional-audit"
   enqueueTransactionalAudit: (conn: PoolConnection, entry: Record<string, unknown>) => Promise<void>;
 };
 
-const ACADEMIC_ROLES = ["student", "staff", "alumni"];
+const ACADEMIC_ROLES = ["student", "alumni"];
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy: Record<string, string[]> = {
   super_admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
@@ -62,7 +62,7 @@ const roleProfile = (input: UserInput, role: string): UserProfile => {
   const libraryCardNumber = value("library_card_number");
   const studentNumber = value("student_number");
   const employeeNumber = value("employee_number");
-  const username = value("username");
+  const username = value("username") || (role === "staff" ? value("library_card_number") : "");
   if (ACADEMIC_ROLES.includes(role)) {
     if (!libraryCardNumber) throw new Error("Library Card Number is required");
     if (role !== "alumni" && !studentNumber) throw new Error("Student No. is required");
@@ -115,7 +115,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
       academicTermId,
       yearLevel: ACADEMIC_ROLES.includes(role) && role !== "alumni" ? year_level as string : null,
       departmentId,
-      remarks: null,
+      remarks: input.remarks ? String(input.remarks) : null,
     }, conn);
     const [createdRows] = await conn.query<RowDataPacket[]>(
       `SELECT id, name, student_employee_id, email, role, is_active, program_id, academic_term_id,
@@ -238,7 +238,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     if (updates.email !== undefined) normalized.email = updates.email || null;
     if (updates.address !== undefined) normalized.address = updates.address;
     if (updates.contact !== undefined) normalized.contact = updates.contact;
-    if (updates.remarks !== undefined && nextRole === "student") normalized.remarks = updates.remarks || null;
+    if (updates.remarks !== undefined) normalized.remarks = updates.remarks || null;
     if (updates.academic_term_id !== undefined) {
       const term = updates.academic_term_id ? await repository.findAcademicTerm(updates.academic_term_id as number | string, conn) : null;
       if (updates.academic_term_id && !term) throw new Error("Select a valid academic term");
@@ -289,18 +289,29 @@ const searchUsers = async (query: UserSearchQuery, requesterRole: string) => {
     if (query.page !== undefined) return { rows: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
     return [];
   }
-  const result = await repository.searchUsers({
-    allowedRoles,
-    showArchived,
-    studentEmployeeId: query.student_employee_id,
-    name: query.name,
-    role: requestedRole,
-    status: query.status,
-    page: query.page,
-    limit: query.limit,
-  });
-  if (query.page === undefined || Array.isArray(result)) return result;
-  return { rows: result.rows, pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.limit)) } };
+  const result = await repository.searchUsers({ allowedRoles, showArchived: false, studentEmployeeId: query.student_employee_id, name: query.name, status: "all_accounts" });
+  const allRows = Array.isArray(result) ? result : result.rows;
+  const { listUnsettledBorrowings } = require("../borrowing/overdue.helper");
+  const fineDetails = await listUnsettledBorrowings({});
+  const balances = new Map<number, number>();
+  for (const fine of fineDetails.rows) balances.set(Number(fine.user_id), (balances.get(Number(fine.user_id)) || 0) + Number(fine.unsettled_amount));
+  const enriched = allRows.map(row => ({ ...row, unpaid_fines: Math.round((balances.get(Number(row.user_id)) || 0) * 100) / 100 }));
+  const statusOf = (row: typeof enriched[number]) => row.deleted_at ? "archived" : Number(row.is_active) === 0 ? "inactive" : "active";
+  const attention = (row: typeof enriched[number]) => !row.deleted_at && (Number(row.overdue_loans) > 0 || row.unpaid_fines > 0);
+  const roleRows = enriched.filter(row => !requestedRole || row.role === requestedRole);
+  const statusCounts = Object.fromEntries(["active", "inactive", "archived", "all"].map(status => [status, roleRows.filter(row => status === "all" || statusOf(row) === status).length]));
+  const roles = Object.fromEntries(allowedRoles.map(role => [role, enriched.filter(row => row.role === role).length]));
+  const summary = { total: enriched.length, active: enriched.filter(row => statusOf(row) === "active").length, needsAttention: enriched.filter(attention).length, statuses: statusCounts, roles };
+  const status = showArchived ? "archived" : String(query.status || "current");
+  let rows = roleRows.filter(row => status === "all" || (status === "current" ? !row.deleted_at : statusOf(row) === status));
+  if (query.access === "attention") rows = rows.filter(attention);
+  if (query.access === "clear") rows = rows.filter(row => !attention(row));
+  const sort = ["name", "name_desc", "attention"].includes(String(query.sort)) ? String(query.sort) : "name";
+  rows.sort((a, b) => sort === "attention" ? Number(b.overdue_loans) - Number(a.overdue_loans) || b.unpaid_fines - a.unpaid_fines || a.name.localeCompare(b.name) : sort === "name_desc" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+  if (query.page === undefined) return rows;
+  const page = Math.max(1, Math.floor(Number(query.page) || 1));
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(query.limit) || 25)));
+  return { rows: rows.slice((page - 1) * limit, page * limit), summary, pagination: { page, limit, total: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / limit)) } };
 };
 
 const queryToolsSearch = async (term: string, requesterRole: string) => {

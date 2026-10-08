@@ -1,32 +1,8 @@
-import { TRANSACTION_CONFIG } from "../circulation.types";
+import { AdminIcon } from "@/features/admin";
 import type { TransactionType } from "../circulation.types";
-import { SegmentedNavigation } from "@/features/admin";
 
-interface Props {
-  value: TransactionType;
-  onChange: (t: TransactionType) => void;
+export default function TransactionTypePicker({ value, onChange, disabled }: { value: TransactionType; onChange: (value: TransactionType) => void; disabled?: boolean }) {
+  return <div className="circulation-mode" role="group" aria-label="Transaction type">
+    {(["borrow", "return"] as const).map(mode => <button key={mode} type="button" data-mode={mode} aria-pressed={value === mode} disabled={disabled} onClick={() => onChange(mode)}><AdminIcon name={mode} />{mode === "borrow" ? "Borrow" : "Return"}</button>)}
+  </div>;
 }
-
-const TransactionTypePicker = ({ value, onChange }: Props) => (
-  <div className="space-y-2">
-    <label
-      className="block text-sm font-medium text-muted-foreground"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      Transaction Type
-    </label>
-
-    <SegmentedNavigation
-      ariaLabel="Transaction type"
-      value={value}
-      onChange={onChange}
-      segments={(Object.keys(TRANSACTION_CONFIG) as TransactionType[]).map((type) => ({
-        value: type,
-        label: TRANSACTION_CONFIG[type].label,
-        icon: TRANSACTION_CONFIG[type].icon,
-      }))}
-    />
-  </div>
-);
-
-export default TransactionTypePicker;

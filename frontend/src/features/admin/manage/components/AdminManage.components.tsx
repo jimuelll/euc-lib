@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, Printer, X, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
+import { Eye, EyeOff, QrCode, Download, Printer, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import {
   Input,
@@ -14,6 +14,7 @@ import type { AcademicProgram, AcademicTerm, Department } from "../api";
 import { fetchUserBarcode } from "../../api";
 import { formatRole } from "../AdminManage.data";
 import { printCodeLabel } from "@/utils/printCodeLabel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -85,104 +86,12 @@ interface QrModalProps {
 }
 
 export const QrModal = ({ target, onClose }: QrModalProps) => {
-  const [qrUrl,   setQrUrl]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    const loadQr = async () => {
-      try {
-        const blob = await fetchUserBarcode(target.studentId);
-        objectUrl = URL.createObjectURL(blob);
-        setQrUrl(objectUrl);
-      } catch {
-        toast.error("Failed to load QR code");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadQr();
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [target.studentId]);
-
-  const handleDownload = async () => {
-    try {
-      const blob = await fetchUserBarcode(target.studentId);
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement("a");
-      a.href     = url;
-      a.download = `qr-${target.studentId}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Failed to download QR code");
-    }
-  };
-
-  const handlePrint = () => {
-    if (!qrUrl) return toast.error("The code is still loading.");
-    if (!printCodeLabel({ imageUrl: qrUrl, title: target.name, code: target.studentId, kind: "Library patron" })) toast.error("Allow pop-ups to print this label.");
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-card border border-border shadow-2xl flex flex-col items-center w-72 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-full bg-primary relative">
-
-          <div className="px-5 py-4 flex items-start justify-between">
-            <div>
-              <p
-                className="text-[13px] font-bold tracking-tight text-primary-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {target.name}
-              </p>
-              <p className="text-xs tracking-[0.15em] text-primary-foreground/50 mt-0.5 uppercase"
-                style={{ fontFamily: "var(--font-heading)" }}>
-                {target.studentId}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-primary-foreground/40 hover:text-primary-foreground transition-colors mt-0.5"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 flex flex-col items-center gap-5 w-full">
-          {loading ? (
-            <div className="h-48 w-48 border border-border flex items-center justify-center">
-              <p className="text-xs  text-muted-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}>Loading…</p>
-            </div>
-          ) : qrUrl ? (
-            <img src={qrUrl} alt={`QR code for ${target.studentId}`} className="h-48 w-48 border border-border" />
-          ) : (
-            <div className="h-48 w-48 border border-destructive/30 flex items-center justify-center">
-              <p className="text-xs  text-destructive"
-                style={{ fontFamily: "var(--font-heading)" }}>Failed to load</p>
-            </div>
-          )}
-          <ActionButton onClick={handleDownload} className="w-full justify-center">
-            <Download className="h-3.5 w-3.5" />
-            Download PNG
-          </ActionButton>
-          <ActionButton onClick={handlePrint} disabled={!qrUrl} className="w-full justify-center">
-            <Printer className="h-3.5 w-3.5" />
-            Print label
-          </ActionButton>
-        </div>
-      </div>
-    </div>
-  );
+ const [qrUrl,setQrUrl]=useState<string|null>(null);
+ const [loading,setLoading]=useState(true);
+ useEffect(()=>{let url:string|null=null;let active=true;setLoading(true);setQrUrl(null);fetchUserBarcode(target.studentId).then(blob=>{url=URL.createObjectURL(blob);if(active)setQrUrl(url);else URL.revokeObjectURL(url);}).catch(()=>{if(active)toast.error("Could not load QR code");}).finally(()=>{if(active)setLoading(false);});return ()=>{active=false;if(url)URL.revokeObjectURL(url);};},[target.studentId]);
+ const handleDownload=()=>{if(!qrUrl)return;const link=document.createElement("a");link.href=qrUrl;link.download=`qr-${target.studentId}.png`;link.click();};
+ const handlePrint=()=>{if(!qrUrl)return;if(!printCodeLabel({imageUrl:qrUrl,title:target.name,code:target.studentId,kind:"Library patron"}))toast.error("Allow pop-ups to print this label.");};
+ return <Dialog open onOpenChange={open=>{if(!open)onClose();}}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{target.name}</DialogTitle><DialogDescription>{target.studentId} / Library QR identity</DialogDescription></DialogHeader><div className="grid justify-items-center gap-4">{loading ? <p>Loading library QR...</p> : qrUrl ? <img src={qrUrl} alt={`QR code for ${target.studentId}`} className="h-48 w-48" /> : <p role="alert">Could not load this QR code.</p>}<Button onClick={handleDownload} disabled={!qrUrl}><Download className="mr-2 h-4 w-4" />Download PNG</Button><Button variant="outline" onClick={handlePrint} disabled={!qrUrl}><Printer className="mr-2 h-4 w-4" />Print label</Button></div></DialogContent></Dialog>;
 };
 
 // ─── Password Field ───────────────────────────────────────────────────────────

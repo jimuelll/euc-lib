@@ -4,7 +4,7 @@ export type { BookType } from "./AdminCatalog.types";
 
 type MessageResponse = { message: string };
 export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; copyright_year?: string | number; publication_place?: string; physical_description?: string; subjects?: string[]; description?: string };
-export type CatalogSearchResponse = { rows: Book[]; pagination: CatalogPagination };
+export type CatalogSearchResponse = { rows: Book[]; pagination: CatalogPagination; summary?: { active: number; archived: number; needsHoldings: number; all: number } };
 
 export async function fetchCatalogSchema(signal?: AbortSignal): Promise<FormField[]> {
   const response = await axiosInstance.get<unknown[]>("api/admin/catalog-schema", { params: { includeArchived: "true" }, signal });
@@ -46,13 +46,14 @@ export async function removeCatalogBookImage(id: number): Promise<void> {
 }
 export async function archiveCatalogBook(id: number): Promise<MessageResponse> { return (await axiosInstance.delete<MessageResponse>(`api/admin/books/${id}`)).data; }
 export async function restoreCatalogBook(id: number): Promise<MessageResponse> { return (await axiosInstance.post<MessageResponse>(`api/admin/books/${id}/restore`)).data; }
-export async function searchCatalogBooks(params: { query: string; materialType: "all" | "book" | "thesis"; page: number; status: "active" | "archived" | "all"; policyStatus?: "all" | "needs_policy" }, signal?: AbortSignal): Promise<CatalogSearchResponse> {
-  const response = await axiosInstance.get<Book[] | CatalogSearchResponse>("api/admin/books", { params: { query: params.query, materialType: params.materialType, status: params.status, policyStatus: params.policyStatus ?? "all", page: params.page, limit: 25 }, signal });
+export async function searchCatalogBooks(params: { query: string; materialType: "all" | "book" | "thesis"; page: number; status: "active" | "archived" | "all"; policyStatus?: "all" | "needs_policy"; holdingStatus?: "all" | "needs"; bookId?: number; limit?: number }, signal?: AbortSignal): Promise<CatalogSearchResponse> {
+  const response = await axiosInstance.get<Book[] | CatalogSearchResponse>("api/admin/books", { params: { query: params.query, materialType: params.materialType, status: params.status, policyStatus: params.policyStatus ?? "all", holdingStatus: params.holdingStatus, bookId: params.bookId, page: params.page, limit: params.limit ?? 25 }, signal });
   const payload = response.data;
   const rows = Array.isArray(payload) ? payload : payload.rows;
-  return { rows, pagination: Array.isArray(payload) ? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } : payload.pagination };
+  return { rows, summary: Array.isArray(payload) ? undefined : payload.summary, pagination: Array.isArray(payload) ? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } : payload.pagination };
 }
 export type CatalogCopy = { id: number; barcode: string; accession_number?: string | null; accession_voided?: number | boolean; borrow_eligible?: number | boolean; needs_policy?: number | boolean; condition: "good" | "damaged" | "lost"; is_active: number; status: "available" | "borrowed" | "reserved" };
+export async function addCatalogCopies(bookId:number,count:number):Promise<{message:string;copies:number}>{return (await axiosInstance.post(`api/admin/books/${bookId}/copies`,{count})).data;}
 export async function fetchCatalogBookCopies(bookId: number, signal?: AbortSignal): Promise<CatalogCopy[]> { return (await axiosInstance.get<CatalogCopy[]>(`api/admin/books/${bookId}/copies`, { signal })).data; }
 export async function fetchCatalogBarcode(barcode: string): Promise<string> { const response = await axiosInstance.get(`api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`, { responseType: "blob" }); return URL.createObjectURL(response.data); }
 export async function updateCatalogCopyCondition(copyId: number, condition: CatalogCopy["condition"]): Promise<void> { await axiosInstance.patch(`api/admin/copies/${copyId}`, { condition }); }
@@ -72,9 +73,9 @@ export type CatalogHolding = {
   borrow_eligible?: boolean | number;
   due_date?: string | null; borrower_name?: string | null; has_active_loan?: number | boolean; has_ready_reservation?: number | boolean;
 };
-export type CatalogHoldingsResponse = { rows: CatalogHolding[]; total: number; page: number; limit: number; pagination: CatalogPagination };
+export type CatalogHoldingsResponse = { rows: CatalogHolding[]; total: number; page: number; limit: number; pagination: CatalogPagination; summary?: Record<string,number> };
 export async function fetchBookHoldings(bookId: number, signal?: AbortSignal): Promise<CatalogHolding[]> { return (await axiosInstance.get<CatalogHolding[]>(`api/admin/books/${bookId}/holdings`, { signal })).data; }
-export async function fetchCatalogHoldings(params: { query?: string; programId?: number; status?: string; completion?: string; page?: number }, signal?: AbortSignal): Promise<CatalogHoldingsResponse> {
+export async function fetchCatalogHoldings(params: { query?: string; programId?: number; bookId?: number; status?: string; completion?: string; page?: number }, signal?: AbortSignal): Promise<CatalogHoldingsResponse> {
   return (await axiosInstance.get<CatalogHoldingsResponse>("api/admin/holdings", { params: { ...params, limit: 25 }, signal })).data;
 }
 export async function saveCopyHolding(copyId: number, payload: { accession_number: string; price: string; program_id: string; course_code: string; location: string; date_acquired: string; distributor: string; invoice_reference: string }): Promise<void> {

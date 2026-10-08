@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Library, Loader2, Search, FileText, RefreshCw, Trash2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { SegmentedNavigation } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import type { BookType, CatalogFormValue, CatalogFormValues, FormField } from "../AdminCatalog.types";
-import FieldInput from "./FieldInput";
+import CatalogRecordFields from "./CatalogRecordFields";
 
 type MaterialType = "book" | "thesis";
 
@@ -30,7 +29,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const FormLabel = ({ children, htmlFor, required = false }: { children: React.ReactNode; htmlFor?: string; required?: boolean }) => (
-  <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-muted-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+  <label htmlFor={htmlFor} className="mb-2 block text-sm font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
     {children}{required && <span className="ml-1 text-destructive">*</span>}
   </label>
 );
@@ -150,37 +149,15 @@ export default function CatalogCreateForm({
           </section>
         )}
 
-        {materialType === "book" && (
-          <div className="mb-5">
-            <FormLabel required>Loan policy</FormLabel>
-            <Select value={String(values.book_type_id ?? "")} onValueChange={(value) => onFieldChange("book_type_id", value)}>
-              <SelectTrigger aria-invalid={Boolean(errors.book_type_id)} aria-describedby={errors.book_type_id ? "book-type-error" : undefined} className={errors.book_type_id ? "border-destructive" : undefined}>
-                <SelectValue placeholder="Select the loan and fine policy" />
-              </SelectTrigger>
-              <SelectContent>{bookTypes.map((type) => <SelectItem key={type.id} value={String(type.id)}>{type.name} — {type.loan_duration_unit === "hour" ? `${Number(type.loan_duration_minutes / 60).toFixed(2)} hours` : `${Math.round(type.loan_duration_minutes / 1440)} days`}, PHP {Number(type.initial_fine ?? 0).toFixed(2)} + PHP {Number(type.fine_per_hour).toFixed(2)}/{type.fine_interval ?? "hour"}</SelectItem>)}</SelectContent>
-            </Select>
-            {errors.book_type_id && <p id="book-type-error" className="mt-1 text-sm text-destructive" role="alert">{errors.book_type_id}</p>}
-          </div>
-        )}
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          {fieldsForMaterial.map((field) => (
-            <div key={field.key} className={field.type === "textarea" ? "sm:col-span-2" : ""}>
-              <FormLabel required={field.required} htmlFor={`create-field-${field.key}`}>{field.label}</FormLabel>
-              <FieldInput id={`create-field-${field.key}`} field={field} value={values[field.key]} onChange={onFieldChange} error={errors[field.key]} />
-              {errors[field.key] && <p id={`create-field-${field.key}-error`} className="mt-1 text-sm text-destructive" role="alert">{errors[field.key]}</p>}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-2.5 border-t border-border pt-5">
+        <CatalogRecordFields fields={fieldsForMaterial} values={values} errors={errors} bookTypes={bookTypes} materialType={materialType} onFieldChange={onFieldChange} prefix="create-field" />
+        {!inSheet && <div className="mt-6 flex flex-wrap gap-2.5 border-t border-border pt-5">
           <button onClick={onSubmit} disabled={loading} className="flex min-h-11 items-center gap-2 bg-primary px-5 text-xs font-bold  text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : <>{materialType === "book" ? <Library className="h-4 w-4" /> : <FileText className="h-4 w-4" />} Add {materialLabel}</>}
           </button>
           <button onClick={onClear} disabled={loading} className="flex min-h-11 items-center gap-2 border border-border px-4 text-xs font-bold  text-muted-foreground hover:border-foreground hover:text-foreground disabled:opacity-50 transition-colors" style={{ fontFamily: "var(--font-heading)" }}>
             <RefreshCw className="h-4 w-4" /> Clear
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );

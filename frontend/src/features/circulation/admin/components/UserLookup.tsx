@@ -1,131 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search, TriangleAlert } from "lucide-react";
-import { Link } from "react-router-dom";
-import type { UserInfo, ActiveBorrow, TransactionType, ClearanceStatus } from "../circulation.types";
-import { searchAdminUsers } from "@/features/admin";
+import { AdminIcon, searchAdminUsers } from "@/features/admin";
 import { useDebounce } from "@/hooks/use-debounce";
 import { circulationKeys } from "../circulation.keys";
+import type { UserInfo } from "../circulation.types";
 
 interface Props {
   studentId: string;
-  onStudentIdChange: (v: string) => void;
-  onLookup: (studentIdOverride?: string) => void;
+  onStudentIdChange: (value: string) => void;
+  onLookup: (id?: string) => void;
   lookingUp: boolean;
   foundUser: UserInfo | null;
-  activeBorrows: ActiveBorrow[];
-  type: TransactionType;
-  clearance: ClearanceStatus | null;
+  disabled?: boolean;
 }
 
-type UserSuggestion = Pick<UserInfo, "student_employee_id" | "name" | "role">;
-
-const UserLookup = ({
-  studentId, onStudentIdChange, onLookup,
-  lookingUp, foundUser, activeBorrows, type, clearance,
-}: Props) => {
+export default function UserLookup({ studentId, onStudentIdChange, onLookup, lookingUp, foundUser, disabled }: Props) {
   const search = useDebounce(studentId.trim(), 180);
-  const suggestionsQuery = useQuery({
-    queryKey: circulationKeys.userSuggestions(search),
-    queryFn: ({ signal }) => searchAdminUsers(search, signal),
-    enabled: search.length >= 2 && foundUser?.student_employee_id !== search && !lookingUp,
-    staleTime: 15_000,
-  });
-  const suggestions: UserSuggestion[] = suggestionsQuery.data?.slice(0, 6) ?? [];
-
-  return <div className="space-y-2">
-
-    <label htmlFor="circulation-patron"
-      className="block text-sm font-medium text-muted-foreground"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      Student / Employee ID or Name
-    </label>
-
-    {/* Input + search button fused */}
-    <div className="flex gap-0 border border-border overflow-hidden focus-within:border-primary transition-colors">
-      <input id="circulation-patron"
-        value={studentId}
-        onChange={(e) => onStudentIdChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onLookup())}
-        placeholder="Type a name, student ID, or employee ID"
-        className="h-10 flex-1 bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-      />
-      <button
-        type="button"
-        aria-label="Find patron"
-        onClick={() => onLookup()}
-        disabled={lookingUp || !studentId.trim()}
-        className="flex h-10 w-10 shrink-0 items-center justify-center border-l border-border bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-      >
-        {lookingUp
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : <Search className="h-4 w-4" />
-        }
-      </button>
-    </div>
-
-    {suggestions.length > 0 && (
-      <div className="divide-y divide-border border border-border bg-card shadow-sm">
-        {suggestions.map((user) => (
-          <button key={user.student_employee_id} type="button" onClick={() => onLookup(user.student_employee_id)} className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left hover:bg-muted/40">
-            <span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{user.name}</span><span className="block font-mono text-xs text-muted-foreground">{user.student_employee_id}</span></span>
-            <span className="text-xs  text-muted-foreground">{user.role}</span>
-          </button>
-        ))}
-      </div>
-    )}
-
-    {/* Found user card */}
-    {foundUser && (
-      <div className="space-y-3">
-      <div className="flex gap-0 border border-border overflow-hidden">
-        {/* Gold left accent — user confirmed */}
-        <div className="w-[3px] shrink-0 bg-warning/60" />
-
-        <div className="flex min-w-0 flex-1 flex-col gap-3 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p
-              className="text-base font-semibold text-foreground truncate leading-tight"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {foundUser.name}
-            </p>
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-              {foundUser.student_employee_id}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
-            {type === "return" && activeBorrows.length > 0 && (
-              <div className="text-right">
-                <p
-                  className="text-xs font-bold  text-muted-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Active Borrows
-                </p>
-                <p
-                  className="text-base font-bold text-foreground leading-tight"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {activeBorrows.length}
-                </p>
-              </div>
-            )}
-            {/* Role badge */}
-            <span
-              className="border border-border bg-muted px-2 py-0.5 text-xs font-bold  text-muted-foreground capitalize"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {foundUser.role}
-            </span>
-          </div>
-        </div>
-      </div>
-      {type === "borrow" && clearance?.status === "blocked" ? <div className="flex flex-col gap-3 border-l-4 border-destructive bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-2"><TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" /><div><p className="text-sm font-semibold text-destructive">Clearance required before borrowing</p>{clearance.reasons.map((reason) => <p key={reason} className="text-xs text-foreground">{reason}</p>)}</div></div><Link to={`/admin/clearance?student_employee_id=${encodeURIComponent(foundUser.student_employee_id)}`} className="text-sm font-medium text-primary underline underline-offset-4">Open Clearance</Link></div> : null}
-      </div>
-    )}
+  const suggestions = useQuery({ queryKey: circulationKeys.userSuggestions(search), queryFn: ({ signal }) => searchAdminUsers(search, signal), enabled: search.length >= 2 && !foundUser && !lookingUp, staleTime: 15_000 });
+  if (foundUser) return <div className="circulation-selection" aria-live="polite"><AdminIcon name="users" /><div><strong>{foundUser.name}</strong><span className="circulation-mono">{foundUser.student_employee_id}</span></div><button type="button" className="circulation-text-button" disabled={disabled} onClick={() => { onStudentIdChange(""); requestAnimationFrame(() => document.getElementById("circulation-patron")?.focus()); }}>Change patron</button></div>;
+  return <div className="circulation-lookup">
+    <label htmlFor="circulation-patron" className="sr-only">Student / employee ID or name</label>
+    <div className="circulation-scan-field"><input id="circulation-patron" autoFocus autoComplete="off" value={studentId} disabled={disabled} onChange={e => onStudentIdChange(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !lookingUp && !disabled) { e.preventDefault(); onLookup(); } }} placeholder="Scan an ID or search by name" /><button type="button" aria-label="Find patron" disabled={disabled || lookingUp || !studentId.trim()} onClick={() => onLookup()}><AdminIcon name={lookingUp ? "refresh" : "search"} className={lookingUp ? "animate-spin" : ""} /></button></div>
+    {suggestions.isError && <p role="alert" className="circulation-error">Could not load suggestions. Enter the exact ID to look up the patron, or <button type="button" onClick={() => void suggestions.refetch()}>retry</button>.</p>}
+    {!foundUser && !lookingUp && (suggestions.data?.length ?? 0) > 0 && <div className="circulation-results">{suggestions.data!.slice(0, 6).map(user => <button type="button" key={user.student_employee_id} disabled={disabled} onClick={() => onLookup(user.student_employee_id)}><span><strong>{user.name}</strong><span className="circulation-mono">{user.student_employee_id}</span></span><span className="circulation-secondary">{user.role}</span></button>)}</div>}
   </div>;
-};
-
-export default UserLookup;
+}

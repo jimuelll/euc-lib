@@ -16,6 +16,8 @@ interface BookSearchOptions {
   showUnheldInOpac?: boolean;
 }
 interface BookPageOptions {
+  holdingStatus?: string;
+  bookId?: number;
   query?: string;
   status?: string;
   materialType?: string;
@@ -379,7 +381,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
   }
 
   const [rows] = await db.query(
-    `SELECT bk.*, (bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}) AS needs_policy,
+    `SELECT bk.*, (SELECT COUNT(*) FROM borrowings loan_count WHERE loan_count.book_id = bk.id AND loan_count.deleted_at IS NULL AND loan_count.status IN ('borrowed','overdue')) AS active_loans, (SELECT COUNT(*) FROM reservations reservation_count WHERE reservation_count.book_id = bk.id AND reservation_count.deleted_at IS NULL AND reservation_count.status IN ('pending','ready') AND (reservation_count.expires_at IS NULL OR reservation_count.expires_at > NOW())) AS active_reservations, (bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}) AS needs_policy,
             COUNT(DISTINCT bc.id) AS total_copies,
             COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} AND bc.is_active = 1 AND bc.condition IN ('good','damaged') THEN bc.id END) AS accessioned_copies,
             COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available
@@ -467,22 +469,28 @@ async function searchPublicCatalogue(options: Record<string, any> = {}) {
   };
 }
 
-async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", page = 1, limit = 25 }: BookPageOptions = {}) {
+async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", holdingStatus = "all", bookId, page = 1, limit = 25 }: BookPageOptions = {}) {
   const { safePage, safeLimit, offset } = normalizePagination(page, limit, 25, 100);
   const like = `%${String(query).trim()}%`;
   const safeStatus = ["active", "archived", "all"].includes(status) ? status : "active";
   const deletedFilter = safeStatus === "all" ? "1 = 1" : `bk.deleted_at ${safeStatus === "archived" ? "IS NOT NULL" : "IS NULL"}`;
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
   const policyFilter = policyStatus === "needs_policy" ? ` AND bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}` : "";
-  const params = [like, like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : [])];
-  const where = `WHERE ${deletedFilter} AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL) ${materialFilter} ${policyFilter}`;
+  const needsHoldings = `bk.material_type = 'book' AND (NOT EXISTS (SELECT 1 FROM book_copies copy_any WHERE copy_any.book_id = bk.id AND copy_any.deleted_at IS NULL) OR EXISTS (SELECT 1 FROM book_copies missing_copy WHERE missing_copy.book_id = bk.id AND missing_copy.deleted_at IS NULL AND missing_copy.is_active = 1 AND missing_copy.condition IN ('good','damaged') AND NOT EXISTS (SELECT 1 FROM copy_holdings missing_holding WHERE missing_holding.copy_id = missing_copy.id AND NULLIF(TRIM(missing_holding.accession_number), '') IS NOT NULL)))`;
+  const params = [like, like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : []), ...(bookId ? [bookId] : [])];
+  const baseWhere = `WHERE (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL) ${materialFilter} ${policyFilter} ${bookId ? "AND bk.id = ?" : ""}`;
+  const [[counts]] = await db.query(`SELECT COUNT(*) AS all_count, SUM(bk.deleted_at IS NULL) AS active_count, SUM(bk.deleted_at IS NOT NULL) AS archived_count, SUM(bk.deleted_at IS NULL AND (${needsHoldings})) AS needs_holdings_count FROM books bk ${baseWhere}`, params);
+  const where = `${baseWhere} AND ${deletedFilter} ${holdingStatus === "needs" ? `AND (${needsHoldings})` : ""}`;
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
   const [rows] = await db.query(
     `SELECT bk.*, (bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}) AS needs_policy, COUNT(DISTINCT bc.id) AS total_copies,
       COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} AND bc.is_active = 1 AND bc.condition IN ('good','damaged') THEN bc.id END) AS accessioned_copies,
       COUNT(DISTINCT CASE WHEN NOT ${hasAccession("bc", "ch")} AND bc.is_active = 1 AND bc.condition IN ('good','damaged') THEN bc.id END) AS unaccessioned_copies,
       COUNT(DISTINCT CASE WHEN bc.is_active = 1 AND bc.condition IN ('good','damaged') AND EXISTS (SELECT 1 FROM accession_claim_voids voided WHERE voided.accession_number = ch.accession_number) THEN bc.id END) AS voided_copies,
-      COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available
+      COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
+      (SELECT COUNT(*) FROM borrowings loan_count WHERE loan_count.book_id = bk.id AND loan_count.deleted_at IS NULL AND loan_count.status IN ('borrowed','overdue')) AS active_loans,
+      (SELECT COUNT(*) FROM borrowings overdue_count WHERE overdue_count.book_id = bk.id AND overdue_count.deleted_at IS NULL AND overdue_count.status IN ('borrowed','overdue') AND overdue_count.due_date < NOW()) AS overdue_loans,
+      (SELECT COUNT(*) FROM reservations reservation_count WHERE reservation_count.book_id = bk.id AND reservation_count.deleted_at IS NULL AND reservation_count.status IN ('pending','ready') AND (reservation_count.expires_at IS NULL OR reservation_count.expires_at > NOW())) AS active_reservations
      FROM books bk
      LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.deleted_at IS NULL
      LEFT JOIN copy_holdings ch ON ch.copy_id = bc.id
@@ -492,7 +500,7 @@ async function searchBooksPage({ query = "", status = "active", materialType = "
      GROUP BY bk.id ORDER BY bk.title ASC LIMIT ? OFFSET ?`,
     [...params, safeLimit, offset]
   );
-  return { rows, total: Number(total), page: safePage, limit: safeLimit };
+  return { rows, total: Number(total), page: safePage, limit: safeLimit, summary: { active: Number(counts.active_count || 0), archived: Number(counts.archived_count || 0), needsHoldings: Number(counts.needs_holdings_count || 0), all: Number(counts.all_count || 0) } };
 }
 
 async function createBookRecord({ createdBy, materialType, title, author, isbn, copies, bookTypeId, metadata }: NewBookInput, conn: any): Promise<number> {

@@ -1,352 +1,40 @@
-import { useAdminFilters } from "@/features/admin";
-import { useAdminUrlState } from "@/features/admin";
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { RefreshCcw } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { AdminPage, AdminPanel, AdminStatCard, AdminStatGrid } from "@/features/admin";
-import { useAttendanceLogs } from "./useAttendanceLogs";
-import { fetchAttendanceHistory } from "./attendance.api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/components/ui/sonner";
+import { AdminDateRange, AdminPageHeader, AdminPageTabs, AdminSummaryTile, AdminStatusBadge, useAdminUrlState, useAdminConfirmDialog } from "@/features/admin";
 import { attendanceKeys } from "./attendance.keys";
-import {
-  EmptyState,
-  ErrorState,
-  FilterBar,
-  LoadingState,
-  LoadMoreButton,
-  StatsStrip,
-  TableFooter,
-  TableHeader,
-  TableRow,
-} from "./components/AdminAttendanceLogs.components";
-
-const emptyHistorySummary = {
-  total_records: 0,
-  check_in_count: 0,
-  check_out_count: 0,
-  unique_users: 0,
-  borrowing_scan_count: 0,
-};
-
-const emptyHistoryFilters = {
-  search: "",
-  type: "all",
-  purpose: "all",
-  dateFrom: "",
-  dateTo: "",
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
-};
-
-const AdminAttendanceLogs = () => {
-  const [params, patchParams] = useAdminUrlState();
-  const mode = params.get("tab") === "history" ? "history" : "today";
-  const setMode = (tab: string) => patchParams({ tab });
-
-  const {
-    logs,
-    visible,
-    stats,
-    fetchState,
-    search,
-    filter,
-    setSearch,
-    setFilter,
-    handleRefresh,
-    handleLoadMore,
-  } = useAttendanceLogs();
-
-  const { applied: appliedHistory, setApplied: applyHistory, page: historyPage, setPage: setHistoryPage } = useAdminFilters("attendance", emptyHistoryFilters);
-  const [historyFilters, setHistoryFilters] = useState(appliedHistory);
-  useEffect(() => { setHistoryFilters(appliedHistory); }, [appliedHistory]);
-  const historyQuery = useQuery({
-    queryKey: attendanceKeys.historyPage({ page: historyPage, ...appliedHistory }),
-    queryFn: ({ signal }) => fetchAttendanceHistory({
-      page: historyPage,
-      limit: 25,
-      search: appliedHistory.search || undefined,
-      type: appliedHistory.type,
-      purpose: appliedHistory.purpose,
-      dateFrom: appliedHistory.dateFrom || undefined,
-      dateTo: appliedHistory.dateTo || undefined,
-    }, signal),
-    enabled: mode === "history",
-    placeholderData: (previousData) => previousData,
-  });
-  const historyRows = historyQuery.data?.rows ?? [];
-  const historySummary = historyQuery.data?.summary ?? emptyHistorySummary;
-  const historyPagination = historyQuery.data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 1 };
-  const historySessions = historyQuery.data?.sessions ?? [];
-  const historyLoading = historyQuery.isPending;
-  const historyRefreshing = historyQuery.isFetching && !historyQuery.isPending;
-  const historyError = historyQuery.isError ? (historyQuery.error as any)?.response?.data?.message || "Failed to load attendance history" : "";
-
-  const isFiltered = Boolean(search || filter !== "all");
-  const showLoadMore = !fetchState.loading && !fetchState.error && fetchState.hasMore && visible.length > 0 && !search && filter === "all";
-
-  const applyHistoryFilters = () => {
-    applyHistory({ ...historyFilters });
-  };
-
-  const resetHistoryFilters = () => {
-    setHistoryFilters(emptyHistoryFilters);
-    applyHistory(emptyHistoryFilters);
-  };
-
-  const refreshActiveMode = () => {
-    if (mode === "today") {
-      handleRefresh();
-      return;
-    }
-
-    void historyQuery.refetch();
-  };
-
-  return (
-    <AdminPage
-      eyebrow="Reports"
-      title="Attendance"
-      description="Open today&apos;s visitor log by default, then switch to history when you need broader attendance reporting."
-      contentWidth="wide"
-      actions={(
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-md"
-          onClick={refreshActiveMode}
-          disabled={mode === "today" ? fetchState.loading : historyLoading || historyRefreshing}
-        >
-          <RefreshCcw className={`mr-2 h-4 w-4 ${
-            mode === "today"
-              ? (fetchState.loading ? "animate-spin" : "")
-              : (historyRefreshing ? "animate-spin" : "")
-          }`} />
-          {mode === "today" ? "Refresh today" : "Refresh history"}
-        </Button>
-      )}
-    >
-      <Tabs value={mode} onValueChange={setMode} className="space-y-4">
-        <TabsList className="h-auto flex-wrap justify-start rounded-md border border-border/70 bg-background p-1">
-          <TabsTrigger value="today" className="rounded-md">Today</TabsTrigger>
-          <TabsTrigger value="history" className="rounded-md">History</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="today" className="space-y-6">
-          <StatsStrip stats={stats} loading={fetchState.loading} />
-
-          <AdminPanel title="Today&apos;s filters" description="Refine the current day&apos;s visitor list by search term or time entry type.">
-            <FilterBar
-              filter={filter}
-              search={search}
-              onFilterChange={setFilter}
-              onSearchChange={setSearch}
-            />
-          </AdminPanel>
-
-          <AdminPanel
-            title="Today&apos;s attendance"
-            description="Recent entries are listed first so staff can quickly confirm who is currently coming in and out."
-            contentClassName="p-0"
-          >
-            <div className="overflow-hidden">
-              <TableHeader />
-
-              {fetchState.loading ? <LoadingState /> : null}
-              {!fetchState.loading && fetchState.error ? <ErrorState message={fetchState.error} /> : null}
-              {!fetchState.loading && !fetchState.error && visible.length === 0 ? <EmptyState isFiltered={isFiltered} /> : null}
-
-              {!fetchState.loading && !fetchState.error && visible.length > 0 ? (
-                <div className="divide-y divide-border bg-background">
-                  {visible.map((log, index) => (
-                    <TableRow key={log.id} log={log} index={index} />
-                  ))}
-                </div>
-              ) : null}
-
-              {showLoadMore ? (
-                <LoadMoreButton loadingMore={fetchState.loadingMore} onLoadMore={handleLoadMore} />
-              ) : null}
-
-              {!fetchState.loading && !fetchState.error && visible.length > 0 ? (
-                <TableFooter visibleCount={visible.length} totalCount={logs.length} isFiltered={isFiltered} />
-              ) : null}
-            </div>
-          </AdminPanel>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-6">
-          <AdminPanel title="History filters" description="Search attendance by person, purpose, type, and date range.">
-            <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
-              <div className="space-y-2">
-                <Label htmlFor="attendance-history-search">Search</Label>
-                <Input
-                  id="attendance-history-search"
-                  placeholder="Name, ID, or scanned ID"
-                  value={historyFilters.search}
-                  onChange={(event) => setHistoryFilters((current) => ({ ...current, search: event.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="attendance-history-type">Type</Label>
-                <Select value={historyFilters.type} onValueChange={(value) => setHistoryFilters((current) => ({ ...current, type: value }))}>
-                  <SelectTrigger id="attendance-history-type">
-                    <SelectValue placeholder="All types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
-                    <SelectItem value="check_in">Time in</SelectItem>
-                    <SelectItem value="check_out">Time out</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="attendance-history-purpose">Purpose</Label>
-                <Select value={historyFilters.purpose} onValueChange={(value) => setHistoryFilters((current) => ({ ...current, purpose: value }))}>
-                  <SelectTrigger id="attendance-history-purpose">
-                    <SelectValue placeholder="All purposes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All purposes</SelectItem>
-                    <SelectItem value="entry_exit">Entry / exit</SelectItem>
-                    <SelectItem value="borrowing">Borrowing scan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="attendance-history-from">Start date</Label>
-                <Input
-                  id="attendance-history-from"
-                  type="date"
-                  value={historyFilters.dateFrom}
-                  onChange={(event) => setHistoryFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="attendance-history-to">End date</Label>
-                <Input
-                  id="attendance-history-to"
-                  type="date"
-                  value={historyFilters.dateTo}
-                  onChange={(event) => setHistoryFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                />
-              </div>
-
-              <div className="flex items-end gap-2">
-                <Button type="button" variant="outline" className="rounded-md" onClick={applyHistoryFilters}>Apply</Button>
-                <Button type="button" variant="ghost" className="rounded-md" onClick={resetHistoryFilters}>Reset</Button>
-              </div>
-            </div>
-          </AdminPanel>
-
-          <AdminStatGrid>
-            <AdminStatCard label="Records" value={String(historySummary.total_records)} helperText="Attendance rows matching the selected filters." />
-            <AdminStatCard label="Time In" value={String(historySummary.check_in_count)} helperText="Check-in scans in the selected range." />
-            <AdminStatCard label="Time Out" value={String(historySummary.check_out_count)} helperText="Check-out scans in the selected range." />
-            <AdminStatCard label="Unique Users" value={String(historySummary.unique_users)} helperText={`${historySummary.borrowing_scan_count} borrowing-linked scan(s) included.`} />
-          </AdminStatGrid>
-
-          {historyFilters.dateFrom && historyFilters.dateFrom === historyFilters.dateTo ? <AdminPanel title="Sessions for selected day" description="Each check-in is paired with its next check-out. Incomplete sessions still need a time-out scan."><div className="space-y-2">{historySessions.length ? historySessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 border border-border px-4 py-3 text-sm"><div><span className="font-medium text-foreground">{session.name}</span><span className="ml-2 text-muted-foreground">{session.student_employee_id}</span></div><div className="text-muted-foreground">{formatDateTime(session.checked_in_at)} → {session.checked_out_at ? formatDateTime(session.checked_out_at) : "Incomplete"}</div><span className={session.status === "complete" ? "text-success" : "text-warning"}>{session.duration_minutes === null ? "Needs time out" : `${session.duration_minutes} min`}</span></div>) : <p className="text-sm text-muted-foreground">No entry/exit sessions for this date.</p>}</div></AdminPanel> : null}
-
-          <AdminPanel title="Attendance history" description="Historical attendance activity ordered from newest to oldest.">
-            {historyLoading ? (
-              <div className="space-y-3" aria-label="Loading attendance history">
-                {[0, 1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-14 w-full rounded-md" />)}
-              </div>
-            ) : null}
-            {historyError ? (
-              <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                {historyError}
-              </div>
-            ) : null}
-
-            {!historyError && !historyLoading && historyRows.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center">
-                <p className="text-sm text-muted-foreground">No attendance records matched the selected filters.</p>
-              </div>
-            ) : null}
-
-            {!historyError && historyRows.length > 0 ? (
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <table className="admin-stack-attendance w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/20">
-                        {["Person", "Role", "Type", "Purpose", "Scanned By", "Time"].map((heading) => (
-                          <th key={heading} className="px-4 py-3 text-xs font-semibold  text-muted-foreground">
-                            {heading}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {historyRows.map((row) => (
-                        <tr key={row.id} className="border-b border-border/70 last:border-b-0">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-foreground">{row.name}</div>
-                            <div className="text-xs text-muted-foreground">{row.student_employee_id}</div>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">{row.role.replace(/_/g, " ")}</td>
-                          <td className="px-4 py-3 text-foreground">{row.type === "check_in" ? "Time in" : "Time out"}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{row.purpose === "entry_exit" ? "Entry / exit" : "Borrowing"}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{row.scanned_by_name ?? "-"}</td>
-                          <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.timestamp)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-md"
-                    disabled={historyRefreshing || historyPagination.page <= 1}
-                    onClick={() => setHistoryPage(historyPagination.page - 1)}
-                  >
-                    Previous
-                  </Button>
-
-                  <p className="text-sm text-muted-foreground">
-                    Page {historyPagination.page} of {historyPagination.totalPages} with {historyPagination.total} record(s)
-                  </p>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-md"
-                    disabled={historyRefreshing || historyPagination.page >= historyPagination.totalPages}
-                    onClick={() => setHistoryPage(historyPagination.page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </AdminPanel>
-        </TabsContent>
-      </Tabs>
-    </AdminPage>
-  );
-};
-
-export default AdminAttendanceLogs;
+import { fetchAttendanceVisits, recordManualAttendance, timeOutAttendance, type AttendanceVisit } from "./attendance.api";
+import "./attendance.css";
+export const attendanceDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ulaanbaatar", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+export const visitDuration = (minutes: number | null) => minutes === null ? "—" : `${Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)}h ` : ""}${minutes % 60}m`;
+const dateText = (value: string) => new Date(value).toLocaleDateString("en-PH", { timeZone: "Asia/Ulaanbaatar", month: "short", day: "numeric", year: "numeric" });
+const timeText = (value: string) => new Date(value).toLocaleTimeString("en-PH", { timeZone: "Asia/Ulaanbaatar", hour: "numeric", minute: "2-digit" });
+function Choice({ label, value, onChange, items }: { label:string; value:string; onChange:(value:string)=>void; items:string[][] }) { return <Select value={value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{items.map(([key,text])=><SelectItem value={key} key={key}>{text}</SelectItem>)}</SelectContent></Select>; }
+export default function AdminAttendanceLogs() {
+ const [params, patch] = useAdminUrlState(); const client = useQueryClient(); const {confirm,confirmDialog} = useAdminConfirmDialog();
+ const tab = params.get("tab") === "history" ? "history" : "today"; const day = attendanceDay();
+ const filter = params.get("filter") || "inside"; const page = Math.max(1,Math.floor(Number(params.get("page")) || 1));
+ const [search,setSearch] = useState(params.get("q") || "");
+ useEffect(()=>setSearch(params.get("q") || ""),[params.get("q")]);
+ useEffect(()=>{const timer=setTimeout(()=>{if(search !== (params.get("q") || ""))patch({q:search,page:null},true);},300);return()=>clearTimeout(timer);},[search,params.get("q"),patch]);
+ const filters = {page,limit:25,search:params.get("q") || "",type:tab === "today" ? filter : params.get("type") || "all",purpose:tab === "today" ? "entry_exit" : params.get("purpose") || "all",dateFrom:tab === "today" ? day : params.get("from") || "",dateTo:tab === "today" ? day : params.get("to") || ""};
+ const badge = useQuery({queryKey:[...attendanceKeys.all,"inside",day],queryFn:({signal})=>fetchAttendanceVisits({page:1,limit:1,type:"all",purpose:"entry_exit",dateFrom:day,dateTo:day},signal),refetchInterval:30000});
+ const query = useQuery({queryKey:[...attendanceKeys.all,"visits",filters],queryFn:({signal})=>fetchAttendanceVisits(filters,signal),refetchInterval:tab === "today" ? 30000 : false});
+ const [highlight,setHighlight] = useState<number[]>([]); const previous = useRef<{key:string;ids:Set<number>} | null>(null); const identity=JSON.stringify(filters);
+ useEffect(()=>{if(!query.data)return;const ids=new Set(query.data.rows.map(row=>row.id));const prior=previous.current;if(tab === "today" && prior?.key === identity)setHighlight([...ids].filter(id=>!prior.ids.has(id)));previous.current={key:identity,ids};const timer=setTimeout(()=>setHighlight([]),8000);return()=>clearTimeout(timer);},[query.dataUpdatedAt,identity,tab]);
+ const [manual,setManual] = useState(false);const [id,setId]=useState("");const [entryType,setEntryType]=useState("check_in");const [busy,setBusy]=useState(false);const lock=useRef(false);const [manualError,setManualError]=useState("");const [exporting,setExporting]=useState(false);
+ const refresh=()=>void client.invalidateQueries({queryKey:attendanceKeys.all});
+ const submit=async(event:FormEvent)=>{event.preventDefault();if(lock.current || !id.trim())return;lock.current=true;setBusy(true);setManualError("");try{await recordManualAttendance(id.trim(),entryType);setManual(false);setId("");toast.success("Attendance recorded");refresh();}catch(error){setManualError((error as {response?:{data?:{message?:string}}}).response?.data?.message || "Could not record attendance. Try again.");}finally{lock.current=false;setBusy(false);}};
+ const timeOut=async()=>{if(lock.current)return;const cutoff=new Date().toISOString();const count=badge.data?.summary.inside;if(!count)return;if(!await confirm({title:"Time out all visitors?",description:`Record a time-out for ${count} visitors currently inside. Visits changed after this confirmation will be skipped.`,actionLabel:"Time out all",tone:"danger"}))return;lock.current=true;setBusy(true);try{const result=await timeOutAttendance(cutoff);toast.success(`${result.completed} visitors timed out${result.skipped ? ` · ${result.skipped} visits not recorded; refresh to review` : ""}`);refresh();}catch{toast.error("Could not time out visitors. Refresh and try again.");}finally{lock.current=false;setBusy(false);}};
+ const exportRows=async()=>{if(exporting)return;setExporting(true);try{const rows:AttendanceVisit[]=[];let n=1,total=1;do{const result=await fetchAttendanceVisits({...filters,page:n,limit:100});rows.push(...result.rows);total=result.pagination.totalPages;n++;}while(n<=total);const cell=(value:unknown)=>{let text=String(value ?? "");if(/^[=+@\-\t\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';};const csv=[["Name","Library ID","Role","Purpose","Time in","Time out","Duration minutes"],...rows.map(row=>[row.name,row.student_employee_id,row.role,row.purpose,row.checked_in_at,row.checked_out_at,row.duration_minutes])].map(row=>row.map(cell).join(",")).join("\r\n");const url=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=`attendance-${tab}-${day}.csv`;a.click();URL.revokeObjectURL(url);}catch{toast.error("Could not export attendance. Try again.");}finally{setExporting(false);}};
+ const rows=query.data?.rows || [];const summary=query.data?.summary;const pagination=query.data?.pagination;const showPurpose=rows.some(row=>row.purpose !== "entry_exit");const showScanner=rows.some(row=>row.scanned_by_name);
+ const visits=<section className="attendance-records" aria-label="Attendance visits">{query.isPending ? <div className="attendance-loading" aria-label="Loading visits">{[1,2,3].map(n=><Skeleton key={n} className="h-16" />)}</div>:rows.length ? <div className="attendance-table-scroll"><table><thead><tr><th>Patron</th><th>Role</th><th>Type</th><th>Time in</th><th>Time out</th><th>Duration</th>{showPurpose && <th>Purpose</th>}{showScanner && <th>Scanned by</th>}</tr></thead><tbody>{rows.map(row=>{const inside=row.purpose === "entry_exit" && Boolean(row.checked_in_at) && !row.checked_out_at && attendanceDay(new Date(row.timestamp)) === day;return <tr key={row.id} data-new={highlight.includes(row.id) || undefined}><td><Link to={`/admin/manage?q=${encodeURIComponent(row.student_employee_id)}&status=all&patron=${encodeURIComponent(row.student_employee_id)}`}>{row.name}</Link><span className="attendance-id">{row.student_employee_id}</span></td><td><AdminStatusBadge status="neutral">{row.role.replace(/_/g," ")}</AdminStatusBadge></td><td><AdminStatusBadge status={inside ? "ready" : row.purpose === "borrowing" ? "borrowed" : row.checked_out_at ? "fulfilled" : "pending"}>{inside ? "In library" : row.purpose === "borrowing" ? "Borrowing scan" : row.checked_out_at ? "Completed" : "Time out missing"}</AdminStatusBadge></td>{[row.checked_in_at,row.checked_out_at].map((value,i)=><td key={i}>{value ? <><time dateTime={value}>{tab === "history" ? dateText(value) : timeText(value)}</time>{tab === "history" && <span className="attendance-secondary">{timeText(value)}</span>}</> : "—"}</td>)}<td className="attendance-duration">{visitDuration(row.duration_minutes)}</td>{showPurpose && <td>{row.purpose === "borrowing" ? "Borrowing" : "Library visit"}</td>}{showScanner && <td>{row.scanned_by_name || "—"}</td>}</tr>;})}</tbody></table></div>:!query.isError && <p className="attendance-empty">{search ? "No visits match your search." : tab === "today" && filter === "inside" ? "No visitors inside right now." : tab === "today" ? "No matching visits today." : "No visits in this view."}</p>}{pagination && pagination.totalPages>1 && <footer className="attendance-pagination"><span>{(page-1)*25+1}–{Math.min(page*25,pagination.total)} of {pagination.total} visits</span><div><Button variant="outline" disabled={page<=1 || query.isFetching} onClick={()=>patch({page:page-1})}>Previous</Button><span>{page} / {pagination.totalPages}</span><Button variant="outline" disabled={page>=pagination.totalPages || query.isFetching} onClick={()=>patch({page:page+1})}>Next</Button></div></footer>}</section>;
+ return <div className="attendance-workspace"><AdminPageHeader title="Attendance" subtitle="Track visitors inside the library and review completed visits." updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={refresh} actions={<Button variant="outline" disabled={exporting || !query.data} onClick={()=>void exportRows()}>{exporting ? "Exporting…" : "Export"}</Button>} /><AdminPageTabs value={tab} onChange={value=>patch({tab:value,page:null,q:null})} label="Attendance views" items={[{value:"today",label:"Today",icon:"attendance",badge:badge.data?.summary.inside,badgeDescription:"visitors inside now",descriptionId:"attendance-inside-count"},{value:"history",label:"History",icon:"transactions"}]}><TabsContent value="today"><div className="attendance-tiles">{[{key:"inside",label:"Inside now",icon:"users" as const,tone:"green" as const,value:summary?.inside},{key:"arrivals",label:"Arrivals",icon:"borrow" as const,tone:"blue" as const,value:summary?.arrivals},{key:"departures",label:"Departures",icon:"return" as const,tone:"neutral" as const,value:summary?.departures}].map(tile=><AdminSummaryTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} tone={tile.tone} selected={filter===tile.key} onSelect={()=>patch({filter:tile.key,page:null})} />)}</div><div className="attendance-toolbar"><Input aria-label="Search today's attendance" placeholder="Search name or library ID" value={search} onChange={event=>setSearch(event.target.value)} /><Button onClick={()=>{setManualError("");setManual(true);}}>Manual entry</Button><Button variant="outline" disabled={busy || !badge.data?.summary.inside} onClick={()=>void timeOut()}>Time out all</Button></div><p className="attendance-live">Updates every 30 seconds while this page is open.</p></TabsContent><TabsContent value="history"><div className="attendance-history-controls"><Input aria-label="Search attendance history" placeholder="Search name or library ID" value={search} onChange={event=>setSearch(event.target.value)} /><Choice label="Visit type" value={filters.type} onChange={value=>patch({type:value,page:null})} items={[["inside","Type: In library"],["arrivals","Type: Arrivals"],["departures","Type: Completed"],["all","Type: All"]]} /><Choice label="Visit purpose" value={filters.purpose} onChange={value=>patch({purpose:value,page:null})} items={[["entry_exit","Purpose: Library visits"],["borrowing","Purpose: Borrowing"],["all","Purpose: All"]]} /><AdminDateRange from={filters.dateFrom} to={filters.dateTo} onChange={(from,to)=>patch({from,to,page:null})} /></div>{summary && <p className="attendance-summary">{summary.total_visits.toLocaleString()} visits · {summary.unique_users.toLocaleString()} patrons · {summary.arrivals.toLocaleString()} arrivals · {summary.departures.toLocaleString()} departures</p>}</TabsContent></AdminPageTabs>{(query.isError || (tab === "today" && badge.isError)) && <div role="alert" className="attendance-error">Could not refresh attendance.{query.data && " Showing the last available visits."}<Button variant="outline" onClick={refresh}>Retry</Button></div>}{visits}<Dialog open={manual} onOpenChange={value=>{if(!busy)setManual(value);}}><DialogContent><DialogHeader><DialogTitle>Manual attendance entry</DialogTitle><DialogDescription>Record a visit using the patron’s library ID. Existing scanner rules apply.</DialogDescription></DialogHeader><form onSubmit={submit} className="attendance-manual"><label>Library ID<Input autoFocus required autoComplete="off" value={id} onChange={event=>setId(event.target.value)} /></label><Choice label="Entry type" value={entryType} onChange={setEntryType} items={[["check_in","Time in"],["check_out","Time out"]]} />{manualError && <p role="alert">{manualError}</p>}<Button disabled={busy || !id.trim()} type="submit">{busy ? "Recording…" : "Record attendance"}</Button></form></DialogContent></Dialog>{confirmDialog}</div>;
+}

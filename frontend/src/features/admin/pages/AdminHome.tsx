@@ -1,62 +1,124 @@
-import { useMemo } from "react";
+import { AdminPageHeader, AdminSummaryTile } from "../components/AdminDeskSystem";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, ArrowRightLeft, BookMarked, CheckCircle2, ClipboardList, RefreshCcw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ContentRowsSkeleton } from "@/components/ui/content-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext";
 import { fetchAdminDashboard, type DashboardStats, type RecentActivity } from "@/features/admin/api";
+import { AdminIcon, type AdminIconName } from "../components/AdminIcon";
+import { CompactAction, CompactMetric, CompactPanel, CompactTextLink } from "../components/CompactAdmin";
+import { canAccessItem, allSidebarItems } from "../layout/AdminLayoutData";
+import "../compact-admin.css";
 
-type AttentionItem = { label: string; detail: string; href: string; status: "urgent" | "attention" | "clear"; value: string };
-
-const emptyStats: DashboardStats = { total_books: 0, available_book_copies: 0, borrowed_book_copies: 0, active_users: 0, overdue_borrowings: 0, borrowings_today: 0, returns_today: 0, ready_reservations: 0, reservations_today: 0, attendance_today: 0, damaged_book_copies: 0, lost_book_copies: 0, active_notifications: 0, active_subscriptions: 0, upcoming_holidays: 0, outstanding_fines: 0 };
-const currency = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const shortDate = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+const shortTime = new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit" });
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const query = useQuery({ queryKey: ["analytics", "desk"], queryFn: ({ signal }) => fetchAdminDashboard(signal) });
-  const stats: DashboardStats = query.data?.stats ?? emptyStats;
-  const activity: RecentActivity[] = query.data?.recentActivity ?? [];
-  const loading = query.isPending;
-  const refreshing = query.isFetching && !query.isPending;
-  const error = query.isError ? (query.error as any)?.response?.data?.message ?? "Couldn’t update the desk. Try refreshing again." : "";
   const updatedAt = query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null;
-  const hasLoadedData = Boolean(query.data);
-  const load = async (_refresh = false) => { await query.refetch(); };
+  const refresh = () => void query.refetch();
+  const quickLinks = [
+    { href: "/admin/manage", label: "Users", icon: "users" as const },
+    { href: "/admin/catalog?filter=needs-holdings", label: "Needs holdings", icon: "catalog" as const },
+    { href: "/admin/reservations", label: "Reservations", icon: "reservations" as const },
+    { href: "/admin/query", label: "Reports", icon: "reports" as const },
+  ].filter(link => {
+    const item = allSidebarItems.find(item => item.url === link.href);
+    return item && canAccessItem(item, user?.role);
+  });
 
-  const attentionItems = useMemo<AttentionItem[]>(() => [
-    { label: "Overdue returns", detail: stats.overdue_borrowings ? "Resolve these loans before completing clearance." : "All active loans are within their due date.", href: "/admin/clearance?review=queue", status: stats.overdue_borrowings ? "urgent" : "clear", value: String(stats.overdue_borrowings) },
-    { label: "Unpaid fines", detail: stats.outstanding_fines ? "Settlements are recorded through clearance." : "No balances are waiting for settlement.", href: "/admin/clearance?review=queue", status: stats.outstanding_fines ? "urgent" : "clear", value: currency.format(stats.outstanding_fines) },
-    { label: "Ready reservations", detail: stats.ready_reservations ? "Items are waiting for collection at the desk." : "No reservations are awaiting pickup.", href: "/admin/reservations?status=ready", status: stats.ready_reservations ? "attention" : "clear", value: String(stats.ready_reservations) },
-  ], [stats]);
-  const deskMetrics = [{ label: "Borrowings", value: stats.borrowings_today, href: "/admin/circulation?tab=history" }, { label: "Returns", value: stats.returns_today, href: "/admin/circulation?tab=history" }, { label: "New reservations", value: stats.reservations_today, href: "/admin/reservations" }, { label: "Attendance", value: stats.attendance_today }];
-  const healthMetrics = [{ label: "Catalog titles", value: stats.total_books }, { label: "Available to borrow", value: stats.available_book_copies }, { label: "Items on loan", value: stats.borrowed_book_copies }, { label: "Active users", value: stats.active_users }, { label: "Damaged copies", value: stats.damaged_book_copies }, { label: "Lost copies", value: stats.lost_book_copies }, { label: "Active subscriptions", value: stats.active_subscriptions }, { label: "Upcoming holidays", value: stats.upcoming_holidays }, { label: "Active notifications", value: stats.active_notifications }];
+  return <div className="admin-dashboard">
+    <AdminPageHeader title="Dashboard" subtitle={<time dateTime={new Date().toISOString()}>{shortDate.format(new Date())}</time>} updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={refresh} />
 
-  return <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 pb-10">
-    <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div><h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl" style={{ fontFamily: "var(--font-heading)" }}>Dashboard</h1><p className="mt-2 text-sm text-muted-foreground">{new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}{updatedAt ? ` · Updated ${updatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</p></div>
-      <Button type="button" variant="outline" className="self-start rounded-md lg:self-auto" onClick={() => void load(true)} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh desk</Button>
-    </header>
-    <section aria-label="Start a desk transaction" className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-semibold">Library desk</h2><p className="mt-1 text-sm text-muted-foreground">Ready for the next patron.</p></div><div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:gap-3"><Button asChild className="min-h-11 w-full sm:w-auto"><Link to="/admin/circulation?transaction=borrow">Borrow a copy <ArrowRight className="ml-3 size-4" /></Link></Button><Button asChild variant="outline" className="min-h-11 w-full sm:w-auto"><Link to="/admin/circulation?transaction=return">Return a copy <ArrowRight className="ml-3 size-4" /></Link></Button></div></section>
-    <div aria-live="polite" className="sr-only">{refreshing ? "Refreshing dashboard data." : updatedAt ? `Dashboard updated at ${updatedAt.toLocaleTimeString()}.` : ""}</div>
-    {error ? <div role="alert" className="flex flex-col gap-3 border border-destructive/40 bg-destructive/5 px-4 py-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"><span>{error}</span><Button type="button" variant="outline" size="sm" className="w-fit rounded-md border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void load(true)}>Try again</Button></div> : null}
-    {!hasLoadedData ? (
-      loading ? <DashboardSkeleton /> : <section className="border border-border bg-card px-5 py-12 text-center"><h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>Desk data unavailable</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">The dashboard will show priorities once it can retrieve current library data.</p></section>
-    ) : (
-      <>
-    <section className="border border-border bg-card" aria-labelledby="attention-heading"><SectionHeading id="attention-heading" title="Needs attention" /><div><div className="divide-y divide-border lg:grid lg:grid-cols-3 lg:divide-x lg:divide-y-0">{attentionItems.map((item) => <AttentionRow key={item.label} item={item} loading={loading} />)}</div></div></section>
+    <nav aria-label="Circulation actions" className="admin-dashboard-actions">
+      <CompactAction href="/admin/circulation?tab=transaction&mode=borrow" icon="borrow" primary>Borrow a copy</CompactAction>
+      <CompactAction href="/admin/circulation?tab=transaction&mode=return" icon="return">Return a copy</CompactAction>
+      <CompactAction href="/admin/reservations" icon="reservations">Reservations</CompactAction>
+    </nav>
+    <div aria-live="polite" className="sr-only">{query.isFetching ? "Refreshing dashboard data." : updatedAt ? `Dashboard updated at ${shortTime.format(updatedAt)}.` : ""}</div>
 
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><section className="border border-border bg-card" aria-labelledby="desk-heading"><SectionHeading id="desk-heading" title="Today at the desk" /><div className="grid border-b border-border sm:grid-cols-4">{deskMetrics.map((metric) => <DeskMetric key={metric.label} {...metric} loading={loading} />)}</div><RecentActivity activity={activity} loading={loading} /></section><section className="border border-border bg-card" aria-labelledby="actions-heading"><SectionHeading id="actions-heading" title="Start a task" /><nav aria-label="Common desk tasks" className="divide-y divide-border"><TaskLink href="/admin/circulation" icon={ArrowRightLeft} label="Borrow & Return" detail="Scan a patron and a library copy" /><TaskLink href="/admin/clearance" icon={ClipboardList} label="Open clearance" detail="Review loans and fine settlements" /><TaskLink href="/admin/reservations" icon={BookMarked} label="Manage reservations" detail="Prepare and release holds" /><TaskLink href="/admin/manage" icon={Users} label="User records" detail="Find and manage library accounts" /></nav></section></div>
-
-    <details className="group border border-border bg-card"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden"><span><span className="block text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>Library health</span><span className="mt-1 block text-sm text-muted-foreground">Reference metrics for the collection, services, and administration.</span></span><span className="text-sm font-semibold text-action group-open:hidden">Show reference metrics</span><span className="hidden text-sm font-semibold text-action group-open:inline">Hide reference metrics</span></summary><div className="grid border-t border-border sm:grid-cols-2 lg:grid-cols-3">{healthMetrics.map((metric) => <div key={metric.label} className="flex items-baseline justify-between gap-4 border-b border-border px-5 py-3"><span className="text-sm text-muted-foreground">{metric.label}</span><span className="font-mono text-sm font-semibold text-foreground">{loading ? "…" : metric.value}</span></div>)}</div></details>
-      </>
-    )}
-  </main>;
+    {query.isError && <div role="alert" className="admin-dashboard-error">
+      <AdminIcon name="warning" /><span>{query.data ? "Couldn’t refresh the dashboard. Showing the last available data." : "Couldn’t load the dashboard. Try again."}</span>
+      <Button type="button" variant="outline" className="admin-compact-button" disabled={query.isFetching} onClick={refresh}>Try again</Button>
+    </div>}
+    {query.data ? <>
+      <OutstandingItems stats={query.data.stats} />
+      <CompactPanel title="Today’s totals" id="today-totals-heading">
+        <div className="admin-dashboard-totals">
+          <CompactMetric label="Borrowings" value={query.data.stats.borrowings_today} icon="borrow" tone="borrowed" href="/admin/circulation?tab=history" />
+          <CompactMetric label="Returns" value={query.data.stats.returns_today} icon="return" tone="returned" href="/admin/circulation?tab=history" />
+          <CompactMetric label="New reservations" value={query.data.stats.reservations_today} icon="reservations" tone="reserved" href="/admin/reservations" />
+          <CompactMetric label="Attendance" value={query.data.stats.attendance_today} icon="attendanceActivity" tone="attendance" />
+        </div>
+      </CompactPanel>
+      <div className="admin-dashboard-lower-grid">
+        <CompactPanel title="Recent transactions" id="recent-transactions-heading" actions={<CompactTextLink href="/admin/circulation?tab=history">View history</CompactTextLink>}>
+          <TransactionList activity={query.data.recentActivity} />
+        </CompactPanel>
+        <CompactPanel title="Quick links" id="quick-links-heading">
+          <nav aria-label="Quick links" className="admin-dashboard-quick-links">
+            {quickLinks.map(link => <Link key={link.href} to={link.href}><AdminIcon name={link.icon} /><span>{link.label}</span><AdminIcon name="arrowRight" /></Link>)}
+          </nav>
+        </CompactPanel>
+      </div>
+      <LibraryOverview stats={query.data.stats} />
+    </> : query.isPending ? <DashboardSkeleton /> : <section className="admin-compact-panel admin-dashboard-unavailable" aria-labelledby="unavailable-heading">
+      <h2 id="unavailable-heading">Dashboard data unavailable</h2><p>Refresh to load library totals and transactions.</p>
+    </section>}
+  </div>;
 }
 
-function SectionHeading({ id, title, detail }: { id: string; title: string; detail?: string }) { return <header className="border-b border-border px-5 py-4"><h2 id={id} className="text-lg font-semibold tracking-[-0.02em] text-foreground" style={{ fontFamily: "var(--font-heading)" }}>{title}</h2>{detail ? <p className="mt-1 text-sm text-muted-foreground">{detail}</p> : null}</header>; }
-function DashboardSkeleton() { return <div className="space-y-6" aria-label="Loading dashboard" aria-busy="true"><section className="border border-border bg-card"><div className="border-b border-border px-5 py-4"><Skeleton className="h-5 w-36" /></div><div className="grid xl:grid-cols-[minmax(0,1fr)_20rem]"><div className="grid divide-y divide-border xl:grid-cols-3 xl:divide-x xl:divide-y-0">{Array.from({ length: 3 }, (_, index) => <div className="p-5" key={index}><Skeleton className="h-6 w-24" /><Skeleton className="mt-4 h-7 w-16" /><Skeleton className="mt-3 h-4 w-28" /><Skeleton className="mt-2 h-4 w-full max-w-[14rem]" /><Skeleton className="mt-5 h-9 w-24" /></div>)}</div><div className="min-h-44 border-t border-border p-5 xl:border-l xl:border-t-0"><Skeleton className="h-10 w-10" /><Skeleton className="mt-12 h-6 w-40" /><Skeleton className="mt-3 h-4 w-full" /><Skeleton className="mt-2 h-4 w-4/5" /><Skeleton className="mt-5 h-4 w-24" /></div></div></section><div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><section className="border border-border bg-card"><div className="border-b border-border px-5 py-4"><Skeleton className="h-5 w-40" /></div><div className="grid border-b border-border sm:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <div className="border-b border-border px-5 py-4 sm:border-b-0 sm:border-r" key={index}><Skeleton className="h-4 w-20" /><Skeleton className="mt-3 h-6 w-12" /></div>)}</div><div className="px-5 py-5"><ContentRowsSkeleton rows={4} /></div></section><section className="border border-border bg-card"><div className="border-b border-border px-5 py-4"><Skeleton className="h-5 w-28" /></div><div className="divide-y divide-border">{Array.from({ length: 4 }, (_, index) => <div className="flex items-center gap-3 px-5 py-4" key={index}><Skeleton className="h-4 w-4" /><div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-4 w-28" /><Skeleton className="h-3 w-40" /></div><Skeleton className="h-4 w-4" /></div>)}</div></section></div></div>; }
-function AttentionRow({ item, loading }: { item: AttentionItem; loading: boolean }) { const Icon = item.status === "urgent" ? AlertTriangle : item.status === "attention" ? BookMarked : CheckCircle2; const statusLabel = item.status === "urgent" ? "Urgent" : item.status === "attention" ? "Needs pickup" : "Clear"; const tone = item.status === "urgent" ? "bg-destructive text-destructive-foreground" : item.status === "attention" ? "bg-warning text-warning-foreground" : "bg-success text-success-foreground"; return <Link to={item.href} className="group block p-5 transition-colors hover:bg-muted/40"><span className={`inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold  ${tone}`}><Icon className="h-3.5 w-3.5" />{statusLabel}</span><span className="mt-4 block font-mono text-2xl font-semibold tracking-[-0.04em] text-foreground">{loading ? "…" : item.value}</span><span className="mt-1 block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-2 block min-h-9 text-sm leading-5 text-muted-foreground">{item.detail}</span><span className="mt-4 inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors group-hover:bg-muted">Review <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span></Link>; }
-function DeskMetric({ label, value, href, loading }: { label: string; value: number; href?: string; loading: boolean }) { const content = <><span className="block text-sm text-muted-foreground">{label}</span><span className="mt-2 block font-mono text-xl font-semibold tracking-[-0.03em] text-foreground">{loading ? "…" : value}</span></>; return href ? <Link to={href} className="border-b border-border px-5 py-4 transition-colors hover:bg-muted/40 sm:border-b-0 sm:border-r sm:last:border-r-0">{content}</Link> : <div className="border-b border-border px-5 py-4 sm:border-b-0 sm:border-r sm:last:border-r-0">{content}</div>; }
-function RecentActivity({ activity, loading }: { activity: RecentActivity[]; loading: boolean }) { if (loading) return <div className="px-5 py-5"><ContentRowsSkeleton rows={4} /></div>; if (!activity.length) return <div className="px-5 py-10"><p className="text-base font-semibold text-foreground">No transactions recorded yet.</p><Link to="/admin/circulation" className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-action">Open circulation to start a desk transaction <ArrowRight className="h-4 w-4" /></Link></div>; return <div className="divide-y divide-border">{activity.slice(0, 6).map((item, index) => <div key={`${item.occurred_at}-${index}`} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 px-5 py-3.5"><span className="font-mono text-xs font-semibold text-action">{String(index + 1).padStart(2, "0")}</span><p className="text-sm leading-5 text-foreground">{item.description}</p><time className="whitespace-nowrap text-xs text-muted-foreground">{formatTime(item.occurred_at)}</time></div>)}<Link to="/admin/circulation?tab=history" className="flex items-center justify-between px-5 py-4 text-sm font-semibold text-action transition-colors hover:bg-muted/40">View transaction history <ArrowRight className="h-4 w-4" /></Link></div>; }
-function TaskLink({ href, icon: Icon, label, detail }: { href: string; icon: typeof ArrowRightLeft; label: string; detail: string }) { return <Link to={href} className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-muted/40"><Icon className="h-4 w-4 shrink-0 text-action" /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-foreground">{label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{detail}</span></span><ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" /></Link>; }
-function formatTime(value: string) { return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+function OutstandingItems({ stats }: { stats: DashboardStats }) {
+  return <CompactPanel title="Outstanding items" id="outstanding-items-heading" className="admin-dashboard-outstanding-panel"><div className="admin-dashboard-outstanding">
+    <AdminSummaryTile label="Overdue loans" value={stats.overdue_borrowings} tone="red" icon="overdue" href="/admin/circulation?tab=history&filter=overdue" heading />
+    <AdminSummaryTile label="Unpaid fines" value={stats.outstanding_fines} currency tone="red" icon="fines" href="/admin/clearance?tab=queue&filter=all" heading />
+    <AdminSummaryTile label="Ready reservations" value={stats.ready_reservations} tone="green" icon="reservations" href="/admin/reservations?filter=ready" heading />
+  </div></CompactPanel>;
+}
+
+function TransactionList({ activity }: { activity: RecentActivity[] }) {
+  if (!activity.length) return <div className="admin-dashboard-empty"><AdminIcon name="transactions" /><div>
+    <p>No recent transactions</p><CompactTextLink href="/admin/circulation">Open circulation</CompactTextLink>
+  </div></div>;
+  const icons: Record<RecentActivity["activity_type"], AdminIconName> = { borrowed: "borrow", returned: "return", reserved: "reservations" };
+  return <ul className="admin-dashboard-transactions">{activity.slice(0, 6).map((item, index) => {
+    const date = new Date(item.occurred_at);
+    const validDate = !Number.isNaN(date.getTime());
+    return <li key={`${item.occurred_at}-${index}`} data-tone={item.activity_type}>
+      <AdminIcon name={icons[item.activity_type] ?? "transactions"} />
+      <p><span className="sr-only">{item.activity_type}: </span>{item.description}</p>
+      <time dateTime={validDate ? date.toISOString() : undefined}>{validDate ? date.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Time unavailable"}</time>
+    </li>;
+  })}</ul>;
+}
+
+function LibraryOverview({ stats }: { stats: DashboardStats }) {
+  const metrics = [
+    { label: "Catalog titles", value: stats.total_books }, { label: "Available to borrow", value: stats.available_book_copies },
+    { label: "Items on loan", value: stats.borrowed_book_copies }, { label: "Active users", value: stats.active_users },
+    { label: "Damaged copies", value: stats.damaged_book_copies }, { label: "Lost copies", value: stats.lost_book_copies },
+    { label: "Active subscriptions", value: stats.active_subscriptions }, { label: "Upcoming holidays", value: stats.upcoming_holidays },
+    { label: "Active notifications", value: stats.active_notifications },
+  ];
+  return <details className="admin-compact-panel admin-dashboard-overview">
+    <summary><span>Library overview</span><AdminIcon name="chevronDown" /></summary>
+    <dl>{metrics.map(metric => <div key={metric.label}><dt>{metric.label}</dt><dd>{metric.value.toLocaleString("en-PH")}</dd></div>)}</dl>
+  </details>;
+}
+
+function DashboardSkeleton() {
+  return <div aria-label="Loading dashboard" aria-busy="true" className="admin-dashboard-loading">
+    <div className="admin-compact-panel admin-dashboard-outstanding-panel"><div className="admin-compact-section-header"><Skeleton className="h-5 w-32" /></div><div className="admin-dashboard-outstanding">{Array.from({ length: 3 }, (_, index) => <div className="admin-compact-panel admin-dashboard-summary" data-tone="neutral" key={index}>
+      <Skeleton className="size-10 shrink-0" /><div className="admin-dashboard-summary-copy"><Skeleton className="h-5 w-28 max-w-full" /><Skeleton className="mt-1 h-8 w-24 max-w-full" /></div>
+    </div>)}</div></div>
+    <div className="admin-compact-panel"><div className="admin-compact-section-header"><Skeleton className="h-5 w-28" /></div><div className="admin-dashboard-totals">
+      {Array.from({ length: 4 }, (_, index) => <div key={index} className="admin-compact-metric"><Skeleton className="size-9 shrink-0 rounded-full" /><div><Skeleton className="h-4 w-20" /><Skeleton className="mt-2 h-6 w-10" /></div></div>)}
+    </div></div>
+    <div className="admin-dashboard-lower-grid">{["transactions", "links"].map(panel => <div className="admin-compact-panel" key={panel}>
+      <div className="admin-compact-section-header"><Skeleton className="h-5 w-36" /></div>
+      {Array.from({ length: 3 }, (_, index) => <div className="flex items-center gap-3 border-b border-border p-4 last:border-0" key={index}><Skeleton className="h-4 w-4" /><Skeleton className="h-4 w-3/4" /></div>)}
+    </div>)}</div>
+    <div className="admin-compact-panel p-4"><Skeleton className="h-5 w-32" /></div>
+  </div>;
+}

@@ -10,3 +10,9 @@ export interface AttendanceHistoryResponse {
 }
 export const fetchTodayAttendance = async (params: Record<string, string | number>, signal?: AbortSignal): Promise<AttendanceLog[]> => (await axiosInstance.get<AttendanceLog[]>("/api/attendance/today", { params, signal })).data;
 export const fetchAttendanceHistory = async (params: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<AttendanceHistoryResponse> => (await axiosInstance.get<AttendanceHistoryResponse>("/api/attendance/logs", { params, signal })).data;
+
+export interface AttendanceVisit extends AttendanceHistoryRow { user_id: number; checked_in_at: string | null; checked_out_at: string | null; duration_minutes: number | null; }
+export interface AttendanceVisitsResponse { rows: AttendanceVisit[]; pagination: { page: number; limit: number; total: number; totalPages: number }; summary: { total_visits: number; unique_users: number; arrivals: number; departures: number; inside: number }; }
+export const fetchAttendanceVisits = async (params: Record<string, string | number>, signal?: AbortSignal): Promise<AttendanceVisitsResponse> => (await axiosInstance.get("/api/attendance/visits", { params, signal })).data;
+export const recordManualAttendance = async (scannedId: string, type: string) => (await axiosInstance.post("/api/attendance/scan", { scannedId, type })).data;
+export const timeOutAttendance = async (cutoff: string): Promise<{ completed: number; skipped: number }> => (await axiosInstance.post("/api/attendance/scan/time-out-all", { cutoff })).data;

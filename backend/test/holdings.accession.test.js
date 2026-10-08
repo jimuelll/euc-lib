@@ -176,7 +176,7 @@ test("global holdings search applies course, completion, and circulation filters
     assert.match(statements[0].sql, /NOT EXISTS \(SELECT 1 FROM borrowings/);
     assert.match(statements[0].sql, /NOT EXISTS \(SELECT 1 FROM reservations/);
     assert.deepEqual(statements[0].params.slice(-1), [8]);
-    assert.equal(statements[1].params.at(-2), 25);
+    assert.equal(statements[2].params.at(-2), 25);
   } finally { db.query = originalQuery; }
 });
 

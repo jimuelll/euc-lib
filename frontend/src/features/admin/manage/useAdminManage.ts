@@ -1,11 +1,11 @@
 import { useAdminUrlState, queryPage } from "@/features/admin/hooks/useAdminUrlState";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import { invalidateServerState } from "@/app/server-state";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
-import type { User, UserFormState, QrTarget } from "./AdminManage.types";
+import type { User, UserFormState, QrTarget, UsersSummary } from "./AdminManage.types";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
@@ -52,6 +52,8 @@ interface UseAdminManageReturn {
   handleRestoreUser: () => Promise<boolean>;
   confirmDialog: JSX.Element;
 
+  summary?: UsersSummary; updatedAt: number; refreshing: boolean; error: boolean; accessFilter: string; setAccessFilter: (v: string) => void; sort: string; setSort: (v: string) => void; canEdit: (u: User) => boolean;
+
   // QR
   qrTarget:    QrTarget | null;
   setQrTarget: (v: QrTarget | null) => void;
@@ -65,26 +67,32 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
+  const updateLock = useRef(false);
   const [loading,       setLoading]       = useState(false);
   const searchQuery = params.get("q") ?? "";
   const debouncedSearch = useDebounce(searchQuery, 180);
   const setSearchQuery = (value: string) => patchParams({ q: value, page: null }, true);
   const roleFilter = params.get("role") ?? "all";
   const setRoleFilter = (value: string) => patchParams({ role: value, page: null }, false);
-  const statusFilter = params.get("status") ?? "all";
-  const setStatusFilter = (value: string) => patchParams({ status: value, page: null }, false);
+  const statusFilter = params.get("filter") ?? params.get("status") ?? "active";
+  const setStatusFilter = (value: string) => patchParams({ filter: value, status: null, archived: null, page: null }, false);
+  const accessFilter = params.get("access") || "all";
+  const setAccessFilter = (value: string) => patchParams({ access: value, page: null });
+  const sort = params.get("sort") || "name";
+  const setSort = (value: string) => patchParams({ sort: value, page: null });
   const [selectedUser,  setSelectedUser]  = useState<User | null>(null);
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
-  const allowedRoles = user ? getAllowedRoles(user.role) : [];
+  const allowedRoles: string[] = user ? getAllowedRoles(user.role).filter(role => role !== user.role) : [];
+  const canEdit = (u: User) => allowedRoles.includes(u.role);
   const departmentsQuery = useQuery({ queryKey: manageKeys.departments(), queryFn: ({ signal }) => fetchDepartments(signal), enabled: Boolean(user) });
   const termsQuery = useQuery({ queryKey: manageKeys.terms(), queryFn: ({ signal }) => fetchAcademicTerms(signal), enabled: Boolean(user) });
   const programsQuery = useQuery({ queryKey: manageKeys.programs(), queryFn: ({ signal }) => fetchAcademicPrograms(signal), enabled: Boolean(user) });
   const departments: Department[] = departmentsQuery.data ?? [];
   const terms: AcademicTerm[] = termsQuery.data ?? [];
   const programs: AcademicProgram[] = programsQuery.data ?? [];
-  const filters = { query: debouncedSearch, role: roleFilter, status: statusFilter, archived: showArchived, page: currentPage };
+  const filters = { query: debouncedSearch, role: roleFilter, status: statusFilter, archived: showArchived, page: currentPage, access: accessFilter, sort };
   const usersQuery = useQuery({ queryKey: manageKeys.userSearch(filters), queryFn: ({ signal }) => searchUsers(filters, signal), enabled: Boolean(user), placeholderData: (previousData) => previousData });
   const searchResults: User[] = usersQuery.data?.rows ?? [];
   const userPagination = usersQuery.data?.pagination ?? { page: currentPage, limit: 25, total: 0, totalPages: 1 };
@@ -125,7 +133,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     try {
       const response = await createMutation.mutateAsync({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
       toast.success(response.message);
-      const identifier = form.libraryCardNumber || form.employeeNumber || form.username;
+      const identifier = ["student","alumni"].includes(form.role) ? form.libraryCardNumber : form.role === "employee" ? form.employeeNumber : form.username;
       setQrTarget({ studentId: identifier, name: fullName });
       resetForm();
       return true;
@@ -158,7 +166,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       contact:    u.contact  || "",
       programId:  u.program_id ? String(u.program_id) : "",
       academicTermId: u.academic_term_id ? String(u.academic_term_id) : "",
-      libraryCardNumber: u.library_card_number || "", studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || "", email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
+      libraryCardNumber: u.library_card_number || "", studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || (!["student","alumni","employee"].includes(u.role) ? u.student_employee_id : ""), email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
       role:       u.role,
       password:   "",
       rePassword: "",
@@ -167,7 +175,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
 
   // ── Update ─────────────────────────────────────────────────────────────────
   const handleUpdateUser = async () => {
-    if (!selectedUser) return false;
+    if (!selectedUser || updateLock.current) return false;
+    updateLock.current = true;
+    try {
     const { password, rePassword } = form;
     const updates = { ...form };
     if (password) {
@@ -177,6 +187,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
       }
       updates.password = password;
     }
+    if (form.role !== selectedUser.role && !await confirm({ title: "Confirm role change?", description: `${selectedUser.name} will change from ${selectedUser.role.replace(/_/g, " ")} to ${form.role.replace(/_/g, " ")}. This changes their access and available permissions.`, actionLabel: "Confirm role change", tone: "danger" })) return false;
+    if (password && !await confirm({ title: "Reset this password?", description: `${selectedUser.name} will use the new password and must change it at their next sign-in.`, actionLabel: "Reset password" })) return false;
     setLoading(true);
     try {
       const response = await updateMutation.mutateAsync({ id: selectedUser.student_employee_id, form: { ...form } });
@@ -189,6 +201,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     } finally {
       setLoading(false);
     }
+    } finally { updateLock.current = false; }
   };
 
   // ── Archive — DELETE /api/admin/users/:id ──────────────────────────────────
@@ -197,8 +210,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!selectedUser) return false;
     const shouldArchive = await confirm({
       title: `Archive ${selectedUser.name}?`,
-      description: "They will lose access to the system and disappear from active searches until restored.",
-      actionLabel: "Archive User",
+      description: "They will lose access to the system until restored. Open loans, unpaid fines and active reservations must be resolved first. The server checks these again before archiving.",
+      actionLabel: "Archive user",
       tone: "danger",
     });
     if (!shouldArchive) return false;
@@ -241,6 +254,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
 
   return {
+    summary: usersQuery.data?.summary, updatedAt: usersQuery.dataUpdatedAt, refreshing: usersQuery.isFetching, error: usersQuery.isError, accessFilter, setAccessFilter, sort, setSort, canEdit,
     form,
     setField,
     showPassword,

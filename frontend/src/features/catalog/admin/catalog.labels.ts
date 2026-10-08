@@ -1,0 +1,6 @@
+import { fetchCatalogBarcode } from "./catalog.api";
+import { toast } from "@/components/ui/sonner";
+export async function printCatalogLabels(barcodes:string[]) {
+ const popup=window.open("","_blank","width=700,height=600"); if(!popup){toast.error("Allow pop-ups to print labels.");return;} popup.opener=null;popup.document.write("<p>Preparing copy labels...</p>");const urls:string[]=[];
+ try { for(const barcode of barcodes) urls.push(await fetchCatalogBarcode(barcode)); if(!urls.length){popup.close();return;} popup.document.open();popup.document.write('<html><head><title>Copy labels</title><style>@page{size:30mm 30mm;margin:0}body{margin:0}.label{width:30mm;height:30mm;display:grid;place-items:center;break-after:page}img{width:27mm;height:27mm}</style></head><body>'+urls.map(url=>'<div class="label"><img src="'+url+'"/></div>').join("")+'</body></html>');popup.document.close();await Promise.all(Array.from(popup.document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));popup.onafterprint=()=>{urls.forEach(URL.revokeObjectURL);popup.close();};popup.print(); } catch {urls.forEach(URL.revokeObjectURL);popup.close();toast.error("Could not prepare labels. Try again.");}
+}

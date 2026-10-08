@@ -22,6 +22,7 @@ interface HoldingDetails {
   invoiceReference: string | null;
 }
 interface HoldingSearchOptions {
+  bookId?: number | null;
   query?: string;
   programId?: number | null;
   status?: string;
@@ -63,7 +64,7 @@ const getBookHoldings = async (bookId: number): Promise<HoldingRow[]> => {
   return rows;
 };
 
-const searchHoldings = async ({ query = "", programId = null, status = "all", completion = "all", page = 1, limit = 25 }: HoldingSearchOptions = {}): Promise<{ rows: HoldingRow[]; total: number; page: number; limit: number }> => {
+const searchHoldings = async ({ query = "", programId = null, bookId = null, status = "all", completion = "all", page = 1, limit = 25 }: HoldingSearchOptions = {}): Promise<{ rows: HoldingRow[]; total: number; page: number; limit: number; summary: Record<string,number> }> => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
   const like = `%${String(query).trim()}%`;
@@ -73,9 +74,12 @@ const searchHoldings = async ({ query = "", programId = null, status = "all", co
     where.push("(bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR bc.barcode LIKE ? OR h.accession_number LIKE ? OR h.course_code LIKE ? OR h.location LIKE ?)");
     params.push(like, like, like, like, like, like, like);
   }
+  if (bookId) { where.push("bc.book_id = ?"); params.push(bookId); }
   if (programId) { where.push("h.program_id = ?"); params.push(programId); }
+  const summaryWhere = `WHERE ${where.join(" AND ")}`;
+  const summaryParams = [...params];
   if (completion === "complete") where.push("h.accession_number IS NOT NULL AND NOT EXISTS (SELECT 1 FROM accession_claim_voids completion_void WHERE completion_void.accession_number = h.accession_number)");
-  if (completion === "missing") where.push("(h.accession_number IS NULL OR EXISTS (SELECT 1 FROM accession_claim_voids completion_void WHERE completion_void.accession_number = h.accession_number))");
+  if (completion === "missing") where.push("NULLIF(TRIM(h.accession_number), '') IS NULL AND bc.is_active = 1");
   if (status === "inactive") where.push("bc.is_active = 0");
   else if (status === "voided") where.push("EXISTS (SELECT 1 FROM accession_claim_voids status_void WHERE status_void.accession_number = h.accession_number)");
   else if (status === "borrowed") where.push("br.id IS NOT NULL");
@@ -86,12 +90,19 @@ const searchHoldings = async ({ query = "", programId = null, status = "all", co
     LEFT JOIN copy_holdings h ON h.copy_id = bc.id
     LEFT JOIN borrowings br ON br.copy_id = bc.id AND br.deleted_at IS NULL AND br.status IN ('borrowed','overdue')
     LEFT JOIN reservations rr ON rr.reserved_copy_id = bc.id AND rr.status = 'ready' AND rr.deleted_at IS NULL AND (rr.expires_at IS NULL OR rr.expires_at > NOW())`;
+  const [[counts]] = await db.query<HoldingRow[]>(`SELECT COUNT(DISTINCT bc.id) AS all_count,
+    COUNT(DISTINCT CASE WHEN NULLIF(TRIM(h.accession_number), '') IS NULL AND bc.is_active = 1 THEN bc.id END) AS needs_count,
+    COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available_count,
+    COUNT(DISTINCT CASE WHEN br.id IS NOT NULL THEN bc.id END) AS borrowed_count,
+    COUNT(DISTINCT CASE WHEN br.id IS NULL AND rr.id IS NOT NULL THEN bc.id END) AS reserved_count,
+    COUNT(DISTINCT CASE WHEN EXISTS(SELECT 1 FROM accession_claim_voids sv WHERE sv.accession_number = h.accession_number) THEN bc.id END) AS voided_count
+    ${fromSql} ${summaryWhere}`,summaryParams);
   const [[{ total }]] = await db.query<Array<HoldingRow & { total: number | string }>>(`SELECT COUNT(DISTINCT bc.id) AS total ${fromSql} ${whereSql}`, params);
   const [rows] = await db.query<HoldingRow[]>(
     `${holdingSelect} ${whereSql} ORDER BY bk.title ASC, bc.id ASC LIMIT ? OFFSET ?`,
     [...params, safeLimit, (safePage - 1) * safeLimit],
   );
-  return { rows, total: Number(total), page: safePage, limit: safeLimit };
+  return { rows, total: Number(total), page: safePage, limit: safeLimit, summary: Object.fromEntries(["all","needs","available","borrowed","reserved","voided"].map(key=>[key,Number(counts?.[`${key}_count`]??0)])) };
 };
 
 const getCopyForUpdate = async (copyId: number, conn: QueryConnection): Promise<CopyHolding | null> => {

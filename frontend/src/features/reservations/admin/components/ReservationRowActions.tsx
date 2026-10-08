@@ -1,136 +1,26 @@
-import { CheckCircle2, XCircle, Loader2, Trash2, ArchiveRestore } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AdminIcon, AdminRowMenu } from "@/features/admin";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ReservationStatus } from "../reservations.types";
 
-interface ReservationRowActionsProps {
-  id:           number;
-  title:        string;
-  status:       ReservationStatus;
-  isActing:     boolean;
-  showArchived: boolean;
-  onMarkReady:  (id: number, title: string) => void;
-  onFulfill:    (id: number, title: string) => void;
-  onCancel:     (id: number, title: string) => void;
-  onArchive:    (id: number, title: string) => void;
-  onRestore:    (id: number, title: string) => void;
+interface Props {
+  id: number; title: string; status: ReservationStatus; isActing: boolean; showArchived: boolean;
+  preparationBlocker?: string;
+  onMarkReady: (id: number, title: string) => void; onFulfill: (id: number, title: string) => void;
+  onCancel: (id: number, title: string) => void; onArchive: (id: number, title: string) => void;
+  onRestore: (id: number, title: string) => void; onDetails?: () => void;
 }
-
-const ActionBtn = ({
-  onClick, disabled, variant, children,
-}: {
-  onClick:  () => void;
-  disabled: boolean;
-  variant:  "primary" | "success" | "danger" | "ghost" | "warning";
-  children: React.ReactNode;
-}) => {
-  const colors: Record<string, string> = {
-    primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-    success: "bg-success text-success-foreground hover:bg-success/90",
-    danger:  "border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-    ghost:   "border border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive",
-    warning: "border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground",
-  };
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-9 items-center gap-1.5 px-3 text-xs font-semibold transition-colors disabled:opacity-40 ${colors[variant]}`}
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {children}
-    </button>
-  );
-};
-
-const ReservationRowActions = ({
-  id, title, status, isActing, showArchived,
-  onMarkReady, onFulfill, onCancel, onArchive, onRestore,
-}: ReservationRowActionsProps) => {
-
-  // ── Archived view: only show Restore ──────────────────────────────────────
-  if (showArchived) {
-    return (
-      <ActionBtn
-        variant="warning"
-        disabled={isActing}
-        onClick={() => onRestore(id, title)}
-      >
-        {isActing
-          ? <Loader2 className="h-3 w-3 animate-spin" />
-          : <ArchiveRestore className="h-3 w-3" />
-        }
-        Restore
-      </ActionBtn>
-    );
-  }
-
-  // ── Active view ───────────────────────────────────────────────────────────
-
-  if (status === "pending") {
-    return (
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <ActionBtn
-          variant="success"
-          disabled={isActing}
-          onClick={() => onMarkReady(id, title)}
-        >
-          {isActing
-            ? <Loader2 className="h-3 w-3 animate-spin" />
-            : <CheckCircle2 className="h-3 w-3" />
-          }
-          Mark Ready
-        </ActionBtn>
-        <ActionBtn
-          variant="danger"
-          disabled={isActing}
-          onClick={() => onCancel(id, title)}
-        >
-          <XCircle className="h-3 w-3" />
-          Cancel
-        </ActionBtn>
-      </div>
-    );
-  }
-
-  if (status === "ready") {
-    return (
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <ActionBtn
-          variant="primary"
-          disabled={isActing}
-          onClick={() => onFulfill(id, title)}
-        >
-          {isActing
-            ? <Loader2 className="h-3 w-3 animate-spin" />
-            : <CheckCircle2 className="h-3 w-3" />
-          }
-          Fulfill
-        </ActionBtn>
-        <ActionBtn
-          variant="danger"
-          disabled={isActing}
-          onClick={() => onCancel(id, title)}
-        >
-          <XCircle className="h-3 w-3" />
-          Cancel
-        </ActionBtn>
-      </div>
-    );
-  }
-
-  // fulfilled / cancelled / expired — show Archive button
-  return (
-    <ActionBtn
-      variant="ghost"
-      disabled={isActing}
-      onClick={() => onArchive(id, title)}
-    >
-      {isActing
-        ? <Loader2 className="h-3 w-3 animate-spin" />
-        : <Trash2 className="h-3 w-3" />
-      }
-      Archive
-    </ActionBtn>
-  );
-};
-
-export default ReservationRowActions;
+export default function ReservationRowActions(p: Props) {
+  const live = p.status === "pending" || p.status === "ready";
+  const primary = <Button className="admin-compact-button" disabled={p.isActing || !!p.preparationBlocker} onClick={() => p.status === "pending" ? p.onMarkReady(p.id, p.title) : p.onFulfill(p.id, p.title)}><AdminIcon name={p.isActing ? "refresh" : p.status === "ready" ? "borrow" : "reservations"} className={p.isActing ? "animate-spin" : ""} />{p.status === "pending" ? "Mark ready" : "Process pickup"}</Button>;
+  return <div className="reservation-actions" onClick={event => event.stopPropagation()}>
+    {!p.showArchived && live && (p.preparationBlocker ? <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="reservation-primary-action" tabIndex={0} aria-label={p.preparationBlocker}>{primary}</span></TooltipTrigger><TooltipContent className="max-w-xs">{p.preparationBlocker}</TooltipContent></Tooltip></TooltipProvider> : primary)}
+    {p.showArchived && <Button variant="outline" className="admin-compact-button" disabled={p.isActing} onClick={() => p.onRestore(p.id, p.title)}>Restore</Button>}
+    <AdminRowMenu label={`Actions for ${p.title}, ${p.id}`} disabled={p.isActing} items={[
+      ...(p.onDetails ? [{ label: "View details", onSelect: p.onDetails }] : []),
+      ...(!p.showArchived && live ? [{ label: "Cancel reservation\u2026", destructive: true, onSelect: () => p.onCancel(p.id, p.title) }] : []),
+      ...(!p.showArchived && !live ? [{ label: "Archive reservation\u2026", onSelect: () => p.onArchive(p.id, p.title) }] : []),
+      ...(p.showArchived ? [{ label: "Restore reservation\u2026", onSelect: () => p.onRestore(p.id, p.title) }] : []),
+    ]} />
+  </div>;
+}

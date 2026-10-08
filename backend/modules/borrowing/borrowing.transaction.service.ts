@@ -3,6 +3,7 @@ import overdue = require("./overdue.helper");
 import notifications = require("../notifications/notifications.service");
 import clearance = require("../clearance/clearance.service");
 import loanDuration = require("./loan-duration");
+import undoTokens = require("./borrowing.undo-token");
 import fineLedger = require("./fine-ledger.service");
 
 const repository = require("./borrowing.repository");
@@ -219,7 +220,7 @@ const borrowBook = async (
     });
     await conn.commit();
 
-    return { borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
+    return { ...(auditRoute === "/api/borrowing/scan/borrow" && !reservationId ? undoTokens.issueDeskUndo(issuedBy, borrowingId, "borrow") : {}), borrowingId, copyId: copy.id, barcode: copy.barcode, dueDate, warning: copy.condition === "damaged" ? "This copy is marked damaged; please handle it with care." : null };
   } catch (error: unknown) {
     await conn.rollback();
     const requestError = error as { code?: string; message?: string };
@@ -235,6 +236,7 @@ const borrowBook = async (
 const returnBook = async (borrowingId: number, userId: number, { auditRoute = null, actorId = userId }: ReturnOptions = {}) => {
   const conn: PoolConnection = await repository.getConnection();
   let returnedAt: Date | string;
+  let undo: { undoToken?: string; undoExpiresAt?: string } = {};
   try {
     await conn.beginTransaction();
     const row = await repository.getBorrowingForReturn(borrowingId, conn);
@@ -245,7 +247,8 @@ const returnBook = async (borrowingId: number, userId: number, { auditRoute = nu
     if (changed !== 1) throw Object.assign(new Error("This loan changed while the return was being processed. Reload and try again."), { status: 409 });
     const [[returned]] = await conn.query<Array<RowDataPacket & { returned_at: Date | string }>>("SELECT returned_at FROM borrowings WHERE id = ?", [borrowingId]);
     returnedAt = returned.returned_at;
-    await fineLedger.assessBorrowing({ ...row, returned_at: returnedAt }, conn);
+    const fineAssessment = await fineLedger.assessBorrowing({ ...row, returned_at: returnedAt }, conn);
+    if (auditRoute === "/api/borrowing/scan/return" && row.status === "borrowed" && fineAssessment.fineAmount === 0 && actorId) undo = undoTokens.issueDeskUndo(actorId, borrowingId, "return", returnedAt);
     const target = await repository.getBorrowingNotificationTarget(borrowingId, conn);
     if (target) await notifications.enqueueNotification(conn, {
       type: "borrowing_returned",
@@ -282,7 +285,7 @@ const returnBook = async (borrowingId: number, userId: number, { auditRoute = nu
   } finally {
     conn.release();
   }
-  return { borrowingId, returnedAt };
+  return { borrowingId, returnedAt, ...undo };
 };
 
 export = { borrowBook, returnBook };

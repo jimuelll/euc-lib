@@ -46,6 +46,20 @@ describe("admin sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(auth.logout).toHaveBeenCalledOnce();
   });
+  it("signals hidden navigation and clears the cue at the end of the list", () => {
+    mount();
+    const navigation = screen.getByRole("navigation", { name: "Administration" }).parentElement!;
+    const region = navigation.parentElement!;
+    Object.defineProperties(navigation, { scrollHeight: { value: 800, configurable: true }, clientHeight: { value: 400, configurable: true } });
+    fireEvent(window, new Event("resize"));
+    expect(region).toHaveAttribute("data-more-below", "true");
+    navigation.scrollTop = 400;
+    fireEvent.scroll(navigation);
+    expect(region).toHaveAttribute("data-more-below", "false");
+    navigation.scrollTop = 100;
+    fireEvent.scroll(navigation);
+    expect(region).toHaveAttribute("data-more-below", "true");
+  });
   it("labels the mobile drawer and closes it after navigating", async () => {
     mount("staff", "/admin", 390);
     fireEvent.click(screen.getByRole("button", { name: "Toggle navigation" }));

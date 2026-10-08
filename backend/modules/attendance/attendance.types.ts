@@ -11,6 +11,7 @@ export interface AttendanceUser extends RowDataPacket {
 }
 
 export interface RecordScanInput {
+  expectedLogId?:number;
   scannedId: string;
   type: AttendanceType;
   scannedBy: number;

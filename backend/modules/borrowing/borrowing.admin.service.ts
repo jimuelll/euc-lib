@@ -94,6 +94,11 @@ const adminGetBorrowings = async (options: Record<string, unknown>) => {
       overdue_count: Number(result.summary?.overdue_count ?? 0),
       returned_count: Number(result.summary?.returned_count ?? 0),
       unique_borrowers: Number(result.summary?.unique_borrowers ?? 0),
+      due_soon_count: Number(result.summary?.due_soon_count ?? 0),
+      oldest_overdue: result.summary?.oldest_overdue ?? null,
+      accrued_fines: Number(result.summary?.accrued_fines ?? 0),
+      borrowed_today: Number(result.summary?.borrowed_today ?? 0),
+      returned_today: Number(result.summary?.returned_today ?? 0),
     },
   };
 };

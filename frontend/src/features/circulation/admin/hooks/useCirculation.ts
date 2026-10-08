@@ -11,6 +11,7 @@ import {
   lookupReturnPreview as apiLookupReturnPreview,
   processBorrow,
   processReturn,
+  undoDeskTransaction,
 } from "../circulation.api";
 import type { TransactionType, UserInfo, BookInfo, ActiveBorrow, ClearanceStatus, ReturnPreview, ReturnReceipt } from "../circulation.types";
 
@@ -20,6 +21,7 @@ interface ReservationCheckout {
   book_title: string;
   student_employee_id: string;
   user_name: string;
+  reserved_copy_barcode?: string | null;
 }
 
 export const useCirculation = (reservationCheckout: ReservationCheckout | null = null, onTransactionCompleted?: () => void) => {
@@ -31,9 +33,16 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   });
   const returnMutation = useMutation({ mutationFn: processReturn, onSuccess: () => invalidateServerState(queryClient, "circulation") });
   const [params, patchParams] = useAdminUrlState();
-  const type: TransactionType = reservationCheckout ? "borrow" : params.get("transaction") === "return" ? "return" : "borrow";
-  const setType = (transaction: TransactionType) => patchParams({ transaction });
+  const type: TransactionType = reservationCheckout ? "borrow" : (params.get("mode") ?? params.get("transaction")) === "return" ? "return" : "borrow";
+  const setType = (transaction: TransactionType) => patchParams({ tab: "transaction", mode: transaction, transaction: null });
   const [completed, setCompleted] = useState("");
+  const [sessionTransactions, setSessionTransactions] = useState<{ type: TransactionType; title: string; patron: string; occurredAt: string; borrowingId: number; undoToken?: string; undoExpiresAt?: string; undone?: boolean }[]>([]);
+  const [submissionError, setSubmissionError] = useState("");
+  const [userLookupError, setUserLookupError] = useState("");
+  const [copyLookupError, setCopyLookupError] = useState("");
+  const submissionLock = useRef(false);
+  const userSequence = useRef(0);
+  const copySequence = useRef(0);
   const [studentId, setStudentId]         = useState("");
   const [copyBarcode, setCopyBarcode]     = useState("");
 
@@ -54,6 +63,9 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
 
   // Reset copy state when type changes
   useEffect(() => {
+    copySequence.current += 1;
+    setSubmissionError("");
+    setCopyLookupError("");
     setFoundCopy(null);
     setCompleted("");
     setMatchedBorrow(null);
@@ -79,9 +91,12 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   const handleLookupUser = async (studentIdOverride?: string) => {
     const lookupId = (studentIdOverride ?? studentId).trim();
     if (!lookupId) return;
+    const sequence = ++userSequence.current;
+    setUserLookupError("");
     setLookingUpUser(true);
     try {
       const { user, activeBorrows, clearance } = await queryClient.fetchQuery({ queryKey: circulationKeys.user(lookupId), queryFn: ({ signal }) => apiLookupUser(lookupId, signal), staleTime: 0 });
+      if (sequence !== userSequence.current) return;
       setStudentId(lookupId);
       setFoundUser(user);
       setActiveBorrows(activeBorrows);
@@ -90,12 +105,14 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
         ? activeBorrows.find((borrow) => borrow.copy_id === foundCopy.id) ?? null
         : null);
     } catch (err: any) {
+      if (sequence !== userSequence.current) return;
+      setUserLookupError(err.response?.data?.message ?? "Could not find the patron. Check the ID and retry.");
       toast.error(err.response?.data?.message ?? "User not found");
       setFoundUser(null);
       setActiveBorrows([]);
       setClearance(null);
     } finally {
-      setLookingUpUser(false);
+      if (sequence === userSequence.current) setLookingUpUser(false);
     }
   };
 
@@ -123,9 +140,12 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
   const handleLookupCopy = async (copyBarcodeOverride?: string) => {
   const lookupBarcode = (copyBarcodeOverride ?? copyBarcode).trim();
   if (!lookupBarcode) return;
+  const sequence = ++copySequence.current;
+  setCopyLookupError("");
   setLookingUpCopy(true);
   try {
     const copy = await queryClient.fetchQuery({ queryKey: circulationKeys.copy(lookupBarcode), queryFn: ({ signal }) => apiLookupCopy(lookupBarcode, signal), staleTime: 0 });
+    if (sequence !== copySequence.current) return;
     setCopyBarcode(lookupBarcode);
     setFoundCopy(copy);
 
@@ -139,16 +159,25 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       if (!match) toast.error("No active borrow found for this copy and user");
     }
   } catch (err: any) {
+    if (sequence !== copySequence.current) return;
+    setCopyLookupError(err.response?.data?.message ?? "Could not find the copy. Check its identifier and retry.");
     toast.error(err.response?.data?.message ?? "Copy not found");
     setFoundCopy(null);
     setMatchedBorrow(null);
-    setClearance(null);
   } finally {
-    setLookingUpCopy(false);
+    if (sequence === copySequence.current) setLookingUpCopy(false);
   }
 };
 
+  useEffect(() => {
+    const barcode = reservationCheckout?.reserved_copy_barcode;
+    if (!reservationCheckout?.id || !barcode) return;
+    setCopyBarcode(barcode);
+    void handleLookupCopy(barcode);
+  }, [reservationCheckout?.id, reservationCheckout?.reserved_copy_barcode]);
+
   const handleReturnIdentifierChange = (value: string) => {
+    setSubmissionError("");
     if (lastReturnLookup.current) void queryClient.cancelQueries({ queryKey: circulationKeys.returnPreview(lastReturnLookup.current) });
     returnLookupSequence.current += 1;
     lastReturnLookup.current = "";
@@ -187,7 +216,21 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     return () => window.clearTimeout(timer);
   }, [copyBarcode, handleLookupReturn, type]);
 
+  const returnIdentifier = params.get("copy");
+  useEffect(() => {
+    if (type === "return" && returnIdentifier) {
+      handleReturnIdentifierChange(returnIdentifier);
+      patchParams({ copy: null }, true);
+    }
+  }, [returnIdentifier, type, patchParams]);
+
   const resetForm = () => {
+    userSequence.current += 1;
+    copySequence.current += 1;
+    setClearance(null);
+    setUserLookupError("");
+    setCopyLookupError("");
+    setSubmissionError("");
     setStudentId("");
     setCopyBarcode("");
     setFoundUser(null);
@@ -201,14 +244,18 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     lastReturnLookup.current = "";
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: { preventDefault: () => void }) => {
+    e?.preventDefault();
+    if (submissionLock.current) return;
+    if (lookingUpCopy || lookingUpUser) return;
+    setSubmissionError("");
     if (type === "return") {
       if (!returnPreview || !copyBarcode.trim()) {
         toast.error("Look up an active loan before recording the return");
         return;
       }
       setSubmitting(true);
+      submissionLock.current = true;
       try {
         const result = await returnMutation.mutateAsync(copyBarcode.trim());
         setReturnReceipt({ ...returnPreview, returned_at: result.returnedAt });
@@ -219,8 +266,10 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
         lastReturnLookup.current = "";
         toast.success(`"${returnPreview.title}" returned by ${returnPreview.user_name}`);
         setCompleted(`Return completed: ${returnPreview.title} - ${returnPreview.user_name}`);
+        setSessionTransactions(previous => [{ type: "return" as const, title: returnPreview.title, patron: returnPreview.user_name, occurredAt: result.returnedAt, borrowingId: result.borrowingId, undoToken: result.undoToken, undoExpiresAt: result.undoExpiresAt }, ...previous]);
         onTransactionCompleted?.();
       } catch (err: any) {
+        setSubmissionError(err.response?.data?.message ?? "Could not record the return. Your selection is retained; retry when ready.");
         if (err.response?.status === 404 || err.response?.status === 409) {
           setReturnPreview(null);
           setReturnLookupError(err.response?.data?.message ?? "This loan is no longer active. Look it up again.");
@@ -228,6 +277,7 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
         }
         toast.error(err.response?.data?.message ?? "Transaction failed");
       } finally {
+        submissionLock.current = false;
         setSubmitting(false);
       }
       return;
@@ -236,12 +286,20 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       toast.error("Look up both the user and the copy first");
       return;
     }
+    if (clearance?.status !== "eligible" || (foundCopy.is_reserved && !reservationCheckout)) {
+      toast.error("Resolve the patron’s clearance or reservation blockers before borrowing");
+      return;
+    }
     if (type === "borrow" && !foundCopy.accession_number) {
       toast.error("This copy has no accession number and cannot be borrowed. Add its holding first.");
       return;
     }
     if (type === "borrow" && (!foundCopy.is_active || foundCopy.borrow_eligible === false || foundCopy.borrow_eligible === 0)) {
       toast.error("This copy is not eligible for checkout");
+      return;
+    }
+    if (foundCopy.accession_voided || foundCopy.needs_policy || (reservationCheckout && foundCopy.book_id !== reservationCheckout.book_id)) {
+      toast.error("Check the copy’s accession, loan policy and reservation before borrowing");
       return;
     }
     if (type === "borrow" && foundCopy.has_active_loan) {
@@ -257,15 +315,17 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
     }
 
     setSubmitting(true);
+    submissionLock.current = true;
     try {
       if (type === "borrow") {
         // Backend expects a barcode OR student_employee_id as userBarcode
-        await borrowMutation.mutateAsync({ studentId: studentId.trim(), barcode: copyBarcode.trim(), reservationId: reservationCheckout?.id });
+        const result = await borrowMutation.mutateAsync({ studentId: studentId.trim(), barcode: copyBarcode.trim(), reservationId: reservationCheckout?.id });
         toast.success(
           reservationCheckout
             ? `Reservation fulfilled and "${foundCopy.title}" borrowed by ${foundUser.name}`
             : `"${foundCopy.title}" borrowed by ${foundUser.name}`
         );
+        setSessionTransactions(previous => [{ type: "borrow" as const, title: foundCopy.title, patron: foundUser.name, occurredAt: new Date().toISOString(), borrowingId: result.borrowingId, undoToken: result.undoToken, undoExpiresAt: result.undoExpiresAt }, ...previous]);
         if (reservationCheckout) {
           navigate("/admin/reservations");
           return;
@@ -275,26 +335,46 @@ export const useCirculation = (reservationCheckout: ReservationCheckout | null =
       resetForm();
       onTransactionCompleted?.();
     } catch (err: any) {
+      setSubmissionError(err.response?.data?.message ?? "Could not record the loan. Your selection is retained; retry when ready.");
       toast.error(err.response?.data?.message ?? "Transaction failed");
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
 
+  const [undoing, setUndoing] = useState(false);
+  const handleUndo = async (borrowingId: number) => {
+    const item = sessionTransactions.find(entry => entry.borrowingId === borrowingId);
+    if (submissionLock.current || !item?.undoToken || item.undone) return;
+    submissionLock.current = true;
+    setUndoing(true);
+    try {
+      await undoDeskTransaction(item.undoToken);
+      setSessionTransactions(previous => previous.map(entry => entry.borrowingId === borrowingId ? { ...entry, undone: true } : entry));
+      resetForm();
+      await invalidateServerState(queryClient, "circulation");
+      onTransactionCompleted?.();
+      toast.success("Transaction undone");
+    } catch (error: any) { toast.error(error.response?.data?.message ?? "Could not undo. The transaction remains recorded."); }
+    finally { submissionLock.current = false; setUndoing(false); }
+  };
   const canSubmit = type === "return"
     ? !submitting && !!returnPreview && !!copyBarcode.trim()
-    : !submitting && !!foundUser && !!foundCopy && foundCopy.is_active && Boolean(foundCopy.accession_number) && foundCopy.borrow_eligible !== false && foundCopy.borrow_eligible !== 0 && foundCopy.condition !== "lost" && !foundCopy.has_active_loan && (!foundCopy.is_reserved || Boolean(reservationCheckout));
+    : !submitting && !lookingUpUser && !lookingUpCopy && !!foundUser && !!foundCopy && foundCopy.is_active && Boolean(foundCopy.accession_number) && !foundCopy.accession_voided && !foundCopy.needs_policy && foundCopy.borrow_eligible !== false && foundCopy.borrow_eligible !== 0 && foundCopy.condition !== "lost" && !foundCopy.has_active_loan && (!foundCopy.is_reserved || Boolean(reservationCheckout)) && (!reservationCheckout || foundCopy.book_id === reservationCheckout.book_id);
   const clearanceAllowsBorrow = type === "return" || clearance?.status === "eligible";
 
   return {
+    sessionTransactions, handleUndo, undoing, submissionError, userLookupError, copyLookupError,
     type, studentId, copyBarcode,
     completed,
     startNextTransaction: () => { setCompleted(""); resetForm(); },
     lookingUpUser, lookingUpCopy, submitting,
     foundUser, foundCopy, activeBorrows, matchedBorrow, clearance,
     returnPreview, returnReceipt, returnLookupError,
-    canSubmit: canSubmit && clearanceAllowsBorrow,
-    setStudentId, setCopyBarcode,
+    canSubmit: canSubmit && clearanceAllowsBorrow && !undoing,
+    setStudentId: (value: string) => { userSequence.current += 1; setStudentId(value); setFoundUser(null); setClearance(null); setActiveBorrows([]); setLookingUpUser(false); setUserLookupError(""); setSubmissionError(""); },
+    setCopyBarcode: (value: string) => { copySequence.current += 1; setCopyBarcode(value); setFoundCopy(null); setLookingUpCopy(false); setCopyLookupError(""); setSubmissionError(""); },
     handleReturnIdentifierChange,
     handleTypeChange: setType,
     handleLookupUser,

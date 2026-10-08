@@ -161,6 +161,22 @@ const updateBook = async (id: number, data: DataRow, actorId: number | null = nu
   }
 };
 
+const addBookCopies = async (id: number, count: number, actorId: number) => {
+  if (!Number.isSafeInteger(count) || count < 1 || count > 100) throw httpError("Add from 1 to 100 copies", 400);
+  const conn = await repository.getConnection();
+  try {
+    await conn.beginTransaction();
+    const book = await repository.findBookForUpdate(id, conn);
+    if (!book) throw httpError("Catalog record not found", 404);
+    if (book.material_type !== "book") throw httpError("Theses do not have lendable physical copies", 400);
+    const before = await repository.getActiveCopyCount(id, conn);
+    const result = await syncBookCopies(id, before + count, conn);
+    await transactionalAudit.enqueueTransactionalAudit(conn, { actorId, category:"catalog", route:`/api/admin/books/${id}/copies`, action:"created", description:`Added ${count} physical copies of “${book.title}”`, before:{activeCopies:before}, after:{activeCopies:result.activeCount}, isCreation:true });
+    await conn.commit();
+    return { message:`${count} physical copies added`, copies:result.activeCount };
+  } catch(error) { await conn.rollback(); throw error; } finally { conn.release(); }
+};
+
 const deleteBook = async (id: number, deletedBy: number): Promise<void> => {
   const conn = await repository.getConnection();
   try {
@@ -229,6 +245,7 @@ const searchBooksPage = async (options: Record<string, any> = {}) => {
   const result = await repository.searchBooksPage(safeOptions);
   return {
     rows: result.rows.map(hydrateCatalogRecord),
+    summary: result.summary,
     pagination: { page: result.page, limit: result.limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.limit)) },
   };
 };
@@ -317,4 +334,4 @@ const lookupIsbn = async (value: unknown) => {
   throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
 };
 
-export = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };
+export = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, addBookCopies, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };

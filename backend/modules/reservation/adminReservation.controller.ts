@@ -52,7 +52,9 @@ const cancelReservationAdmin: RequestHandler = async (req, res) => {
     const id = reservationId(req);
     if (id === null) return void res.status(400).json({ message: "Invalid reservation ID" });
     const user = req as AuthenticatedRequest;
-    await service.cancelReservationAdmin(id, user.user.id);
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (reason.length > 500) return void res.status(400).json({ message: "Cancellation reason must be 500 characters or fewer" });
+    await service.cancelReservationAdmin(id, user.user.id, reason);
     res.locals.auditEnqueued = true;
     res.json({ message: "Reservation cancelled" });
   } catch (error: unknown) {

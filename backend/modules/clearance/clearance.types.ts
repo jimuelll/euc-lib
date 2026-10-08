@@ -49,6 +49,7 @@ export interface ClearanceQueueEntry {
   overdueTitles: string[];
   outstandingAmount: number;
   fineRecords: number;
+  oldestFineDate: Date | string | null;
 }
 
 export interface QueueOverdueBorrowing extends RowDataPacket {
@@ -136,6 +137,7 @@ export interface CreateTransactionResult {
 }
 
 export interface ClearanceQueuePage {
+  summary: { total: number; blocked: number; finesOnly: number; unpaidFines: number };
   rows: ClearanceQueueEntry[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }

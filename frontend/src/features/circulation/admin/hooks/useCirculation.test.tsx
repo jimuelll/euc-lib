@@ -14,6 +14,7 @@ vi.mock("../circulation.api", () => ({
   lookupReturnPreview: vi.fn(),
   processBorrow: vi.fn(),
   processReturn: vi.fn(),
+  undoDeskTransaction: vi.fn(),
 }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
@@ -57,6 +58,58 @@ afterEach(() => {
 });
 
 describe("desk transaction handoffs", () => {
+  it("fills the patron and prepared copy for a reservation pickup without recording it", async () => {
+    const { result } = renderHook(() => useCirculation({ id: 7, book_id: 3, book_title: "Test book", student_employee_id: "TEST-1", user_name: "Test Patron", reserved_copy_barcode: "COPY-2" }), { wrapper });
+    await waitFor(() => expect(result.current.foundCopy?.id).toBe(2));
+    await waitFor(() => expect(result.current.foundUser?.id).toBe(1));
+    expect(result.current.type).toBe("borrow");
+    expect(result.current.copyBarcode).toBe("COPY-2");
+    expect(api.lookupCopy).toHaveBeenCalledWith("COPY-2", expect.any(AbortSignal));
+    expect(api.processBorrow).not.toHaveBeenCalled();
+  });
+  it("keeps successful returns in the session list and leaves the scanner ready", async () => {
+    const { result } = renderHook(() => useCirculation(), { wrapper });
+    act(() => result.current.handleReturnIdentifierChange("ACC-2"));
+    await act(async () => { await result.current.handleLookupReturn("ACC-2", true); });
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.sessionTransactions).toEqual([expect.objectContaining({ type: "return", title: preview.title, patron: preview.user_name, occurredAt: "2026-09-25T10:15:00.000Z" })]);
+    expect(result.current.copyBarcode).toBe("");
+    act(() => result.current.handleReturnIdentifierChange("ACC-3"));
+    expect(result.current.returnReceipt).toBeNull();
+    expect(result.current.sessionTransactions).toHaveLength(1);
+  });
+
+  it("does not submit twice while recording a return", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof api.processReturn>>) => void;
+    vi.mocked(api.processReturn).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const { result } = renderHook(() => useCirculation(), { wrapper });
+    act(() => result.current.handleReturnIdentifierChange("ACC-2"));
+    await act(async () => { await result.current.handleLookupReturn("ACC-2", true); });
+    let first!: Promise<void>;
+    act(() => { first = result.current.handleSubmit(); void result.current.handleSubmit(); });
+    await waitFor(() => expect(api.processReturn).toHaveBeenCalledTimes(1));
+    await act(async () => { finish({ message: "ok", borrowingId: 4, returnedAt: "2026-09-25T10:15:00.000Z" }); await first; });
+    expect(result.current.sessionTransactions).toHaveLength(1);
+  });
+
+  it("clears a selected patron when their ID changes", async () => {
+    const { result } = renderHook(() => useCirculation(), { wrapper });
+    await act(async () => { await result.current.handleLookupUser("TEST-1"); });
+    act(() => result.current.setStudentId("TEST-2"));
+    expect(result.current.foundUser).toBeNull();
+    expect(result.current.clearance).toBeNull();
+  });
+
+  it("blocks a direct submission for an uncleared patron", async () => {
+    vi.mocked(api.lookupUser).mockResolvedValue({ user: patron, activeBorrows: [], clearance: { status: "blocked", reasons: ["Unpaid fine"], outstandingAmount: 100, overdueItems: [] } });
+    const { result } = renderHook(() => useCirculation(), { wrapper });
+    act(() => result.current.handleTypeChange("borrow"));
+    await act(async () => { await result.current.handleLookupUser("TEST-1"); await result.current.handleLookupCopy("COPY-2"); });
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.canSubmit).toBe(false);
+    expect(api.processBorrow).not.toHaveBeenCalled();
+    expect(result.current.sessionTransactions).toHaveLength(0);
+  });
   it("looks up the active borrower automatically after accession entry", async () => {
     const { result } = renderHook(() => useCirculation(), { wrapper });
     expect(result.current.type).toBe("return");
@@ -165,4 +218,22 @@ describe("desk transaction handoffs", () => {
     expect(result.current.location.pathname).toBe("/admin/reservations");
     expect(api.processReturn).not.toHaveBeenCalled();
   });
+});
+
+it("reverses an eligible session write, refreshes server state and clears the preview", async () => {
+  vi.mocked(api.processReturn).mockResolvedValue({ message: "ok", borrowingId: 4, returnedAt: new Date().toISOString(), undoToken: "signed-token", undoExpiresAt: new Date(Date.now()+60000).toISOString() });
+  vi.mocked(api.undoDeskTransaction).mockResolvedValue();
+  const { result } = renderHook(() => useCirculation(), { wrapper });
+  await act(async () => { await result.current.handleLookupReturn("ACC-2", true); });
+  await act(async () => { result.current.handleReturnIdentifierChange("ACC-2"); await result.current.handleLookupReturn("ACC-2", true); });
+  await act(async () => { await result.current.handleSubmit(); });
+  await act(async () => { await result.current.handleUndo(4); });
+  expect(api.undoDeskTransaction).toHaveBeenCalledWith("signed-token");
+  expect(result.current.sessionTransactions[0].undone).toBe(true);
+  expect(result.current.returnReceipt).toBeNull();
+});
+it("opens return mode from the new dashboard URL", () => {
+  const modeWrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={testClient}><MemoryRouter initialEntries={["/admin/circulation?tab=transaction&mode=return"]}>{children}</MemoryRouter></QueryClientProvider>;
+  const { result } = renderHook(() => useCirculation(), { wrapper: modeWrapper });
+  expect(result.current.type).toBe("return");
 });

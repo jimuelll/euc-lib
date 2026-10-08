@@ -1,65 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Barcode, BookOpen, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
+import { AdminFilterChips, AdminStatusBadge, AdminSelectionCheckbox, AdminEmptyState, useAdminUrlState, queryPage } from "@/features/admin";
 import { fetchAcademicPrograms } from "@/features/library-settings";
 import { librarySettingsKeys } from "@/features/library-settings/library-settings.keys";
-import { fetchCatalogHoldings, type CatalogHolding, type CatalogHoldingsResponse } from "../catalog.api";
+import { fetchCatalogHoldings, type CatalogHolding } from "../catalog.api";
 import { catalogKeys } from "../../catalog.keys";
 import { useDebounce } from "@/hooks/use-debounce";
-import { getApiErrorMessage } from "@/utils/apiError";
-
-type Props = { onBack: () => void; onSelect: (holding: CatalogHolding) => void };
-const emptyResult: CatalogHoldingsResponse = { rows: [], total: 0, page: 1, limit: 25, pagination: { page: 1, limit: 25, total: 0, totalPages: 1 } };
-
-export default function CatalogHoldingsView({ onBack, onSelect }: Props) {
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
-  const [completion, setCompletion] = useState("all");
-  const [programId, setProgramId] = useState("");
-  const [page, setPage] = useState(1);
-  const debouncedQuery = useDebounce(query, 180);
-  const programsQuery = useQuery({ queryKey: librarySettingsKeys.programs("active"), queryFn: ({ signal }) => fetchAcademicPrograms("active", signal) });
-  const filters = { query: debouncedQuery, status, completion, programId: programId ? Number(programId) : undefined, page };
-  const holdingsQuery = useQuery({
-    queryKey: catalogKeys.holdings(filters),
-    queryFn: ({ signal }) => fetchCatalogHoldings(filters, signal),
-    placeholderData: keepPreviousData,
-  });
-  const programs = programsQuery.data ?? [];
-  const result = holdingsQuery.data ?? emptyResult;
-  const loading = holdingsQuery.isFetching;
-  const error = holdingsQuery.isError ? getApiErrorMessage(holdingsQuery.error, "Could not load holdings. Try again.") : "";
-
-  const changeFilter = (change: () => void) => { change(); setPage(1); };
-
-  return <section className="space-y-4" aria-labelledby="holdings-view-heading">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3"><Button variant="outline" size="icon" className="shrink-0" aria-label="Back to catalog" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button><div><h2 id="holdings-view-heading" className="text-lg font-semibold text-foreground">Book holdings</h2><p className="mt-1 text-sm text-muted-foreground">Search accessioned copies, unaccessioned copies, and voided accession records.</p></div></div>
-      <span className="text-sm tabular-nums text-muted-foreground">{result.total} physical cop{result.total === 1 ? "y" : "ies"}</span>
-    </div>
-
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_190px_190px_200px]">
-      <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search holdings" className="pl-9" placeholder="Title, author, barcode, accession…" value={query} onChange={(event) => changeFilter(() => setQuery(event.target.value))} /></div>
-      <Select value={status} onValueChange={(value) => changeFilter(() => setStatus(value))}><SelectTrigger aria-label="Filter by copy status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All copy states</SelectItem><SelectItem value="available">Available</SelectItem><SelectItem value="borrowed">Borrowed</SelectItem><SelectItem value="reserved">Reserved</SelectItem><SelectItem value="voided">Accession voided</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select>
-      <Select value={completion} onValueChange={(value) => changeFilter(() => setCompletion(value))}><SelectTrigger aria-label="Filter by holding details"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All holdings</SelectItem><SelectItem value="complete">Accessioned</SelectItem><SelectItem value="missing">Needs accession</SelectItem></SelectContent></Select>
-      <Select value={programId || "all"} onValueChange={(value) => changeFilter(() => setProgramId(value === "all" ? "" : value))}><SelectTrigger aria-label="Filter by course"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All courses</SelectItem>{programs.map((program) => <SelectItem key={program.id} value={String(program.id)}>{program.name}</SelectItem>)}</SelectContent></Select>
-    </div>
-
-    <div className="overflow-hidden border border-border bg-card">
-      {loading && !holdingsQuery.data ? <div className="flex items-center justify-center gap-2 p-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading holdings…</div> : holdingsQuery.isError && !holdingsQuery.data ? <div role="alert" className="flex items-center justify-center gap-2 p-12 text-sm text-destructive">{error}<Button type="button" variant="outline" size="sm" onClick={() => void holdingsQuery.refetch()}>Try again</Button></div> : result.rows.length === 0 ? <div className="px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground/40" /><p className="mt-3 text-sm font-medium text-foreground">No holdings match these filters</p><p className="mt-1 text-sm text-muted-foreground">Try another search or show copies that need an accession number.</p></div> : <><div className="admin-mobile-records divide-y divide-border md:hidden" aria-label="Book holdings">{result.rows.map((holding) => <article key={holding.copy_id} className="min-w-0 space-y-3 p-4"><div><h3 className="break-words font-semibold">{holding.title}</h3><p className="text-sm text-muted-foreground">{holding.author || "Unknown author"}</p></div><dl className="grid gap-2 text-sm"><div><dt className="text-muted-foreground">Copy / accession</dt><dd className="break-all">{holding.barcode} · {holding.accession_voided ? `Voided ${holding.accession_number}` : holding.accession_number ? `Acc. ${holding.accession_number}` : "Needs accession"}</dd></div><div><dt className="text-muted-foreground">Course and location</dt><dd className="break-words">{holding.course || "—"} · {holding.location || "—"}</dd></div><div><dt className="text-muted-foreground">Circulation</dt><dd>{!holding.is_active ? "Inactive" : holding.accession_voided ? "Accession voided" : holding.circulation_status === "available" && !holding.accession_number ? "Unavailable" : holding.circulation_status}</dd></div></dl><Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => onSelect(holding)}>{holding.accession_number ? "Edit holding" : "Add holding"}</Button></article>)}</div><div className="admin-desktop-table overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm">
-        <thead><tr className="border-b border-border bg-muted/30">{["Book and author", "Copy / accession", "Course", "Location", "Circulation", ""].map((heading) => <th key={heading} className="px-4 py-3 text-xs font-semibold text-muted-foreground">{heading}</th>)}</tr></thead>
-        <tbody className="divide-y divide-border">{result.rows.map((holding) => <tr key={holding.copy_id} className="hover:bg-muted/20">
-          <td className="max-w-[280px] px-4 py-3"><p className="truncate font-medium text-foreground">{holding.title}</p><p className="mt-1 truncate text-xs text-muted-foreground">{holding.author || "Unknown author"}</p></td>
-          <td className="px-4 py-3"><div className="flex items-center gap-1.5 font-mono text-xs text-foreground"><Barcode className="h-3.5 w-3.5 text-muted-foreground" />{holding.barcode}</div><p className={`mt-1 text-xs ${holding.accession_voided || !holding.accession_number ? "font-medium text-warning" : "text-muted-foreground"}`}>{holding.accession_voided ? `Voided · ${holding.accession_number}` : holding.accession_number ? `Acc. ${holding.accession_number}` : "Needs accession"}</p></td>
-          <td className="max-w-[180px] px-4 py-3"><p className="truncate">{holding.course || "—"}</p>{holding.course_code && <p className="mt-1 text-xs text-muted-foreground">{holding.course_code}</p>}</td>
-          <td className="max-w-[150px] truncate px-4 py-3 text-muted-foreground">{holding.location || "—"}</td>
-          <td className="px-4 py-3"><span className="font-medium">{!holding.is_active ? "Inactive" : holding.accession_voided ? "Accession voided" : holding.circulation_status === "available" && !holding.accession_number ? "Unavailable" : holding.circulation_status}</span>{holding.accession_number && <p className="mt-1 text-xs text-muted-foreground">{holding.condition}</p>}</td>
-          <td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => onSelect(holding)}>{holding.accession_number ? "Edit holding" : "Add holding"}</Button></td>
-        </tr>)}</tbody>
-      </table></div></>}
-      <div className="flex flex-col gap-3 border-t border-border bg-muted/15 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>Page {result.pagination.page} of {result.pagination.totalPages}</span><div className="flex justify-between gap-2 sm:justify-end"><Button size="sm" variant="outline" disabled={result.pagination.page <= 1 || loading} onClick={() => setPage(result.pagination.page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={result.pagination.page >= result.pagination.totalPages || loading} onClick={() => setPage(result.pagination.page + 1)}>Next</Button></div></div>
-    </div>
-  </section>;
+import { printCatalogLabels } from "../catalog.labels";
+import { csvText } from "../catalog.csv";
+import { downloadCsv } from "./CatalogImportDialog";
+type Props={onBack:()=>void;onSelect:(holding:CatalogHolding)=>void;onState?:(state:{updatedAt:number;loading:boolean;refresh:()=>void})=>void};
+export default function CatalogHoldingsView({onSelect,onState}:Props){
+ const[params,patch]=useAdminUrlState();const query=params.get("hq")||"";const status=params.get("hstatus")||"all";const completion=params.get("completion")||"all";const programId=params.get("programId")||"";const page=queryPage(params.get("hpage"));const filter=completion==="missing"?"needs":status;
+ const bookId=Number(params.get("bookId"))||undefined;
+ const filters={bookId,query:useDebounce(query,180),status,completion,programId:programId?Number(programId):undefined,page};
+ const holdingsQuery=useQuery({queryKey:catalogKeys.holdings(filters),queryFn:({signal})=>fetchCatalogHoldings(filters,signal),placeholderData:keepPreviousData});
+ const programsQuery=useQuery({queryKey:librarySettingsKeys.programs("active"),queryFn:({signal})=>fetchAcademicPrograms("active",signal)});
+ const[selection,setSelection]=useState<number[]>([]);const[printing,setPrinting]=useState(false);const rows=holdingsQuery.data?.rows??[];const counts=holdingsQuery.data?.summary;
+ useEffect(()=>setSelection([]),[filters.query,status,completion,programId,page,bookId]);
+ useEffect(()=>{onState?.({updatedAt:holdingsQuery.dataUpdatedAt,loading:holdingsQuery.isFetching,refresh:()=>void holdingsQuery.refetch()});},[onState,holdingsQuery.dataUpdatedAt,holdingsQuery.isFetching]);
+ const applyFilter=(value:string)=>patch({hstatus:value==="needs"?"all":value,completion:value==="needs"?"missing":"all",hpage:null});
+ const selected=rows.filter(row=>selection.includes(row.copy_id));const showCourse=rows.some(row=>row.course||row.course_code);const showLocation=rows.some(row=>row.location);
+ const state=(row:CatalogHolding)=>!row.is_active?"Inactive":row.accession_voided?"Voided":row.circulation_status==="borrowed"?"Borrowed":row.circulation_status==="reserved"?"Reserved":!row.accession_number?"Awaiting accession":row.needs_policy?"Needs loan policy":row.condition==="lost"?"Lost":row.borrow_eligible===false||row.borrow_eligible===0?"Not lendable":"Available";
+ const badge=(row:CatalogHolding)=><><AdminStatusBadge status={state(row)==="Available"?"eligible":state(row)==="Borrowed"?"borrowed":state(row)==="Reserved"?"ready":"cancelled"}>{state(row)}</AdminStatusBadge>{row.condition!=="good"&&<span className="catalog-secondary">{row.condition==="damaged"?"Damaged":"Lost"}</span>}</>;
+ const check=(id:number,value:boolean)=>setSelection(current=>value?[...current,id]:current.filter(x=>x!==id));
+ return <section className="catalog-holdings" aria-label="Physical holdings"><div className="catalog-control-row"><AdminFilterChips label="Copy status" value={filter} onChange={applyFilter} items={[{value:"needs",label:"Needs accession",count:counts?.needs,tone:"amber"},{value:"available",label:"Available",count:counts?.available},{value:"borrowed",label:"Borrowed",count:counts?.borrowed},{value:"reserved",label:"Reserved",count:counts?.reserved},{value:"voided",label:"Voided",count:counts?.voided},{value:"all",label:"All",count:counts?.all}]}/><Input aria-label="Search holdings" placeholder="Scan ISBN, barcode or accession" value={query} onChange={e=>patch({hq:e.target.value,hpage:null},true)}/><Select value={programId||"all"} onValueChange={value=>patch({programId:value==="all"?null:value,hpage:null})}><SelectTrigger aria-label="Course filter"><span>Course: <SelectValue/></span></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{(programsQuery.data??[]).map(program=><SelectItem key={program.id} value={String(program.id)}>{program.name}</SelectItem>)}</SelectContent></Select></div>
+ <div className="catalog-holdings-meta">{bookId&&<span className="catalog-secondary">Copies of this record <Button variant="ghost" onClick={()=>patch({bookId:null,hpage:null})}>Show all records</Button></span>}<span className="catalog-secondary">{holdingsQuery.data?`${holdingsQuery.data.total} physical copies matching these filters`:"Loading physical copies..."}</span><Button variant="ghost" onClick={()=>patch({tab:"records",filter:"needs-holdings"})}>View records needing holdings</Button></div>
+ {selection.length>0&&<div className="catalog-bulk" role="region" aria-label="Selected copies"><strong>{selection.length} selected</strong><Button disabled={printing} onClick={()=>{setPrinting(true);void printCatalogLabels(selected.map(row=>row.barcode)).finally(()=>setPrinting(false));}}>Print labels</Button><Button variant="outline" onClick={()=>downloadCsv(csvText([["Title","Barcode","Accession","State"],...selected.map(row=>[row.title,row.barcode,row.accession_number,state(row)])]),"selected-holdings.csv")}>Export selected</Button><Button variant="ghost" onClick={()=>setSelection([])}>Clear</Button></div>}
+ {holdingsQuery.isError&&<div role="alert" className="catalog-error">Could not load holdings.{holdingsQuery.data&&" Showing cached copies."}<Button variant="outline" onClick={()=>void holdingsQuery.refetch()}>Retry</Button></div>}
+ {holdingsQuery.isPending?<p role="status">Loading holdings...</p>:!rows.length?holdingsQuery.data&&<AdminEmptyState title="No holdings match" description="Try another search or show copies that need accession numbers."/>:<div className="catalog-holdings-table"><table><thead><tr><th><AdminSelectionCheckbox label="Select visible copies" checked={rows.every(row=>selection.includes(row.copy_id))} onChange={value=>setSelection(value?rows.map(row=>row.copy_id):[])}/></th><th>Book and author</th><th>Copy / accession</th>{showCourse&&<th>Course</th>}{showLocation&&<th>Location</th>}<th>State</th><th className="catalog-actions-heading">Actions</th></tr></thead><tbody>{rows.map(row=><tr key={row.copy_id} onClick={e=>{if(!(e.target as HTMLElement).closest("button,input,label"))onSelect(row);}}><td><AdminSelectionCheckbox label={`Select ${row.barcode}`} checked={selection.includes(row.copy_id)} onChange={value=>check(row.copy_id,value)}/></td><td><button className="catalog-record-title" title={row.title} onClick={()=>onSelect(row)}>{row.title}</button><p className="catalog-secondary">{row.author||"Author not recorded"}</p></td><td><span className="catalog-identifier">{row.barcode}</span><div>{row.accession_voided?<AdminStatusBadge status="cancelled">Voided {row.accession_number}</AdminStatusBadge>:row.accession_number?<span className="catalog-secondary">Acc. {row.accession_number}</span>:<AdminStatusBadge status="pending">Needs accession number</AdminStatusBadge>}</div></td>{showCourse&&<td>{row.course||row.course_code||"—"}</td>}{showLocation&&<td>{row.location||"—"}</td>}<td><div className="catalog-holding-state">{badge(row)}</div></td><td className="catalog-row-actions"><Button variant={row.accession_number?"outline":"default"} disabled={!row.is_active||Boolean(row.accession_voided)} onClick={()=>onSelect(row)}>{row.accession_number?"Edit holding":"Add holdings"}</Button></td></tr>)}</tbody></table></div>}
+ {holdingsQuery.data&&<footer className="catalog-pagination"><span>Page {page} of {holdingsQuery.data.pagination.totalPages}</span><Button variant="outline" disabled={page<=1||holdingsQuery.isFetching} onClick={()=>patch({hpage:page-1})}>Previous</Button><Button variant="outline" disabled={page>=holdingsQuery.data.pagination.totalPages||holdingsQuery.isFetching} onClick={()=>patch({hpage:page+1})}>Next</Button></footer>}
+ </section>;
 }

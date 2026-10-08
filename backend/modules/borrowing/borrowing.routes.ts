@@ -26,6 +26,7 @@ router.get("/scan/user",                      scannerOrAbove, controller.lookupU
 // ─── Barcode scan — borrow / return at the desk ───────────────────────────────
 router.post("/scan/borrow",                   scannerOrAbove, limiters.deskTransaction, controller.scanBorrow);
 router.post("/scan/return",                   scannerOrAbove, limiters.deskTransaction, controller.scanReturn);
+router.post("/scan/undo", staffOrAbove, limiters.deskTransaction, controller.undoDeskTransaction);
 router.get ("/scan/return-preview/:identifier", scannerOrAbove, controller.getReturnPreview);
 
 // ─── Admin borrowing management ───────────────────────────────────────────────

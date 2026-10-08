@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { X, ScanLine, Loader2, Download, Printer, BookOpen, Archive, ArchiveRestore } from "lucide-react";
 import { printCodeLabel } from "@/utils/printCodeLabel";
-import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition, retireCatalogCopy, restoreCatalogCopy } from "../catalog.api";
+import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition, retireCatalogCopy, restoreCatalogCopy, addCatalogCopies } from "../catalog.api";
 import { catalogKeys } from "../../catalog.keys";
 import { getApiErrorMessage } from "@/utils/apiError";
 
@@ -76,6 +77,11 @@ const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) 
 
 const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props) => {
   const queryClient = useQueryClient();
+  const [addOpen,setAddOpen]=useState(false);
+  const [addCount,setAddCount]=useState("1");
+  const [adding,setAdding]=useState(false);
+  const [addError,setAddError]=useState("");
+  const addLock=useRef(false);
   const copiesQuery = useQuery({ queryKey: catalogKeys.adminCopies(bookId), queryFn: ({ signal }) => fetchCatalogBookCopies(bookId, signal) });
   const copies: Copy[] = copiesQuery.data ?? [];
   const loading = copiesQuery.isPending;
@@ -179,10 +185,13 @@ const BookCopiesModal = ({ bookId, bookTitle, onClose, embedded = false }: Props
   const active = copies.filter((c) => Boolean(c.is_active)).length;
   const retired = copies.length - active;
 
+  const addCopies=async()=>{const value=Number(addCount);if(addLock.current||!Number.isInteger(value)||value<1||value>100)return;addLock.current=true;setAdding(true);setAddError("");try{await addCatalogCopies(bookId,value);await queryClient.invalidateQueries({queryKey:catalogKeys.admin()});setAddOpen(false);toast.success(`${value} physical copies added. Assign accession numbers before lending.`);}catch(error){setAddError(getApiErrorMessage(error,"Could not add copies"));}finally{addLock.current=false;setAdding(false);}};
   return (
     <div className={embedded ? "flex min-h-0 flex-1 flex-col" : "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"}>
       <div className={embedded ? "relative flex min-h-0 w-full flex-1 flex-col overflow-hidden border border-border bg-background" : "relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden border border-border bg-background shadow-2xl"}>
 
+        {embedded && <div className="flex justify-end p-3"><Button onClick={()=>{setAddCount("1");setAddError("");setAddOpen(true);}}>Add physical copies</Button></div>}
+        <Dialog open={addOpen} onOpenChange={value=>{if(!adding)setAddOpen(value);}}><DialogContent><DialogHeader><DialogTitle>Add physical copies</DialogTitle><DialogDescription>Adds new unaccessioned copies of {bookTitle}. Existing copies are retained. Record accession details in Holdings before lending.</DialogDescription></DialogHeader><label htmlFor="new-copy-count">Number of new copies</label><input id="new-copy-count" type="number" min="1" max="100" className="h-11 border border-border bg-background px-3" value={addCount} onChange={e=>setAddCount(e.target.value)}/>{addError&&<p role="alert" className="text-destructive">{addError}</p>}<DialogFooter><Button variant="outline" disabled={adding} onClick={()=>setAddOpen(false)}>Cancel</Button><Button disabled={adding||!Number.isInteger(Number(addCount))||Number(addCount)<1||Number(addCount)>100} onClick={()=>void addCopies()}>{adding?"Adding…":"Add copies"}</Button></DialogFooter></DialogContent></Dialog>
         {/* Gold top rule */}
         <div className="h-[3px] w-full bg-warning shrink-0" />
 

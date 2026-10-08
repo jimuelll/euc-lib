@@ -96,6 +96,8 @@ const getBooks = async (req: CatalogHttpRequest, res: Response) => {
           : (req.query.archived === "true" ? "archived" : "active"),
         materialType: String(req.query.materialType ?? "all"),
         policyStatus: String(req.query.policyStatus ?? "all"),
+        holdingStatus: req.query.holdingStatus === "needs" ? "needs" : "all",
+        bookId: Number.isSafeInteger(Number(req.query.bookId)) && Number(req.query.bookId) > 0 ? Number(req.query.bookId) : undefined,
         page: Number(req.query.page),
         limit: Number(req.query.limit) || 25,
       }));
@@ -158,6 +160,11 @@ const updateBook = async (req: CatalogHttpRequest, res: Response) => {
   }
 };
 
+const addBookCopies = async (req: CatalogHttpRequest, res: Response) => {
+  try { const result=await service.addBookCopies(Number(req.params.id),Number(req.body.count),req.user!.id);res.locals.auditEnqueued=true;res.status(201).json(result); }
+  catch(error:any) { res.status(error.status??500).json({message:error.message??"Could not add copies"}); }
+};
+
 const deleteBook = async (req: CatalogHttpRequest, res: Response) => {
   try {
     await service.deleteBook(Number(req.params.id), req.user!.id);
@@ -210,9 +217,10 @@ const getBookHoldings = async (req: CatalogHttpRequest, res: Response) => {
 const getHoldings = async (req: CatalogHttpRequest, res: Response) => {
   try {
     const result = await holdingsService.searchHoldings({
+      bookId: Number.isSafeInteger(Number(req.query.bookId)) && Number(req.query.bookId) > 0 ? Number(req.query.bookId) : undefined,
       query: String(req.query.query ?? "").trim(),
       programId: req.query.programId ? Number(req.query.programId) : null,
-      status: ["all", "available", "borrowed", "reserved", "inactive"].includes(String(req.query.status)) ? String(req.query.status) : "all",
+      status: ["all", "available", "borrowed", "reserved", "inactive", "voided"].includes(String(req.query.status)) ? String(req.query.status) : "all",
       completion: ["all", "complete", "missing"].includes(String(req.query.completion)) ? String(req.query.completion) : "all",
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 25,
@@ -335,6 +343,7 @@ export = {
   uploadBookImage,
   removeBookImage,
   deleteBook,
+  addBookCopies,
   getBookCopies,
   getBookHoldings,
   getHoldings,

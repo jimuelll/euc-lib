@@ -289,11 +289,6 @@ async function getAdminReservations({
   const conditions = [`r.deleted_at IS ${archived ? "NOT NULL" : "NULL"}`];
   const params: Array<string | number> = [];
 
-  if (status && status !== "all") {
-    conditions.push("r.status = ?");
-    params.push(status);
-  }
-
   if (search?.trim()) {
     conditions.push(`(
       bk.title              LIKE ? OR
@@ -315,6 +310,12 @@ async function getAdminReservations({
     params.push(dateTo);
   }
 
+  const summaryConditions = [...conditions];
+  const summaryParams = [...params];
+  if (status === "needs_action") conditions.push("r.status IN ('pending','ready')");
+  else if (status === "closed") conditions.push("r.status IN ('fulfilled','cancelled','expired')");
+  else if (status === "attention") conditions.push("(r.status = 'expired' OR (r.status IN ('pending','ready') AND r.expires_at <= DATE_ADD(NOW(), INTERVAL 1 DAY)))");
+  else if (status && status !== "all") { conditions.push("r.status = ?"); params.push(status); }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const baseFromClause = `
      FROM reservations r
@@ -330,16 +331,18 @@ async function getAdminReservations({
     params
   );
 
-  const [summaryRows] = await db.query<Array<RowDataPacket & { total_records: number | string; pending_count: number | string | null; ready_count: number | string | null; fulfilled_count: number | string | null; cancelled_count: number | string | null; expired_count: number | string | null }>>(
+  const [summaryRows] = await db.query<RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total_records,
        SUM(CASE WHEN r.status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
        SUM(CASE WHEN r.status = 'ready' THEN 1 ELSE 0 END) AS ready_count,
        SUM(CASE WHEN r.status = 'fulfilled' THEN 1 ELSE 0 END) AS fulfilled_count,
        SUM(CASE WHEN r.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
-       SUM(CASE WHEN r.status = 'expired' THEN 1 ELSE 0 END) AS expired_count
-     ${baseFromClause}`,
-    params
+       SUM(CASE WHEN r.status = 'expired' THEN 1 ELSE 0 END) AS expired_count,
+       SUM(CASE WHEN r.status IN ('pending','ready') AND r.expires_at <= DATE_ADD(NOW(), INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS expiring_count,
+       MIN(CASE WHEN r.status = 'ready' THEN r.expires_at ELSE NULL END) AS soonest_expiry
+     ${baseFromClause.replace(where, `WHERE ${summaryConditions.join(" AND ")}`)}`,
+    summaryParams
   );
 
   const [rows] = await db.query<RowDataPacket[]>(
@@ -354,9 +357,17 @@ async function getAdminReservations({
        bk.author AS book_author,
        h.location AS book_location,
        u.name AS user_name,
-       u.student_employee_id
+       u.student_employee_id,
+       u.email AS patron_email,
+       u.contact AS patron_contact,
+       (SELECT bc.barcode FROM book_copies bc WHERE bc.id = r.reserved_copy_id) AS reserved_copy_barcode,
+       (SELECT COUNT(*) FROM book_copies bc WHERE bc.book_id = r.book_id AND ${availableToBorrow("bc")}) AS available_copies,
+       (SELECT COUNT(*) + 1 FROM reservations queue WHERE queue.book_id = r.book_id AND queue.deleted_at IS NULL AND queue.status = 'pending' AND (queue.reserved_at < r.reserved_at OR (queue.reserved_at = r.reserved_at AND queue.id < r.id))) AS queue_position
      ${baseFromClause}
-     ORDER BY r.reserved_at DESC
+     ORDER BY CASE r.status WHEN 'ready' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+       CASE WHEN r.status = 'ready' THEN COALESCE(r.expires_at, '9999-12-31') END ASC,
+       CASE WHEN r.status = 'pending' THEN r.reserved_at END ASC,
+       r.reserved_at DESC, r.id ASC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
@@ -373,6 +384,8 @@ async function getAdminReservations({
       fulfilled_count: Number(summaryRows[0]?.fulfilled_count ?? 0),
       cancelled_count: Number(summaryRows[0]?.cancelled_count ?? 0),
       expired_count: Number(summaryRows[0]?.expired_count ?? 0),
+      expiring_count: Number(summaryRows[0]?.expiring_count ?? 0),
+      soonest_expiry: summaryRows[0]?.soonest_expiry ?? null,
     },
   };
 }
@@ -440,10 +453,10 @@ async function findReservationForAdminCancel(reservationId: number, conn: PoolCo
   return rows[0] || null;
 }
 
-async function cancelReservationAdmin(reservationId: number, conn: PoolConnection): Promise<number> {
+async function cancelReservationAdmin(reservationId: number, conn: PoolConnection, reason = ""): Promise<number> {
   const [result] = await conn.query<ResultSetHeader>(
-    "UPDATE reservations SET status = 'cancelled', cancelled_at = NOW() WHERE id = ? AND status IN ('pending','ready') AND deleted_at IS NULL",
-    [reservationId]
+    "UPDATE reservations SET status = 'cancelled', cancelled_at = NOW(), notes = CONCAT_WS(CHAR(10), NULLIF(notes, ''), NULLIF(?, '')) WHERE id = ? AND status IN ('pending','ready') AND deleted_at IS NULL",
+    [reason ? `Cancellation reason: ${reason}` : "", reservationId]
   );
   return result.affectedRows;
 }

@@ -19,6 +19,7 @@ export interface BookInfo {
   needs_policy?: boolean | number;
   is_reserved?: boolean | number;
   has_active_loan?: boolean | number;
+  due_date_preview?: string | null;
 }
 
 export interface UserInfo {

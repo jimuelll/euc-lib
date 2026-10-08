@@ -182,7 +182,7 @@ const findCopyByBarcode = async (identifier: string): Promise<DataRow | null> =>
             (h.copy_id IS NOT NULL) AS has_holding,
             (${hasAccession("bc", "h")} AND bc.is_active = 1 AND bc.condition IN ('good','damaged') AND bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")}) AS borrow_eligible,
             (bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}) AS needs_policy,
-            bk.title, bk.author, bk.copies,
+            bk.title, bk.author, bk.copies, bt.loan_duration_minutes, bt.loan_duration_unit,
             EXISTS(SELECT 1 FROM reservations r
               WHERE r.reserved_copy_id = bc.id AND r.status = 'ready' AND r.deleted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > NOW())) AS is_reserved,
             EXISTS(SELECT 1 FROM borrowings active_borrow
@@ -190,6 +190,7 @@ const findCopyByBarcode = async (identifier: string): Promise<DataRow | null> =>
      FROM book_copies bc
      JOIN books bk ON bk.id = bc.book_id AND bk.deleted_at IS NULL
      LEFT JOIN copy_holdings h ON h.copy_id = bc.id
+     LEFT JOIN book_types bt ON bt.id = bk.book_type_id AND bt.is_active = 1
      WHERE (bc.barcode = ? OR h.accession_number = ?) AND bc.deleted_at IS NULL
      ORDER BY (h.accession_number = ?) DESC LIMIT 1`,
     [identifier, identifier, identifier],
@@ -420,7 +421,7 @@ const markReturned = async (borrowingId: number, conn: QueryConnection): Promise
 };
 
 const getAdminBorrowing = async (borrowingId: number): Promise<(DataRow & { id: number; user_id: number; status: string }) | null> => {
-  const [[row]] = await db.query<Array<DataRow & { id: number; user_id: number; status: string }>>("SELECT id, user_id, status FROM borrowings WHERE id = ? AND deleted_at IS NULL", [borrowingId]);
+  const [[row]] = await db.query<Array<DataRow & { id: number; user_id: number; status: string }>>("SELECT id, user_id, book_id, copy_id, status FROM borrowings WHERE id = ? AND deleted_at IS NULL", [borrowingId]);
   return row ?? null;
 };
 
@@ -431,7 +432,7 @@ const lockBorrowingOwner = async (userId: number, conn: QueryConnection): Promis
 
 const getAdminBorrowingForUpdate = async (borrowingId: number, conn: QueryConnection): Promise<DataRow | null> => {
   const [[row]] = await conn.query<DataRow[]>(
-    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at,
+    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at, b.borrowed_at, b.issued_by, b.notes,
             bk.title, bc.barcode
        FROM borrowings b JOIN books bk ON bk.id = b.book_id
        LEFT JOIN book_copies bc ON bc.id = b.copy_id
@@ -443,7 +444,7 @@ const getAdminBorrowingForUpdate = async (borrowingId: number, conn: QueryConnec
 
 const getAdminBorrowingAuditSnapshot = async (borrowingId: number, conn: QueryConnection): Promise<DataRow | null> => {
   const [[row]] = await conn.query<DataRow[]>(
-    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at,
+    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at, b.borrowed_at, b.issued_by, b.notes,
             bk.title, bc.barcode
        FROM borrowings b JOIN books bk ON bk.id = b.book_id
        LEFT JOIN book_copies bc ON bc.id = b.copy_id
@@ -460,7 +461,7 @@ const archiveBorrowing = async (borrowingId: number, deletedBy: number, conn: Qu
 
 const getArchivedBorrowing = async (borrowingId: number, conn: QueryConnection): Promise<DataRow | null> => {
   const [[row]] = await conn.query<DataRow[]>(
-    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at,
+    `SELECT b.id, b.user_id, b.book_id, b.copy_id, b.status, b.deleted_at, b.due_date, b.returned_at, b.borrowed_at, b.issued_by, b.notes,
             bk.title, bc.barcode
        FROM borrowings b JOIN books bk ON bk.id = b.book_id
        LEFT JOIN book_copies bc ON bc.id = b.copy_id
@@ -479,10 +480,15 @@ const getAdminBorrowings = async ({ search = "", status, showArchived = false, p
   const offset = (page - 1) * limit;
   const conditions = [`b.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`];
   const params = [];
-  if (status && status !== "all") { conditions.push("b.status = ?"); params.push(status); }
-  if (search.trim()) { conditions.push("(bk.title LIKE ? OR u.name LIKE ? OR u.student_employee_id LIKE ?)"); const like = `%${search.trim()}%`; params.push(like, like, like); }
+
+  if (search.trim()) { conditions.push("(bk.title LIKE ? OR u.name LIKE ? OR u.student_employee_id LIKE ? OR bk.isbn LIKE ?)"); const like = `%${search.trim()}%`; params.push(like, like, like, like); }
   if (dateFrom) { conditions.push("DATE(b.borrowed_at) >= ?"); params.push(dateFrom); }
   if (dateTo) { conditions.push("DATE(b.borrowed_at) <= ?"); params.push(dateTo); }
+  const summaryWhere = `WHERE ${conditions.join(" AND ")}`;
+  const summaryParams = [...params];
+  if (status === "needs_action") conditions.push("b.status IN ('borrowed','overdue')");
+  else if (status === "today") conditions.push("(DATE(b.borrowed_at) = CURDATE() OR DATE(b.returned_at) = CURDATE())");
+  else if (status && status !== "all") { conditions.push("b.status = ?"); params.push(status); }
   const where = `WHERE ${conditions.join(" AND ")}`;
   const [[{ total }]] = await db.query<Array<DataRow & { total: number | string }>>(
     `SELECT COUNT(*) AS total FROM borrowings b JOIN books bk ON bk.id = b.book_id JOIN users u ON u.id = b.user_id ${where}`,
@@ -492,12 +498,13 @@ const getAdminBorrowings = async ({ search = "", status, showArchived = false, p
     `SELECT b.id, b.status, b.borrowed_at, b.due_date, b.returned_at, b.deleted_at, b.notes,
             COALESCE(b.settled_amount, 0) AS settled_amount, b.settled_at, b.settled_by,
             bk.title AS book_title, bk.author AS book_author, bk.isbn,
-            u.name AS user_name, u.student_employee_id, bc.barcode AS copy_barcode,
+            u.name AS user_name, u.student_employee_id, u.email AS user_email, bc.barcode AS copy_barcode,
             CASE WHEN b.copy_id IS NULL THEN 1 ELSE 0 END AS is_legacy,
             issuer.name AS issued_by_name
        FROM borrowings b JOIN books bk ON bk.id = b.book_id JOIN users u ON u.id = b.user_id
        LEFT JOIN book_copies bc ON bc.id = b.copy_id LEFT JOIN users issuer ON issuer.id = b.issued_by
-       ${where} ORDER BY b.borrowed_at DESC LIMIT ? OFFSET ?`,
+       ${where} ORDER BY CASE WHEN b.status = 'overdue' THEN 0 WHEN b.status = 'borrowed' AND b.due_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR) THEN 1 WHEN b.status = 'borrowed' THEN 2 ELSE 3 END,
+       CASE WHEN b.status IN ('borrowed','overdue') THEN b.due_date END ASC, b.borrowed_at DESC, b.id DESC LIMIT ? OFFSET ?`,
     [...params, limit, offset],
   );
   const [[summary]] = await db.query<DataRow[]>(
@@ -505,9 +512,15 @@ const getAdminBorrowings = async ({ search = "", status, showArchived = false, p
             SUM(CASE WHEN b.status = 'borrowed' THEN 1 ELSE 0 END) AS borrowed_count,
             SUM(CASE WHEN b.status = 'overdue' THEN 1 ELSE 0 END) AS overdue_count,
             SUM(CASE WHEN b.status = 'returned' THEN 1 ELSE 0 END) AS returned_count,
-            COUNT(DISTINCT b.user_id) AS unique_borrowers
-       FROM borrowings b JOIN books bk ON bk.id = b.book_id JOIN users u ON u.id = b.user_id ${where}`,
-    params,
+            COUNT(DISTINCT b.user_id) AS unique_borrowers,
+            SUM(CASE WHEN b.status = 'borrowed' AND b.due_date <= DATE_ADD(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) AS due_soon_count,
+            MIN(CASE WHEN b.status = 'overdue' THEN b.due_date END) AS oldest_overdue,
+            SUM(CASE WHEN b.status = 'overdue' THEN COALESCE(fa.charged_amount,0) ELSE 0 END) AS accrued_fines,
+            SUM(DATE(b.borrowed_at) = CURDATE()) AS borrowed_today,
+            SUM(DATE(b.returned_at) = CURDATE()) AS returned_today
+       FROM borrowings b JOIN books bk ON bk.id = b.book_id JOIN users u ON u.id = b.user_id
+       LEFT JOIN fine_accounts fa ON fa.borrowing_id = b.id ${summaryWhere}`,
+    summaryParams,
   );
   return { rows, total: Number(total), summary, page, limit };
 };
@@ -617,7 +630,26 @@ const findBorrowingsForFineDetails = async (userId: number | null = null, conn: 
   return rows;
 };
 
+// Desk reversals preserve the record and audit trail, without altering fine entries.
+const lockDeskUndoCopy = async (bookId: number, copyId: number, conn: QueryConnection) => {
+  await conn.query("SELECT id FROM books WHERE id = ? FOR UPDATE", [bookId]);
+  const [[copy]] = await conn.query<DataRow[]>("SELECT id FROM book_copies WHERE id = ? AND deleted_at IS NULL AND is_active = 1 FOR UPDATE", [copyId]);
+  if (!copy) throw Object.assign(new Error("This copy is no longer active."), { status: 409 });
+};
+const isDeskUndoFineFree = async (id: number, conn: QueryConnection) => {
+  const [[account]] = await conn.query<DataRow[]>("SELECT charged_amount FROM fine_accounts WHERE borrowing_id = ? FOR UPDATE", [id]);
+  const [entries] = await conn.query<DataRow[]>("SELECT id FROM fine_ledger_entries WHERE borrowing_id = ? FOR UPDATE", [id]);
+  return Boolean(account) && Number(account.charged_amount) === 0 && entries.length === 0;
+};
+const reverseDeskTransaction = async (id: number, kind: string, actorId: number, undoId: string, conn: QueryConnection) => {
+  const [result] = kind === "borrow"
+    ? await conn.query<ResultSetHeader>("UPDATE borrowings SET status = 'returned', returned_at = NOW(), deleted_at = NOW(), deleted_by = ?, notes = CONCAT(COALESCE(notes,''), ?, '\nDesk loan reversed within undo window.') WHERE id = ? AND status = 'borrowed' AND deleted_at IS NULL", [actorId, `\nDesk undo ${undoId}`, id])
+    : await conn.query<ResultSetHeader>("UPDATE borrowings SET status = 'borrowed', returned_at = NULL, notes = CONCAT(COALESCE(notes,''), ?, '\nDesk return reversed within undo window.') WHERE id = ? AND status = 'returned' AND deleted_at IS NULL", [`\nDesk undo ${undoId}`, id]);
+  return result.affectedRows;
+};
+
 module.exports = {
+  lockDeskUndoCopy, isDeskUndoFineFree, reverseDeskTransaction,
   countBorrowHistory,
   findActiveBorrows,
   findActiveBorrowingByCopyBarcode,

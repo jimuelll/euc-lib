@@ -38,6 +38,7 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/subscriptions", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/user-guide", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/bulletin", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "state_transition", exclude: /\/(?:like|comments)(?:\/|$)/ },
+  { prefix: "/api/attendance/scan/time-out-all", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/attendance/scan", methods: ["POST"], type: "state_transition" },
   { prefix: "/api/admin/circulation", methods: ["POST"], type: "state_transition" },
   { prefix: "/api/borrowing/scan", methods: ["POST"], type: "state_transition" },
@@ -511,6 +512,7 @@ function changedCount(body: Record<string, any> = {}, details: any = null): numb
 }
 
 function affectedRecordType(path: string): string {
+  if (path.includes("/attendance/scan/time-out-all")) return "attendance time-outs";
   if (path.includes("/book-types/")) return "books now needing a loan policy";
   if (path.includes("/backup/") && path.includes("restore")) return "database records from snapshot";
   if (path.includes("/backup/snapshots")) return "backup snapshot";

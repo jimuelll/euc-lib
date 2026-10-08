@@ -109,6 +109,8 @@ export interface ReservationAdminPage {
     fulfilled_count: number;
     cancelled_count: number;
     expired_count: number;
+    expiring_count: number;
+    soonest_expiry: string | Date | null;
   };
 }
 

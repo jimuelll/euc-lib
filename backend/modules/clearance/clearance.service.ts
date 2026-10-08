@@ -25,11 +25,15 @@ interface ServiceError extends Error {
 interface QueueOptions {
   page?: number;
   limit?: number;
+  search?: string;
+  filter?: string;
 }
 
 interface FullPaymentInput {
   studentEmployeeId: string;
   createdBy: number;
+  amount?: unknown;
+  expectedOutstanding?: unknown;
 }
 
 interface FineAdjustmentInput {
@@ -46,6 +50,7 @@ interface TransactionReversalInput {
 }
 
 const createServiceError = (message: string, status: number, extra: Partial<ServiceError> = {}): ServiceError => Object.assign(new Error(message), { status, ...extra });
+const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", currencyDisplay: "narrowSymbol" });
 const roundCurrency = (value: unknown): number => Number((Number(value) || 0).toFixed(2));
 
 const buildStatus = async (userId: number, conn?: PoolConnection): Promise<ClearanceStatus> => {
@@ -53,7 +58,7 @@ const buildStatus = async (userId: number, conn?: PoolConnection): Promise<Clear
   const fines = await listUnsettledBorrowings({ userId }, conn);
   const reasons: string[] = [];
   if (overdueRows.length) reasons.push(`${overdueRows.length} overdue item${overdueRows.length === 1 ? "" : "s"} must be returned`);
-  if (fines.summary.total_unsettled_amount > 0) reasons.push(`PHP ${fines.summary.total_unsettled_amount.toFixed(2)} outstanding fine${fines.summary.total_unsettled_amount === 1 ? "" : "s"}`);
+  if (fines.summary.total_unsettled_amount > 0) reasons.push(`${money.format(fines.summary.total_unsettled_amount)} outstanding fine${fines.summary.total_unsettled_amount === 1 ? "" : "s"}`);
   return {
     status: reasons.length ? "blocked" : "eligible",
     reasons,
@@ -73,7 +78,7 @@ const getClearanceProfile = async (studentEmployeeId: string) => {
   return { user, ...clearance, reservations, transactions };
 };
 
-const getClearanceQueue = async ({ page, limit }: QueueOptions = {}): Promise<ClearanceQueueEntry[] | ClearanceQueuePage> => {
+const getClearanceQueue = async ({ page, limit, search = "", filter = "all" }: QueueOptions = {}): Promise<ClearanceQueueEntry[] | ClearanceQueuePage> => {
   await syncOverdueBorrowings();
   const overdueRows = await repository.findQueueOverdueBorrowings();
   const fines = await listUnsettledBorrowings();
@@ -89,6 +94,7 @@ const getClearanceQueue = async ({ page, limit }: QueueOptions = {}): Promise<Cl
       overdueTitles: row.overdue_titles ? row.overdue_titles.split(" | ") : [],
       outstandingAmount: 0,
       fineRecords: 0,
+      oldestFineDate: null,
     });
   }
   for (const fine of fines.rows) {
@@ -101,14 +107,19 @@ const getClearanceQueue = async ({ page, limit }: QueueOptions = {}): Promise<Cl
       overdueTitles: [],
       outstandingAmount: 0,
       fineRecords: 0,
+      oldestFineDate: null,
     };
     existing.outstandingAmount = roundCurrency(existing.outstandingAmount + Number(fine.unsettled_amount));
     existing.fineRecords += 1;
+    const fineDate = fine.due_date as Date | string | null;
+    if (fineDate && (!existing.oldestFineDate || new Date(fineDate).getTime() < new Date(existing.oldestFineDate).getTime())) existing.oldestFineDate = fineDate;
     queue.set(fine.user_id, existing);
   }
 
-  const rows = Array.from(queue.values()).sort((left, right) => {
-    if (right.overdueCount !== left.overdueCount) return right.overdueCount - left.overdueCount;
+  const matches = Array.from(queue.values()).filter(row => !search.trim() || `${row.name} ${row.studentEmployeeId} ${row.overdueTitles.join(" ")}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const summary = { total: matches.length, blocked: matches.filter(row => row.overdueCount > 0).length, finesOnly: matches.filter(row => row.overdueCount === 0 && row.outstandingAmount > 0).length, unpaidFines: roundCurrency(matches.reduce((sum, row) => sum + row.outstandingAmount, 0)) };
+  const rows = matches.filter(row => filter === "blocked" ? row.overdueCount > 0 : filter === "fines_only" ? row.overdueCount === 0 && row.outstandingAmount > 0 : true).sort((left, right) => {
+    if (Boolean(right.overdueCount) !== Boolean(left.overdueCount)) return Number(Boolean(right.overdueCount)) - Number(Boolean(left.overdueCount));
     if (right.outstandingAmount !== left.outstandingAmount) return right.outstandingAmount - left.outstandingAmount;
     return String(left.name).localeCompare(String(right.name));
   });
@@ -118,6 +129,7 @@ const getClearanceQueue = async ({ page, limit }: QueueOptions = {}): Promise<Cl
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25));
   const total = rows.length;
   return {
+    summary,
     rows: rows.slice((safePage - 1) * safeLimit, safePage * safeLimit),
     pagination: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) },
   };
@@ -132,7 +144,7 @@ const assertEligible = async (userId: number, conn?: PoolConnection): Promise<Cl
   return profile;
 };
 
-const recordFullPayment = async ({ studentEmployeeId, createdBy }: FullPaymentInput) => {
+const recordFullPayment = async ({ studentEmployeeId, createdBy, amount: requestedAmount, expectedOutstanding }: FullPaymentInput) => {
   await syncOverdueBorrowings();
   const conn = await repository.getConnection();
   try {
@@ -140,15 +152,21 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }: FullPaymentIn
     const user = await repository.findUserForPayment(studentEmployeeId, conn);
     if (!user) throw createServiceError("User not found", 404);
     const fines = await listUnsettledBorrowings({ userId: user.id }, conn);
-    const amount = fines.summary.total_unsettled_amount;
-    if (amount <= 0) throw createServiceError("This user has no outstanding fines", 409);
+    const outstanding = fines.summary.total_unsettled_amount;
+    if (expectedOutstanding !== undefined && (!Number.isFinite(Number(expectedOutstanding)) || roundCurrency(expectedOutstanding) !== roundCurrency(outstanding))) throw createServiceError("The fine balance changed. Refresh and confirm the updated amount before recording payment.", 409);
+    const amount = requestedAmount === undefined ? outstanding : roundCurrency(requestedAmount);
+    if (!Number.isFinite(Number(requestedAmount ?? outstanding)) || amount <= 0 || amount > outstanding) throw createServiceError("Payment must be positive and cannot exceed the outstanding balance", 409);
+    let remaining = amount;
+    const allocations = fines.rows.map(row => { const allocated = roundCurrency(Math.min(remaining, Number(row.unsettled_amount))); remaining = roundCurrency(remaining - allocated); return { borrowingId: row.id, amount: allocated }; }).filter(row => row.amount > 0);
+    if (remaining > 0) throw createServiceError("The balance changed. Refresh before recording payment.", 409);
+    if (outstanding <= 0) throw createServiceError("This user has no outstanding fines", 409);
     const transaction = await repository.createTransaction({
       userId: user.id,
       type: "payment",
       amount,
       method: "cash",
       createdBy,
-      allocations: fines.rows.map((row) => ({ borrowingId: row.id, amount: row.unsettled_amount })),
+      allocations,
     }, conn);
     const [savedRows] = await conn.query<Array<RowDataPacket & { id: number; transaction_type: string; amount: number | string; receipt_number: string | null }>>(
       "SELECT id, transaction_type, amount, receipt_number FROM clearance_transactions WHERE id = ?",
@@ -169,7 +187,7 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }: FullPaymentIn
     await notificationsService.enqueueNotification(conn, {
       type: "payment_settled",
       title: "Payment received",
-      body: `A cash payment of PHP ${amount.toFixed(2)} was recorded for your library fines.`,
+      body: `A cash payment of ${money.format(amount)} was recorded for your library fines.`,
       href: "/my-library",
       audienceType: "user",
       audienceUserId: user.id,
@@ -177,7 +195,7 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy }: FullPaymentIn
     });
     const clearance = await buildStatus(user.id, conn);
     await conn.commit();
-    return { message: "Full payment recorded", receiptNumber: transaction.receiptNumber, transactionId: transaction.id, amount, clearance: { user, ...clearance } };
+    return { message: amount === outstanding ? "Full payment recorded" : "Partial payment recorded", receiptNumber: transaction.receiptNumber, transactionId: transaction.id, amount, clearance: { user, ...clearance } };
   } catch (error) {
     await conn.rollback();
     throw error;

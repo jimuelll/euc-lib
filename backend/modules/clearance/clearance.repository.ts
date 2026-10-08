@@ -23,7 +23,7 @@ const getConnection = (): Promise<PoolConnection> => db.getConnection();
 
 const findUserByStudentEmployeeId = async (studentEmployeeId: string, conn: QueryConnection = db): Promise<ClearanceUser | null> => {
   const [rows] = await conn.query<ClearanceUser[]>(
-    `SELECT u.id, u.name, u.role, u.student_employee_id, u.is_active, p.name AS program_course
+    `SELECT u.id, u.name, u.role, u.student_employee_id, u.is_active, u.email, u.contact, p.name AS program_course
      FROM users u
      LEFT JOIN academic_programs p ON p.id = u.program_id
      WHERE u.student_employee_id = ? AND u.deleted_at IS NULL LIMIT 1`,
@@ -42,8 +42,9 @@ const findActiveUser = async (userId: number, conn: PoolConnection): Promise<Cle
 
 const findOverdueBorrowings = async (userId: number, conn: QueryConnection = db): Promise<OverdueBorrowing[]> => {
   const [rows] = await conn.query<OverdueBorrowing[]>(
-    `SELECT b.id, bk.title, b.due_date
+    `SELECT b.id, bk.title, b.due_date, bc.barcode AS copy_barcode
      FROM borrowings b JOIN books bk ON bk.id = b.book_id
+     LEFT JOIN book_copies bc ON bc.id = b.copy_id
      WHERE b.user_id = ? AND b.status = 'overdue' AND b.deleted_at IS NULL
      ORDER BY b.due_date ASC`,
     [userId],
@@ -65,9 +66,10 @@ const findUserReservations = async (userId: number): Promise<ClearanceReservatio
 
 const findUserTransactions = async (userId: number): Promise<ClearanceUserTransaction[]> => {
   const [rows] = await db.query<ClearanceUserTransaction[]>(
-    `SELECT ct.id, ct.receipt_number, ct.transaction_type, ct.amount, ct.reason, ct.created_at,
+    `SELECT ct.id, ct.receipt_number, ct.transaction_type, ct.amount, ct.reason, ct.created_at, staff.name AS processed_by,
        EXISTS(SELECT 1 FROM clearance_transactions reversed WHERE reversed.reverses_transaction_id = ct.id) AS corrected
      FROM clearance_transactions ct
+     LEFT JOIN users staff ON staff.id = ct.created_by
      WHERE ct.user_id = ?
      ORDER BY ct.created_at DESC, ct.id DESC LIMIT 12`,
     [userId],

@@ -55,6 +55,8 @@ export interface SearchUserRow extends RowDataPacket {
   name: string;
   role: string;
   is_active: number | boolean;
+  deleted_at?: Date | string | null;
+  active_loans?: number; overdue_loans?: number; active_reservations?: number; user_id?: number;
   [key: string]: unknown;
 }
 

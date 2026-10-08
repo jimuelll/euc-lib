@@ -125,15 +125,20 @@ const searchUsers = async ({ allowedRoles, showArchived, studentEmployeeId, name
   let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.name, u.role,
                     CASE WHEN ${expiredStudentTerm} THEN 0 ELSE u.is_active END AS is_active,
                     u.address, u.contact, u.program_id, u.academic_term_id, u.year_level, u.department_id, u.remarks,
-                    p.name AS program_course, d.name AS department_name, u.deleted_at
+                    p.name AS program_course, d.name AS department_name, u.deleted_at,
+                    CASE WHEN u.deleted_at IS NOT NULL THEN 'Archived account' WHEN u.is_active = 0 THEN 'Access disabled' WHEN ${expiredStudentTerm} THEN 'Academic term missing or expired' ELSE NULL END AS inactive_reason,
+                    (SELECT COUNT(*) FROM borrowings b WHERE b.user_id=u.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue')) AS active_loans,
+                    (SELECT COUNT(*) FROM borrowings b WHERE b.user_id=u.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue') AND b.due_date < NOW()) AS overdue_loans,
+                    (SELECT COUNT(*) FROM reservations r WHERE r.user_id=u.id AND r.deleted_at IS NULL AND r.status IN ('pending','ready') AND (r.expires_at IS NULL OR r.expires_at > NOW())) AS active_reservations,
+                    u.id AS user_id
              FROM users u LEFT JOIN academic_programs p ON p.id = u.program_id LEFT JOIN departments d ON d.id = u.department_id
              LEFT JOIN academic_terms assigned_term ON assigned_term.id = u.academic_term_id
-             WHERE u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}
+             WHERE ${status === "all_accounts" ? "1=1" : `u.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`}
                AND u.role IN (${allowedRoles.map(() => "?").join(", ")})`;
   const values: SqlParameter[] = [...allowedRoles];
   if (studentEmployeeId && name) {
-    sql += " AND (u.student_employee_id = ? OR u.name LIKE ?)";
-    values.push(String(studentEmployeeId), `%${String(name)}%`);
+    sql += " AND (u.student_employee_id LIKE ? OR u.name LIKE ?)";
+    values.push(`%${String(studentEmployeeId)}%`, `%${String(name)}%`);
   } else {
     if (studentEmployeeId) { sql += " AND u.student_employee_id = ?"; values.push(String(studentEmployeeId)); }
     if (name) { sql += " AND u.name LIKE ?"; values.push(`%${String(name)}%`); }

@@ -126,9 +126,10 @@ const AdminCatalog = () => {
     return <div role="alert" className="mt-6 flex items-center gap-3 text-sm text-destructive">{getApiErrorMessage(schemaQuery.error, "Failed to load form schema")}<Button type="button" variant="outline" size="sm" onClick={() => void schemaQuery.refetch()}>Try again</Button></div>;
   }
 
+  if (mode === "catalog") return <AdminCatalogData fields={fields} isSuperAdmin={user?.role === "super_admin"} />;
+
   return (
     <AdminPage title={mode === "builder" ? "Catalog Configuration" : mode === "ai" ? "AI Recommendations" : "Catalog"} description={description} contentWidth="wide">
-      {mode === "catalog" && <div className="mt-5"><AdminCatalogData fields={fields} isSuperAdmin={user?.role === "super_admin"} /></div>}
       {mode === "builder" && canAccessBuilder && <div className="mt-5"><AdminCatalogBuilder fields={fields} onFieldsChange={setFields} /></div>}
       {mode === "ai" && canAccessBuilder && <div className="mt-5 space-y-5">
             <div className="grid gap-4 lg:grid-cols-3">

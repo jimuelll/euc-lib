@@ -216,7 +216,7 @@ const markReservationReady = async (reservationId: number, markedBy: number | nu
   }
 };
 
-const cancelReservationAdmin = async (reservationId: number, cancelledBy: number | null = null): Promise<void> => {
+const cancelReservationAdmin = async (reservationId: number, cancelledBy: number | null = null, reason = ""): Promise<void> => {
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
@@ -227,7 +227,7 @@ const cancelReservationAdmin = async (reservationId: number, cancelledBy: number
       throw serviceError("Reservation cannot be cancelled", 409);
     }
 
-    const changed = await repository.cancelReservationAdmin(reservationId, conn);
+    const changed = await repository.cancelReservationAdmin(reservationId, conn, reason);
     if (changed !== 1) throw serviceError("This reservation changed while it was being cancelled. Reload and try again.", 409);
     await notificationsService.enqueueNotification(conn, {
       type: "reservation_cancelled",
@@ -244,7 +244,7 @@ const cancelReservationAdmin = async (reservationId: number, cancelledBy: number
       category: "reservation",
       route: `/api/admin/reservations/${reservationId}/cancel`,
       action: "cancelled",
-      description: `Cancelled reservation for “${row.title}”`,
+      description: `Cancelled reservation for “${row.title}”${reason ? `: ${reason}` : ""}`,
       before: row,
       after,
       type: "state_transition",

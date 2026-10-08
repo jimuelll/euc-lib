@@ -20,6 +20,11 @@ export interface AdminReservation {
   reserved_at: string;
   expires_at: string | null;
   notes: string | null;
+  patron_email?: string | null;
+  patron_contact?: string | null;
+  available_copies?: number;
+  queue_position?: number;
+  reserved_copy_barcode?: string | null;
 }
 
 export interface ReservationsResult {
@@ -34,6 +39,8 @@ export interface ReservationsResult {
     fulfilled_count: number;
     cancelled_count: number;
     expired_count: number;
+    expiring_count?: number;
+    soonest_expiry?: string | null;
   };
 }
 
@@ -82,6 +89,7 @@ export const RESERVATION_STATUS_CONFIG: Record<ReservationStatus, StatusConfig> 
 };
 
 export const FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "needs_action", label: "Needs action" },
   { value: "all", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "ready", label: "Ready" },

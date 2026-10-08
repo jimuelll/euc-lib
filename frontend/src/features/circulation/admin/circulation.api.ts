@@ -10,6 +10,8 @@ export interface LookupUserResult {
 export interface CirculationLogEntry {
   id: number;
   user_name: string;
+  user_email?: string | null;
+  notes?: string | null;
   student_employee_id: string;
   book_title: string;
   book_author: string;
@@ -42,6 +44,11 @@ export interface CirculationLogSummary {
   overdue_count: number;
   returned_count: number;
   unique_borrowers: number;
+  due_soon_count?: number;
+  oldest_overdue?: string | null;
+  accrued_fines?: number;
+  borrowed_today?: number;
+  returned_today?: number;
 }
 
 export interface CirculationLogResult {
@@ -85,7 +92,7 @@ export const processBorrow = async (
 
 export const processReturn = async (copyBarcode: string) => {
   const res = await axiosInstance.post("/api/borrowing/scan/return", { copyBarcode });
-  return res.data as { message: string; borrowingId: number; returnedAt: string };
+  return res.data as { message: string; borrowingId: number; returnedAt: string; undoToken?: string; undoExpiresAt?: string };
 };
 
 export const getCirculationLog = async (
@@ -116,3 +123,5 @@ export const fetchCirculationBookCopies = async (bookId: number, signal?: AbortS
   const response = await axiosInstance.get<CirculationCopyResult[]>(`/api/admin/books/${bookId}/copies`, { signal });
   return response.data;
 };
+
+export const undoDeskTransaction = async (undoToken: string): Promise<void> => { await axiosInstance.post("/api/borrowing/scan/undo", { undoToken }); };

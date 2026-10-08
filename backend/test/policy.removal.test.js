@@ -171,7 +171,7 @@ test("needs-policy catalog filter is applied to both rows and pagination counts"
     const result = await repository.searchBooksPage({ query: "", policyStatus: "needs_policy", page: 1 });
     assert.equal(result.total, 1);
     assert.equal(result.rows[0].needs_policy, 1);
-    assert.equal(queries.length, 2);
+    assert.equal(queries.length, 3);
     for (const query of queries) {
       assert.match(query.sql, /bk\.material_type = 'book' AND NOT \(bk\.book_type_id IS NOT NULL/);
       assert.match(query.sql, /active_policy\.is_active = 1/);

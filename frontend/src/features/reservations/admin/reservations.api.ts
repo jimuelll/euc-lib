@@ -27,10 +27,10 @@ export const markReservationReady = async (
 };
 
 export const cancelReservationAdmin = async (
-  reservationId: number
+  reservationId: number, reason?: string
 ): Promise<AdminReservation> => {
   const res = await axiosInstance.post(
-    `/api/admin/reservations/${reservationId}/cancel`
+    `/api/admin/reservations/${reservationId}/cancel`, { reason }
   );
   return res.data;
 };

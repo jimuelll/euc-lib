@@ -23,10 +23,12 @@ const getProfile = respond((req) => service.getClearanceProfile(String(req.query
 const getQueue = respond((req) => service.getClearanceQueue({
   page: req.query.page === undefined ? undefined : Number(req.query.page),
   limit: req.query.limit === undefined ? undefined : Number(req.query.limit),
+  search: String(req.query.search || ""),
+  filter: String(req.query.filter || "all"),
 }));
 const recordPayment = respond((req) => {
   const user = req as AuthenticatedRequest;
-  return service.recordFullPayment({ studentEmployeeId: req.body?.student_employee_id, createdBy: user.user.id });
+  return service.recordFullPayment({ studentEmployeeId: req.body?.student_employee_id, createdBy: user.user.id, amount: req.body?.amount, expectedOutstanding: req.body?.expectedOutstanding });
 });
 const adjustFine = respond((req) => {
   const user = req as AuthenticatedRequest;
