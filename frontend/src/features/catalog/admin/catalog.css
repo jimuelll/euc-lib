@@ -67,3 +67,4 @@
 
 .catalog-copy-row>.catalog-row-actions { grid-column:auto; grid-row:auto; }
 @media(max-width:480px) { .catalog-copies-toolbar>span { flex-basis:100%; }.catalog-copy-row>div { min-width:0; } }
+.catalog-holdings-table td.catalog-row-actions { display:table-cell; text-align:right; white-space:nowrap; } .catalog-holdings-table th.catalog-actions-heading { text-align:right; }
