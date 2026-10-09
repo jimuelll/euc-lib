@@ -19,6 +19,7 @@ const comparableSchema = (fields: Array<Record<string, any>>) => fields
     label: field.label,
     type: field.type,
     options: typeof field.options === "string" ? JSON.parse(field.options || "null") : (field.options ?? null),
+    archived_options: typeof field.archived_options === "string" ? JSON.parse(field.archived_options || "[]") : (field.archived_options || []),
     required: Boolean(field.required),
     locked: Boolean(field.locked),
     public: Boolean(field.public),
@@ -38,6 +39,11 @@ const getSchema = async (req: CatalogHttpRequest, res: Response) => {
     logError("[catalog] getSchema:", err);
     res.status(500).json({ message: "Failed to fetch schema" });
   }
+};
+
+const getConfigurationImpact = async (_req:CatalogHttpRequest,res:Response) => {
+  try { res.json(await require('./catalog.configuration.service').getConfigurationImpact()); }
+  catch (error:any) { logError('[catalog] configuration impact:',error);res.status(500).json({message:'Could not load field usage. Retry before making changes.'}); }
 };
 
 const updateSchema = async (req: CatalogHttpRequest, res: Response) => {
@@ -63,11 +69,12 @@ const updateSchema = async (req: CatalogHttpRequest, res: Response) => {
 
     // Builder definitions are stored in catalog_schema and values in JSON metadata.
     // Never mutate the books table as a side effect of a form edit.
-    await service.upsertSchema(fields);
+    await service.upsertSchema(fields,baseFields,req.user?.id,req.body.deleteKeys??[]);
+    res.locals.auditEnqueued=true;
     res.json({ message: "Schema updated successfully" });
   } catch (err: any) {
     logError("[catalog] updateSchema:", err);
-    res.status(500).json({ message: "Failed to update schema" });
+    res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update schema" });
   }
 };
 
@@ -95,7 +102,9 @@ const getBooks = async (req: CatalogHttpRequest, res: Response) => {
           ? String(req.query.status)
           : (req.query.archived === "true" ? "archived" : "active"),
         materialType: String(req.query.materialType ?? "all"),
-        policyStatus: String(req.query.policyStatus ?? "all"),
+        policyStatus: String(req.query.policyStatus ?? "all"),bookTypeId:req.query.bookTypeId,
+        fieldKey:req.query.fieldKey,fieldUsage:req.query.fieldUsage,unheld:req.query.unheld === "true",
+        uncategorized:req.query.uncategorized === "true",
         holdingStatus: req.query.holdingStatus === "needs" ? "needs" : "all",
         bookId: Number.isSafeInteger(Number(req.query.bookId)) && Number(req.query.bookId) > 0 ? Number(req.query.bookId) : undefined,
         page: Number(req.query.page),
@@ -327,12 +336,13 @@ const restoreBook = async (req: CatalogHttpRequest, res: Response) => {
 };
 
 const getBookTypes = async (_req: CatalogHttpRequest, res: Response) => { try { res.json(await service.getBookTypes()); } catch { res.status(500).json({ message: "Failed to fetch book types" }); } };
-const createBookType = async (req: CatalogHttpRequest, res: Response) => { try { res.status(201).json(await service.createBookType({ name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book type" }); } };
-const updateBookType = async (req: CatalogHttpRequest, res: Response) => { try { res.json(await service.updateBookType(Number(req.params.id), { name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine })); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book type" }); } };
+const createBookType = async (req: CatalogHttpRequest, res: Response) => { try { const result=await service.createBookType({ name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine },req.user?.id); res.locals.auditEnqueued=true; res.status(201).json(result); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to create book type",field:err.field }); } };
+const updateBookType = async (req: CatalogHttpRequest, res: Response) => { try { const result=await service.updateBookType(Number(req.params.id), { name: req.body?.name, defaultBorrowDays: req.body?.default_borrow_days, durationMinutes: req.body?.loan_duration_minutes, durationUnit: req.body?.loan_duration_unit, finePerHour: req.body?.fine_per_hour, fineInterval: req.body?.fine_interval, initialFine: req.body?.initial_fine,isActive:req.body?.is_active,reason:req.body?.reason },req.user?.id); res.locals.auditEnqueued=true; res.json(result); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update book type",field:err.field }); } };
 const deleteBookType = async (req: CatalogHttpRequest, res: Response) => { try { const result = await service.deleteBookType(Number(req.params.id), req.user?.id); res.locals.auditEnqueued = true; res.json({ ...result, message: result.affected_books ? `Policy deleted. ${result.affected_books} ${result.affected_books === 1 ? "book now needs" : "books now need"} a loan policy.` : "Policy deleted." }); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to delete book type" }); } };
 const updateCopyCondition = async (req: CatalogHttpRequest, res: Response) => { try { await service.updateCopyCondition(Number(req.params.copyId), req.body?.condition, req.body?.notes, req.user?.id); res.locals.auditEnqueued = true; res.json({ message: "Copy condition updated" }); } catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Failed to update copy" }); } };
 
 export = {
+  getConfigurationImpact,
   getSchema,
   getPublicSchema,
   updateSchema,

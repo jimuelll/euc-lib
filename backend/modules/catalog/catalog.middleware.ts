@@ -197,6 +197,8 @@ const validateSchemaPayload = validate((req: CatalogRequest) => {
     if (f.type === "select" && (!Array.isArray(f.options) || !f.options.length)) {
       throw createValidationError(`Dropdown field "${f.key}" must have at least one option`);
     }
+    if(f.archived_options!==undefined&&(!Array.isArray(f.archived_options)||f.archived_options.some((o:any)=>typeof o!=='string'||!o.trim()||o.length>255)||new Set(f.archived_options.map((o:string)=>o.trim().toLowerCase())).size!==f.archived_options.length||f.archived_options.some((o:string)=>f.options?.some((active:string)=>active.toLowerCase()===o.toLowerCase()))))throw createValidationError('Archived options must be unique and separate from active options.');
+    if (f.type==='select' && (f.options.some((option:any)=>typeof option!=='string'||!option.trim()||option.length>255) || new Set(f.options.map((option:string)=>option.trim().toLowerCase())).size!==f.options.length)) throw createValidationError(`Options for "${f.key}" must be unique, non-empty text (up to 255 characters).`);
     if (typeof f.order !== "number") {
       throw createValidationError(`Field "${f.key}" is missing a numeric order`);
     }

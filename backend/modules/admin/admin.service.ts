@@ -290,7 +290,14 @@ const searchUsers = async (query: UserSearchQuery, requesterRole: string) => {
     return [];
   }
   const result = await repository.searchUsers({ allowedRoles, showArchived: false, studentEmployeeId: query.student_employee_id, name: query.name, status: "all_accounts" });
-  const allRows = Array.isArray(result) ? result : result.rows;
+  const academicFilters = ["programId", "departmentId", "termId"].map(key => {
+    const value = query[key];
+    if (value == null || value === "") return null;
+    const id = Number(value);
+    if (!Number.isInteger(id) || id < 1) throw Object.assign(new Error("Invalid academic filter"), { status: 400 });
+    return { field: key === "programId" ? "program_id" : key === "departmentId" ? "department_id" : "academic_term_id", id };
+  }).filter(Boolean);
+  const allRows = (Array.isArray(result) ? result : result.rows).filter(row => academicFilters.every(filter => Number((row as unknown as Record<string, unknown>)[filter!.field]) === filter!.id));
   const { listUnsettledBorrowings } = require("../borrowing/overdue.helper");
   const fineDetails = await listUnsettledBorrowings({});
   const balances = new Map<number, number>();

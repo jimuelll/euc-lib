@@ -60,6 +60,16 @@ const createHoliday: RequestHandler = async (req, res) => {
   }
 };
 
+const importHolidays: RequestHandler = async (req, res) => {
+  try {
+    const input = req.body?.holidays;
+    if (!Array.isArray(input)) { res.status(400).json({ message: "Choose a holiday list." }); return; }
+    const holidays = await service.importHolidays(input.map(item => ({ name: item?.name, holidayDate: item?.holiday_date, description: item?.description })), userId(req));
+    res.locals.auditEnqueued = true;
+    res.status(201).json({ holidays, message: "Holidays imported" });
+  } catch (error) { sendError(res, error, "Could not import holidays"); }
+};
+
 const updateHoliday: RequestHandler = async (req, res) => {
   try {
     const holidayId = routeId(req.params.holidayId);
@@ -134,7 +144,7 @@ const updateAcademicProgram: RequestHandler = async (req, res) => {
 
 const deleteAcademicProgram: RequestHandler = async (req, res) => {
   try {
-    const result = await service.deleteAcademicProgram(routeId(req.params.programId), userId(req));
+    const result = await service.deleteAcademicProgram(routeId(req.params.programId), userId(req), undefined, req.query.mode === "archive" ? "archive" : req.query.mode === "delete" ? "delete" : "auto");
     res.locals.auditEnqueued = true;
     res.locals.auditDetails = { affectedCount: result.reference_count, action: result.action };
     res.json({
@@ -192,7 +202,7 @@ const updateDepartment: RequestHandler = async (req, res) => {
 
 const deleteDepartment: RequestHandler = async (req, res) => {
   try {
-    const result = await service.deleteDepartment(routeId(req.params.departmentId), userId(req));
+    const result = await service.deleteDepartment(routeId(req.params.departmentId), userId(req), undefined, req.query.mode === "archive" ? "archive" : req.query.mode === "delete" ? "delete" : "auto");
     res.locals.auditEnqueued = true;
     res.json({
       ...result,
@@ -277,6 +287,7 @@ export = {
   getLibrarySettings,
   updateLibrarySettings,
   createHoliday,
+  importHolidays,
   updateHoliday,
   deleteHoliday,
   restoreHoliday,

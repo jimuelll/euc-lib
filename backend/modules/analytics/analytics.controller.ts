@@ -54,17 +54,17 @@ async function handleTrackVisit(req: AnalyticsRequest, res: Response) {
 
 async function handleGetDashboardOverview(req: AnalyticsRequest, res: Response) {
   try {
-    const result = await getDashboardOverview({ range: req.query.range as string | undefined });
+    const result = await getDashboardOverview({ range: req.query.range as string | undefined,dateFrom:req.query.dateFrom as string|undefined,dateTo:req.query.dateTo as string|undefined,allTime:req.query.allTime==='true',actorId:req.user?.id });
     res.json(result);
   } catch (err: any) {
     logError("[analytics] getDashboardOverview:", err);
-    res.status(500).json({ message: "Failed to load dashboard data" });
+    res.status(err.status||500).json({ message: err.status?err.message:"Failed to load dashboard data" });
   }
 }
 
 async function handleCreateAiAnalyticsReport(req: AnalyticsRequest, res: Response) {
   try {
-    const result = await createAiAnalyticsReport(req.body || {});
+    const result = await createAiAnalyticsReport(req.body || {}, req.user?.id);
     res.json(result);
   } catch (err: any) {
     if (err.status && err.status < 500) return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}) });
@@ -83,12 +83,12 @@ async function handleGetAuditLog(req: AnalyticsRequest, res: Response) {
       action: req.query.action,
       query: req.query.query,
       dateFrom: req.query.dateFrom,
-      dateTo: req.query.dateTo,
+      dateTo: req.query.dateTo,actor:req.query.actor,record:req.query.record,important:req.query.important,security:req.query.security,event:req.query.event,quick:req.query.quick,currentActorId:req.user?.id,
     });
     res.json(result);
   } catch (err: any) {
     logError("[analytics] getAuditLog:", err);
-    res.status(500).json({ message: "Failed to load audit log" });
+    res.status(err.status||500).json({ message: err.status?err.message:"Failed to load audit log" });
   }
 }
 

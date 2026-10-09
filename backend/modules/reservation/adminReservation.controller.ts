@@ -22,7 +22,7 @@ const getAdminReservations: RequestHandler = async (req, res) => {
     const dateFrom = String(req.query.dateFrom ?? "");
     const dateTo = String(req.query.dateTo ?? "");
     const archived = req.query.archived === "true";
-    res.json(await service.getAdminReservations({ search, status, dateFrom, dateTo, archived, page, limit }));
+    res.json(await service.getAdminReservations({ search, status, dateFrom, dateTo, archived, page, limit,recordId:parsePositiveSafeInteger(req.query.recordId)||undefined }));
   } catch (error: unknown) {
     logError("[admin/reservations] getAdminReservations:", error);
     res.status(500).json({ message: "Failed to fetch reservations" });

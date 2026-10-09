@@ -77,18 +77,22 @@ async function createSnapshotRecord({
   bookImagePublicIds = [],
   kind,
   createdBy,
+  checksum = null,
+  version = null,
+  label = null,
+  notes = null,
 }: {
   publicId: string;
   filename: string;
   sizeBytes: number;
   bookImagePublicIds?: string[];
   kind: string;
-  createdBy: number | null | undefined;
+  createdBy: number | null | undefined; checksum?: string | null; version?: number | null;label?:string|null;notes?:string|null;
 }): Promise<ResultSetHeader> {
   const [result] = await db.query<ResultSetHeader>(
-    `INSERT INTO ${registry.SNAPSHOT_TABLE} (cloudinary_public_id, filename, size_bytes, book_image_public_ids, kind, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [publicId, filename, sizeBytes, JSON.stringify(bookImagePublicIds), kind, createdBy || null],
+    `INSERT INTO ${registry.SNAPSHOT_TABLE} (cloudinary_public_id, filename, size_bytes, book_image_public_ids, kind, created_by,checksum,snapshot_version,label,notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [publicId, filename, sizeBytes, JSON.stringify(bookImagePublicIds), kind, createdBy || null,checksum,version,label,notes],
   );
   return result;
 }
@@ -97,7 +101,7 @@ async function getSnapshotsToPrune(maxSnapshots: number): Promise<SavedSnapshot[
   const [snapshots] = await db.query<SavedSnapshot[]>(
     `SELECT id, cloudinary_public_id, book_image_public_ids
      FROM ${registry.SNAPSHOT_TABLE}
-     ORDER BY created_at DESC, id DESC LIMIT 18446744073709551615 OFFSET ?`,
+     WHERE pinned=0 ORDER BY created_at DESC, id DESC LIMIT 18446744073709551615 OFFSET ?`,
     [maxSnapshots],
   );
   return snapshots;
@@ -118,12 +122,13 @@ async function setSnapshotBookImagePublicIds(id: number, publicIds: string[]): P
 }
 
 async function pruneSnapshots(maxSnapshots: number, excludedIds: number[] = []): Promise<SavedSnapshot[]> {
-  const excluded = new Set(excludedIds.map(Number));
-  const expired = (await getSnapshotsToPrune(maxSnapshots)).filter((snapshot) => !excluded.has(Number(snapshot.id)));
-  if (expired.length) {
-    await db.query(`DELETE FROM ${registry.SNAPSHOT_TABLE} WHERE id IN (?)`, [expired.map((snapshot) => snapshot.id)]);
-  }
-  return expired;
+  const connection=await db.getConnection();
+  try{await connection.beginTransaction();
+   const [rows]=await connection.query<SavedSnapshot[]>(`SELECT id,cloudinary_public_id,book_image_public_ids FROM ${registry.SNAPSHOT_TABLE} WHERE pinned=0 ORDER BY created_at DESC,id DESC LIMIT 18446744073709551615 OFFSET ? FOR UPDATE`,[maxSnapshots]);
+   const excluded=new Set(excludedIds.map(Number)),expired=rows.filter(row=>!excluded.has(Number(row.id)));
+   if(expired.length)await connection.query(`DELETE FROM ${registry.SNAPSHOT_TABLE} WHERE id IN (?) AND pinned=0`,[expired.map(row=>row.id)]);
+   await connection.commit();return expired;
+  }catch(error){await connection.rollback();throw error;}finally{connection.release();}
 }
 
 async function isBookImageReferenced(publicId: string): Promise<boolean> {
@@ -146,7 +151,7 @@ async function findSnapshot(id: number | string): Promise<SavedSnapshot> {
 
 async function listSnapshots(): Promise<SavedSnapshot[]> {
   const [snapshots] = await db.query<SavedSnapshot[]>(
-    `SELECT bs.id, bs.filename, bs.size_bytes AS sizeBytes, bs.kind, bs.created_at AS createdAt, u.name AS createdBy
+    `SELECT bs.id, bs.filename, bs.size_bytes AS sizeBytes, bs.kind, bs.created_at AS createdAt, u.name AS createdBy,bs.label,bs.notes,bs.pinned,bs.checksum,bs.snapshot_version AS version,bs.verification_status AS verification,bs.verified_at AS verifiedAt,(SELECT id FROM audit_events WHERE category='backup' AND action='restored' AND JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.pre_restore_snapshot_id'))=CAST(bs.id AS CHAR) ORDER BY id DESC LIMIT 1) AS restoreEventId,(SELECT occurred_at FROM audit_events WHERE category='backup' AND action='restored' AND JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.pre_restore_snapshot_id'))=CAST(bs.id AS CHAR) ORDER BY id DESC LIMIT 1) AS restoreOccurredAt
      FROM ${registry.SNAPSHOT_TABLE} bs LEFT JOIN users u ON u.id = bs.created_by
      ORDER BY bs.created_at DESC, bs.id DESC`,
   );

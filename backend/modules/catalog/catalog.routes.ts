@@ -24,6 +24,7 @@ const validateCopyIdParam: RequestHandler = (req, res, next) => {
 };
 
 router.get   ("/catalog-schema", requireCatalogRole,                       controller.getSchema);
+router.get("/catalog-schema/impact", requireSuperAdminRole, controller.getConfigurationImpact);
 router.get   ("/catalog-settings", requireCatalogRole, controller.getCatalogSettings);
 router.put   ("/catalog-settings", requireSuperAdminRole, controller.updateCatalogSettings);
 router.get   ("/book-types", requireCatalogRole, controller.getBookTypes);

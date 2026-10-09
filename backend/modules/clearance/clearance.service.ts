@@ -30,6 +30,7 @@ interface QueueOptions {
 }
 
 interface FullPaymentInput {
+  actorRole?: string;
   studentEmployeeId: string;
   createdBy: number;
   amount?: unknown;
@@ -144,7 +145,7 @@ const assertEligible = async (userId: number, conn?: PoolConnection): Promise<Cl
   return profile;
 };
 
-const recordFullPayment = async ({ studentEmployeeId, createdBy, amount: requestedAmount, expectedOutstanding }: FullPaymentInput) => {
+const recordFullPayment = async ({ studentEmployeeId, createdBy, actorRole, amount: requestedAmount, expectedOutstanding }: FullPaymentInput) => {
   await syncOverdueBorrowings();
   const conn = await repository.getConnection();
   try {
@@ -156,6 +157,7 @@ const recordFullPayment = async ({ studentEmployeeId, createdBy, amount: request
     if (expectedOutstanding !== undefined && (!Number.isFinite(Number(expectedOutstanding)) || roundCurrency(expectedOutstanding) !== roundCurrency(outstanding))) throw createServiceError("The fine balance changed. Refresh and confirm the updated amount before recording payment.", 409);
     const amount = requestedAmount === undefined ? outstanding : roundCurrency(requestedAmount);
     if (!Number.isFinite(Number(requestedAmount ?? outstanding)) || amount <= 0 || amount > outstanding) throw createServiceError("Payment must be positive and cannot exceed the outstanding balance", 409);
+    if (actorRole !== "admin" && actorRole !== "super_admin" && amount !== roundCurrency(outstanding)) throw createServiceError("Staff can record full payment only. An administrator is required for partial payments.", 403);
     let remaining = amount;
     const allocations = fines.rows.map(row => { const allocated = roundCurrency(Math.min(remaining, Number(row.unsettled_amount))); remaining = roundCurrency(remaining - allocated); return { borrowingId: row.id, amount: allocated }; }).filter(row => row.amount > 0);
     if (remaining > 0) throw createServiceError("The balance changed. Refresh before recording payment.", 409);
@@ -235,6 +237,7 @@ const adjustFine = async ({ borrowingId, amount, reason, createdBy }: FineAdjust
       route: `/api/admin/clearance/borrowings/${borrowingId}/adjust`,
       action: "adjusted",
       description: `Adjusted fine for borrowing ${borrowingId}`,
+      extraMetadata: {reason: String(reason).trim()},
       before: null,
       after: savedTransaction,
       details: { transactionId: savedTransaction.id, borrowingId, stateFrom: "Not recorded", stateTo: "Adjusted", stateLabel: "Fine adjustment" },

@@ -127,7 +127,7 @@ test("holding audit snapshots show financial changes approved for super admins",
   assert.deepEqual(metadata.changes.find((change) => change.field === "Accession number"), { field: "Accession number", before: "Cleared", after: "ACC-42" });
   assert.deepEqual(metadata.changes.find((change) => change.field === "Price (PHP)"), { field: "Price (PHP)", before: "Cleared", after: "125.00" });
   assert.deepEqual(metadata.changes.find((change) => change.field === "Invoice reference"), { field: "Invoice reference", before: "Cleared", after: "OR-44" });
-  assert.deepEqual(metadata.changes.find((change) => change.field === "Distributor"), { field: "Distributor", value: "Changed" });
+  assert.deepEqual(metadata.changes.find((change) => change.field === "Distributor"), { field: "Distributor", value: "Redacted (sensitive)" });
 });
 
 test("voiding an accession audits the persisted Assigned to Voided transition without the reason", () => {
@@ -243,8 +243,8 @@ test("user audit changes hide personal values and distinguish no change from fai
   const after = { ...before, name: "B Person", email: "new@example.test", role: "staff" };
   const changed = audit.metadataFor("/api/admin/users/S-123", {}, before, after, null, false, policy, { comparable: true });
   assert.equal(changed.detail_status, "changes_captured");
-  assert.deepEqual(changed.changes.find((change) => change.field === "Name"), { field: "Name", value: "Changed" });
-  assert.deepEqual(changed.changes.find((change) => change.field === "Email"), { field: "Email", value: "Changed" });
+  assert.deepEqual(changed.changes.find((change) => change.field === "Name"), { field: "Name", value: "Redacted (sensitive)" });
+  assert.deepEqual(changed.changes.find((change) => change.field === "Email"), { field: "Email", value: "Redacted (sensitive)" });
   assert.ok(changed.changes.find((change) => change.field === "Role" && change.before === "student" && change.after === "staff"));
   const unchanged = audit.metadataFor("/api/admin/users/S-123", {}, before, before, null, false, policy, { comparable: true });
   assert.equal(unchanged.detail_status, "no_field_changes");

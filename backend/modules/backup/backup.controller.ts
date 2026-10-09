@@ -23,17 +23,21 @@ function requireRestoreSignOutAcknowledgement(req: Request): void {
 function sendError(res: Response, error: unknown, fallback: string): void {
   logError("[backup]", error);
   const requestError = error as RequestError;
-  res.status(requestError?.status || 500).json({ message: requestError?.message || fallback });
+    const restoreError=error as {restoreCommitted?:boolean;safetySnapshotId?:number};
+    res.status(requestError?.status || 500).json({ message: requestError?.message || fallback,...(restoreError.restoreCommitted!==undefined?{liveDataChanged:restoreError.restoreCommitted,safetySnapshotId:restoreError.safetySnapshotId}: {}) });
 }
 
-const exportBackup: RequestHandler = async (_req, res) => {
+const exportBackup: RequestHandler = async (req, res) => {
   try {
     const backup = await snapshot.createBackupPayload();
     const { contents } = storage.serializeSnapshot(backup);
     const filename = `euc-library-backup-${backup.createdAt.replace(/[:.]/g, "-")}.json.gz`;
+    const compressed=gzipSync(contents);
+    await logDownload(req,null,backup.createdAt);
+    res.locals.auditEnqueued=true;
     res.setHeader("Content-Type", "application/gzip");
     res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
-    res.send(gzipSync(contents));
+    res.send(compressed);
   } catch (error: unknown) {
     sendError(res, error, "Could not create the database backup.");
   }
@@ -50,7 +54,7 @@ const listSavedSnapshots: RequestHandler = async (_req, res) => {
 const backupStatus: RequestHandler = async (_req, res) => {
   try {
     const state = await repository.getMaintenanceStatus();
-    res.json({ mode: state.mode ?? "normal", startedAt: state.startedAt ?? null, snapshotVersion: transforms.SNAPSHOT_VERSION, maxImportBytes: importLimit() });
+    res.json({ mode: state.mode ?? "normal", startedAt: state.startedAt ?? null, snapshotVersion: transforms.SNAPSHOT_VERSION, maxImportBytes: importLimit(),activeSessions:await require('./backup.safety').activeSessions(),progress:require('./backup.safety').getProgress(),storage:{provider:"Cloudinary",access:"Authenticated storage",region:null,encryptionAtRest:null},schedule:await require('./backup.schedule').read(),retention:30,noticeRecipients:await require('../notifications/notifications.admin.service').count({audienceType:'all'}) });
   } catch (error: unknown) {
     sendError(res, error, "Backup maintenance state is unavailable.");
   }
@@ -74,11 +78,15 @@ const checkSavedCompatibility: RequestHandler = async (req, res) => {
   }
 };
 
+async function logDownload(req:Request,id:number|null,createdAt:string){await require("../analytics/analytics.audit.service").recordAuditEvent({actorId:(req as AuthenticatedRequest).user!.id,category:"backup",action:"exported",description:id?`Prepared backup file for snapshot #${id}`:"Prepared backup file of current data",route:"/api/admin/backup/export",metadata:{snapshot_id:id,created_at:createdAt}});}
+
 const saveSnapshot: RequestHandler = async (req, res) => {
   try {
     const user = (req as AuthenticatedRequest).user!;
+    const {label,notes}=req.body||{};
+    if(label!==undefined&&(typeof label!=='string'||label.length>120)||notes!==undefined&&(typeof notes!=='string'||notes.length>500))throw Object.assign(new Error('Use a name up to 120 characters and notes up to 500 characters.'),{status:400});
     res.status(201).json({
-      snapshot: await storage.uploadSnapshot(await snapshot.createBackupPayload(), user.id, "manual"),
+      snapshot: await storage.uploadSnapshot(await snapshot.createBackupPayload(), user.id, "manual",{label:label?.trim()||null,notes:notes?.trim()||null}),
       message: "Snapshot saved securely.",
     });
   } catch (error: unknown) {
@@ -90,9 +98,12 @@ const downloadSnapshot: RequestHandler = async (req, res) => {
   try {
     const savedSnapshot = await repository.findSnapshot(String(req.params.id));
     const payload = await storage.getSnapshotPayload(savedSnapshot);
+    const compressed=gzipSync(JSON.stringify(payload));
+    await logDownload(req,savedSnapshot.id,payload.createdAt);
+    res.locals.auditEnqueued=true;
     res.setHeader("Content-Type", "application/gzip");
     res.setHeader("Content-Disposition", `attachment; filename=\"${savedSnapshot.filename.replace(/\.json$/i, ".json.gz")}\"`);
-    res.send(gzipSync(JSON.stringify(payload)));
+    res.send(compressed);
   } catch (error: unknown) {
     sendError(res, error, "Could not download the snapshot.");
   }
@@ -101,6 +112,7 @@ const downloadSnapshot: RequestHandler = async (req, res) => {
 const restoreSavedSnapshot: RequestHandler = async (req, res) => {
   try {
     requireRestoreSignOutAcknowledgement(req);
+    await require('./backup.safety').requireRestoreCredentials(req);
     const savedSnapshot = await repository.findSnapshot(String(req.params.id));
     const backup = await storage.getSnapshotPayload(savedSnapshot);
     if (!transforms.validateBackup(backup)) throw Object.assign(new Error("The saved snapshot is invalid."), { status: 400 });
@@ -125,6 +137,7 @@ const restoreSavedSnapshot: RequestHandler = async (req, res) => {
 const restoreUploadedSnapshot: RequestHandler = async (req, res) => {
   try {
     requireRestoreSignOutAcknowledgement(req);
+    await require('./backup.safety').requireRestoreCredentials(req);
     if (!transforms.validateBackup(req.body)) throw Object.assign(new Error("This file is not a valid EUC Library backup."), { status: 400 });
     const user = (req as AuthenticatedRequest).user!;
     const preRestoreSnapshot = await restore.performRestore(req.body, {

@@ -71,6 +71,8 @@ interface BorrowingCreateInput {
   loanPolicyNameSnapshot?: string | null;
 }
 interface AdminBorrowingFilters {
+  policyId?:number;
+  previousTerms?:boolean;
   search?: string;
   status?: string;
   showArchived?: boolean;
@@ -476,10 +478,12 @@ const restoreBorrowing = async (borrowingId: number, conn: QueryConnection): Pro
   return Number(result.affectedRows);
 };
 
-const getAdminBorrowings = async ({ search = "", status, showArchived = false, page = 1, limit = 20, dateFrom, dateTo }: AdminBorrowingFilters): Promise<{ rows: DataRow[]; total: number; summary: DataRow; page: number; limit: number }> => {
+const getAdminBorrowings = async ({ search = "", status, showArchived = false, page = 1, limit = 20, dateFrom, dateTo, policyId, previousTerms }: AdminBorrowingFilters): Promise<{ rows: DataRow[]; total: number; summary: DataRow; page: number; limit: number }> => {
   const offset = (page - 1) * limit;
   const conditions = [`b.deleted_at IS ${showArchived ? "NOT NULL" : "NULL"}`];
   const params = [];
+  if(policyId){conditions.push('b.loan_policy_id_snapshot = ?');params.push(policyId);}
+  if(previousTerms){const {previousPolicyTerms}=require('../catalog/policy.snapshot');conditions.push(`b.status IN ('borrowed','overdue') AND EXISTS (SELECT 1 FROM book_types bt WHERE bt.id=b.loan_policy_id_snapshot AND ${previousPolicyTerms()})`);}
 
   if (search.trim()) { conditions.push("(bk.title LIKE ? OR u.name LIKE ? OR u.student_employee_id LIKE ? OR bk.isbn LIKE ?)"); const like = `%${search.trim()}%`; params.push(like, like, like, like); }
   if (dateFrom) { conditions.push("DATE(b.borrowed_at) >= ?"); params.push(dateFrom); }

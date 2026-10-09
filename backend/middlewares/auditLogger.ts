@@ -48,7 +48,7 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/reservations", methods: ["POST", "PATCH", "DELETE"], type: "state_transition" },
   { prefix: "/api/clearance", methods: ["POST", "PATCH", "DELETE"], type: "state_transition" },
   { prefix: "/api/admin/clearance", methods: ["POST", "PATCH", "DELETE"], type: "state_transition" },
-  { prefix: "/api/admin/backup", methods: ["POST"], type: "affected_records", exclude: /\/compatibility$/ },
+  { prefix: "/api/admin/backup", methods: ["POST"], type: "affected_records", exclude: /\/(?:compatibility|preview)$/ },
   { prefix: "/api/admin/recommendations/books", methods: ["PUT", "PATCH"], type: "field_changes" },
   { prefix: "/api/admin/recommendations/embeddings/backfill", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/admin/subscriptions/reorder", methods: ["PATCH"], type: "affected_records" },
@@ -62,6 +62,7 @@ function getAuditPolicy(method: string, path: string): any {
 }
 
 function getCategory(path: string): string {
+  if (path.includes("book-types") || path.includes("catalog-schema") || path.includes("catalog-settings") || path.includes("library-settings")) return "settings";
   if (path.includes("/books") || path.includes("catalog-schema") || path.includes("book-types") || path.includes("/copies") || path.includes("catalog-settings")) return "catalog";
   if (path.includes("/academic-") || path.includes("/library-") || path.includes("/holidays") || path.includes("/departments")) return "academic_settings";
   if (path.includes("/users")) return "users";
@@ -189,9 +190,9 @@ function change(field: string, label: string, before: any, after: any): any {
   if (normalizeComparable(before) === normalizeComparable(after)) return null;
   const key = String(field).toLowerCase(); const caption = String(label).toLowerCase();
   const sensitive = /(password|token|secret|email|phone|contact|address|user.?id|student_employee|student employee|personal|birth|date of birth|remarks|notes|reason|distributor)/i.test(`${key} ${caption}`)
-    || key === "name" && !/(program|course|term|department|holiday)/i.test(caption)
+    || key === "name" && !/(policy|program|course|term|department|holiday)/i.test(caption)
     || caption === "name";
-  if (sensitive) return { field: label, value: "Changed" };
+  if (sensitive) return { field: label, value: "Redacted (sensitive)" };
   return { field: label, before: valueFor(before, key), after: valueFor(after, key) };
 }
 
@@ -530,6 +531,10 @@ function metadataFor(path: string, body: any, before: any, after: any, details: 
   if (policy?.type === "state_transition" && !capture.comparable && !(details?.stateFrom !== undefined && details?.stateTo !== undefined)) changes = [];
   if (policy?.type === "field_changes" && (capture.failed || !capture.comparable && !isCreation)) changes = [];
   const metadata: Record<string, any> = { changes };
+  if (path.includes('/book-types/') && !capture.failed) {
+    metadata.fine_interval_before = before?.fine_interval ?? null;
+    metadata.fine_interval_after = after?.fine_interval ?? null;
+  }
   const detailsObject = details && typeof details === "object" ? details : {};
   if (!capture.failed && detailsObject.stateFrom !== undefined && detailsObject.stateTo !== undefined && (!capture.comparable || !changes.length)) {
     changes = [...changes, { field: detailsObject.stateLabel || "State", before: valueFor(detailsObject.stateFrom), after: valueFor(detailsObject.stateTo) }];
@@ -538,7 +543,7 @@ function metadataFor(path: string, body: any, before: any, after: any, details: 
   if (detailsObject.financialChange) changes.push({ field: String(detailsObject.financialChange), value: "Changed" });
   if (changes !== metadata.changes) metadata.changes = changes;
   if (path.includes("/users") && body.password) metadata.security_change = "Password value withheld; password changed";
-  if (after?.id != null) metadata.target_id = after.id;
+  if ((after?.id??before?.id) != null) metadata.target_id = after?.id??before.id;
   const transactionId = detailsObject.transactionId ?? body.transactionId;
   if (transactionId != null && Number.isSafeInteger(Number(transactionId))) metadata.transaction_id = Number(transactionId);
   const borrowingId = detailsObject.borrowingId ?? body.borrowingId;

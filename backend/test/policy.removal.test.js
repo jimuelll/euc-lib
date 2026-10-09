@@ -5,7 +5,7 @@ const repository = require("../modules/catalog/catalog.repository");
 const middleware = require("../modules/catalog/catalog.middleware");
 const { availableToBorrow, hasActiveBookPolicy, hasPreparedReservation } = require("../modules/catalog/copyEligibility");
 
-test("deleting an assigned policy clears active and archived assignments atomically", async () => {
+test("deleting an assigned policy is rejected without clearing active or archived assignments", async () => {
   const originalGetConnection = db.getConnection;
   const statements = [];
   const connection = {
@@ -28,12 +28,13 @@ test("deleting an assigned policy clears active and archived assignments atomica
   };
   db.getConnection = async () => connection;
   try {
-    const result = await repository.deleteBookType(7);
-    assert.deepEqual(result, { id: 7, name: "General", active_books: 2, archived_books: 1, affected_books: 3 });
+    await assert.rejects(repository.deleteBookType(7), {status:409});
     assert.match(statements[1], /^SELECT id, name FROM book_types WHERE id = \? FOR UPDATE$/);
     assert.match(statements[2], /^SELECT id, deleted_at FROM books WHERE book_type_id = \? FOR UPDATE$/);
-    assert.ok(statements.indexOf("COMMIT") > statements.findIndex((sql) => typeof sql === "string" && sql.startsWith("DELETE FROM book_types")));
-    assert.equal(statements.filter((sql) => typeof sql === "string" && sql.startsWith("UPDATE books SET book_type_id = NULL")).length, 1);
+    assert.ok(statements.includes("ROLLBACK"));
+    assert.ok(!statements.includes("COMMIT"));
+    assert.ok(!statements.some(sql=>sql.startsWith("DELETE FROM book_types")));
+    assert.equal(statements.filter((sql) => typeof sql === "string" && sql.startsWith("UPDATE books SET book_type_id = NULL")).length, 0);
     assert.equal(statements.at(-1), "RELEASE");
   } finally { db.getConnection = originalGetConnection; }
 });
@@ -76,7 +77,7 @@ test("an unused policy deletes without changing books", async () => {
   try {
     const result = await repository.deleteBookType(8);
     assert.deepEqual(result, { id: 8, name: "Reference", active_books: 0, archived_books: 0, affected_books: 0 });
-    assert.equal(statements.filter((sql) => sql.startsWith("UPDATE books SET book_type_id = NULL")).length, 1);
+    assert.equal(statements.filter((sql) => sql.startsWith("UPDATE books SET book_type_id = NULL")).length, 0);
     assert.equal(statements.at(-2), "COMMIT");
   } finally { db.getConnection = originalGetConnection; }
 });

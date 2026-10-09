@@ -42,7 +42,8 @@ interface ScoredCandidate extends RecommendationCandidate {
 }
 
 interface BackfillState {
-  status: "idle" | "running" | "completed" | "completed_with_errors" | "paused_rate_limited";
+  status: "idle" | "running" | "completed" | "completed_with_errors" | "paused_rate_limited" | "cancelled" | "interrupted";
+  runId?:string; startedAt?:string; finishedAt?:string; cancelRequested?:boolean; succeeded?:number; skipped?:number; failedBooks?:number; scope?:string; providers?:string[]; actorId?:number|null; auditError?:string;
   total: number;
   completed: number;
   missingSynopses: number;
@@ -274,8 +275,10 @@ const dismiss = async (userId: number, bookId: number): Promise<void> => {
   await repository.dismissBook(userId, bookId);
 };
 
-const listMetadataBooks = async ({ query = "", needsAttention = false, page = 1, limit = 25 }: MetadataListOptions = {}) => {
-  const result = await repository.listBooksForMetadata({ query, needsAttention, page, limit });
+const listMetadataBooks = async (options: MetadataListOptions = {}) => {
+  const {page=1,limit=25}=options;
+  for(const [key,allowed] of Object.entries({synopsis:['all','blank','present','not_checked','no_description','lookup_failed','missing'],embedding:['all','ready','needed','missing','stale','failed'],details:['all','found','missing','manual','failed'],sort:['attention','title','author']})){if(options[key as keyof MetadataListOptions]!==undefined&&!allowed.includes(String(options[key as keyof MetadataListOptions])))throw createServiceError('Invalid readiness filter',400);}
+  const result = await repository.listBooksForMetadata(options);
   const rows = result.rows.map((row) => {
     const enrichment = parseEnrichment(row.enrichment_json);
     const hasMetadata = hasUsefulMetadata(enrichment);
@@ -283,7 +286,7 @@ const listMetadataBooks = async ({ query = "", needsAttention = false, page = 1,
       : row.metadata_status === "failed" ? "failed"
         : row.metadata_status === "ready" && hasMetadata ? "ready" : "missing";
     return {
-      id: row.id, title: row.title, author: row.author, isbn: row.isbn,
+      id: row.id, title: row.title, author: row.author, isbn: row.isbn, imageUrl: row.image_url || null,
       source: row.metadata_source || null, metadataStatus, embeddingStatus: row.embedding_status || "missing",
       synopsisStatus: synopsisStatus(row.isbn, row.metadata_source, enrichment),
     };
@@ -314,10 +317,11 @@ const getManualMetadata = async (bookId: number) => {
     synopsisError: enrichment.synopsisLastError || enrichment.googleBooksSynopsisLastError ? publicMetadataError(enrichment.synopsisLastError || enrichment.googleBooksSynopsisLastError) : null,
     embeddingStatus: record.embedding_status || "missing",
     embeddingError: record.embedding_error ? publicEmbeddingError(record.embedding_error) : null,
+    staffEditedAt:enrichment.staffEditedAt||null,staffEditedBy:enrichment.staffEditedBy||null,
   };
 };
 
-const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload = {}) => {
+const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload = {},actorId:number|null=null) => {
   const record = await repository.findBookMetadataRecord(bookId);
   if (!record) throw createServiceError("Book not found", 404);
   if (record.material_type !== "book") throw createServiceError("Manual AI details are available for books only", 400);
@@ -367,6 +371,7 @@ const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload
   delete enrichment.descriptionSource;
   delete enrichment.googleBooksSynopsisLastError;
   if (!hasUsefulMetadata(enrichment)) throw createServiceError("Add at least one book detail before saving", 400);
+  if(actorId){enrichment.staffEditedAt=new Date().toISOString();enrichment.staffEditedBy=await require("./recommendations.run-log").staffName(actorId);}
   await repository.saveManualEnrichment(bookId, enrichment);
 
   try {
@@ -380,7 +385,7 @@ const saveManualMetadata = async (bookId: number, payload: ManualMetadataPayload
   }
 };
 
-const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }: { retryRateLimit?: boolean } = {}): Promise<EnrichmentOutcome> => {
+const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false,retryLookup=false }: { retryRateLimit?: boolean;retryLookup?:boolean } = {}): Promise<EnrichmentOutcome> => {
   const existing = await repository.findEnrichment(bookId);
   const savedEnrichment = parseEnrichment(existing?.enrichment_json);
   if (existing?.source === "manual") {
@@ -394,7 +399,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     return { enrichment: Object.keys(savedEnrichment).length ? savedEnrichment : null, synopsisStatus: "missing", synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
   }
   if (existing?.status === "ready" && hasUsefulMetadata(savedEnrichment)) {
-    if (hasSynopsisCheck(savedEnrichment)) {
+    if (hasSynopsisCheck(savedEnrichment)&&!retryLookup) {
       return { enrichment: savedEnrichment, synopsisStatus: synopsisStatus(isbnRecord.isbn, existing.source, savedEnrichment), synopsisCheckedNow: false, descriptionAddedNow: false, lookupFailed: false, lookupErrors: [], rateLimited: false, retryAfterMs: null };
     }
     const lookup = await isbnMetadataLookup.lookupBookSynopsis(isbnRecord.isbn, { retryRateLimit });
@@ -434,7 +439,7 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false }:
     };
   }
 
-  const markerAlreadySet = hasSynopsisCheck(savedEnrichment);
+  const markerAlreadySet = hasSynopsisCheck(savedEnrichment)&&!retryLookup;
   const metadata = await isbnMetadataLookup.lookupIsbnMetadata(isbnRecord.isbn, { retryRateLimit, skipGoogleBooks: markerAlreadySet });
   const enrichment: Enrichment = {
     ...savedEnrichment,
@@ -489,7 +494,7 @@ const enrichBook = async (bookId: number): Promise<(Enrichment & { __lookupFaile
   return outcome.enrichment;
 };
 
-const embedBook = async (bookId: number): Promise<{ bookId: number; dimensions: number } | null> => {
+const embedBook = async (bookId: number): Promise<{ bookId: number; dimensions: number; reused?:boolean } | null> => {
   const book = await repository.findBookForEmbedding(bookId);
   if (!book) return null;
   const enrichmentRow = await repository.findReadyEnrichment(bookId);
@@ -498,7 +503,7 @@ const embedBook = async (bookId: number): Promise<{ bookId: number; dimensions: 
   if (enrichmentRow?.embedding_status === "ready"
     && enrichmentRow.embedding_model === model
     && enrichmentRow.embedding_content_hash === hash) {
-    return { bookId: book.id, dimensions: Number(enrichmentRow.embedding_dimensions || 0) };
+    return { bookId: book.id, dimensions: Number(enrichmentRow.embedding_dimensions || 0),reused:true };
   }
   if (process.env.AI_EMBEDDING_PROVIDER !== "gemini" || !process.env.GEMINI_API_KEY) throw new Error("Gemini embedding provider is not configured");
   const response = await fetch(
@@ -544,71 +549,103 @@ const addLookupErrors = (messages: string[], title: string): void => {
   }
 };
 
-const runBackfill = async (books: BackfillBook[]): Promise<void> => {
+const runBackfill = async (books: BackfillBook[],run:BackfillState=activeBackfill): Promise<void> => {
   let pauseForRateLimit = false;
   for (const book of books) {
-    activeBackfill.currentTitle = book.title;
+    if(run.cancelRequested){run.status="cancelled";break;}
+    const beforeFailures=run.failed+run.lookupFailed;let reused=false;
+    run.currentTitle = book.title;
     let outcome: EnrichmentOutcome | null = null;
     try {
-      outcome = await enrichBookWithOutcome(book.id, { retryRateLimit: true });
-      if (outcome.synopsisCheckedNow && outcome.synopsisStatus === "no_description") activeBackfill.synopsesNotFound += 1;
-      if (outcome.descriptionAddedNow) activeBackfill.synopsesAdded += 1;
-      if (outcome.lookupFailed) {
-        activeBackfill.lookupFailed += 1;
+      outcome = run.scope==='embeddings'?null:await enrichBookWithOutcome(book.id, { retryRateLimit: true,retryLookup:run.scope==='synopses'||run.scope==='selected' });
+      if(outcome)run.providers=[...new Set([...(run.providers||[]),...(outcome.providerAttempts||[])])].slice(0,30);
+      if (outcome?.synopsisCheckedNow && outcome.synopsisStatus === "no_description") run.synopsesNotFound += 1;
+      if (outcome?.descriptionAddedNow) run.synopsesAdded += 1;
+      if (outcome?.lookupFailed) {
+        run.lookupFailed += 1;
         const sourcePath = outcome.providerAttempts?.length ? `Synopsis source path: ${outcome.providerAttempts.join(" → ")}` : "";
         addLookupErrors([[...outcome.lookupErrors, sourcePath].filter(Boolean).join("; ")], book.title);
       }
     } catch (error: unknown) {
-      activeBackfill.lookupFailed += 1;
+      run.lookupFailed += 1;
       addLookupErrors([errorMessage(error)], book.title);
     }
     if (outcome?.rateLimited) {
       pauseForRateLimit = true;
       const waitMs = outcome.retryAfterMs;
-      activeBackfill.rateLimitRetryAt = waitMs == null ? null : new Date(Date.now() + waitMs).toISOString();
+      run.rateLimitRetryAt = waitMs == null ? null : new Date(Date.now() + waitMs).toISOString();
     }
     try {
       const embedding = await embedBook(book.id);
-      if (embedding) activeBackfill.embedded += 1;
+      if (embedding) run.embedded += 1;
+      reused=!embedding||Boolean(embedding.reused);
     } catch (error: unknown) {
-      activeBackfill.failed += 1;
+      run.failed += 1;
       const message = `${book.title}: ${publicEmbeddingError(error)}`.slice(0, 240);
-      if (!activeBackfill.errors.includes(message)) activeBackfill.errors.push(message);
+      if (!run.errors.includes(message)) run.errors.push(message);
+      await repository.markEmbeddingFailed(book.id,message).catch(()=>{run.errors.push(`${book.title}: failed to store AI matching error; check the database.`);});
     } finally {
-      activeBackfill.completed += 1;
+      run.completed += 1;
+      if(run.failed+run.lookupFailed>beforeFailures)run.failedBooks=(run.failedBooks||0)+1;
+      else if(reused&&!outcome?.synopsisCheckedNow&&!outcome?.descriptionAddedNow)run.skipped=(run.skipped||0)+1;
+      else run.succeeded=(run.succeeded||0)+1;
     }
     if (pauseForRateLimit) {
-      activeBackfill.status = "paused_rate_limited";
-      activeBackfill.deferred = activeBackfill.total - activeBackfill.completed;
+      run.status = "paused_rate_limited";
+      run.deferred = run.total - run.completed;
       break;
     }
   }
-  if (!pauseForRateLimit) activeBackfill.status = activeBackfill.failed || activeBackfill.lookupFailed ? "completed_with_errors" : "completed";
-  activeBackfill.currentTitle = null;
+  if (!pauseForRateLimit&&run.status!=="cancelled") run.status = run.failed || run.lookupFailed ? "completed_with_errors" : "completed";
+  run.currentTitle = null;
+  run.finishedAt=new Date().toISOString();run.deferred=run.total-run.completed;
   try {
     const { row } = await repository.getEmbeddingStatus();
-    activeBackfill.missingSynopses = Number(row.missing_synopses || 0);
+    run.missingSynopses = Number(row.missing_synopses || 0);
   } catch { /* Preserve the last known count if the refresh query fails. */ }
+  await recordBackfill(run);
 };
-const startBackfill = async () => {
-  if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
-  const [books, status] = await Promise.all([repository.findBooksForBackfill(), repository.getEmbeddingStatus()]);
-  activeBackfill = { status: "running", total: books.length, completed: 0, missingSynopses: Number(status.row.missing_synopses || 0), embedded: 0, synopsesAdded: 0, synopsesNotFound: 0, failed: 0, lookupFailed: 0, deferred: 0, rateLimitRetryAt: null, currentTitle: null, errors: [], lookupErrors: [] };
-  if (!books.length) { activeBackfill.status = "completed"; return { ...activeBackfill }; }
-  setImmediate(() => runBackfill(books).catch((error: unknown) => {
-    activeBackfill.status = "completed_with_errors";
-    activeBackfill.errors.push(errorMessage(error || "Backfill failed").slice(0, 180));
+const recordBackfill=async(run:BackfillState=activeBackfill)=>{try{await require('./recommendations.run-log').recordRun({...run},run.actorId||null);}catch{run.auditError='Could not record the final run result. Check the audit service.';}};
+const previewBackfill=async(input:any={})=>{
+ const options=require('./recommendations.admin').validateBackfillOptions(input),books=await repository.findBooksForBackfill(options);
+ const last=await require('./recommendations.run-log').latestRun();
+ const elapsed=last?.startedAt&&last?.finishedAt&&last.completed?(Date.parse(last.finishedAt)-Date.parse(last.startedAt))/1000/last.completed:null;
+ return {total:books.length,missingSynopses:books.filter(b=>(b as any).missing_synopsis).length,synopsisLookups:books.filter(b=>(b as any).needs_lookup&&options.scope!=='embeddings').length,embeddings:books.filter(b=>(b as any).needs_embedding).length,estimatedSeconds:elapsed?Math.ceil(elapsed*books.length):null,options};
+};
+const startBackfill = async (input:any={},actorId:number|null=null) => {
+ const options=require('./recommendations.admin').validateBackfillOptions(input);
+ if (activeBackfill.status === "running") return { ...activeBackfill, alreadyRunning: true };
+ // Reserve the run before the first await so concurrent requests cannot both start work.
+ const previous=activeBackfill;
+ activeBackfill={status:'running',runId:crypto.randomUUID(),startedAt:new Date().toISOString(),actorId,scope:options.scope,total:0,completed:0,missingSynopses:0,embedded:0,synopsesAdded:0,synopsesNotFound:0,failed:0,lookupFailed:0,deferred:0,rateLimitRetryAt:null,currentTitle:null,errors:[],lookupErrors:[],providers:[],succeeded:0,skipped:0,failedBooks:0};
+ try{
+  const [books, status] = await Promise.all([repository.findBooksForBackfill(options), repository.getEmbeddingStatus()]);
+  activeBackfill.total=books.length;activeBackfill.missingSynopses=Number(status.row.missing_synopses||0);
+  await require('./recommendations.run-log').recordRun({...activeBackfill},actorId);
+  if (!books.length) { activeBackfill.status = "completed";activeBackfill.finishedAt=new Date().toISOString();await recordBackfill();return { ...activeBackfill }; }
+  const job=activeBackfill;
+  setImmediate(() => runBackfill(books,job).catch(async(error: unknown) => {
+   job.status = "completed_with_errors";job.finishedAt=new Date().toISOString();job.deferred=job.total-job.completed;
+   job.errors.push(publicEmbeddingError(error || "Backfill failed"));await recordBackfill(job);
   }));
   return { ...activeBackfill };
+ }catch(error){activeBackfill=previous;throw error;}
 };
+const cancelBackfill=()=>{if(activeBackfill.status==='running')activeBackfill.cancelRequested=true;return backfillProgress();};
+const restoredBackfillProgress=async()=>{
+ if(activeBackfill.status!=='idle')return backfillProgress();
+ const last=await require('./recommendations.run-log').latestRun();
+ return last?{...last,...(last.status==='running'?{status:'interrupted',deferred:last.total-last.completed}:{})}:backfillProgress();
+};
+const providerConfiguration=()=>({model:embeddingModel(),gemini:process.env.AI_EMBEDDING_PROVIDER==='gemini'&&Boolean(process.env.GEMINI_API_KEY),openLibrary:true,googleBooks:true,googleBooksKey:Boolean(process.env.GOOGLE_BOOKS_API_KEY),hardcover:Boolean(process.env.HARDCOVER_API_TOKEN)});
 const backfillProgress = (): BackfillState => ({ ...activeBackfill, errors: [...activeBackfill.errors] });
 const embeddingStatus = async () => {
   const { row, errors } = await repository.getEmbeddingStatus();
   return {
     total: Number(row.total || 0), ready: Number(row.ready || 0), stale: Number(row.stale || 0), failed: Number(row.failed || 0), missing: Number(row.missing || 0),
-    missingSynopses: Number(row.missing_synopses || 0), needsAttention: Number(row.needs_attention || 0),
+    missingSynopses: Number(row.missing_synopses || 0), missingDetails: Number(row.missing_details || 0), needsAttention: Number(row.needs_attention || 0),
     errors: errors.map((entry) => ({ bookId: entry.book_id, message: String(entry.last_error).replace(/key=[^&\s]+/gi, "key=[redacted]") })),
   };
 };
 
-export = { recommendationsForSeed, personalized, dismiss, listMetadataBooks, getManualMetadata, saveManualMetadata, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, backfillProgress, embeddingStatus };
+export = { recommendationsForSeed, personalized, dismiss, listMetadataBooks, getManualMetadata, saveManualMetadata, embedBook, enrichBook, markEmbeddingStale, queueEmbedding, queueEnrichmentAndEmbedding, startBackfill, previewBackfill, cancelBackfill, restoredBackfillProgress, providerConfiguration, backfillProgress, embeddingStatus };

@@ -244,7 +244,7 @@ async function replaceApplicationData(backup: SnapshotPayload, {
        AND category NOT IN ('auth', 'backup', 'system')`,
       [restoreAuditId, snapshotCutoff]
     );
-    await connection.query(
+    const [auditEvent] = await connection.query<ResultSetHeader>(
       `INSERT INTO audit_events
          (actor_id, actor_name, actor_role, category, action, description, route, metadata)
        VALUES (?, ?, ?, 'backup', 'restored', ?, '/api/admin/backup/restore', ?)`,
@@ -259,7 +259,7 @@ async function replaceApplicationData(backup: SnapshotPayload, {
     await connection.query("SET @allow_accession_restore = 0");
     await connection.query("SET FOREIGN_KEY_CHECKS = 1");
     await connection.commit();
-    return { orphanedAccessionClaimCount };
+    return { orphanedAccessionClaimCount,restoreAuditId,auditEventId:auditEvent.insertId,preRestoreSnapshotId,reversedEventCount:reversed.affectedRows };
   } catch (error) {
     if (connection) await connection.rollback();
     throw error;

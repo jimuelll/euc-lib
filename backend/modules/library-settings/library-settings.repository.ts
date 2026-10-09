@@ -52,8 +52,9 @@ const updateSettings = async (overdueFinePerHour: number | string, updatedBy: nu
 const listHolidays = async ({ status = "active" }: { status?: RecordStatus | string } = {}, conn: QueryConnection = db): Promise<HolidayRecord[]> => {
   const statusFilter = status === "all" ? "" : status === "archived" ? "WHERE is_active = 0" : "WHERE is_active = 1";
   const [rows] = await conn.query<HolidayRecord[]>(
-    `SELECT id, name, holiday_date, description, is_active, created_at, updated_at,
-            NULL AS usage_count, 'Usage cannot be reliably reconstructed from saved due dates' AS usage_note
+    `SELECT id, name, DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date, description, is_active, created_at, updated_at,
+            (SELECT name FROM users actor WHERE actor.id = COALESCE(library_holidays.updated_by, library_holidays.created_by)) AS changed_by,
+            NULL AS usage_count, 'Holidays are archived so existing loans keep their due dates.' AS usage_note
      FROM library_holidays
      ${statusFilter}
      ORDER BY holiday_date ASC, id ASC`,
@@ -69,7 +70,7 @@ const createHoliday = async ({ name, holidayDate, description = null }: HolidayI
     [name, holidayDate, description, userId ?? null, userId ?? null],
   );
   const [rows] = await conn.query<HolidayRecord[]>(
-    `SELECT id, name, holiday_date, description, created_at, updated_at
+    `SELECT id, name, DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date, description, created_at, updated_at
      FROM library_holidays
      WHERE id = ?`,
     [result.insertId],
@@ -86,7 +87,7 @@ const updateHoliday = async (holidayId: number, { name, holidayDate, description
   );
   if (!result.affectedRows) return null;
   const [rows] = await conn.query<HolidayRecord[]>(
-    `SELECT id, name, holiday_date, description, created_at, updated_at
+    `SELECT id, name, DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date, description, created_at, updated_at
      FROM library_holidays
      WHERE id = ?`,
     [holidayId],
@@ -114,6 +115,7 @@ const listAcademicPrograms = async ({ status = "active" }: { status?: RecordStat
   const statusFilter = status === "all" ? "" : status === "archived" ? "WHERE ap.is_active = 0" : "WHERE ap.is_active = 1";
   const [rows] = await conn.query<ProgramRecord[]>(
     `SELECT ap.id, ap.name, ap.is_active, ap.created_at, ap.updated_at,
+       (SELECT name FROM users actor WHERE actor.id = COALESCE(ap.updated_by, ap.created_by)) AS changed_by,
        (SELECT COUNT(*) FROM users u WHERE u.program_id = ap.id) AS user_reference_count,
        (SELECT COUNT(*) FROM copy_holdings h WHERE h.program_id = ap.id) AS holding_reference_count
      FROM academic_programs ap
@@ -139,7 +141,7 @@ const updateAcademicProgram = async (programId: number, name: string, userId: nu
   return rows[0] ?? null;
 };
 
-const deleteAcademicProgram = async (programId: number, userId: number | null | undefined, conn: QueryConnection = db): Promise<ProgramDeletion | null> => {
+const deleteAcademicProgram = async (programId: number, userId: number | null | undefined, conn: QueryConnection = db, mode: "auto" | "archive" | "delete" = "auto"): Promise<ProgramDeletion | null> => {
   const [programRows] = await conn.query<ProgramRecord[]>("SELECT id, name, is_active FROM academic_programs WHERE id = ? FOR UPDATE", [programId]);
   const [program] = programRows;
   if (!program) return null;
@@ -152,7 +154,8 @@ const deleteAcademicProgram = async (programId: number, userId: number | null | 
   const userCount = Number(usage.users || 0);
   const holdingCount = Number(usage.holdings || 0);
   const referenceCount = userCount + holdingCount;
-  if (referenceCount) {
+  if (mode === "delete" && referenceCount) throw Object.assign(new Error("This program has references. Archive it instead."), { status: 409 });
+  if (referenceCount || mode === "archive") {
     if (program.is_active) await conn.query("UPDATE academic_programs SET is_active = 0, updated_by = ? WHERE id = ?", [userId ?? null, programId]);
     return { action: "archived", program, user_reference_count: userCount, holding_reference_count: holdingCount, reference_count: referenceCount };
   }
@@ -170,7 +173,7 @@ const restoreAcademicProgram = async (programId: number, userId: number | null |
 const listDepartments = async ({ status = "active" }: { status?: RecordStatus | string } = {}, conn: QueryConnection = db): Promise<DepartmentRecord[]> => {
   const statusFilter = status === "all" ? "" : status === "archived" ? "WHERE d.is_active = 0" : "WHERE d.is_active = 1";
   const [rows] = await conn.query<DepartmentRecord[]>(
-    `SELECT d.id, d.name, d.is_active, d.created_at, d.updated_at,
+    `SELECT d.id, d.name, d.is_active, d.created_at, d.updated_at, (SELECT name FROM users actor WHERE actor.id=COALESCE(d.updated_by,d.created_by)) AS changed_by,
        (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id) AS user_reference_count
      FROM departments d ${statusFilter} ORDER BY d.is_active DESC, d.name ASC`,
   );
@@ -190,13 +193,14 @@ const updateDepartment = async (departmentId: number, name: string, userId: numb
   return rows[0] ?? null;
 };
 
-const deleteDepartment = async (departmentId: number, userId: number | null | undefined, conn: QueryConnection = db): Promise<DepartmentDeletion | null> => {
+const deleteDepartment = async (departmentId: number, userId: number | null | undefined, conn: QueryConnection = db, mode: "auto" | "archive" | "delete" = "auto"): Promise<DepartmentDeletion | null> => {
   const [departmentRows] = await conn.query<DepartmentRecord[]>("SELECT id, name, is_active FROM departments WHERE id = ? FOR UPDATE", [departmentId]);
   const [department] = departmentRows;
   if (!department) return null;
   const [usageRows] = await conn.query<Array<RowDataPacket & { total: number | string }>>("SELECT COUNT(*) AS total FROM users WHERE department_id = ?", [departmentId]);
   const count = Number(usageRows[0].total || 0);
-  if (count) {
+  if (mode === "delete" && count) throw Object.assign(new Error("This department has references. Archive it instead."), { status: 409 });
+  if (count || mode === "archive") {
     if (department.is_active) await conn.query("UPDATE departments SET is_active = 0, updated_by = ? WHERE id = ?", [userId ?? null, departmentId]);
     return { action: "archived", department, user_reference_count: count, reference_count: count };
   }
@@ -210,7 +214,7 @@ const restoreDepartment = async (departmentId: number, userId: number | null | u
 };
 
 const listAcademicTerms = async (conn: QueryConnection = db): Promise<AcademicTermRecord[]> => {
-  const [rows] = await conn.query<AcademicTermRecord[]>("SELECT id, name, starts_on, ends_on, is_current, created_at, updated_at FROM academic_terms ORDER BY starts_on DESC, id DESC");
+  const [rows] = await conn.query<AcademicTermRecord[]>("SELECT t.id,t.name,DATE_FORMAT(t.starts_on, '%Y-%m-%d') AS starts_on,DATE_FORMAT(t.ends_on, '%Y-%m-%d') AS ends_on,t.is_current,t.created_at,t.updated_at,(SELECT name FROM users actor WHERE actor.id=COALESCE(t.updated_by,t.created_by)) AS changed_by,(SELECT COUNT(*) FROM users u WHERE u.academic_term_id=t.id) AS user_reference_count FROM academic_terms t ORDER BY t.starts_on DESC,t.id DESC");
   return rows;
 };
 

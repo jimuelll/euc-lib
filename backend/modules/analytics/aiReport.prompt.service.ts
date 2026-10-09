@@ -22,15 +22,17 @@ function reportPrompt(evidence: Record<string, any>, question: string): string {
   return [
     "You are an operations analyst writing a concise internal library performance brief.",
     "Use ONLY the JSON evidence below. Do not infer causes, add facts, mention personal data, or claim access to any other source.",
-    evidence.range.allTime
-      ? "This report covers the entire recorded history. Do not compare it with the period before records began; summarize the most important long-term totals and patterns instead."
+    evidence.range.allTime || evidence.comparison?.available === false
+      ? "The previous period is not fully recorded. Say 'No prior data to compare'; summarize only the selected period's totals and patterns."
       : "Do not restate every metric. Compare the selected period with the previous equal-length period and surface only the changes that matter.",
-    `Write plain text with these short headings: Performance assessment, ${evidence.range.allTime ? "Key findings" : "What changed"}, Recommended follow-up.`,
+    `Use Markdown with these short headings: Performance assessment, ${evidence.range.allTime || evidence.comparison?.available === false ? "Key findings" : "What changed"}, Recommended follow-up.`,
     "Under What changed, give at most three evidence-backed findings. Explain the operational implication without inventing a cause.",
     "Under Recommended follow-up, give one or two concrete actions tied to the evidence. Current watch items are a snapshot at generation time, not selected-period activity.",
     "State the inclusive reporting dates exactly and make comparisons numerically precise. If a previous value is zero, use an absolute change instead of a percentage.",
     "If all selected-period activity counts are zero, clearly say that no recorded activity was found for the period.",
     "Keep the report neutral, practical, and under 220 words.",
+    "All money is Philippine pesos (PHP). Use ₱ with thousands separators; never USD or dollars. Keep headings, bullet points and bold numeric figures in Markdown.",
+    "If comparison.available is false, state 'No prior data to compare'. Never calculate growth against a period before recordedFrom. Add no claims of renewed traffic or other causes not in the evidence.",
     `Evidence JSON: ${JSON.stringify(modelEvidence)}`,
   ].join("\n\n");
 }

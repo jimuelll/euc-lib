@@ -1,3 +1,4 @@
+import {sortRows} from './query.output';
 import type { Pool, RowDataPacket } from "mysql2/promise";
 
 type QueryFilters = Record<string, unknown>;
@@ -48,7 +49,7 @@ const DATASETS: Record<string, DatasetDefinition> = {
       ["needsAccessionCopies", "Needs accession"], ["availableCopies", "Available to borrow"], ["createdAt", "Added"],
     ],
     from: "FROM books b LEFT JOIN book_types bt ON bt.id = b.book_type_id",
-    select: `b.title, b.author, b.material_type AS materialType, COALESCE(bt.name, 'Unassigned') AS bookType, COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.category')), ''), 'Uncategorized') AS category, b.isbn,
+    select: `b.id AS bookId,b.title, b.author, b.material_type AS materialType, COALESCE(bt.name, 'Unassigned') AS bookType, COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.category')), ''), 'Uncategorized') AS category, b.isbn,
       (SELECT COUNT(*) FROM book_copies physical WHERE physical.book_id = b.id AND physical.deleted_at IS NULL) AS copies,
       (SELECT COUNT(*) FROM book_copies active_h WHERE active_h.book_id = b.id AND active_h.deleted_at IS NULL AND active_h.is_active = 1 AND ${hasAccession("active_h")}) AS activeAccessionedCopies,
       (SELECT COUNT(*) FROM book_copies missing_h WHERE missing_h.book_id = b.id AND missing_h.deleted_at IS NULL AND missing_h.is_active = 1 AND NOT ${hasAccession("missing_h")}) AS needsAccessionCopies,
@@ -188,8 +189,10 @@ function buildWhere(datasetName: string, filters: QueryFilters = {}) {
   return { dataset, clause: where.join(" AND "), params };
 }
 
+function orderBy(dataset: DatasetDefinition, filters: QueryFilters) { const key=String(filters.sort||'');if(!key)return dataset.order;if(!dataset.columns.some(([name])=>name===key))throw Object.assign(new Error('Choose a valid sort column.'),{status:400});return '`'+key+'` '+(filters.direction==='desc'?'DESC':'ASC')+', '+dataset.order; }
+
 function queryColumns(dataset: DatasetDefinition): Array<{ key: string; label: string; type: "date" | "dateTime" | "number" | "text" }> {
-  return dataset.columns.map(([key, label]) => ({ key, label, type: key === "oldestDueDate" ? "date" : ["createdAt", "borrowedAt", "dueDate", "returnedAt", "reservedAt", "expiresAt", "fulfilledAt"].includes(key) ? "dateTime" : ["copies", "activeAccessionedCopies", "needsAccessionCopies", "availableCopies", "overdueCount", "outstandingAmount", "fineRecords"].includes(key) ? "number" : "text" }));
+  return dataset.columns.map(([key, label]) => ({ key, label, type: key === "oldestDueDate" || key === "createdAt" && label === "Added" ? "date" : ["createdAt", "borrowedAt", "dueDate", "returnedAt", "reservedAt", "expiresAt", "fulfilledAt"].includes(key) ? "dateTime" : ["copies", "activeAccessionedCopies", "needsAccessionCopies", "availableCopies", "overdueCount", "outstandingAmount", "fineRecords"].includes(key) ? "number" : "text" }));
 }
 
 function validateClearanceFilters(filters: QueryFilters): { search: string; reason: string } {
@@ -218,13 +221,13 @@ async function listQuery(input: QueryFilters) {
   const datasetName = String(datasetNameValue);
   const currentPage = safePage(page); const currentLimit = safeLimit(limit);
   if (datasetName === "clearance") {
-    const dataset = getDataset(datasetName); const rows = await getClearanceRows(filters); const total = rows.length;
+    const dataset = getDataset(datasetName); const rows = sortRows(await getClearanceRows(filters),filters,queryColumns(dataset)); const total = rows.length;
     const summary = rows.reduce((totals, row) => ({ overduePatrons: totals.overduePatrons + Number(row.overdueCount > 0), unpaidFinePatrons: totals.unpaidFinePatrons + Number(row.outstandingAmount > 0), overdueItems: totals.overdueItems + row.overdueCount, outstandingAmount: totals.outstandingAmount + row.outstandingAmount }), { overduePatrons: 0, unpaidFinePatrons: 0, overdueItems: 0, outstandingAmount: 0 });
     return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows: rows.slice((currentPage - 1) * currentLimit, currentPage * currentLimit), pagination: { page: currentPage, limit: currentLimit, total, totalPages: Math.max(Math.ceil(total / currentLimit), 1) }, summary, filters };
   }
   const { dataset, clause, params } = buildWhere(datasetName, filters);
   const [[count]] = await db.query<RowDataPacket[]>(`SELECT COUNT(*) AS total ${dataset.from} WHERE ${clause}`, params);
-  const [rows] = await db.query<RowDataPacket[]>(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${dataset.order} LIMIT ? OFFSET ?`, [...params, currentLimit, (currentPage - 1) * currentLimit]);
+  const [rows] = await db.query<RowDataPacket[]>(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${orderBy(dataset,filters)} LIMIT ? OFFSET ?`, [...params, currentLimit, (currentPage - 1) * currentLimit]);
   return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, pagination: { page: currentPage, limit: currentLimit, total: Number(count.total), totalPages: Math.max(Math.ceil(Number(count.total) / currentLimit), 1) }, filters };
 }
 
@@ -237,12 +240,13 @@ async function exportQuery(input: QueryFilters) {
     return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, filters };
   }
   const { dataset, clause, params } = buildWhere(datasetName, filters);
-  const [rows] = await db.query<RowDataPacket[]>(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${dataset.order} LIMIT ?`, [...params, EXPORT_LIMIT + 1]);
+  const [rows] = await db.query<RowDataPacket[]>(`SELECT ${dataset.select} ${dataset.from} WHERE ${clause} ORDER BY ${orderBy(dataset,filters)} LIMIT ?`, [...params, EXPORT_LIMIT + 1]);
   if (rows.length > EXPORT_LIMIT) throw Object.assign(new Error(`Exports are limited to ${EXPORT_LIMIT.toLocaleString()} records. Narrow the filters and try again.`), { status: 400 });
   return { dataset: datasetName, label: dataset.label, columns: queryColumns(dataset), rows, filters };
 }
 
 async function getQueryMeta() {
+ const [[term]]=await db.query<RowDataPacket[]>("SELECT name,DATE_FORMAT(starts_on,'%Y-%m-%d') AS dateFrom,DATE_FORMAT(ends_on,'%Y-%m-%d') AS dateTo FROM academic_terms WHERE ends_on < CURDATE() ORDER BY ends_on DESC,id DESC LIMIT 1");
   const [[bookTypes], [categories], [programs], [issuers], [subscriptionCategories]] = await Promise.all([
     db.query<RowDataPacket[]>("SELECT id, name FROM book_types WHERE is_active = 1 UNION SELECT DISTINCT COALESCE(loan_policy_id_snapshot, 0) AS id, COALESCE(NULLIF(loan_policy_name_snapshot, ''), 'Unknown historical policy') AS name FROM borrowings ORDER BY name ASC"),
     db.query<RowDataPacket[]>("SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) AS value FROM books WHERE deleted_at IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) IS NOT NULL AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.category')) <> '' ORDER BY value ASC"),
@@ -250,7 +254,7 @@ async function getQueryMeta() {
     db.query<RowDataPacket[]>("SELECT id, name FROM users WHERE deleted_at IS NULL AND role IN ('staff', 'admin', 'super_admin') ORDER BY name ASC"),
     db.query<RowDataPacket[]>("SELECT DISTINCT category AS value FROM academic_subscriptions WHERE deleted_at IS NULL AND category IS NOT NULL AND category <> '' ORDER BY value ASC"),
   ]);
-  return { datasets: Object.entries(DATASETS).map(([value, dataset]) => ({ value, label: dataset.label, filters: dataset.filters })), bookTypes, categories, programs, issuers, subscriptionCategories, roles: ROLES };
+  return { previousTerm:term?{from:term.dateFrom,to:term.dateTo,name:term.name}:null,datasets: Object.entries(DATASETS).map(([value, dataset]) => ({ value, label: dataset.label, filters: dataset.filters })), bookTypes, categories, programs, issuers, subscriptionCategories, roles: ROLES };
 }
 
 export = { listQuery, exportQuery, getQueryMeta, buildWhere, filterClearanceRows, queryColumns, DATASETS };

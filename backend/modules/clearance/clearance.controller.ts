@@ -3,7 +3,7 @@ import service = require("./clearance.service");
 
 const { logError } = require("../../logger") as { logError: (...values: unknown[]) => void };
 
-type AuthenticatedRequest = Request & { user: { id: number } };
+type AuthenticatedRequest = Request & { user: { id: number; role: string } };
 type RequestError = Error & { status?: number; clearance?: unknown };
 type ClearanceHandler = (req: Request) => Promise<unknown>;
 
@@ -28,7 +28,7 @@ const getQueue = respond((req) => service.getClearanceQueue({
 }));
 const recordPayment = respond((req) => {
   const user = req as AuthenticatedRequest;
-  return service.recordFullPayment({ studentEmployeeId: req.body?.student_employee_id, createdBy: user.user.id, amount: req.body?.amount, expectedOutstanding: req.body?.expectedOutstanding });
+  return service.recordFullPayment({ studentEmployeeId: req.body?.student_employee_id, createdBy: user.user.id, actorRole: user.user.role, amount: req.body?.amount, expectedOutstanding: req.body?.expectedOutstanding });
 });
 const adjustFine = respond((req) => {
   const user = req as AuthenticatedRequest;

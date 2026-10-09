@@ -16,12 +16,15 @@ interface BookSearchOptions {
   showUnheldInOpac?: boolean;
 }
 interface BookPageOptions {
+  fieldKey?:string; fieldUsage?:string; unheld?:boolean;
+  uncategorized?:boolean;
   holdingStatus?: string;
   bookId?: number;
   query?: string;
   status?: string;
   materialType?: string;
   policyStatus?: string;
+  bookTypeId?:number;
   page?: number;
   limit?: number;
 }
@@ -78,12 +81,13 @@ async function upsertSchema(fields: SchemaField[], conn: any): Promise<void> {
   if (!fields.length) return;
   await conn.query(
     `INSERT INTO catalog_schema
-       (\`key\`, label, type, options, required, locked, \`public\`, \`order\`, archived, scope)
+       (\`key\`, label, type, options, archived_options, required, locked, \`public\`, \`order\`, archived, scope)
      VALUES ?
      ON DUPLICATE KEY UPDATE
        label = VALUES(label),
        type = VALUES(type),
        options = VALUES(options),
+       archived_options = VALUES(archived_options),
        required = VALUES(required),
        locked = VALUES(locked),
        \`public\` = VALUES(\`public\`),
@@ -95,6 +99,7 @@ async function upsertSchema(fields: SchemaField[], conn: any): Promise<void> {
       field.label,
       field.type,
       field.options ? JSON.stringify(field.options) : null,
+      JSON.stringify(field.archived_options||[]),
       field.required ? 1 : 0,
       field.locked ? 1 : 0,
       field.public ? 1 : 0,
@@ -469,16 +474,18 @@ async function searchPublicCatalogue(options: Record<string, any> = {}) {
   };
 }
 
-async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", holdingStatus = "all", bookId, page = 1, limit = 25 }: BookPageOptions = {}) {
+async function searchBooksPage({ query = "", status = "active", materialType = "all", policyStatus = "all", holdingStatus = "all", uncategorized=false, bookId, bookTypeId, fieldKey, fieldUsage, unheld=false, page = 1, limit = 25 }: BookPageOptions = {}) {
   const { safePage, safeLimit, offset } = normalizePagination(page, limit, 25, 100);
   const like = `%${String(query).trim()}%`;
   const safeStatus = ["active", "archived", "all"].includes(status) ? status : "active";
   const deletedFilter = safeStatus === "all" ? "1 = 1" : `bk.deleted_at ${safeStatus === "archived" ? "IS NOT NULL" : "IS NULL"}`;
   const materialFilter = ["book", "thesis"].includes(materialType) ? " AND bk.material_type = ?" : "";
+  const typeFilter=bookTypeId ? " AND bk.book_type_id = ?" : "";
   const policyFilter = policyStatus === "needs_policy" ? ` AND bk.material_type = 'book' AND NOT ${hasActiveBookPolicy("bk")}` : "";
   const needsHoldings = `bk.material_type = 'book' AND (NOT EXISTS (SELECT 1 FROM book_copies copy_any WHERE copy_any.book_id = bk.id AND copy_any.deleted_at IS NULL) OR EXISTS (SELECT 1 FROM book_copies missing_copy WHERE missing_copy.book_id = bk.id AND missing_copy.deleted_at IS NULL AND missing_copy.is_active = 1 AND missing_copy.condition IN ('good','damaged') AND NOT EXISTS (SELECT 1 FROM copy_holdings missing_holding WHERE missing_holding.copy_id = missing_copy.id AND NULLIF(TRIM(missing_holding.accession_number), '') IS NOT NULL)))`;
-  const params = [like, like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : []), ...(bookId ? [bookId] : [])];
-  const baseWhere = `WHERE (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL) ${materialFilter} ${policyFilter} ${bookId ? "AND bk.id = ?" : ""}`;
+  const configuration = require("./catalog.configuration-filters").configurationFilter(fieldKey,fieldUsage,unheld);
+  const params = [like, like, like, like, ...(["book", "thesis"].includes(materialType) ? [materialType] : []), ...(bookTypeId ? [bookTypeId] : []), ...(bookId ? [bookId] : []), ...configuration.params];
+  const baseWhere = `WHERE (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ? OR JSON_SEARCH(bk.metadata, 'one', ?) IS NOT NULL) ${materialFilter} ${policyFilter} ${typeFilter} ${uncategorized?"AND (JSON_EXTRACT(bk.metadata, '$.category') IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))='null' OR TRIM(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category')))='')":""} ${bookId ? "AND bk.id = ?" : ""} ${configuration.sql}`;
   const [[counts]] = await db.query(`SELECT COUNT(*) AS all_count, SUM(bk.deleted_at IS NULL) AS active_count, SUM(bk.deleted_at IS NOT NULL) AS archived_count, SUM(bk.deleted_at IS NULL AND (${needsHoldings})) AS needs_holdings_count FROM books bk ${baseWhere}`, params);
   const where = `${baseWhere} AND ${deletedFilter} ${holdingStatus === "needs" ? `AND (${needsHoldings})` : ""}`;
   const [[{ total }]] = await db.query(`SELECT COUNT(*) AS total FROM books bk ${where}`, params);
@@ -586,11 +593,16 @@ async function restoreBook(id: number, conn: any): Promise<void> {
 }
 
 async function getBookTypes() {
+  const {previousPolicyTerms}=require('./policy.snapshot');
   const [rows] = await db.query(`SELECT bt.id, bt.name, bt.default_borrow_days, bt.loan_duration_minutes, bt.loan_duration_unit, bt.fine_per_hour, bt.fine_interval, bt.initial_fine,
-       bt.is_active,
+       bt.is_active, bt.updated_at,
+       ae.actor_name AS last_changed_by, ae.occurred_at AS last_changed_at, ae.id AS last_audit_event_id,
+       (SELECT COUNT(*) FROM borrowings b WHERE b.loan_policy_id_snapshot=bt.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue')) AS active_loans,
+       (SELECT COUNT(*) FROM borrowings b WHERE b.loan_policy_id_snapshot=bt.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue') AND ${previousPolicyTerms()}) AS previous_terms_loans,
        COUNT(CASE WHEN bk.id IS NOT NULL AND bk.deleted_at IS NULL THEN 1 END) AS assigned_active_books,
        COUNT(CASE WHEN bk.id IS NOT NULL AND bk.deleted_at IS NOT NULL THEN 1 END) AS assigned_archived_books
      FROM book_types bt LEFT JOIN books bk ON bk.book_type_id = bt.id
+     LEFT JOIN audit_events ae ON ae.id=(SELECT latest.id FROM audit_events latest WHERE latest.route=CONCAT('/api/admin/book-types/',bt.id) AND latest.occurred_at>=bt.updated_at AND COALESCE(latest.restore_status,'retained')='retained' AND latest.action IN ('created','updated','archived','restored') ORDER BY latest.occurred_at DESC,latest.id DESC LIMIT 1)
      GROUP BY bt.id ORDER BY bt.is_active DESC, bt.name`);
   return rows;
 }
@@ -623,14 +635,14 @@ async function deleteBookType(id: number, actorId: number | null = null) {
     const [assignedBooks] = await conn.query("SELECT id, deleted_at FROM books WHERE book_type_id = ? FOR UPDATE", [id]);
     const activeCount = assignedBooks.filter((book: any) => book.deleted_at == null).length;
     const archivedCount = assignedBooks.length - activeCount;
-    await conn.query("UPDATE books SET book_type_id = NULL WHERE book_type_id = ?", [id]);
+    if (assignedBooks.length) throw Object.assign(new Error('Reassign all active and archived books before deleting this policy.'), {status:409});
     const [deleted] = await conn.query("DELETE FROM book_types WHERE id = ?", [id]);
     if (!deleted.affectedRows) throw Object.assign(new Error("Book type policy not found"), { status: 404 });
     await enqueueAuditEvent(conn, {
       actorId,
       category: "catalog",
       action: "deleted",
-      description: `Deleted loan policy “${policy.name}” · ${assignedBooks.length} book${assignedBooks.length === 1 ? " now needs" : "s now need"} a loan policy`,
+      description: `Deleted unused loan policy “${policy.name}” · recorded loans retain their terms`,
       route: `/api/admin/book-types/${id}`,
       metadata: {
         detail_status: "affected_record_summary",

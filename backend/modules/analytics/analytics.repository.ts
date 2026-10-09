@@ -70,6 +70,9 @@ async function hasRecordedActivity({ startAt, nextAt, date }: RecordedActivityIn
 }
 
 async function recordAuditEvent({ actorId = null, actorName = null, actorRole = null, category, action, description, route = null, metadata = null, eventKey = null }: AuditEventInput): Promise<void> {
+  const {redact}=require("./audit.feed.helpers");
+  const context=require("./audit.context").auditContext.getStore();
+  metadata=redact({...metadata,...context});description=redact(description);
   if (actorId) {
     const [[actor]] = await db.query("SELECT name, role FROM users WHERE id = ? LIMIT 1", [actorId]);
     actorName ||= actor?.name ?? null;

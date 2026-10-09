@@ -13,6 +13,9 @@ router.get("/notifications/unread-count", anyAuthenticatedUser, controller.getUn
 router.post("/notifications/:notificationId/read", anyAuthenticatedUser, controller.markAsRead);
 router.post("/notifications/read-all", anyAuthenticatedUser, controller.markAllAsRead);
 router.get("/admin/notifications/recipients", adminOnly, controller.searchAdminNotificationRecipients);
+router.get('/admin/notifications/audience-count', adminOnly, controller.countAdminRecipients);
+router.get('/admin/notifications/:key/details', adminOnly, controller.notificationDetails);
+router.post('/admin/notifications/:key/:action', adminOnly, limiters.adminNotification, controller.notificationAction);
 router.get("/admin/notifications", adminOnly, controller.listAdminNotifications);
 router.post("/admin/notifications", adminOnly, limiters.adminNotification, controller.createAdminNotification);
 

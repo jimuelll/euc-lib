@@ -45,8 +45,8 @@ test("new user audit entries store lookup names and keep personal changes redact
   assert.deepEqual(metadata.changes.find((entry) => entry.field === "Department"), {
     field: "Department", before: "Former department", after: "Library services",
   });
-  assert.deepEqual(metadata.changes.find((entry) => entry.field === "Name"), { field: "Name", value: "Changed" });
-  assert.deepEqual(metadata.changes.find((entry) => entry.field === "Email"), { field: "Email", value: "Changed" });
+  assert.deepEqual(metadata.changes.find((entry) => entry.field === "Name"), { field: "Name", value: "Redacted (sensitive)" });
+  assert.deepEqual(metadata.changes.find((entry) => entry.field === "Email"), { field: "Email", value: "Redacted (sensitive)" });
 });
 
 test("event-time lookup resolves both sides of a changed reference and falls back clearly", async () => {

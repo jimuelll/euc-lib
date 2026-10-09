@@ -1,3 +1,4 @@
+import { calendarDate } from './analytics.calendar';
 const repository = require("./analytics.repository");
 const { listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const { DATE_ONLY, normalizeDateRange } = require("./aiReport.question.service");
@@ -20,7 +21,7 @@ const totals = (row: Record<string, any> = {}): Record<string, number> => Object
 const toDateOnly = (value: unknown): string => {
   if (typeof value === "string" && DATE_ONLY.test(value.slice(0, 10))) return value.slice(0, 10);
   const parsed = new Date(value as string | number | Date);
-  return Number.isNaN(parsed.getTime()) ? String(value || "") : parsed.toISOString().slice(0, 10);
+  return Number.isNaN(parsed.getTime()) ? String(value || "") : calendarDate(parsed);
 };
 
 /**
@@ -43,12 +44,13 @@ async function buildAiReportEvidence(input: Record<string, any>): Promise<Record
   };
   const previousStartAt = `${previousRange.dateFrom} 00:00:00`;
   const previousEndAt = `${previousRange.dateTo} 00:00:00`;
-  const [data, unsettledOverview]: [any, any] = await Promise.all([
+  const [data, unsettledOverview, bounds]: [any, any, any] = await Promise.all([
     repository.getAiReportQueryData({ range, previousRange, startAt, endExclusive, previousStartAt, previousEndAt }),
     listUnsettledBorrowings({ limit: null }),
+    repository.getReportRangeBounds(),
   ]);
   const dailyRowsByDate = new Map<string, Record<string, any>>(data.dailyActivity.map((row: Record<string, any>) => [toDateOnly(row.day), row]));
-  const dailyActivity = range.allTime ? data.dailyActivity : Array.from({ length: range.days }, (_, index) => {
+  const dailyActivity = Array.from({ length: range.days }, (_, index) => {
     const date = new Date(`${range.dateFrom}T00:00:00Z`);
     date.setUTCDate(date.getUTCDate() + index);
     return dailyRowsByDate.get(date.toISOString().slice(0, 10)) || { day: date.toISOString().slice(0, 10) };
@@ -57,6 +59,7 @@ async function buildAiReportEvidence(input: Record<string, any>): Promise<Record
   return {
     range,
     previous_range: previousRange,
+    comparison: { recordedFrom: bounds.dateFrom, available: !range.allTime && previousRange.dateFrom >= bounds.dateFrom },
     activity: {
       circulation: totals(data.circulation),
       reservations: totals(data.reservations),

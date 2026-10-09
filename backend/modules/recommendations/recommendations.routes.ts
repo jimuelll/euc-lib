@@ -6,8 +6,11 @@ router.get("/recommendations/me", limiters.authenticatedCatalogue, controller.mi
 router.post("/recommendations/:bookId/dismiss", controller.dismiss);
 router.get("/admin/recommendations/books", requireSuperAdminRole, controller.metadataBooks);
 router.get("/admin/recommendations/books/:bookId/metadata", requireSuperAdminRole, controller.getBookMetadata);
+router.get("/admin/recommendations/books/:bookId/preview", requireSuperAdminRole, controller.forBook);
 router.put("/admin/recommendations/books/:bookId/metadata", requireSuperAdminRole, controller.saveBookMetadata);
 router.get("/admin/recommendations/embeddings/status", requireSuperAdminRole, controller.status);
 router.post("/admin/recommendations/embeddings/backfill", requireSuperAdminRole, limiters.embeddingBackfill, controller.backfill);
+router.post("/admin/recommendations/embeddings/backfill/preview", requireSuperAdminRole, controller.preview);
+router.post("/admin/recommendations/embeddings/backfill/cancel", requireSuperAdminRole, controller.cancel);
 router.get("/admin/recommendations/embeddings/backfill/progress", requireSuperAdminRole, controller.backfillProgress);
 module.exports = router;

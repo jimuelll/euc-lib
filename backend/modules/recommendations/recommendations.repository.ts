@@ -118,7 +118,7 @@ function bookNeedsManualMetadataSql(alias = "enrichment") {
 }
 
 function bookMissingSynopsisSql(alias = "enrichment") {
-  return `COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.description'))), ''), '') = ''`;
+  return `COALESCE(NULLIF(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(${alias}.enrichment_json, '$.description'))), 'null'), ''), '') = ''`;
 }
 
 function bookNeedsAttentionSql() {
@@ -128,7 +128,7 @@ function bookNeedsAttentionSql() {
     OR embeddings.status <> 'ready')`;
 }
 
-async function listBooksForMetadata({ query = "", needsAttention = false, page = 1, limit = 25 }: MetadataListOptions) {
+async function listBooksForMetadata({ query = "", needsAttention = false, synopsis="all", embedding="all", details="all", sort="attention", page = 1, limit = 25 }: MetadataListOptions) {
   const filters = ["bk.material_type = 'book'", "bk.deleted_at IS NULL"];
   const params = [];
   if (query.trim()) {
@@ -137,6 +137,14 @@ async function listBooksForMetadata({ query = "", needsAttention = false, page =
     params.push(match, match, match);
   }
   if (needsAttention) filters.push(bookNeedsAttentionSql());
+  const synopsisState=require('./recommendations.admin').synopsisSql();
+  if(synopsis!=="all"){filters.push(synopsis==="blank"?bookMissingSynopsisSql():`(${synopsisState}) = ?`);if(synopsis!=="blank")params.push(synopsis);}
+  if(embedding!=="all"){filters.push(embedding==='needed'?"(embeddings.book_id IS NULL OR embeddings.status<>'ready')":"COALESCE(embeddings.status,'missing') = ?");if(embedding!=='needed')params.push(embedding);}
+  if(details==='found')filters.push(`NOT ${bookNeedsManualMetadataSql()}`);
+  if(details==='missing')filters.push(bookNeedsManualMetadataSql());
+  if(details==='manual')filters.push("enrichment.source='manual'");
+  if(details==='failed')filters.push("enrichment.status='failed'");
+
   const where = filters.join(" AND ");
   const [countRows] = await db.query<Array<RowDataPacket & { total: number | string }>>(
     `SELECT COUNT(*) AS total FROM books bk
@@ -147,14 +155,14 @@ async function listBooksForMetadata({ query = "", needsAttention = false, page =
   );
   const [count] = countRows;
   const [rows] = await db.query<MetadataListRecord[]>(
-    `SELECT bk.id, bk.title, bk.author, bk.isbn,
+    `SELECT bk.id, bk.title, bk.author, bk.isbn, bk.image_url,
        enrichment.source AS metadata_source, enrichment.status AS metadata_status, enrichment.enrichment_json,
        embeddings.status AS embedding_status
      FROM books bk
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
      LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
      WHERE ${where}
-       ORDER BY CASE WHEN ${bookNeedsAttentionSql()} THEN 0 ELSE 1 END, bk.title ASC, bk.id ASC
+       ORDER BY ${sort==="title"?"bk.title ASC":sort==="author"?"bk.author ASC, bk.title ASC":`CASE WHEN ${bookNeedsAttentionSql()} THEN 0 ELSE 1 END, bk.title ASC`}, bk.id ASC
      LIMIT ? OFFSET ?`,
     [...params, limit, (page - 1) * limit]
   );
@@ -260,16 +268,20 @@ async function markEmbeddingStale(bookId: number, model: string): Promise<void> 
 }
 
 async function markEmbeddingFailed(bookId: number, message: string): Promise<void> {
-  await db.query("UPDATE book_embeddings SET status = 'failed', last_error = ? WHERE book_id = ?", [message, bookId]);
+  await db.query("INSERT INTO book_embeddings (book_id,model,content_hash,status,last_error) VALUES (?,?,'','failed',?) ON DUPLICATE KEY UPDATE status='failed',last_error=VALUES(last_error)", [bookId,process.env.GEMINI_EMBEDDING_MODEL||'gemini-embedding-001',message]);
 }
 
-async function findBooksForBackfill(): Promise<BackfillBook[]> {
+async function findBooksForBackfill(options:import("./recommendations.types").BackfillOptions={}): Promise<BackfillBook[]> {
+  const scope=options.scope??"attention";
+  const extra=scope==="synopses"?bookMissingSynopsisSql():scope==="embeddings"?"(embeddings.book_id IS NULL OR embeddings.status<>'ready')":scope==="selected"?"bk.id IN (?)":"1=1";
+  const failed=`(enrichment.status='failed' OR embeddings.status='failed' OR (${require('./recommendations.admin').synopsisSql()})='lookup_failed')`;
   const [books] = await db.query<BackfillBook[]>(
-    `SELECT bk.id, bk.title FROM books bk
+    `SELECT bk.id, bk.title, (${bookMissingSynopsisSql()}) AS missing_synopsis, (NULLIF(TRIM(bk.isbn),'') IS NOT NULL AND COALESCE(enrichment.source,'')<>'manual' AND ${bookMissingSynopsisSql()}) AS needs_lookup, (embeddings.book_id IS NULL OR embeddings.status<>'ready') AS needs_embedding FROM books bk
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id
      LEFT JOIN book_embeddings embeddings ON embeddings.book_id = bk.id
      WHERE bk.material_type = 'book' AND bk.deleted_at IS NULL
-       AND (
+       AND ${extra} ${options.retryFailures?`AND ${failed}`:""}
+       ${scope==="attention"?`AND (
          (COALESCE(enrichment.source, '') <> 'manual' AND ${bookNeedsManualMetadataSql()})
          OR embeddings.book_id IS NULL
          OR embeddings.status <> 'ready'
@@ -280,20 +292,22 @@ async function findBooksForBackfill(): Promise<BackfillBook[]> {
            AND COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.description'))), ''), '') = ''
            AND CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(enrichment.enrichment_json, '$.synopsisProviderCheckVersion')), ''), '0') AS UNSIGNED) < 1
          )
-       )
-     ORDER BY bk.id`
+       )`:""}
+     ORDER BY bk.id LIMIT ?`,
+    [...(scope==="selected"?[options.bookIds]:[]),options.limit??100]
   );
   return books;
 }
 
 async function getEmbeddingStatus(): Promise<{ row: EmbeddingStatusRecord; errors: EmbeddingErrorRecord[] }> {
   const [statusRows] = await db.query<EmbeddingStatusRecord[]>(
-    `SELECT COUNT(embeddings.book_id) AS total,
+    `SELECT COUNT(bk.id) AS total,
        COALESCE(SUM(embeddings.status = 'ready'), 0) AS ready,
        COALESCE(SUM(embeddings.status = 'stale'), 0) AS stale,
        COALESCE(SUM(embeddings.status = 'failed'), 0) AS failed,
        COALESCE(SUM(embeddings.book_id IS NULL), 0) AS missing,
        COALESCE(SUM(${bookMissingSynopsisSql()}), 0) AS missing_synopses,
+       COALESCE(SUM(${bookNeedsManualMetadataSql()}), 0) AS missing_details,
        COALESCE(SUM(${bookNeedsAttentionSql()}), 0) AS needs_attention
      FROM books bk
      LEFT JOIN book_enrichment enrichment ON enrichment.book_id = bk.id

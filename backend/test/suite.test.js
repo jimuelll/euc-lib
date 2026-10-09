@@ -2,6 +2,7 @@ const { after } = require("node:test");
 const db = require("../db");
 
 require("./analytics.helpers.test");
+require("./analytics.period.test");
 require("./attendance.visits.test");
 require("./rate-limit.test");
 require("./auth-session.test");
@@ -15,6 +16,7 @@ require("./backup.restore.test");
 require("./backup.accession.restore.test");
 require("./backup.transforms.test");
 require("./publishing.test");
+require("./notifications.admin.test");
 require("./borrowing.helpers.test");
 require("./borrowing.desk-preview.test");
 require("./reservation.admin-queue.test");
@@ -28,6 +30,8 @@ require("./catalog.public-search.test");
 require("./delivery.outbox.test");
 require("./fine-calculation.test");
 require("./clearance.desk.test");
+require("./desk.permissions.test");
+require("./staff.desk.integration.test");
 require("./admin.users-desk.test");
 require("./holdings.accession.test");
 require("./numeric-input.test");
@@ -40,3 +44,11 @@ require("./report.service.test");
 require("./reservation.visibility.test");
 
 after(async () => db.end());
+require('./query.export.test');
+
+require('./academic-settings.test');
+require('./book-type-policies.test');
+require('./catalog.configuration.test');
+require('./recommendations.admin.test');
+require('./audit.feed.test');
+require('./backup.safety.test.js');

@@ -1,0 +1,85 @@
+import * as repository from './notifications.admin.repository';
+import notifications = require('./notifications.service');
+import hub = require('../../realtime/notificationHub');
+const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
+const roles = ['student', 'alumni', 'employee', 'scanner', 'staff', 'admin', 'super_admin'];
+const destinations = ['/my-library', '/bulletin', '/services/borrowing', '/catalogue'];
+export function validate(input: any, now = new Date()) {
+    if (typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200)
+        fail('Enter a title of up to 200 characters.');
+    if (typeof input.body !== 'string' || !input.body.trim() || input.body.length > 2000)
+        fail('Enter a message of up to 2,000 characters.');
+    if (!['announcement', 'reminder', 'reservation_ready', 'reservation_cancelled', 'overdue_fine'].includes(input.type))
+        fail('Choose a notification type.');
+    if (!['all', 'role', 'user'].includes(input.audienceType))
+        fail('Choose an audience.');
+    if (input.audienceType === 'role' && !roles.includes(input.audienceRole))
+        fail('Choose a valid audience role.');
+    if (input.audienceType === 'user' && (!Number.isInteger(Number(input.audienceUserId)) || Number(input.audienceUserId) < 1))
+        fail('Select an active patron.');
+    if (input.href && !destinations.includes(input.href))
+        fail('Choose a destination from the list.');
+    const scheduled = input.scheduledAt ? new Date(input.scheduledAt) : null;
+    if (scheduled && (!Number.isFinite(scheduled.getTime()) || scheduled <= now))
+        fail('Choose a send time in the future.');
+    const expires = input.expiresAt ? new Date(input.expiresAt) : null;
+    if (expires && (!Number.isFinite(expires.getTime()) || expires <= (scheduled || now)))
+        fail('Expiry must be after the send time.');
+    return { type: input.type, title: input.title.trim(), body: input.body.trim(), href: input.href || null, audienceType: input.audienceType, audienceUserId: input.audienceType === 'user' ? Number(input.audienceUserId) : null, audienceRole: input.audienceType === 'role' ? input.audienceRole : null, expiresAt: expires, scheduledAt: scheduled };
+}
+export async function count(input: any) { const type = String(input.audienceType || 'all'); if (!['all', 'role', 'user'].includes(type) || type === 'role' && !roles.includes(input.audienceRole))
+    fail('Choose a valid audience.'); return repository.audienceCount(type, input.audienceRole || null, Number(input.audienceUserId) || null); }
+export async function create(input: any, actor: number) {
+    const value = validate(input);
+    const recipients = await count(value);
+    if (!recipients)
+        fail('This audience has no active recipients.');
+    if (value.audienceType !== 'user' && Number(input.confirmedRecipientCount) !== recipients)
+        fail('The recipient count changed. Review the audience and confirm again.', 409);
+    const { scheduledAt, ...payload } = value;
+    if (scheduledAt) {
+        const queueId = await repository.enqueue({ ...payload, createdBy: actor, scheduledAt: scheduledAt.toISOString() }, scheduledAt);
+        return { queueId, status: 'scheduled', recipientCount: recipients };
+    }
+    return notifications.createNotification({ ...payload, createdBy: actor });
+}
+export async function list(input: any) {
+    const tab = ['announcements', 'system', 'all'].includes(input.tab) ? input.tab : 'announcements', filter = ['manual', 'automatic', 'failed', 'all'].includes(input.filter) ? input.filter : 'all';
+    const page = Math.max(1, Math.floor(Number(input.page) || 1)), limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 20)));
+    const result = await repository.list({ tab, filter, search: String(input.q || '').trim().slice(0, 200), page, limit });
+    return { notifications: result.rows, counts: result.counts, pagination: { page, limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / limit)) } };
+}
+export async function action(key: string, action: string, actor: number, input: any) {
+    const record = await repository.get(key);
+    if (!record)
+        fail('Notification not found.', 404);
+    if (action === 'expire') {
+        if (!await repository.expire(key))
+            fail('This notification changed or is being delivered. Refresh and try again.', 409);
+        try {
+            if (record.audience_type === 'user')
+                hub.pushNotification(record.audience_user_id, { type: 'notification.audience_changed' });
+            else
+                hub.pushAudienceChanged({ audienceType: record.audience_type, audienceRole: record.audience_role });
+        }
+        catch { /* Saved expiry remains authoritative if a socket disconnects. */ }
+        return { success: true };
+    }
+    if (action !== 'resend')
+        fail('Unknown notification action.');
+    const recipients = await count({ audienceType: record.audience_type, audienceRole: record.audience_role, audienceUserId: record.audience_user_id });
+    if (!recipients)
+        fail('This audience has no active recipients.');
+    if (record.audience_type !== 'user' && Number(input.confirmedRecipientCount) !== recipients)
+        fail('The recipient count changed. Confirm again.', 409);
+    if (record.queue_id) {
+        if (record.delivery_status !== 'failed')
+            fail('Only failed queued notifications can be retried.');
+        if (!await repository.retry(record.queue_id))
+            fail('Delivery already started. Refresh and try again.', 409);
+        return { success: true };
+    }
+    return notifications.createNotification({ type: record.type, title: record.title, body: record.body, href: record.href, audienceType: record.audience_type, audienceUserId: record.audience_user_id, audienceRole: record.audience_role, expiresAt: null, createdBy: actor, sourceType: record.source_type });
+}
+export async function details(key: string) { const record = await repository.get(key); if (!record)
+    fail('Notification not found.', 404); const day = new Date(record.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Ulaanbaatar' }); return record.origin === 'automatic' ? repository.group(record.type, day, record.delivery_status) : [record]; }

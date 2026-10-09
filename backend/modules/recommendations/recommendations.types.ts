@@ -90,10 +90,12 @@ export interface EmbeddingStatusRecord extends RowDataPacket {
   failed: number | string;
   missing: number | string;
   missing_synopses: number | string;
+  missing_details: number | string;
   needs_attention: number | string;
 }
 
 export interface Enrichment {
+  staffEditedAt?:string;staffEditedBy?:string;
   description?: string;
   descriptionSource?: "openlibrary" | "googlebooks" | "hardcover";
   synopsisProviderCheckVersion?: number;
@@ -116,8 +118,14 @@ export interface ManualMetadataPayload {
 }
 
 export interface MetadataListOptions {
+  synopsis?:string;
+  embedding?:string;
+  details?:string;
+  sort?:string;
   query?: string;
   needsAttention?: boolean;
   page?: number;
   limit?: number;
 }
+
+export interface BackfillOptions {scope?:'attention'|'synopses'|'embeddings'|'selected'|'all';bookIds?:number[];limit?:number;retryFailures?:boolean;}

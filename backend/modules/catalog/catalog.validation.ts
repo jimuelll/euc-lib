@@ -38,6 +38,10 @@ function validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durat
   if (!name?.trim() || !Number.isInteger(minutes) || minutes < 1 || minutes > 525600 || !["day", "hour"].includes(durationUnit) || (durationUnit === "day" && minutes % 1440 !== 0) || !Number.isFinite(fine) || fine < 0 || !["hour", "day"].includes(fineInterval) || !Number.isFinite(initial) || initial < 0) {
     throw httpError("Enter a valid policy with non-negative fines", 400);
   }
+  if(name.trim().length>100) throw Object.assign(httpError('Use 100 characters or fewer.',400),{field:'name'});
+  for(const [field,value] of [['fine_per_hour',fine],['initial_fine',initial]] as const){
+    if(value>99999999.99 || Math.abs(value*100-Math.round(value*100))>0.000001) throw Object.assign(httpError('Enter an amount up to ₱99,999,999.99 with no more than two decimals.',400),{field});
+  }
   return { name: name.trim(), days, minutes, durationUnit, fine, fineInterval, initial };
 }
 

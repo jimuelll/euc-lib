@@ -1,0 +1,3 @@
+// Compare captured loan terms, never today's book assignment. NULL snapshots
+// are unknown legacy terms, not evidence of a previous policy.
+export const previousPolicyTerms = (loan = 'b', policy = 'bt') => `(${loan}.loan_duration_minutes IS NOT NULL AND ${loan}.fine_per_hour IS NOT NULL AND ${loan}.fine_interval IS NOT NULL AND ${loan}.initial_fine IS NOT NULL AND (NOT (${loan}.loan_duration_minutes <=> ${policy}.loan_duration_minutes) OR NOT (${loan}.fine_per_hour <=> ${policy}.fine_per_hour) OR NOT (${loan}.fine_interval <=> ${policy}.fine_interval) OR NOT (${loan}.initial_fine <=> ${policy}.initial_fine)))`;

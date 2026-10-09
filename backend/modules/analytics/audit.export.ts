@@ -1,0 +1,8 @@
+const db=require('../../db');
+const {filters,safeRow,csvCell}=require('./audit.feed.helpers');
+export async function handleExport(req:any,res:any){
+ try{const where=filters({...req.body,currentActorId:req.user.id});const [rows]=await db.query(`SELECT id,occurred_at,actor_name,category,action,description,route,metadata FROM audit_events ${where.sql} ORDER BY occurred_at DESC,id DESC LIMIT 10001`,where.params);if(rows.length>10000)return res.status(400).json({message:'More than 10,000 events match. Narrow your filters before exporting.'});
+ const values=[['Event ID','Timestamp','Actor','Category','Action','Summary','Record route','Details'],...rows.map((r:any)=>{const safe=safeRow(r);return [safe.id,safe.occurred_at instanceof Date?safe.occurred_at.toISOString():safe.occurred_at,safe.actor_name,safe.category,safe.action,safe.description,safe.route,JSON.stringify(safe.metadata)];})];
+ await require('./analytics.audit.service').recordAuditEvent({actorId:req.user.id,category:'system',action:'exported',description:`Exported ${rows.length} ${rows.length===1?'audit event':'audit events'} as CSV`,route:'/api/admin/dashboard/audit/export',metadata:{filters:req.body,affected_record_count:rows.length,affected_record_type:'audit events'}});res.locals.auditEnqueued=true;res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="audit-logs.csv"');res.send('\uFEFF'+values.map(row=>row.map(csvCell).join(',')).join('\r\n'));
+ }catch(error:any){res.status(error.status||500).json({message:error.status?error.message:'Audit export could not be recorded or prepared. No export was released.'});}
+}

@@ -1,8 +1,10 @@
+import { calendarDate } from './analytics.calendar';
+import { reportMetadata } from './analytics.report-metadata.repository';
 const repository = require("./analytics.repository");
 const { syncOverdueBorrowings, listUnsettledBorrowings } = require("../borrowing/overdue.helper");
 const { buildDateLabels, buildMonthLabels, normalizeSeries, resolveDashboardRange } = require("./analytics.helpers");
 
-async function getDashboardOverview({ range }: { range?: string } = {}): Promise<Record<string, any>> {
+async function getDashboardOverview({ range,dateFrom,dateTo,allTime,actorId }: { range?: string;dateFrom?:string;dateTo?:string;allTime?:boolean;actorId?:number } = {}): Promise<Record<string, any>> {
   await syncOverdueBorrowings();
   const rangeDays = resolveDashboardRange(range);
   const daysAgo = rangeDays - 1;
@@ -31,7 +33,8 @@ async function getDashboardOverview({ range }: { range?: string } = {}): Promise
   const overdueFinePerHour = Number(stats.overdue_fine_per_hour || 0);
   const outstandingFines = Number(unsettledOverview.summary.total_unsettled_amount || 0);
 
-  return {
+  const result:Record<string,any> = {
+    ...await reportMetadata(actorId),
     stats: {
       total_books: Number(stats.total_books || 0),
       total_book_copies: Number(stats.total_book_copies || 0),
@@ -79,8 +82,24 @@ async function getDashboardOverview({ range }: { range?: string } = {}): Promise
       borrowingByRole: borrowingByRole.map((row: Record<string, any>) => ({ name: row.name, value: Number(row.value || 0) })),
       fineCollectionTrend: normalizeSeries(fineCollectionTrend, monthLabels, ["settled_amount"]),
     },
+    needsAttention: (unsettledOverview.rows||[]).filter((row:any)=>row.status==='overdue').sort((a:any,b:any)=>new Date(a.due_date).getTime()-new Date(b.due_date).getTime()).slice(0,5).map((row:any)=>({borrowingId:row.id,title:row.book_title,dueDate:calendarDate(row.due_date),outstanding:Number(row.unsettled_amount||0)})),
     recentActivity: recentActivity.map((row: Record<string, any>) => ({ occurred_at: row.occurred_at, activity_type: row.activity_type, description: row.description })),
   };
+  {
+    const {buildAiReportEvidence}=require('./aiReport.evidence.service');
+    const {periodCharts}=require('./analytics.period.repository');
+    const evidence=await buildAiReportEvidence(allTime?{allTime:true}:{dateFrom:dateFrom||dayLabels[0],dateTo:dateTo||dayLabels[dayLabels.length-1]});
+    const extra=await periodCharts(evidence.range.dateFrom,evidence.range.dateTo);
+    const daily=evidence.activity.daily_activity,labels=daily.map((row:any)=>row.date);
+    result.period=evidence.range;result.comparison=evidence.comparison;result.previousActivity=evidence.previous_activity;result.activity=evidence.activity;
+    result.charts.circulationTrend=daily.map((row:any)=>({label:row.date,borrowed_count:row.borrowed,returned_count:row.returned}));
+    result.charts.attendanceTrend=daily.map((row:any)=>({label:row.date,entry_exit_count:row.entry_exit_scans,borrowing_count:row.borrowing_scans,library_entries:row.library_entries,unique_library_visitors:row.unique_library_visitors}));
+    result.charts.visitTrend=daily.map((row:any)=>({label:row.date,unique_visitors:row.unique_visitors,visit_hits:row.page_hits}));
+    result.charts.reservationTrend=normalizeSeries(extra.reservations,labels,['created_count','fulfilled_count','cancelled_count']);
+    result.charts.fineCollectionTrend=normalizeSeries(extra.fines,labels,['settled_amount']);
+    result.charts.borrowingByRole=extra.roles.map((row:any)=>({name:row.name,value:Number(row.value)}));result.charts.popularBooks=extra.books.map((row:any)=>({name:row.name,total:Number(row.total)}));
+  }
+  return result;
 }
 
 export = { getDashboardOverview };

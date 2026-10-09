@@ -105,7 +105,7 @@ async function uploadToCloudinary(contents: string, snapshotId: string): Promise
   });
 }
 
-async function uploadSnapshot(payload: SnapshotPayload, createdBy: number | null | undefined, kind = "manual") {
+async function uploadSnapshot(payload: SnapshotPayload, createdBy: number | null | undefined, kind = "manual",details:{label?:string|null;notes?:string|null}={}) {
   requireCloudinary();
   const snapshotId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const { contents, sizeBytes } = serializeSnapshot(payload);
@@ -120,6 +120,10 @@ async function uploadSnapshot(payload: SnapshotPayload, createdBy: number | null
     bookImagePublicIds,
     kind,
     createdBy,
+    checksum:payload.integrity?.checksum||null,
+    version:payload.version,
+    label:details.label||null,
+    notes:details.notes||null,
   });
 
   const preserveSnapshotIds: number[] = [];
@@ -154,7 +158,7 @@ async function uploadSnapshot(payload: SnapshotPayload, createdBy: number | null
     }));
   }
 
-  return { id: result.insertId, filename, sizeBytes: compressedSizeBytes, uncompressedSizeBytes: sizeBytes, createdAt: payload.createdAt, kind };
+  return { id: result.insertId, filename, sizeBytes: compressedSizeBytes, uncompressedSizeBytes: sizeBytes, createdAt: payload.createdAt, kind,...details };
 }
 
 function parseBookImagePublicIds(value: unknown): string[] {
@@ -188,4 +192,10 @@ async function getSnapshotPayload(snapshot: StoredSnapshot): Promise<SnapshotPay
   return JSON.parse(contents.toString("utf8")) as SnapshotPayload;
 }
 
-export = { uploadSnapshot, getSnapshotPayload, serializeSnapshot, getBookImagePublicIds, parseBookImagePublicIds };
+async function removeStoredSnapshot(saved:StoredSnapshot){
+ await cloudinary.uploader.destroy(saved.cloudinary_public_id,{resource_type:'raw',type:'authenticated'}).catch(()=>{});
+ for(const publicId of parseBookImagePublicIds(saved.book_image_public_ids)){
+  if(!await repository.isBookImageReferenced(publicId))await cloudinary.uploader.destroy(publicId,{resource_type:'image'}).catch(()=>{});
+ }
+}
+export = { uploadSnapshot, getSnapshotPayload, serializeSnapshot, getBookImagePublicIds, parseBookImagePublicIds,removeStoredSnapshot };

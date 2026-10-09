@@ -19,4 +19,5 @@ server.listen(PORT, () => {
   startRefreshSessionPurgeJob();
   startDeliveryOutboxJob();
   startReservationExpiryJob();
+  require('./modules/backup/backup.schedule').start();
 });

@@ -1,4 +1,5 @@
 const repository = require("./catalog.repository");
+const policies = require("./catalog.policies.repository");
 const { httpError, validateBookTypeInput, validateIsbn } = require("./catalog.validation");
 const { parseMetadata, hydrateCatalogRecord } = require("./catalog.projection");
 const isbnMetadataLookup = require("./isbn-metadata.lookup") as {
@@ -241,7 +242,10 @@ const restoreBook = async (id: number, restoredBy: number | null = null): Promis
 };
 
 const searchBooksPage = async (options: Record<string, any> = {}) => {
-  const safeOptions = { ...options, policyStatus: options.policyStatus === "needs_policy" ? "needs_policy" : "all" };
+  if(options.bookTypeId!==undefined && (!Number.isSafeInteger(Number(options.bookTypeId))||Number(options.bookTypeId)<1))throw httpError("Invalid book type filter",400);
+  if(options.fieldKey!==undefined && (typeof options.fieldKey!=="string" || !/^[a-z][a-z0-9_]{1,63}$/.test(options.fieldKey) || !["used","missing"].includes(options.fieldUsage)))throw httpError("Invalid field usage filter",400);
+  if(options.fieldUsage!==undefined&&!options.fieldKey)throw httpError("Choose a field for the usage filter",400);
+  const safeOptions = { ...options,bookTypeId:options.bookTypeId?Number(options.bookTypeId):undefined, policyStatus: options.policyStatus === "needs_policy" ? "needs_policy" : "all" };
   const result = await repository.searchBooksPage(safeOptions);
   return {
     rows: result.rows.map(hydrateCatalogRecord),
@@ -254,14 +258,16 @@ const getCatalogRecordForValidation = async (id: number) => repository.findCatal
 
 const getBookTypes = async () => repository.getBookTypes();
 
-const createBookType = async ({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0 }: BookTypeInput) => {
+const createBookType = async ({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0 }: BookTypeInput, actorId:number|null=null) => {
   const { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine });
-  return repository.createBookType({ name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial });
+  return policies.savePolicy(null,{ name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial },actorId);
 };
 
-const updateBookType = async (id: number, { name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0 }: BookTypeInput) => {
+const updateBookType = async (id: number, { name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval = "hour", initialFine = 0, isActive, reason }: BookTypeInput, actorId:number|null=null) => {
+  if(!Number.isSafeInteger(id)||id<1)throw httpError("Invalid book type ID",400);
+  if(isActive!==undefined && ![0,1,false,true].includes(isActive))throw httpError("Choose Active or Archived.",400);
   const { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial } = validateBookTypeInput({ name, defaultBorrowDays, durationMinutes, durationUnit, finePerHour, fineInterval, initialFine });
-  const row = await repository.updateBookType(id, { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial });
+  const row = await policies.savePolicy(id, { name: safeName, days, minutes, durationUnit: safeUnit, fine, fineInterval: safeInterval, initial, isActive, reason },actorId);
   if (!row) throw httpError("Book type not found", 404);
   return row;
 };

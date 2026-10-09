@@ -30,4 +30,5 @@ router.get(
   handleGetAuditLogMeta
 );
 
+router.post("/dashboard/audit/export",authMiddleware(["super_admin"]),require("./audit.export").handleExport);
 module.exports = router;

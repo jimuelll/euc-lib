@@ -89,6 +89,7 @@ const listHolidays = async (options: HolidayStatusOptions = {}, conn?: PoolConne
 const getHolidayDateSet = async (conn?: PoolConnection): Promise<Set<string>> => {
   const holidays = await listHolidays({ status: "active" }, conn);
   return new Set(holidays.map((holiday) => {
+    if (typeof holiday.holiday_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(holiday.holiday_date)) return holiday.holiday_date;
     const date = new Date(holiday.holiday_date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -99,7 +100,7 @@ const getHolidayDateSet = async (conn?: PoolConnection): Promise<Set<string>> =>
 
 const createHoliday = async ({ name, holidayDate, description }: HolidayInput, userId: number | undefined, conn?: PoolConnection) => {
   if (!name?.trim()) throw Object.assign(new Error("Holiday name is required"), { status: 400 });
-  if (!holidayDate?.trim()) throw Object.assign(new Error("Holiday date is required"), { status: 400 });
+  if (typeof holidayDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(holidayDate) || Number.isNaN(Date.parse(holidayDate)) || new Date(holidayDate).toISOString().slice(0,10) !== holidayDate) throw Object.assign(new Error("Choose a valid holiday date"), { status: 400 });
   try {
     return await withTransaction(conn, async (connection) => {
       const holiday = await repository.createHoliday(
@@ -115,10 +116,19 @@ const createHoliday = async ({ name, holidayDate, description }: HolidayInput, u
   }
 };
 
+const importHolidays = async (holidays: HolidayInput[], userId: number | undefined) => {
+  if (!Array.isArray(holidays) || !holidays.length || holidays.length > 100) throw Object.assign(new Error("Choose between 1 and 100 holidays."), { status: 400 });
+  return withTransaction(undefined, async connection => {
+    const created = [];
+    for (const holiday of holidays) created.push(await createHoliday(holiday, userId, connection));
+    return created;
+  });
+};
+
 const updateHoliday = async (holidayId: number, { name, holidayDate, description }: HolidayInput, userId: number | undefined, conn?: PoolConnection) => {
   if (!Number.isInteger(holidayId) || holidayId < 1) throw Object.assign(new Error("Invalid holiday ID"), { status: 400 });
   if (!name?.trim()) throw Object.assign(new Error("Holiday name is required"), { status: 400 });
-  if (!holidayDate?.trim()) throw Object.assign(new Error("Holiday date is required"), { status: 400 });
+  if (typeof holidayDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(holidayDate) || Number.isNaN(Date.parse(holidayDate)) || new Date(holidayDate).toISOString().slice(0,10) !== holidayDate) throw Object.assign(new Error("Choose a valid holiday date"), { status: 400 });
   try {
     return await withTransaction(conn, async (connection) => {
       const before = await settingSnapshot(connection, "holiday", holidayId);
@@ -208,10 +218,10 @@ const updateAcademicProgram = async (programId: number, { name }: NameInput, use
   }
 };
 
-const deleteAcademicProgram = async (programId: number, userId: number | undefined, conn?: PoolConnection) => {
+const deleteAcademicProgram = async (programId: number, userId: number | undefined, conn?: PoolConnection, mode: "auto" | "archive" | "delete" = "auto") => {
   if (!Number.isInteger(programId) || programId < 1) throw Object.assign(new Error("Invalid program / course"), { status: 400 });
   return withTransaction(conn, async (connection) => {
-    const result = await repository.deleteAcademicProgram(programId, userId, connection);
+    const result = await repository.deleteAcademicProgram(programId, userId, connection, mode);
     if (!result) throw Object.assign(new Error("Program / course not found"), { status: 404 });
     const after = await settingSnapshot(connection, "program", programId);
     await auditSetting(connection, {
@@ -272,10 +282,10 @@ const updateDepartment = async (departmentId: number, { name }: NameInput, userI
     });
   } catch (error: unknown) { if (isDuplicateEntry(error)) throw duplicateError("That department name is already used by an active or archived record. Check Archived and restore it, or choose another name."); throw error; }
 };
-const deleteDepartment = async (departmentId: number, userId: number | undefined, conn?: PoolConnection) => {
+const deleteDepartment = async (departmentId: number, userId: number | undefined, conn?: PoolConnection, mode: "auto" | "archive" | "delete" = "auto") => {
   if (!Number.isInteger(departmentId) || departmentId < 1) throw Object.assign(new Error("Invalid department"), { status: 400 });
   return withTransaction(conn, async (connection) => {
-    const result = await repository.deleteDepartment(departmentId, userId, connection);
+    const result = await repository.deleteDepartment(departmentId, userId, connection, mode);
     if (!result) throw Object.assign(new Error("Department not found"), { status: 404 });
     const after = await settingSnapshot(connection, "department", departmentId);
     await auditSetting(connection, {
@@ -312,8 +322,24 @@ const validateTerm = ({ name, startsOn, endsOn }: Pick<AcademicTermInput, "name"
   if (!String(name || "").trim() || !startsOn || !endsOn) {
     throw Object.assign(new Error("Term name and dates are required"), { status: 400 });
   }
+  const validDate=(value:string|Date)=>{const date=value instanceof Date?value.toISOString().slice(0,10):String(value);return /^\d{4}-\d{2}-\d{2}$/.test(date)&&!Number.isNaN(Date.parse(date+"T00:00:00Z"))&&new Date(date+"T00:00:00Z").toISOString().slice(0,10)===date;};
+  if(!validDate(startsOn)||!validDate(endsOn))throw Object.assign(new Error("Choose valid term dates."),{status:400});
   if (new Date(startsOn) > new Date(endsOn)) {
     throw Object.assign(new Error("The end date must be after the start date"), { status: 400 });
+  }
+};
+
+const validateTermPeers = async (connection: PoolConnection, name: string, startsOn: string | Date, endsOn: string | Date, id = 0) => {
+  const [rows] = await connection.query<Array<RowDataPacket & { id: number; name: string; starts_on: string; ends_on: string }>>(
+    "SELECT id,name,DATE_FORMAT(starts_on, '%Y-%m-%d') AS starts_on,DATE_FORMAT(ends_on, '%Y-%m-%d') AS ends_on FROM academic_terms ORDER BY id FOR UPDATE",
+  );
+  const day = (value: string | Date) => value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`
+    : String(value).slice(0, 10);
+  for (const row of rows) {
+    if (row.id === id) continue;
+    if (row.name.trim().toLocaleLowerCase() === name.trim().toLocaleLowerCase()) throw Object.assign(new Error("A term already uses this name."), { status: 409, field: "name" });
+    if (day(startsOn) <= row.ends_on && day(endsOn) >= row.starts_on) throw Object.assign(new Error(`These dates overlap ${row.name}. Choose dates outside that term.`), { status: 409, field: "dates" });
   }
 };
 
@@ -321,6 +347,7 @@ const createAcademicTerm = async ({ name, startsOn, endsOn, isCurrent }: Academi
   validateTerm({ name, startsOn, endsOn });
   try {
     return await withTransaction(conn, async (connection) => {
+      await validateTermPeers(connection,String(name),startsOn,endsOn);
       const [currentRows] = await connection.query<Array<RowDataPacket & { id: number; name: string }>>("SELECT id, name FROM academic_terms WHERE is_current = 1 LIMIT 1");
       const [currentBefore] = currentRows;
       const term = await repository.createAcademicTerm(
@@ -351,6 +378,7 @@ const updateAcademicTerm = async (termId: number, { name, startsOn, endsOn, isCu
   try {
     const term = await withTransaction(conn, async (connection) => {
       const before = await settingSnapshot(connection, "term", termId);
+      await validateTermPeers(connection,String(name),startsOn,endsOn,termId);
       const updated = await repository.updateAcademicTerm(termId, { name: String(name).trim(), startsOn, endsOn, isCurrent }, userId, connection);
       if (!updated) throw Object.assign(new Error("Academic term not found"), { status: 404 });
       const after = await settingSnapshot(connection, "term", termId);
@@ -422,6 +450,7 @@ export = {
   listHolidays,
   getHolidayDateSet,
   createHoliday,
+  importHolidays,
   updateHoliday,
   deleteHoliday,
   restoreHoliday,

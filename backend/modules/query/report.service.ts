@@ -1,3 +1,4 @@
+import {sortRows} from './query.output';
 import type { Pool, RowDataPacket } from "mysql2/promise";
 
 type ReportFilters = Record<string, unknown>;
@@ -17,7 +18,7 @@ const selectRows = async (sql: string, params: Array<string | number> = []): Pro
 const PAGE_LIMIT = 25;
 const EXPORT_LIMIT = 10000;
 const REPORTS = {
-  fined: { label: "Fined", dateLabel: "Charge date" },
+  fined: { label: "Fines", dateLabel: "Charge date" },
   daily_users: { label: "Daily Library Users", dateLabel: "Attendance date" },
   date_due: { label: "Date Due", dateLabel: "Due date" },
   top_users: { label: "Top 10 Users", dateLabel: "Activity date" },
@@ -32,7 +33,7 @@ type ReportDefinition = (typeof REPORTS)[ReportName];
 const columns: Record<ReportName, ReportColumn[]> = {
   fined: [
     ["borrower", "Borrower", "text"], ["studentEmployeeId", "Student / employee ID", "text"], ["title", "Book", "text"],
-    ["chargedAt", "Charged", "dateTime"], ["assessedAmount", "Assessed", "number"], ["paidAmount", "Paid", "number"],
+    ["chargedAt", "Charged", "date"], ["assessedAmount", "Assessed", "number"], ["paidAmount", "Paid", "number"],
     ["adjustedAmount", "Adjusted", "number"], ["outstandingAmount", "Outstanding", "number"], ["status", "Status", "text"],
   ],
   daily_users: [["date", "Date", "date"], ["uniqueUsers", "Unique users", "number"], ["checkIns", "Check-ins", "number"]],
@@ -106,7 +107,7 @@ function holdingsWhere(filters: ReportFilters = {}) {
 
 async function holdingsRows(filters: ReportFilters = {}, { limit = null, offset = 0 }: { limit?: number | null; offset?: number } = {}) {
   const { where, params } = holdingsWhere(filters);
-  const select = `SELECT bc.id AS copyId, bk.title, bk.author, bk.material_type AS materialType, bk.isbn, bc.barcode,
+  const select = `SELECT bk.id AS bookId,bc.id AS copyId, bk.title, bk.author, bk.material_type AS materialType, bk.isbn, bc.barcode,
     h.accession_number AS accessionNumber,
     CASE WHEN voided_accession.accession_number IS NOT NULL THEN 'Voided' WHEN ${hasAccession("bc", "h")} THEN 'Assigned' ELSE 'Needs accession' END AS accessionStatus,
     h.price, COALESCE(ap.name, 'Unassigned') AS program, h.course_code AS courseCode,
@@ -124,7 +125,7 @@ async function holdingsRows(filters: ReportFilters = {}, { limit = null, offset 
     FROM book_copies bc JOIN books bk ON bk.id = bc.book_id
     LEFT JOIN copy_holdings h ON h.copy_id = bc.id LEFT JOIN academic_programs ap ON ap.id = h.program_id
     LEFT JOIN accession_claim_voids voided_accession ON voided_accession.accession_number = h.accession_number
-    WHERE ${where} ORDER BY bk.title ASC, bc.id ASC`;
+    WHERE ${where} ORDER BY ${filters.sort&&columns.holdings_inventory.some(([key])=>key===filters.sort)?'`'+String(filters.sort)+'` '+(filters.direction==='desc'?'DESC':'ASC')+', ':''}bk.title ASC, bc.id ASC`;
   const suffix = limit == null ? "" : " LIMIT ? OFFSET ?";
   const rows = await selectRows(`${select}${suffix}`, limit == null ? params : [...params, limit, offset]);
   return rows;
@@ -143,7 +144,7 @@ async function rawRows(reportName: ReportName, filters: ReportFilters = {}): Pro
     const chargeRange = dateWhere("ch.effective_at", from, to, params);
     const where = ["b.id IS NOT NULL", `EXISTS (SELECT 1 FROM fine_ledger_entries ch WHERE ch.borrowing_id = b.id AND ch.kind IN ('charge','legacy_charge')${chargeRange.length ? ` AND ${chargeRange.join(" AND ")}` : ""})`];
     if (search) { where.push("(u.name LIKE ? OR u.student_employee_id LIKE ? OR bk.title LIKE ?)"); params.push(like, like, like); }
-    const rows = await selectRows(`SELECT COALESCE(u.name, 'Deleted patron') AS borrower, u.student_employee_id AS studentEmployeeId, COALESCE(bk.title, 'Deleted book') AS title,
+    const rows = await selectRows(`SELECT b.book_id AS bookId,COALESCE(u.name, 'Deleted patron') AS borrower, u.student_employee_id AS studentEmployeeId, COALESCE(bk.title, 'Deleted book') AS title,
       MIN(fe.effective_at) AS chargedAt,
       COALESCE(SUM(CASE WHEN fe.kind IN ('charge','legacy_charge') THEN fe.amount ELSE 0 END), 0) AS assessedAmount,
       COALESCE(-SUM(CASE WHEN fe.kind IN ('payment','reversal','legacy_credit') THEN fe.amount ELSE 0 END), 0) AS paidAmount,
@@ -158,7 +159,7 @@ async function rawRows(reportName: ReportName, filters: ReportFilters = {}): Pro
   if (reportName === "date_due") {
     const where = ["b.deleted_at IS NULL", "b.status IN ('borrowed','overdue')", ...dateWhere("b.due_date", from, to, params)];
     if (search) { where.push("(u.name LIKE ? OR u.student_employee_id LIKE ? OR bk.title LIKE ?)"); params.push(like, like, like); }
-    const rows = await selectRows(`SELECT COALESCE(u.name,'Deleted patron') AS borrower,u.student_employee_id AS studentEmployeeId,COALESCE(bk.title,'Deleted book') AS title,b.due_date AS dueDate,b.status FROM borrowings b LEFT JOIN users u ON u.id=b.user_id LEFT JOIN books bk ON bk.id=b.book_id WHERE ${where.join(" AND ")} ORDER BY b.due_date ASC,b.id ASC`, params); return rows;
+    const rows = await selectRows(`SELECT b.book_id AS bookId,COALESCE(u.name,'Deleted patron') AS borrower,u.student_employee_id AS studentEmployeeId,COALESCE(bk.title,'Deleted book') AS title,b.due_date AS dueDate,b.status FROM borrowings b LEFT JOIN users u ON u.id=b.user_id LEFT JOIN books bk ON bk.id=b.book_id WHERE ${where.join(" AND ")} ORDER BY b.due_date ASC,b.id ASC`, params); return rows;
   }
   if (reportName === "daily_users" || reportName === "daily_stats") {
     const where = ["a.purpose='entry_exit'", "a.type='check_in'", ...dateWhere("a.created_at", from, to, params)];
@@ -183,7 +184,7 @@ async function rawRows(reportName: ReportName, filters: ReportFilters = {}): Pro
   throw Object.assign(new Error("Report is not implemented."), { status: 400 });
 }
 
-function shape(reportName: ReportName, rows: RowDataPacket[]): Array<Record<string, unknown>> { return rows.map((row) => Object.fromEntries(columns[reportName].map(([key]) => [key, row[key] ?? null]))); }
+function shape(reportName: ReportName, rows: RowDataPacket[]): Array<Record<string, unknown>> { return rows.map((row) => ({...Object.fromEntries(columns[reportName].map(([key]) => [key, row[key] ?? null])),...(row.bookId?{bookId:row.bookId}:{})})); }
 async function listReport(input: ReportFilters) {
   const { report: reportValueInput = "fined", page, limit, ...filters } = input;
   const reportName = String(reportValueInput) as ReportName;
@@ -196,8 +197,8 @@ async function listReport(input: ReportFilters) {
     const total = Number(count.total || 0);
     return { report: reportName, label: REPORTS[reportName].label, columns: columns[reportName].map(([key,label,type]) => ({ key,label,type })), rows, pagination: { page: currentPage, limit: currentLimit, total, totalPages: Math.max(Math.ceil(total/currentLimit),1) }, filters };
   }
-  const all = shape(reportName, await rawRows(reportName, filters)); const total = all.length;
-  return { report: reportName, label: REPORTS[reportName].label, columns: columns[reportName].map(([key,label,type]) => ({ key,label,type })), rows: all.slice((currentPage-1)*currentLimit,currentPage*currentLimit), pagination: { page: currentPage, limit: currentLimit, total, totalPages: Math.max(Math.ceil(total/currentLimit),1) }, filters };
+  const all = sortRows(shape(reportName, await rawRows(reportName, filters)),filters,columns[reportName].map(([key,label,type])=>({key,label,type}))); const total = all.length;const totals=reportName==='fined'?Object.fromEntries(['assessedAmount','paidAmount','adjustedAmount','outstandingAmount'].map(key=>[key,all.reduce((sum,row)=>sum+Number(row[key]||0),0)])):undefined;
+  return { report: reportName, label: REPORTS[reportName].label, columns: columns[reportName].map(([key,label,type]) => ({ key,label,type })), rows: all.slice((currentPage-1)*currentLimit,currentPage*currentLimit), totals, pagination: { page: currentPage, limit: currentLimit, total, totalPages: Math.max(Math.ceil(total/currentLimit),1) }, filters };
 }
 async function exportReport(input: ReportFilters) {
   const { report: reportValueInput = "fined", ...filters } = input;
@@ -208,8 +209,8 @@ async function exportReport(input: ReportFilters) {
     if (filters.dateFrom || filters.dateTo) throw Object.assign(new Error("Date filters do not apply to the current inventory snapshot."), { status: 400 });
     raw = await holdingsRows(filters, { limit: EXPORT_LIMIT + 1 });
   } else raw = await rawRows(reportName, filters);
-  const rows = shape(reportName, raw);
+  const rows = sortRows(shape(reportName, raw),filters,columns[reportName].map(([key,label,type])=>({key,label,type})));const totals=reportName==='fined'?Object.fromEntries(['assessedAmount','paidAmount','adjustedAmount','outstandingAmount'].map(key=>[key,rows.reduce((sum,row)=>sum+Number(row[key]||0),0)])):undefined;
   if (rows.length > EXPORT_LIMIT) throw Object.assign(new Error(`Exports are limited to ${EXPORT_LIMIT.toLocaleString()} records.`), { status: 400 });
-  return { report: reportName, label: REPORTS[reportName].label, columns: columns[reportName].map(([key,label,type]) => ({ key,label,type })), rows, filters };
+  return { report: reportName, label: REPORTS[reportName].label, columns: columns[reportName].map(([key,label,type]) => ({ key,label,type })), rows, totals, filters };
 }
 export = { REPORTS, columns, listReport, exportReport, holdingsWhere, holdingsRows };

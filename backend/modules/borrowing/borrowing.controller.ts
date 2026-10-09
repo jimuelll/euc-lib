@@ -248,7 +248,11 @@ const adminGetBorrowings: RequestHandler = async (req, res) => {
     const dateFrom = req.query.dateFrom ?? "";
     const dateTo = req.query.dateTo ?? "";
 
-    const result = await service.adminGetBorrowings({ search, status, showArchived, page, limit, dateFrom, dateTo });
+    const policyId=req.query.policyId===undefined?undefined:Number(req.query.policyId);
+    if(policyId!==undefined&&(!Number.isSafeInteger(policyId)||policyId<1)){res.status(400).json({message:'Choose a valid policy.'});return;}
+    const previousTerms=req.query.previousTerms==='true';
+    if(previousTerms&&!policyId){res.status(400).json({message:'Choose a policy for previous terms.'});return;}
+    const result = await service.adminGetBorrowings({ search, status, showArchived, page, limit, dateFrom, dateTo, policyId, previousTerms });
     res.json(result);
   } catch (error: unknown) {
     logError("[borrowing] adminGetBorrowings:", error);

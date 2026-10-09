@@ -42,6 +42,7 @@ const { authMiddleware } = require("./modules/auth/auth.middleware");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
 
 const app = express();
+app.use(require("./modules/analytics/audit.context").auditRequestContext);
 const backupBodyLimit = Number(process.env.BACKUP_MAX_BYTES || 50 * 1024 * 1024);
 app.set("trust proxy", 1);
 app.use(cors({

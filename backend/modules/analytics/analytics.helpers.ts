@@ -1,29 +1,30 @@
+import { calendarDate } from './analytics.calendar';
 interface SeriesRow extends Record<string, any> { label: string; }
 interface SeriesPoint extends Record<string, string | number> { label: string; }
 
-function buildDateLabels(days: number): string[] {
+function buildDateLabels(days: number, now = new Date()): string[] {
   return Array.from({ length: days }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - 1 - index));
+    const date = new Date(calendarDate(now) + 'T00:00:00Z');
+    date.setUTCDate(date.getUTCDate() - (days - 1 - index));
     return date.toISOString().slice(0, 10);
   });
 }
 
 function resolveDashboardRange(range: string): number {
   if (range === "30d") return 30;
-  if (range === "month") return Math.max(new Date().getDate(), 1);
+  if (range === "month") return Number(calendarDate().slice(8));
   if (range === "year") {
-    const now = new Date();
-    return Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000) + 1;
+    const today = calendarDate();
+    return Math.floor((new Date(today+'T00:00:00Z').getTime() - new Date(today.slice(0,4)+'-01-01T00:00:00Z').getTime()) / 86400000) + 1;
   }
   return 7;
 }
 
 function buildMonthLabels(months: number): string[] {
   return Array.from({ length: months }, (_, index) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - (months - 1 - index), 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const date = new Date(calendarDate().slice(0,7)+'-01T00:00:00Z');
+    date.setUTCMonth(date.getUTCMonth() - (months - 1 - index), 1);
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
   });
 }
 

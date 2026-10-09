@@ -277,6 +277,7 @@ async function cancelReservation(reservationId: number, conn: PoolConnection): P
 }
 
 async function getAdminReservations({
+  recordId,
   search,
   status,
   dateFrom,
@@ -289,6 +290,7 @@ async function getAdminReservations({
   const conditions = [`r.deleted_at IS ${archived ? "NOT NULL" : "NULL"}`];
   const params: Array<string | number> = [];
 
+  if(recordId){conditions.push("r.id = ?");params.push(recordId);}
   if (search?.trim()) {
     conditions.push(`(
       bk.title              LIKE ? OR

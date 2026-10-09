@@ -88,6 +88,7 @@ export interface CatalogueSearchOptions extends ReservationHistoryOptions {
 }
 
 export interface AdminReservationOptions {
+  recordId?:number;
   search?: string;
   status?: string;
   dateFrom?: string;
