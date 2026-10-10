@@ -146,20 +146,15 @@
 .publishing-record-drawer .publishing-footer-actions { justify-content:flex-end; }
 .publishing-record-drawer .content-field input,.publishing-record-drawer .content-field textarea { border-radius:6px; }
 .publishing-record-drawer .content-field label { font-size:13px; font-weight:500; }
-.publishing-preview { width:calc(100vw - 32px); max-width:1000px; max-height:calc(100dvh - 32px); display:flex; flex-direction:column; gap:16px; padding:24px; }
-.publishing-preview-body { overflow-y:auto; min-height:0; line-height:1.7; }
-.publishing-preview-body h2 { font-size:24px; line-height:1.3; margin:0 0 12px; }
-.publishing-preview-body h3 { font-size:18px; margin-top:16px; }
-.publishing-preview-body p { white-space:pre-wrap; overflow-wrap:anywhere; }
-.publishing-preview-body section,.publishing-preview-body article { padding:24px 0; border-bottom:1px solid hsl(var(--border)); }
-.publishing-preview-body img { width:auto; max-width:100%; max-height:260px; object-fit:cover; margin:12px 0; }
-.publishing-preview-body a { color:hsl(var(--action)); text-decoration:underline; text-underline-offset:4px; }
-.publishing-preview-body :is(ul,ol) { padding-left:24px; }
-.publishing-preview-body dl { display:flex; flex-wrap:wrap; gap:16px 32px; }
-.publishing-preview-body dd { font-weight:600; }
-.publishing-preview-hero { background-size:cover; background-position:center; padding:40px 24px; color:white; border-radius:8px; }
-.publishing-preview-hero h2 { font-size:40px; }
-.publishing-preview-hero dl { margin-top:24px; }
+.publishing-preview { width:calc(100vw - 32px); max-width:1440px; height:calc(100dvh - 32px); max-height:960px; display:flex; flex-direction:column; gap:16px; padding:24px; }
+.publishing-preview-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; flex-shrink:0; }
+.publishing-preview-toolbar [role="group"] { display:flex; gap:8px; }
+.publishing-preview-role { display:flex; align-items:center; gap:12px; font-size:13px; }
+.publishing-preview-role select { width:auto; }
+.publishing-preview-stage { position:relative; min-height:0; flex:1; overflow:auto; background:hsl(var(--muted)); border:1px solid hsl(var(--border)); }
+.publishing-preview-frame { display:block; width:100%; height:100%; border:0; margin-inline:auto; background:hsl(var(--background)); }
+.publishing-preview-stage[data-device="mobile"] .publishing-preview-frame { width:390px; max-width:100%; }
+.publishing-preview-loading { position:absolute; inset:0; display:grid; place-items:center; background:hsl(var(--background)); z-index:1; }
 @media(max-width:1000px) { .publishing-guide { grid-template-columns:minmax(0,1fr); gap:16px; } .publishing-footer { flex-wrap:wrap; } .publishing-footer-status { flex-basis:100%; } .publishing-footer-actions { margin-left:auto; } }
 @media(max-width:640px) {
   .publishing-title-row { padding:12px 0; gap:12px; }

@@ -1,23 +1,49 @@
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 import type { ContentPayload, ContentSection } from "../publishing.service";
-import { formatContentDate } from "./PublishingFields";
-export default function PublishingPreview({ open, onClose, section, value, role, onRoleChange }: {
-    open: boolean;
-    onClose: () => void;
-    section: ContentSection;
-    value: ContentPayload;
-    role: string;
-    onRoleChange: (role: string) => void;
+import type { PreviewSnapshot } from "./preview-data";
+
+export default function PublishingPreview({ open, onClose, section, value, documents, role, onRoleChange }: {
+  open: boolean; onClose: () => void; section: ContentSection; value: ContentPayload;
+  documents?: PreviewSnapshot["documents"]; role: string; onRoleChange: (role: string) => void;
 }) {
-    const items = (value.items || []).filter((item: ContentPayload) => !item.deleted);
-    return <Dialog open={open} onOpenChange={next => { if (!next)
-        onClose(); }}><DialogContent className="publishing-preview"><DialogHeader><DialogTitle>Draft preview</DialogTitle><DialogDescription>Preview the current edits. This does not publish changes.</DialogDescription></DialogHeader><div className="publishing-preview-body">
-    {section === "homepage" && <><div className="publishing-preview-hero" style={{ backgroundImage: `linear-gradient(90deg,rgba(0,0,0,.8),rgba(0,0,0,.3)),url(${JSON.stringify(value.hero_image_url || "/hero.jpg")})` }}><p>{value.hero_kicker}</p><h2>{value.hero_title} <span>{value.hero_highlight}</span></h2><p>{value.hero_description}</p><dl>{(value.hero_stats || []).map((stat: any, index: number) => <div key={index}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl></div><section><h2>Operating hours</h2><dl>{(value.hours || []).map((row: any, index: number) => <div key={index}><dt>{row.day}</dt><dd>{row.time}{!row.open && " · Closed"}</dd></div>)}</dl></section><section><h2>Contact the library</h2><p>{value.address}</p><p>{value.contact_email}</p><p>{value.contact_phone}</p></section></>}
-    {section === "about" && <><section><h2>{value.library_name}</h2>{value.established && <p>Established {value.established}</p>}</section><section><h2>{value.mission_title}</h2><p>{value.mission_text}</p></section><section><h2>{value.history_title}</h2><p>{value.history_text}</p></section><section><h2>Borrowing policies</h2><ul>{(value.policies || []).map((text: string, index: number) => <li key={index}>{text}</li>)}</ul></section><section><h2>Facilities</h2><ul>{(value.facilities || []).map((text: string, index: number) => <li key={index}>{text}</li>)}</ul></section><section><h2>Staff directory</h2>{(value.staff || []).map((member: any, index: number) => <article key={index}>{member.image_url && <img src={member.image_url} alt={member.image_alt??member.name}/>}<h3>{member.name}</h3><p>{member.role}</p></article>)}</section><section><h2>Library spaces</h2>{(value.spaces || []).map((space: any, index: number) => <article key={index}>{space.image_url && <img src={space.image_url} alt={space.image_alt??space.name}/>}<h3>{space.name}</h3><p>{space.description}</p></article>)}</section></>}
-    {section === "events" && <section><h2>Upcoming events</h2>{items.filter((item: ContentPayload) => new Date(item.ends_at || item.starts_at).getTime() >= Date.now()).sort((a: ContentPayload, b: ContentPayload) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((item: ContentPayload, index: number) => <article key={index}><h3>{item.title}</h3><p>{formatContentDate(item.starts_at)}{item.ends_at && ` – ${formatContentDate(item.ends_at)}`}</p></article>)}</section>}
-    {section === "subscriptions" && <section><h2>Academic resources</h2>{items.filter((item: ContentPayload) => item.is_active).map((item: ContentPayload, index: number) => <article key={index}>{item.image_url && <img src={item.image_url} alt={item.image_alt||""}/>}<h3>{item.title}</h3><p>{item.category}</p><p>{item.description}</p>{/^https?:\/\//.test(item.url) && <a href={item.url} target="_blank" rel="noopener noreferrer">Open resource</a>}</article>)}</section>}
-    {section === "bulletin" && <section><h2>Library bulletin</h2>{items.filter((item: ContentPayload) => !item.archived).sort((a: ContentPayload, b: ContentPayload) => Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned))).map((item: ContentPayload, index: number) => <article key={index}><h3>{item.title}</h3>{item.is_pinned && <p>Pinned announcement</p>}{item.image_url && <img src={item.image_url} alt={item.image_alt||""}/>}<p>{item.content}</p>{(item.gallery||[]).length>0&&<div className="publishing-gallery">{item.gallery.map((image:any,i:number)=><img key={i} src={image.url} alt={image.alt}/>)}</div>}{item.post_type === "event" && <p>{formatContentDate(item.event_starts_at)} · {item.event_location}</p>}</article>)}</section>}
-    {section === "guide" && <><label className="content-field">Preview as<select value={role === "all" ? "staff" : role} onChange={e => onRoleChange(e.target.value)}><option value="staff">Staff</option><option value="admin">Administrator</option><option value="super_admin">Super administrator</option></select></label>{items.filter((item: ContentPayload) => item.is_published && item.audience_roles?.includes(role === "all" ? "staff" : role)).map((item: ContentPayload, index: number) => <article key={index}><h2>{item.title}</h2><p>{item.summary}</p><p>{item.overview}</p>{item.image_url && <img src={item.image_url} alt={item.image_alt||""}/>}<h3>Before you begin</h3><ul>{(item.before_you_begin || []).map((text: string, i: number) => <li key={i}>{text}</li>)}</ul><h3>Steps</h3><ol>{(item.steps || []).map((step: any, i: number) => <li key={i}><h4>{step.title}</h4><p>{step.body}</p></li>)}</ol><h3>Important reminders</h3><ul>{(item.warnings || []).map((text: string, i: number) => <li key={i}>{text}</li>)}</ul>{(item.troubleshooting || []).length > 0 && <><h3>Troubleshooting</h3>{item.troubleshooting.map((tip: any, i: number) => <div key={i}><h4>{tip.problem}</h4><p>{tip.solution}</p></div>)}</>}</article>)}</>}
-    {["events", "subscriptions", "bulletin", "guide"].includes(section) && !items.length && <p>No content to preview yet.</p>}
-  </div></DialogContent></Dialog>;
+  const frame = useRef<HTMLIFrameElement>(null);
+  const { user, getToken } = useAuth();
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [ready, setReady] = useState(false);
+  const snapshot: PreviewSnapshot = { section, documents: { ...documents, [section]: value }, user,
+    role: role === "all" ? "staff" : role, token: getToken() };
+  const latest = useRef(snapshot);
+  latest.current = snapshot;
+  useEffect(() => {
+    if (!open) { setReady(false); return; }
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.type !== "content-preview-ready") return;
+      frame.current.contentWindow?.postMessage({ type: "content-preview-data", snapshot: latest.current }, window.location.origin);
+      setReady(true);
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [open]);
+  useEffect(() => {
+    if (open && ready) frame.current?.contentWindow?.postMessage({ type: "content-preview-data", snapshot: latest.current }, window.location.origin);
+  }, [open, ready, section, value, documents, role, user]);
+  return <Dialog open={open} onOpenChange={next => { if (!next) onClose(); }}>
+    <DialogContent className="publishing-preview">
+      <DialogHeader><DialogTitle>Draft preview</DialogTitle><DialogDescription>The actual page with your current edits. Changes stay private; saving actions are disabled here.</DialogDescription></DialogHeader>
+      <div className="publishing-preview-toolbar">
+        <div role="group" aria-label="Preview viewport">
+          <Button variant={device === "desktop" ? "default" : "outline"} size="sm" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}>Desktop</Button>
+          <Button variant={device === "mobile" ? "default" : "outline"} size="sm" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")}>Mobile</Button>
+        </div>
+        {section === "guide" && <label className="publishing-preview-role">Preview as<select value={snapshot.role} onChange={event => onRoleChange(event.target.value)}><option value="staff">Staff</option><option value="admin">Administrator</option><option value="super_admin">Super administrator</option></select></label>}
+      </div>
+      <div className="publishing-preview-stage" data-device={device}>
+        {!ready && <p className="publishing-preview-loading" role="status">Loading page preview…</p>}
+        <iframe ref={frame} src="/?__content_preview=1" title={`${section} draft preview`} className="publishing-preview-frame" />
+      </div>
+    </DialogContent>
+  </Dialog>;
 }

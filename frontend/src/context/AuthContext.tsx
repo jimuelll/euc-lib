@@ -29,7 +29,7 @@ interface AuthContextProps {
   getToken: () => string | null;
 }
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+export const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 const decodeAccessToken = (token: string): User | null => {
   try {
