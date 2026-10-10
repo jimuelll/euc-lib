@@ -1,108 +1,74 @@
-import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAdminConfirmDialog } from "@/features/admin";
-import { createBookType, deleteBookType, fetchBookTypes, updateBookType, type BookType } from "./catalog.api";
-import { Trash2 } from "lucide-react";
-import { catalogKeys } from "../catalog.keys";
-import { getApiErrorMessage } from "@/utils/apiError";
-import { invalidateServerState } from "@/app/server-state";
-
-export default function BookTypesSettings() {
-  const queryClient = useQueryClient();
-  const typesQuery = useQuery({ queryKey: catalogKeys.bookTypes(), queryFn: ({ signal }) => fetchBookTypes(signal) });
-  const [typeDrafts, setTypeDrafts] = useState<Record<number, Partial<BookType>>>({});
-  const types = (typesQuery.data ?? []).map((type) => ({ ...type, ...typeDrafts[type.id] }));
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState("7");
-  const [durationUnit, setDurationUnit] = useState<"hour" | "day">("day");
-  const [fine, setFine] = useState("1");
-  const [interval, setInterval] = useState<"hour" | "day">("hour");
-  const [initialFine, setInitialFine] = useState("0");
-  const { confirm, confirmDialog } = useAdminConfirmDialog();
-  const invalidateBookTypes = () => invalidateServerState(queryClient, "settings");
-  const createMutation = useMutation({
-    mutationFn: createBookType,
-    onSuccess: async () => { toast.success("Book type added"); setName(""); await invalidateBookTypes(); },
-    onError: (error) => toast.error(getApiErrorMessage(error, "Failed to save book type")),
-  });
-  const updateMutation = useMutation({
-    mutationFn: (type: BookType) => updateBookType(type.id, type),
-    onSuccess: async (_result, type) => { toast.success("Book type updated"); setTypeDrafts((current) => { const next = { ...current }; delete next[type.id]; return next; }); await invalidateBookTypes(); },
-    onError: (error) => toast.error(getApiErrorMessage(error, "Failed to update book type")),
-  });
-  const deleteMutation = useMutation({
-    mutationFn: deleteBookType,
-    onSuccess: async (result) => { toast.success(result.message); await invalidateBookTypes(); },
-    onError: (error) => toast.error(getApiErrorMessage(error, "Failed to delete policy")),
-  });
-  const saving = createMutation.isPending || updateMutation.isPending;
-  const deletingId = deleteMutation.isPending ? deleteMutation.variables ?? null : null;
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    createMutation.mutate({ name, loan_duration_minutes: durationUnit === "day" ? Number(duration) * 1440 : Math.round(Number(duration) * 60), loan_duration_unit: durationUnit, fine_per_hour: Number(fine), fine_interval: interval, initial_fine: Number(initialFine) });
-  };
-
-  const update = async (type: BookType) => {
-    updateMutation.mutate(type);
-  };
-
-  const remove = async (type: BookType) => {
-    const active = Number(type.assigned_active_books ?? 0);
-    const archived = Number(type.assigned_archived_books ?? 0);
-    const total = active + archived;
-    const impact = total
-      ? `${active} active and ${archived} archived ${total === 1 ? "book is" : "books are"} assigned to this policy. Deleting it permanently removes those assignments. Active books will show “Needs loan policy” and cannot be borrowed or reserved until staff assigns another active policy. Archived books will also need a policy if restored. Existing loans can still be returned with their recorded terms.`
-      : "No books are assigned to this policy. This policy will be permanently deleted.";
-    const approved = await confirm({
-      title: `Delete “${type.name}”?`,
-      description: impact,
-      actionLabel: "Delete policy",
-      tone: "danger",
-    });
-    if (!approved) return;
-    deleteMutation.mutate(type.id);
-  };
-
-  return <section className="admin-panel-surface admin-etched-border border border-border bg-card">
-    {confirmDialog}
-    {typesQuery.isError ? <div role="alert" className="flex items-center justify-between gap-3 border-b border-destructive/30 px-5 py-3 text-sm text-destructive">{getApiErrorMessage(typesQuery.error, "Failed to load book types")}<Button type="button" variant="outline" size="sm" onClick={() => void typesQuery.refetch()}>Try again</Button></div> : null}
-    <div className="border-b border-border bg-muted/30 px-5 py-4">
-      <h2 className="text-lg font-semibold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>Book types and loan policies</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Set a day- or hour-based loan duration. Hour-based limits support fractional hours such as 1.5 hours.</p>
-    </div>
-    <div className="p-5">
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-7">
-        <div className="space-y-2 md:col-span-2"><Label htmlFor="book-type-name">Type name</Label><Input id="book-type-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Reserve collection" required /></div>
-        <div className="space-y-2"><Label htmlFor="book-type-duration">Loan duration</Label><Input id="book-type-duration" type="number" min="0.01" step="0.01" value={duration} onChange={(event) => setDuration(event.target.value)} required /></div>
-        <div className="space-y-2"><Label>Unit</Label><select value={durationUnit} onChange={(event) => setDurationUnit(event.target.value as "hour" | "day")} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="day">Days</option><option value="hour">Hours</option></select></div>
-        <div className="space-y-2"><Label>Fine increment</Label><select value={interval} onChange={(event) => setInterval(event.target.value as "hour" | "day")} className="h-10 w-full border border-input bg-background px-3 text-sm"><option value="hour">Per hour</option><option value="day">Per day</option></select></div>
-        <div className="space-y-2"><Label htmlFor="book-type-initial-fine">Initial fine (PHP)</Label><Input id="book-type-initial-fine" type="number" min="0" step="0.01" value={initialFine} onChange={(event) => setInitialFine(event.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="book-type-recurring-fine">Recurring fine (PHP)</Label><Input id="book-type-recurring-fine" type="number" min="0" step="0.01" value={fine} onChange={(event) => setFine(event.target.value)} required /></div>
-        <div className="flex items-end"><Button type="submit" disabled={saving}>{saving ? "Saving…" : "Add book type"}</Button></div>
-      </form>
-      <div className="mt-6 overflow-x-auto">
-        <table className="admin-stack-policies w-full min-w-[900px] text-left text-sm">
-          <thead><tr className="border-b border-border bg-muted/20"><th className="px-3 py-2">Book type</th><th className="px-3 py-2">Loan duration</th><th className="px-3 py-2">Initial fine</th><th className="px-3 py-2">Recurring fine</th><th className="px-3 py-2">Interval</th><th className="px-3 py-2">Assigned books</th><th className="px-3 py-2">Action</th></tr></thead>
-          <tbody>{types.map((type) => {
-            const activePolicy = Number(type.is_active ?? 1) === 1;
-            const fieldsDisabled = saving || deletingId !== null || !activePolicy;
-            return <tr key={type.id} className="border-b border-border/70 align-top">
-              <td className="px-3 py-2"><Input aria-label={`${type.name} policy name`} value={type.name} disabled={fieldsDisabled} onChange={(event) => setTypeDrafts((all) => ({ ...all, [type.id]: { ...all[type.id], name: event.target.value } }))} /><span className={`mt-1 block text-xs ${activePolicy ? "text-success" : "text-muted-foreground"}`}>{activePolicy ? "Active" : "Inactive · delete only"}</span></td>
-              <td className="px-3 py-2"><Input aria-label={`${type.name} loan duration`} type="number" min="1" value={type.loan_duration_unit === "hour" ? Number(type.loan_duration_minutes / 60).toFixed(2) : Math.round(type.loan_duration_minutes / 1440)} disabled={fieldsDisabled} onChange={(event) => setTypeDrafts((all) => ({ ...all, [type.id]: { ...all[type.id], loan_duration_minutes: type.loan_duration_unit === "hour" ? Math.round(Number(event.target.value) * 60) : Math.round(Number(event.target.value) * 1440) } }))} /></td>
-              <td className="px-3 py-2"><Input aria-label={`${type.name} initial fine`} type="number" min="0" step="0.01" value={type.initial_fine} disabled={fieldsDisabled} onChange={(event) => setTypeDrafts((all) => ({ ...all, [type.id]: { ...all[type.id], initial_fine: Number(event.target.value) } }))} /></td>
-              <td className="px-3 py-2"><Input aria-label={`${type.name} recurring fine`} type="number" min="0" step="0.01" value={type.fine_per_hour} disabled={fieldsDisabled} onChange={(event) => setTypeDrafts((all) => ({ ...all, [type.id]: { ...all[type.id], fine_per_hour: Number(event.target.value) } }))} /></td>
-              <td className="px-3 py-2"><select aria-label={`${type.name} fine interval`} value={type.fine_interval} disabled={fieldsDisabled} onChange={(event) => setTypeDrafts((all) => ({ ...all, [type.id]: { ...all[type.id], fine_interval: event.target.value as "hour" | "day" } }))} className="h-10 border border-input bg-background px-2 text-sm"><option value="hour">Hour</option><option value="day">Day</option></select></td>
-              <td className="px-3 py-3 text-xs text-muted-foreground">{Number(type.assigned_active_books ?? 0)} active · {Number(type.assigned_archived_books ?? 0)} archived</td>
-              <td className="px-3 py-2"><div className="flex flex-wrap gap-2"><Button type="button" disabled={fieldsDisabled} onClick={() => void update(type)}>Save changes</Button><Button type="button" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground" disabled={saving || deletingId !== null} onClick={() => void remove(type)}><Trash2 className="mr-1.5 h-4 w-4" />{deletingId === type.id ? "Deleting…" : "Delete policy"}</Button></div></td>
-            </tr>;
-          })}</tbody>
-        </table>
-      </div>
-    </div>
-  </section>;
+import {useState,useEffect,useRef,type FormEvent} from 'react';
+import {Link,useNavigate,useSearchParams} from 'react-router-dom';
+import {ArrowDown,ArrowUp,ArrowUpDown,Pencil} from 'lucide-react';
+import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
+import {toast} from '@/components/ui/sonner';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
+import {AdminPageHeader,AdminPageTabs,AdminDetailDrawer,AdminRowMenu,AdminStatusBadge,AdminIcon,formatPeso,useAdminConfirmDialog,useUnsavedChanges} from '@/features/admin';
+import {createBookType,deleteBookType,fetchBookTypes,updateBookType,type BookType} from './catalog.api';
+import {catalogKeys} from '../catalog.keys';
+import {getApiErrorMessage} from '@/utils/apiError';
+import {invalidateServerState} from '@/app/server-state';
+import {policyDraft,policyErrors,finePreview,loanDuration,type PolicyDraft} from './book-type-policy';
+import {TabsContent} from '@/components/ui/tabs';
+import {adminInstant,adminUpdatedTime} from '@/utils/adminInstant';
+import './book-types.css';
+const auditLink=(type:BookType)=>type.last_audit_event_id?`/admin/audit-logs?event=${type.last_audit_event_id}`:`/admin/audit-logs?record=${encodeURIComponent('/api/admin/book-types/'+type.id)}`;
+const loanLink=(id:number,previous=false)=>`/admin/circulation?tab=history&filter=needs_action&policyId=${id}${previous?'&previousTerms=true':''}`;
+const assignedBooks=(type:BookType)=>Number(type.assigned_active_books||0)+Number(type.assigned_archived_books||0);
+const fineTerms=(initial:number,recurring:number,interval:string)=>`${formatPeso(initial)} when overdue, then ${formatPeso(recurring)} per ${interval}`;
+const updated=(type:BookType)=>type.last_changed_at||type.updated_at;
+const sortNames={name:'Name',duration:'Loan duration',fine:'Recurring fine',assigned:'Assigned books',updated:'Last updated'};
+type Sort=keyof typeof sortNames;
+export default function BookTypesSettings(){
+ const [params]=useSearchParams(),navigate=useNavigate(),opened=useRef('');
+ const client=useQueryClient(),query=useQuery({queryKey:catalogKeys.bookTypes(),queryFn:({signal})=>fetchBookTypes(signal)}),types=query.data||[];
+ const [editor,setEditor]=useState<BookType|null|undefined>(),[draft,setDraft]=useState<PolicyDraft>(policyDraft()),[errors,setErrors]=useState<Record<string,string>>({}),[error,setError]=useState(''),[search,setSearch]=useState(''),[status,setStatus]=useState('active'),[sort,setSort]=useState<Sort>('name'),[descending,setDescending]=useState(false),[searchOpen,setSearchOpen]=useState(false),[highlight,setHighlight]=useState<number>();
+ useEffect(()=>{if(highlight===undefined)return;const timer=setTimeout(()=>setHighlight(undefined),6000);return()=>clearTimeout(timer);},[highlight]);
+ const guard=useUnsavedChanges(draft,editor!==undefined,editor?.id||'new'),{confirm,confirmDialog}=useAdminConfirmDialog();
+ const [reason,setReason]=useState('');
+ const termsChanged=Boolean(editor)&&(Math.round(Number(draft.duration)*(draft.unit==='day'?1440:60))!==Number(editor!.loan_duration_minutes??Number(editor!.default_borrow_days)*1440)||Number(draft.initial)!==Number(editor!.initial_fine||0)||Number(draft.recurring)!==Number(editor!.fine_per_hour)||draft.interval!==(editor!.fine_interval||'hour'));
+ const validation:Record<string,string>={...policyErrors(draft,types,editor?.id),...(termsChanged&&(reason.trim().length<3||reason.trim().length>500)?{reason:'Enter a reason (3–500 characters).'}:{})},dirty=guard.dirty;
+ const mutation=useMutation({mutationFn:async(action:{kind:'save'|'status'|'delete';type?:BookType})=>{
+  if(action.kind==='delete')return deleteBookType(action.type!.id);
+  if(action.kind==='status')return updateBookType(action.type!.id,{...action.type!,is_active:Number(action.type!.is_active??1)?0:1});
+  const payload={name:draft.name.trim(),loan_duration_minutes:Math.round(Number(draft.duration)*(draft.unit==='day'?1440:60)),loan_duration_unit:draft.unit,fine_per_hour:Number(draft.recurring),fine_interval:draft.interval,initial_fine:Number(draft.initial),reason:reason.trim()};
+  return editor?updateBookType(editor.id,{...editor,...payload}):createBookType(payload);
+ },onSuccess:async(result,action)=>{
+ const name=action.type?.name||draft.name.trim(),id=result?.id||action.type?.id||editor?.id;
+ const verb=action.kind==='delete'?'deleted':action.kind==='status'?(Number(action.type?.is_active??1)?'archived':'restored'):editor?'updated':'added';
+ toast.success(`${name} ${verb}.${action.kind==='save'?' Applies to new loans only.':''}`,id?{action:{label:'View policy changes',onClick:()=>navigate(`/admin/audit-logs?record=${encodeURIComponent('/api/admin/book-types/'+id)}`)}}:undefined);
+ if(id)setHighlight(id);if(action.kind==='save'){guard.markSaved();setEditor(undefined);}await invalidateServerState(client,'settings');},onError:(failure:any)=>{const message=getApiErrorMessage(failure,'Could not save this policy. Try again.');setError(message);const field=failure.response?.data?.field,key=field==='fine_per_hour'?'recurring':field==='initial_fine'?'initial':field;if(key)setErrors(current=>({...current,[key]:message}));}});
+ const pending=mutation.isPending;
+ const open=(type?:BookType)=>{setReason('');setEditor(type||null);setDraft(policyDraft(type));setErrors({});setError('');};
+ useEffect(()=>{const id=params.get('policyId');if(!id||opened.current===id)return;const type=types.find(t=>String(t.id)===id);if(type){opened.current=id;setEditor(type);setDraft(policyDraft(type));setStatus('all');}},[params,types]);
+ const close=async()=>{if(!pending&&await guard.confirmDiscard())setEditor(undefined);};
+ const submit=(event:FormEvent)=>{event.preventDefault();setErrors(validation);if(!Object.keys(validation).length&&!pending&&dirty)mutation.mutate({kind:'save'});};
+ const action=async(type:BookType,kind:'status'|'delete')=>{const assigned=Number(type.assigned_active_books||0)+Number(type.assigned_archived_books||0),active=Number(type.is_active??1)===1;
+  if(assigned&&(kind==='delete'||active))return;
+  const ok=await confirm({title:`${kind==='delete'?'Delete':active?'Archive':'Restore'} “${type.name}”?`,description:kind==='delete'?'No books are assigned. This permanently deletes the policy; recorded loans keep their saved terms.':active?'No books are assigned. This policy will no longer be available for new assignments or loans. Restore it from Archived. Existing loans keep their saved terms.':'This policy becomes available for new loans. Assigned books can be borrowed when their copies and other borrowing requirements are ready.',actionLabel:kind==='delete'?'Delete policy':active?'Archive policy':'Restore policy',tone:kind==='delete'||active?'danger':'default'});
+  if(ok){setError('');mutation.mutate({kind,type});}
+ };
+ const sortValue=(type:BookType)=>sort==='duration'?Number(type.loan_duration_minutes):sort==='fine'?Number(type.fine_per_hour)/(type.fine_interval==='day'?24:1):sort==='assigned'?assignedBooks(type):sort==='updated'?(updated(type)?adminInstant(updated(type)!).getTime():0):type.name;
+ const list=types.filter(type=>(status==='all'||(Number(type.is_active??1)===1)===(status==='active'))&&type.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a,b)=>{const av=sortValue(a),bv=sortValue(b);return ((typeof av==='string'&&typeof bv==='string'?av.localeCompare(bv):Number(av)-Number(bv))||a.name.localeCompare(b.name))*(descending?-1:1);});
+ const sortBy=(value:Sort)=>{if(sort===value)setDescending(!descending);else{setSort(value);setDescending(false);}};
+ const header=(value:Sort)=><button type="button" onClick={()=>sortBy(value)} title={value==='fine'?'Recurring fines are compared per hour. Initial fines are separate.':undefined} aria-label={`Sort by ${sortNames[value]}`}>{sortNames[value]}{sort===value?(descending?<ArrowDown/>:<ArrowUp/>):<ArrowUpDown/>}</button>;
+ const ariaSort=(value:Sort)=>sort===value?(descending?'descending':'ascending'):'none';
+ const metadata=(type:BookType)=><div className="policy-metadata">{Number(type.is_active??1)===0&&<AdminStatusBadge status="neutral"><AdminIcon name="archive"/>Archived</AdminStatusBadge>}{/^(test|demo)(\b|[_ -])/i.test(type.name)&&<AdminStatusBadge status="pending">Review test name</AdminStatusBadge>}{updated(type)?<Link to={auditLink(type)} title={`Updated ${adminUpdatedTime(updated(type)!)} · UTC+08:00 · ${type.last_changed_by?'by '+type.last_changed_by:'Actor not recorded'}`}>Updated {adminUpdatedTime(updated(type)!)} · {type.last_changed_by?'by '+type.last_changed_by:'Actor not recorded'}</Link>:<span>Never changed</span>}</div>;
+ const change=(key:keyof PolicyDraft,value:string)=>{setDraft(current=>({...current,[key]:value}));setErrors(current=>({...current,[key]:''}));setError('');};
+ const field=(key:'name'|'duration'|'initial'|'recurring',label:string,help?:string)=><div className="policy-field"><Label htmlFor={'policy-'+key}>{label} <span aria-hidden="true">*</span></Label><Input id={'policy-'+key} required type={key==='name'?'text':'number'} min={key==='duration'?draft.unit==='day'?1:1/60:0} max={key==='duration'?draft.unit==='day'?365:8760:99999999.99} step={key==='duration'?draft.unit==='day'?1:'any':0.01} maxLength={key==='name'?100:undefined} value={draft[key]} onChange={event=>change(key,event.target.value)} onBlur={()=>{setErrors(current=>({...current,[key]:validation[key]||''}));if((key==='initial'||key==='recurring')&&!validation[key])setDraft(current=>({...current,[key]:Number(current[key]).toFixed(2)}));}} aria-invalid={Boolean(errors[key])} aria-describedby={'policy-'+key+'-help'}/><p id={'policy-'+key+'-help'} className={errors[key]?'policy-field-error':'policy-helper'}>{errors[key]||help}</p></div>;
+ return <div className="policy-workspace"><AdminPageHeader title="Book Type Policies" subtitle="Set loan duration and overdue fines for each book type." actions={<Button onClick={()=>open()} disabled={pending}><AdminIcon name="plus"/>Add book type</Button>}/>
+ <div className="policy-impact"><p>Changes apply to new loans only. Existing loans keep their saved terms.</p><Link to="/admin/audit-logs?category=settings&query=book%20type%20policy">View policy changes <AdminIcon name="arrowRight"/></Link></div>
+ <AdminPageTabs value={status} onChange={setStatus} label="Policy status" items={[{value:'active',label:'Active',icon:'policies',badge:types.filter(t=>Number(t.is_active??1)===1).length,descriptionId:'policy-active-count',badgeDescription:'policies'},{value:'archived',label:'Archived',icon:'archive',badge:types.filter(t=>Number(t.is_active??1)===0).length,descriptionId:'policy-archived-count',badgeDescription:'policies'},{value:'all',label:'All',icon:'catalog',badge:types.length,descriptionId:'policy-all-count',badgeDescription:'policies'}]}>
+ <TabsContent value={status} className="policy-panel">
+ <div className="policy-tools">{types.length>8||searchOpen||search?<div className="policy-search"><AdminIcon name="search"/><Input autoFocus={searchOpen} aria-label="Search book types" placeholder="Search book types…" value={search} onChange={event=>setSearch(event.target.value)}/></div>:<Button variant="outline" onClick={()=>setSearchOpen(true)}><AdminIcon name="search"/>Search</Button>}<div className="policy-sort"><Label htmlFor="policy-sort">Sort by</Label><Select value={sort} onValueChange={value=>setSort(value as Sort)}><SelectTrigger id="policy-sort"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(sortNames).map(([value,label])=><SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Button variant="outline" aria-label={descending?'Sort ascending':'Sort descending'} onClick={()=>setDescending(!descending)}>{descending?<ArrowDown/>:<ArrowUp/>}</Button></div></div>
+ {query.isError&&<p role="alert" className="policy-impact">{getApiErrorMessage(query.error,'Could not load policies.')}<Button variant="outline" onClick={()=>void query.refetch()}>Retry</Button></p>}{error&&editor===undefined&&<p role="alert" className="policy-field-error">{error}</p>}
+ {query.isPending?<div role="status" aria-label="Loading book type policies" className="policy-loading">{[0,1,2].map(i=><div key={i}/>)}<span className="sr-only">Loading book type policies…</span></div>:!list.length&&!query.isError?<p className="policy-empty">{!types.length?'No book types yet. Add one to set loan rules.':search?'No policies match your search.':`No ${status} policies.`}<Button variant="outline" onClick={()=>search?(setStatus('all'),setSearch('')):open()}>{search?'Clear filters':'Add book type'}</Button></p>:list.length>0&&<table className="policy-table"><caption className="sr-only">Book type policies · Fine sorting compares recurring fines per hour; initial fines are shown separately.</caption><thead><tr><th scope="col" aria-sort={ariaSort('name')}>{header('name')}<span className="sr-only">Book type</span></th><th scope="col" aria-sort={ariaSort('duration')}>{header('duration')}</th><th scope="col" aria-sort={ariaSort('fine')}>{header('fine')}</th><th scope="col" aria-sort={ariaSort('assigned')}>{header('assigned')}</th><th scope="col">Actions</th></tr></thead><tbody>{list.map(type=>{const active=Number(type.is_active??1)===1,assigned=assignedBooks(type),oldLoans=Number(type.previous_terms_loans||0);return <tr key={type.id} data-changed={highlight===type.id||undefined}><th scope="row" data-label="Book type"><strong title={type.name}>{type.name}</strong>{metadata(type)}{oldLoans>0&&<Link className="policy-old-loans" to={loanLink(type.id,true)}>{oldLoans} active {oldLoans===1?'loan still uses':'loans still use'} previous terms <AdminIcon name="arrowRight"/></Link>}</th><td data-label="Loan duration">{loanDuration(type)}</td><td data-label="Overdue fine"><span>{fineTerms(Number(type.initial_fine||0),Number(type.fine_per_hour),type.fine_interval||'hour')}</span><details className="policy-example"><summary>Fine example</summary><p>Example: {finePreview(Number(type.initial_fine||0),Number(type.fine_per_hour),type.fine_interval||'hour')}</p></details></td><td data-label="Assigned books">{assigned?<Link to={`/admin/catalog?tab=records&bookTypeId=${type.id}&status=all`} className="policy-reference" title={`${Number(type.assigned_active_books||0)} active · ${Number(type.assigned_archived_books||0)} archived books`}>{assigned} {assigned===1?'book':'books'} <AdminIcon name="arrowRight"/></Link>:<span>0 books</span>}</td><td data-label="Actions"><div className="policy-row-actions"><Button variant="outline" aria-label={`Edit ${type.name}`} disabled={pending||!active} onClick={()=>open(type)}><Pencil aria-hidden="true"/>Edit</Button><AdminRowMenu label={`More actions for ${type.name}`} disabled={pending} items={[{label:active?(assigned?'Archive unavailable · reassign books':'Archive policy'):'Restore policy',disabled:active&&assigned>0,onSelect:()=>void action(type,'status')},{label:assigned?'Delete unavailable · reassign books':'Delete policy',destructive:true,disabled:assigned>0,onSelect:()=>void action(type,'delete')},{label:'View policy changes',onSelect:()=>navigate(auditLink(type))}]}/></div></td></tr>;})}</tbody></table>}
+ </TabsContent></AdminPageTabs>
+ <AdminDetailDrawer className="policy-drawer" open={editor!==undefined} onClose={()=>void close()} title={editor?`Edit ${editor.name}`:'Add book type'} description="Loan duration and overdue fine policy" footer={<><span role="status">{pending?'Saving…':dirty?`${draft.name || 'New policy'} · Unsaved changes`:'No unsaved changes'}</span><Button variant="outline" disabled={pending} onClick={()=>void close()}>Cancel</Button><Button form="policy-editor" type="submit" disabled={pending||Boolean(Object.keys(validation).length)||!dirty}>{pending?'Saving…':editor?'Save changes':'Add book type'}</Button></>}>
+ <form id="policy-editor" onSubmit={submit} noValidate className="policy-editor"><p className="policy-helper">Required fields are marked *. Changes apply to new loans only and are recorded in the audit log.</p>{field('name','Type name','Use a unique, recognizable collection name.')}<div className="policy-editor-grid">{field('duration','Loan duration',draft.unit==='day'?'1–365 whole days.':'Fractional hours are supported in whole minutes, e.g. 1.5 hours.')}<div className="policy-field"><Label htmlFor="policy-unit">Loan unit *</Label><Select value={draft.unit} onValueChange={value=>change('unit',value)}><SelectTrigger id="policy-unit" aria-required="true"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="day">Days</SelectItem><SelectItem value="hour">Hours</SelectItem></SelectContent></Select></div>{field('initial','Initial fine (₱)','Charged once when the loan becomes overdue. Use 0.00 for none.')}{field('recurring','Recurring fine (₱)','Added for each started fine interval. A partial interval counts as one.')}<div className="policy-field"><Label htmlFor="policy-interval">Fine interval *</Label><Select value={draft.interval} onValueChange={value=>change('interval',value)}><SelectTrigger id="policy-interval" aria-required="true"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="hour">Per hour</SelectItem><SelectItem value="day">Per day</SelectItem></SelectContent></Select></div></div><section className="policy-live-preview" aria-label="Policy preview"><h2>Policy preview</h2><strong>{draft.name.trim()||'New book type'}</strong><p>{draft.duration||'—'} {draft.unit==='day'?(Number(draft.duration)===1?'day':'days'):(Number(draft.duration)===1?'hour':'hours')} · {validation.initial||validation.recurring?'Enter valid fine amounts.':fineTerms(Number(draft.initial),Number(draft.recurring),draft.interval)}</p><p>Example: {validation.initial||validation.recurring?'Enter valid fine amounts to preview.':finePreview(Number(draft.initial),Number(draft.recurring),draft.interval)}</p></section>{editor&&<section className="policy-save-impact" aria-label="Impact before saving"><h2>Before → After</h2>{dirty?<dl>{draft.name.trim()!==editor.name&&<div><dt>Type name</dt><dd><span>{editor.name}</span><AdminIcon name="arrowRight"/><strong>{draft.name.trim()||'Enter a name'}</strong></dd></div>}<div><dt>Loan duration</dt><dd><span>{loanDuration(editor)}</span><AdminIcon name="arrowRight"/><strong>{draft.duration||'—'} {draft.unit==='day'?(Number(draft.duration)===1?'day':'days'):(Number(draft.duration)===1?'hour':'hours')}</strong></dd></div><div><dt>Overdue fine</dt><dd><span>{fineTerms(Number(editor.initial_fine||0),Number(editor.fine_per_hour),editor.fine_interval||'hour')}</span><AdminIcon name="arrowRight"/><strong>{validation.initial||validation.recurring?'Enter valid fine amounts.':fineTerms(Number(draft.initial),Number(draft.recurring),draft.interval)}</strong></dd></div></dl>:<p className="policy-helper">No policy changes yet.</p>}<p>Changes apply to new loans only. {Number(editor.active_loans||0)} active {Number(editor.active_loans||0)===1?'loan keeps its':'loans keep their'} saved duration and fine terms.</p>{Number(editor.active_loans||0)>0&&<Link className="policy-reference" to={loanLink(editor.id)}>View active loans <AdminIcon name="arrowRight"/></Link>}</section>}{termsChanged&&<div className="policy-field"><Label htmlFor="policy-change-reason">Reason for change *</Label><Input id="policy-change-reason" aria-required="true" aria-describedby="policy-reason-help" maxLength={500} value={reason} onChange={e=>{setReason(e.target.value);setError('');}} placeholder="Why are the loan terms changing?"/><p id="policy-reason-help" className="policy-helper">Required when changing duration or fines. Recorded in the audit log; free-text values remain hidden for privacy.</p>{reason&&validation.reason&&<p role="alert" className="policy-field-error">{validation.reason}</p>}</div>}{error&&<p role="alert" className="policy-field-error">{error}</p>}{editor&&metadata(editor)}</form>
+ </AdminDetailDrawer>{confirmDialog}{guard.discardDialog}</div>;
 }

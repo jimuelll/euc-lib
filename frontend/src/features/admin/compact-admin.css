@@ -254,3 +254,10 @@
 .admin-record-footer :is(.circulation-inline-actions,.reservation-actions) { display:flex; gap:8px; flex-wrap:wrap; margin:0; }
 
 .admin-desk-filter-chips button[data-tone=amber]:not([aria-pressed=true]) { background:hsl(var(--admin-tone-amber)/.1); border-color:hsl(var(--admin-tone-amber)/.5); color:hsl(var(--admin-tone-amber)); }
+
+.admin-form-field {display:flex;flex-direction:column;gap:8px;min-width:0;}
+.admin-form-field > label {font-size:13px;font-weight:500;}
+.admin-date-time {display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.admin-date-time > button {flex:1;min-width:160px;}
+.admin-date-time input {width:120px;}
+.admin-date-time > button:last-child:has(svg:only-child) {flex:none;min-width:40px;}

@@ -24,7 +24,9 @@ describe("admin sidebar", () => {
     const nav = within(screen.getByRole("navigation", { name: "Administration" }));
     const expected = [dashboardItem, ...visibleSidebarSections(role).flatMap(section => section.items)];
     expect(nav.getAllByRole("link").map(link => link.getAttribute("href"))).toEqual(expected.map(item => item.url));
-    expect(nav.queryByRole("button")).not.toBeInTheDocument();
+    expect(nav.queryByRole("button", { name: /Backup & Restore/ })).not.toBeInTheDocument();
+    expect(nav.queryByRole("link", { name: "Backup & Restore" }) !== null).toBe(role === "super_admin");
+    for (const name of ["Catalog", "Reservations", "Clearance & Fines", "Borrow & Return", "Users"]) expect(nav.getByRole("link", {name})).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "EUC Library dashboard" }).querySelector("img")).toHaveAttribute("src", "/aa1.ico");
   });
   it.each([

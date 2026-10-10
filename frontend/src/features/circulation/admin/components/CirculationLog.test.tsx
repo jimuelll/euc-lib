@@ -13,11 +13,18 @@ configure({ asyncUtilTimeout: 5000 });
 const row: api.CirculationLogEntry = { id: 1, user_name: "Mika Santos", student_employee_id: "DEMO-REAL-004", book_title: "Library book", book_author: "Author", isbn: "9780123456789", copy_barcode: "COPY-1", borrowed_at: "2026-09-14T09:15:00", due_date: "2026-09-21T09:15:00", returned_at: null, fine_amount: 24, hours_overdue: 576, status: "overdue", issued_by_name: "Librarian", deleted_at: null };
 const summary = { total_records: 10, borrowed_count: 2, overdue_count: 4, returned_count: 4, unique_borrowers: 6 };
 function Location() { const location = useLocation(); return <output data-testid="route">{location.pathname}{location.search}</output>; }
-const setup = () => render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={["/admin/circulation?tab=history"]}><CirculationLog /><Location /></MemoryRouter></QueryClientProvider>);
+const setup = (url="/admin/circulation?tab=history") => render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={[url]}><CirculationLog /><Location /></MemoryRouter></QueryClientProvider>);
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [row], total: 10, page: 1, totalPages: 1, summary }); });
 afterEach(cleanup);
 
 describe("circulation history", () => {
+  it("preserves previous-policy filters for rows and counts and lets staff clear them",async()=>{
+    setup('/admin/circulation?tab=history&filter=needs_action&policyId=7&previousTerms=true');
+    await screen.findByRole('button',{name:'Clear policy filter'});
+    await waitFor(()=>expect(api.getCirculationLog).toHaveBeenCalledWith(expect.objectContaining({policyId:7,previousTerms:true}),expect.any(AbortSignal)));
+    fireEvent.click(screen.getByRole('button',{name:'Clear policy filter'}));
+    await waitFor(()=>expect(screen.getByTestId('route').textContent).not.toContain('policyId'));
+  });
   it("defaults to live work, groups overdue first and exposes Return", async () => {
     setup();
     await screen.findByRole("button", { name: "All 10" });

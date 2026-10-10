@@ -6,6 +6,7 @@ export type FormField = {
   label: string;
   type: FieldType;
   options?: string[];
+  archived_options?: string[];
   required?: boolean;
   locked?: boolean;
   public?: boolean;
@@ -56,6 +57,8 @@ export type BookType = {
   fine_interval?: "hour" | "day";
   initial_fine?: number;
   is_active?: number | boolean;
+  updated_at?:string;last_changed_by?:string|null;last_changed_at?:string|null;last_audit_event_id?:number|null;
+  active_loans?:number;previous_terms_loans?:number;
   assigned_active_books?: number;
   assigned_archived_books?: number;
 };

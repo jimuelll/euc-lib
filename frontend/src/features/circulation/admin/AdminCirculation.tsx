@@ -37,7 +37,7 @@ export default function AdminCirculation() {
     setExporting(true);
     const controller = new AbortController(); exportController.current = controller;
     try {
-      const filters = { status: history && params.get("archived") !== "true" ? (params.get("filter") ?? params.get("status")) || "needs_action" : undefined, archived: history && params.get("archived") === "true" || undefined, search: params.get("search") || undefined, dateFrom: params.get("dateFrom") || undefined, dateTo: params.get("dateTo") || undefined, limit: 50 };
+      const filters = { policyId: history ? Number(params.get('policyId')) || undefined : undefined, previousTerms: history && params.get('previousTerms') === 'true' || undefined, status: history && params.get("archived") !== "true" ? (params.get("filter") ?? params.get("status")) || "needs_action" : undefined, archived: history && params.get("archived") === "true" || undefined, search: params.get("search") || undefined, dateFrom: params.get("dateFrom") || undefined, dateTo: params.get("dateTo") || undefined, limit: 50 };
       const rows = await fetchCirculationExport(filters, controller.signal);
       const csv = circulationCsv(rows);
       const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `circulation-${new Date().toISOString().slice(0,10)}.csv`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, QrCode, Download, Printer, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
@@ -163,7 +164,7 @@ const ProgramSelect = ({ value, programs, onChange, disabled = false }: { value:
         {programs.map((program) => <SelectItem key={program.id} value={String(program.id)} className="rounded-md">{program.name}</SelectItem>)}
       </SelectContent>
     </Select>
-    {!programs.length ? <p className="mt-1.5 text-xs text-muted-foreground">No choices configured yet. An administrator can add them in Academic Calendar.</p> : null}
+    {!programs.length ? <p className="mt-1.5 text-xs text-muted-foreground">No choices configured yet. An administrator can add them in <Link to="/admin/holidays?tab=programs" className="underline">Academic Settings</Link>.</p> : null}
   </div>
 );
 const TermSelect = ({ value, terms, onChange, disabled = false }: { value: string; terms: AcademicTerm[]; onChange: (value: string) => void; disabled?: boolean }) => <div><FieldLabel>Academic term <span className="normal-case tracking-normal">(students)</span></FieldLabel><Select value={value || "__current"} onValueChange={v => onChange(v === "__current" ? "" : v)} disabled={disabled}><SelectTrigger className="rounded-md"><SelectValue placeholder="Current term" /></SelectTrigger><SelectContent className="rounded-md"><SelectItem value="__current">Current term (automatic)</SelectItem>{terms.map(term => <SelectItem key={term.id} value={String(term.id)}>{term.name}{term.is_current ? " · Current" : ""}</SelectItem>)}</SelectContent></Select></div>;

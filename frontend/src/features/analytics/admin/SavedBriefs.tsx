@@ -1,0 +1,54 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { AdminIcon, AdminDetailDrawer, formatAdminDate, useAdminConfirmDialog } from '@/features/admin';
+import type { AiAnalyticsReportResponse } from '../api/adminAnalytics.api';
+export interface SavedBrief {
+    id: string;
+    title: string;
+    savedAt: string;
+    report: AiAnalyticsReportResponse;
+}
+const key = 'library.analytics.saved-briefs.v1';
+export const readSavedBriefs = (): SavedBrief[] => { try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value.filter(item => typeof item?.id === 'string' && typeof item?.title === 'string' && typeof item?.report?.report === 'string' && typeof item?.report?.range?.dateFrom === 'string' && typeof item?.report?.range?.dateTo === 'string').slice(0, 30) : [];
+}
+catch {
+    return [];
+} };
+export function saveBrief(report: AiAnalyticsReportResponse, title: string) { const entries = readSavedBriefs(); const item = { id: crypto.randomUUID(), title: title || 'Library performance brief', savedAt: new Date().toISOString(), report }; localStorage.setItem(key, JSON.stringify([item, ...entries].slice(0, 30))); return item; }
+export function printBrief(report: AiAnalyticsReportResponse, title = 'Library performance brief') {
+ const popup = window.open('', '_blank');
+ if (!popup) throw new Error('Allow the report preview window, then export again.');
+ const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+ const inline = (value: string) => escape(value).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+ const narrative = report.report.split(/\n\s*\n/).filter(Boolean).map(block => {
+  const lines = block.split('\n'), heading = /^#+\s/.test(lines[0]) || /^(Performance assessment|What changed|Key findings|Recommended follow-up|Summary):?$/i.test(lines[0]);
+  const body = heading ? lines.slice(1) : lines;
+  return (heading ? '<h2>' + inline(lines[0].replace(/^#+\s*/, '').replace(/:$/, '')) + '</h2>' : '') + ((body.every(line => /^\s*([-*]|\d+[.)])\s/.test(line)) ? '<ul>' + body.map(line => '<li>' + inline(line.replace(/^\s*([-*]|\d+[.)])\s*/, '')) + '</li>').join('') + '</ul>' : '<p>' + body.map(inline).join('<br>') + '</p>'));
+ }).join('');
+ popup.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + escape(title) + '</title><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.6;max-width:720px;margin:40px auto;color:#17202a}h1{font-size:20pt}h2{font-size:13pt;margin-top:24px}p,li{overflow-wrap:anywhere}@media print{body{margin:0}@page{margin:20mm}}</style></head><body><p>' + escape(report.libraryName || 'Library') + '</p><h1>' + escape(title) + '</h1><p>' + escape(report.range.dateFrom) + ' – ' + escape(report.range.dateTo) + '</p><p>Generated ' + escape(report.generatedAt ? formatAdminDate(report.generatedAt) : 'Time unavailable') + ' · By ' + escape(report.generatedBy || 'Generator unavailable') + ' · Philippine pesos (PHP)</p>' + narrative + '</body></html>');
+ popup.document.close(); popup.focus(); popup.print();
+}
+export function downloadBrief(item: SavedBrief) {
+    const report = item.report;
+    const text = `${report.libraryName || 'Library'}\n\n# ${item.title}\n\nPeriod: ${formatAdminDate(report.range.dateFrom,false)} – ${formatAdminDate(report.range.dateTo,false)}\nGenerated: ${report.generatedAt ? formatAdminDate(report.generatedAt) : 'Time unavailable'}\nBy: ${report.generatedBy || 'Generator unavailable'}\nSaved: ${formatAdminDate(item.savedAt)}\n\n${report.report}\n`;
+    const url = URL.createObjectURL(new Blob([text], {type:'text/markdown;charset=utf-8'}));
+    const link = document.createElement('a'); link.href=url; link.download=(item.title.replace(/[^a-z0-9]+/gi,'-').slice(0,80)||'library-brief')+'.md'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+export function SavedBriefs() {
+    const [entries,setEntries] = useState(readSavedBriefs), [selected,setSelected] = useState<SavedBrief|null>(null), [error,setError] = useState('');
+    const {confirm,confirmDialog} = useAdminConfirmDialog();
+    const remove = async (item: SavedBrief) => {
+        if (!await confirm({title:`Delete ${item.title}?`,description:'This removes the saved copy from this device. Downloaded copies remain available.',actionLabel:'Delete brief',tone:'danger'})) return;
+        try {const next=entries.filter(entry=>entry.id!==item.id);localStorage.setItem(key,JSON.stringify(next));setEntries(next);if(selected?.id===item.id)setSelected(null);}catch{setError('Could not delete the saved brief. Try again.');}
+    };
+    const print = (item: SavedBrief) => {try{printBrief(item.report,item.title);}catch(error){setError((error as Error).message);}};
+    const period = (item: SavedBrief) => `${formatAdminDate(item.report.range.dateFrom,false)} – ${formatAdminDate(item.report.range.dateTo,false)}`;
+    return <section className="analytics-saved"><h2>Saved briefs</h2><p className="admin-desk-secondary">Saved on this device. Download a Markdown copy or print a PDF to share.</p>{error && <p role="alert">{error}</p>}
+        {entries.length ? <ul>{entries.map(item=><li key={item.id}><div className="analytics-brief-details"><h3>{item.title}</h3><p>{period(item)}</p><p>{item.report.generatedBy ? `Generated by ${item.report.generatedBy}` : 'Generator unavailable'}{item.report.generatedAt ? ` · ${formatAdminDate(item.report.generatedAt)}` : ''}</p><small>Saved {formatAdminDate(item.savedAt)}</small></div><div className="analytics-brief-actions"><Button variant="outline" onClick={()=>setSelected(item)}><AdminIcon name="eye"/>Open</Button><Button variant="outline" title="Download this brief as Markdown" onClick={()=>downloadBrief(item)}><AdminIcon name="reports"/>Download</Button><Button variant="outline" onClick={()=>print(item)}>Print / PDF</Button><Button variant="ghost" className="text-destructive" aria-label={`Delete saved brief ${item.title}`} onClick={()=>void remove(item)}>Delete</Button></div></li>)}</ul> : <div className="analytics-notice">No saved briefs yet. <Link to="/admin/analytics?tab=ai-report">Create an AI report</Link></div>}
+        <AdminDetailDrawer open={Boolean(selected)} onClose={()=>setSelected(null)} title={selected?.title || 'Saved brief'} description={selected ? `${period(selected)} · ${selected.report.generatedBy || 'Generator unavailable'}` : 'Saved brief'} footer={<><Button variant="outline" onClick={()=>setSelected(null)}>Close</Button>{selected && <><Button variant="outline" onClick={()=>print(selected)}>Print / PDF</Button><Button onClick={()=>downloadBrief(selected)}>Download</Button></>}</>}>{selected && <article className="analytics-brief-preview"><p className="admin-desk-secondary">{selected.report.generatedAt ? `Generated ${formatAdminDate(selected.report.generatedAt)}` : `Saved ${formatAdminDate(selected.savedAt)}`}</p><div className="analytics-saved-text">{selected.report.report}</div></article>}</AdminDetailDrawer>
+        {confirmDialog}
+    </section>;
+}

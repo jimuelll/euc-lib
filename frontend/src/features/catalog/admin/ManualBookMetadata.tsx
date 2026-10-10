@@ -1,3 +1,5 @@
+import {Link} from 'react-router-dom';
+import {AdminRowMenu,AdminDetailDrawer,useUnsavedChanges,formatAdminDate,AdminStatusChip} from '@/features/admin';
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -5,10 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchManualBookMetadata, fetchManualMetadataBooks, saveManualBookMetadata, type ManualBookMetadata, type ManualMetadataBook } from "./catalog.api";
-import { Check, CircleAlert, LoaderCircle, Search, Sparkles } from "lucide-react";
+import { fetchManualBookMetadata, fetchManualMetadataBooks, saveManualBookMetadata, type ManualBookMetadata, type ManualMetadataBook,type EmbeddingStatus,fetchRecommendationPreview } from "./catalog.api";
+import { Check, CircleAlert, Sparkles } from "lucide-react";
 import { catalogKeys } from "../catalog.keys";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -20,33 +21,22 @@ const statusLabel: Record<ManualMetadataBook["metadataStatus"], string> = {
   manual: "Added by staff",
 };
 
-const statusClass: Record<ManualMetadataBook["metadataStatus"], string> = {
-  missing: "border-warning/30 bg-warning/5 text-warning-foreground",
-  failed: "border-destructive/25 bg-destructive/5 text-destructive",
-  ready: "border-border bg-muted/30 text-muted-foreground",
-  manual: "border-success/25 bg-success/5 text-success",
-};
-
 const synopsisLabel: Record<ManualMetadataBook["synopsisStatus"], string> = {
-  present: "Synopsis added",
-  not_checked: "Synopsis not checked",
-  no_description: "No online synopsis",
-  lookup_failed: "Synopsis lookup failed",
-  missing: "Synopsis missing",
+  present: "Found",
+  not_checked: "Not checked",
+  no_description: "Not found",
+  lookup_failed: "Lookup failed",
+  missing: "Needs staff input",
 };
 
-const synopsisClass: Record<ManualMetadataBook["synopsisStatus"], string> = {
-  present: "border-success/25 bg-success/5 text-success",
-  not_checked: "border-warning/45 bg-warning/10 text-foreground",
-  no_description: "border-warning/45 bg-warning/10 text-foreground",
-  lookup_failed: "border-destructive/25 bg-destructive/5 text-destructive",
-  missing: "border-warning/45 bg-warning/10 text-foreground",
-};
-
-const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: number }) => {
+type Props={backfillRevision?:number;filter?:string;onFilter?:(value:string)=>void;coverage?:EmbeddingStatus;clearFilter?:()=>void;selectedIds?:number[];onSelection?:(ids:number[])=>void;onLookup?:(id:number)=>void;running?:boolean};
+const ManualBookMetadata = ({ backfillRevision = 0,filter='all',onFilter=()=>{},coverage,clearFilter=()=>{},selectedIds=[],onSelection=()=>{},onLookup=()=>{},running=false }: Props) => {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1),[limit,setLimit]=useState(25),[sort,setSort]=useState('attention');
+  useEffect(()=>setPage(1),[filter]);
+  const [previewBook,setPreviewBook]=useState<ManualMetadataBook|null>(null);
+  const previewQuery=useQuery({queryKey:[...catalogKeys.embeddings(),'preview',previewBook?.id],queryFn:({signal})=>fetchRecommendationPreview(previewBook!.id,signal),enabled:Boolean(previewBook)});
   const [selectedBook, setSelectedBook] = useState<ManualMetadataBook | null>(null);
   const [summary, setSummary] = useState("");
   const [subjectsText, setSubjectsText] = useState("");
@@ -57,9 +47,10 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
   const [publishedDate, setPublishedDate] = useState("");
   const [formError, setFormError] = useState("");
   const debouncedQuery = useDebounce(query.trim(), 220);
+  const listFilters={query:debouncedQuery,needsAttention:filter==='attention',page,limit,synopsis:filter==='synopses'?'blank':'all',embedding:filter==='matching'?'needed':filter==='ready'?'ready':'all',details:filter==='details'?'missing':'all',sort};
   const booksQuery = useQuery({
-    queryKey: catalogKeys.manualMetadataBooks({ query: debouncedQuery, needsAttention: !debouncedQuery, page }),
-    queryFn: ({ signal }) => fetchManualMetadataBooks({ query: debouncedQuery, needsAttention: !debouncedQuery, page }, signal),
+    queryKey: catalogKeys.manualMetadataBooks(listFilters),
+    queryFn: ({ signal }) => fetchManualMetadataBooks(listFilters, signal),
     placeholderData: keepPreviousData,
   });
   const detailsQuery = useQuery({
@@ -82,7 +73,8 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
     },
   });
   const saving = saveMutation.isPending;
-  const searchingAllBooks = Boolean(query.trim());
+  const dirty=Boolean(details)&&JSON.stringify([summary,subjectsText,publisher,categoriesText,language,pageCountText,publishedDate])!==JSON.stringify([details!.summary,details!.subjects.join('\n'),details!.additionalDetails.publisher,details!.additionalDetails.categories.join('\n'),details!.additionalDetails.language,details!.additionalDetails.pageCount==null?'':String(details!.additionalDetails.pageCount),details!.additionalDetails.publishedDate]);
+  const guard=useUnsavedChanges({},Boolean(selectedBook),selectedBook?.id??0,dirty);
 
   useEffect(() => {
     if (backfillRevision > 0) void queryClient.invalidateQueries({ queryKey: catalogKeys.embeddings() });
@@ -112,8 +104,8 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
     setFormError("");
   };
 
-  const closeEditor = () => {
-    if (saving) return;
+  const closeEditor = async () => {
+    if (saving||!await guard.confirmDiscard()) return;
     setSelectedBook(null);
     setFormError("");
   };
@@ -147,7 +139,7 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
       if (result.embeddingStatus === "ready") {
         if (summary.trim()) toast.success("Book details saved and AI recommendations updated.");
         else toast.warning("Book details saved. The AI synopsis is still missing.");
-        setSelectedBook(null);
+        guard.markSaved();setSelectedBook(null);
       } else {
         const message = `Your book details were saved, but AI recommendations could not be updated: ${result.embeddingError || "Please try again later."}`;
         setFormError(message);
@@ -162,83 +154,43 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
   const currentSynopsisStatus = details?.synopsisStatus || selectedBook?.synopsisStatus;
   return (
     <>
-      <section aria-labelledby="manual-ai-details-heading" className="rounded-md border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 id="manual-ai-details-heading" className="text-base font-semibold text-foreground">Add book details for recommendations</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Add or correct book details here. Saved details help the system suggest similar books.</p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-2 text-xs text-muted-foreground"><Sparkles className="size-4" />Private AI details</span>
-        </div>
-
-        <div className="space-y-4 p-5">
-          <div className="relative max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Search books by title, author, or ISBN" className="pl-9" placeholder="Search any book by title, author, or ISBN" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} />
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground" aria-live="polite">
-            {searchingAllBooks ? "Search results include books with and without AI details." : "Showing active books missing a synopsis, useful details, or a ready embedding. Search above to open any active book."}
-          </p>
-
-          {loadingBooks && !booksQuery.data ? <div className="space-y-2" aria-label="Loading books">{[0, 1, 2].map((item) => <div key={item} className="h-[68px] animate-pulse rounded-md bg-muted/60" />)}</div> : listError && !booksQuery.data ? (
-            <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription className="flex flex-wrap items-center justify-between gap-3">{listError}<Button size="sm" variant="outline" onClick={() => void booksQuery.refetch()}>Try again</Button></AlertDescription></Alert>
-          ) : books.length ? (
-            <>
-              <ul className="divide-y divide-border rounded-md border border-border" aria-label={searchingAllBooks ? "Book search results" : "Books needing an AI update"}>
-                {books.map((book) => <li key={book.id}>
-                  <button type="button" onClick={() => void openBook(book)} className="flex w-full flex-col gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between">
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-foreground">{book.title}</span>
-                      <span className="mt-1 block truncate text-xs text-muted-foreground">{book.author || "Author not listed"}{book.isbn ? ` · ISBN ${book.isbn}` : " · No ISBN"}</span>
-                    </span>
-                    <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                      <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs font-medium ${statusClass[book.metadataStatus]}`}>{book.metadataStatus === "ready" ? "Other details found" : statusLabel[book.metadataStatus]}</span>
-                      <span className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs font-medium ${synopsisClass[book.synopsisStatus]}`}>{synopsisLabel[book.synopsisStatus]}</span>
-                      <span className="text-xs text-muted-foreground">{book.embeddingStatus === "ready" ? "Embedding ready" : "Embedding update needed"}</span>
-                    </span>
-                  </button>
-                </li>)}
-              </ul>
-              <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-                <span>{total} book{total === 1 ? "" : "s"}</span>
-                <div className="flex items-center justify-between gap-3 sm:justify-end">
-                  <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-                  <span className="tabular-nums">Page {page} of {totalPages}</span>
-                  <Button type="button" size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-md border border-dashed border-border px-5 py-8 text-center">
-              <Check className="mx-auto size-5 text-success" />
-              <p className="mt-2 text-sm font-medium text-foreground">{searchingAllBooks ? "No books found" : "No books need an AI update"}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{searchingAllBooks ? "Try another title, author, or ISBN." : "All active books have a synopsis, useful details, and a ready AI embedding. Search above to review a book."}</p>
-            </div>
-          )}
-        </div>
+      <section aria-labelledby="manual-ai-details-heading" className="ai-book-list">
+       <div className="ai-list-title"><h2 id="manual-ai-details-heading">Book readiness</h2><span className="ai-muted">{total} active books match</span></div>
+       <div className="ai-list-sticky"><Input aria-label="Search books by title, author, or ISBN" placeholder="Search title, author or ISBN…" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
+        <div className="ai-list-filters" role="group" aria-label="Book data filters">{[
+         ['attention','Needs attention',coverage?.needsAttention],['synopses','Needs synopsis',coverage?.missingSynopses],['details','Needs book details',coverage?.missingDetails],['matching','Needs matching',coverage?coverage.total-coverage.ready:undefined],['all','All',coverage?.total]
+        ].map(([value,label,count])=><Button key={String(value)} variant="outline" aria-pressed={filter===value} onClick={()=>onFilter(String(value))}>{filter===value&&<Check aria-hidden="true"/>}{label} {count??'—'}</Button>)}<label>Sort by<select aria-label="Sort books" value={sort} onChange={e=>{setSort(e.target.value);setPage(1);}}><option value="attention">Needs attention first</option><option value="title">Title</option><option value="author">Author</option></select></label></div>
+        {(filter!=='all'||query)&&<div className="ai-filter-summary"><span>{filter==='all'?'All books':filter==='synopses'?'Missing synopsis':filter==='details'?'Missing book details':filter==='matching'?'Missing AI data':'Needs attention'}{query?` · “${query}”`:''}</span><Button variant="ghost" onClick={()=>{clearFilter();setQuery('');setPage(1);}}>Clear filters</Button></div>}
+        {selectedIds.length>0&&<div className="ai-filter-summary"><span>{selectedIds.length} books selected across pages</span><Button variant="ghost" onClick={()=>onSelection([])}>Clear selection</Button></div>}
+        <div className="ai-book-head"><label className="ai-selection"><input type="checkbox" aria-label="Select all books on this page" checked={books.length>0&&books.every(book=>selectedIds.includes(book.id))} ref={input=>{if(input)input.indeterminate=books.some(book=>selectedIds.includes(book.id))&&!books.every(book=>selectedIds.includes(book.id));}} disabled={!books.length||booksQuery.isPlaceholderData} onChange={e=>onSelection(e.target.checked?[...new Set([...selectedIds,...books.map(book=>book.id)])]:selectedIds.filter(id=>!books.some(book=>book.id===id)))}/></label><span>Book</span><span>Synopsis</span><span title="A saved synopsis, subjects, publisher, language, page count or publication details">Book details</span><span>AI matching</span><span>Actions</span></div>
+       </div>
+       {listError&&<p role="alert" className="ai-error">{listError}<Button variant="outline" onClick={()=>void booksQuery.refetch()}>Try again</Button></p>}
+       {loadingBooks&&!booksQuery.data?<p className="ai-empty" role="status">Loading book readiness…</p>:books.length?<><ul className="ai-books" aria-label="Book readiness list">{books.map(book=><li className="ai-book-row" key={book.id}>
+        <label className="ai-selection"><input type="checkbox" aria-label={`Select ${book.title}`} checked={selectedIds.includes(book.id)} onChange={e=>onSelection(e.target.checked?[...selectedIds,book.id]:selectedIds.filter(id=>id!==book.id))}/></label>
+        <div className="ai-book-identity"><img src={book.imageUrl||'/book-cover-fallback.svg'} alt="" loading="lazy" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src='/book-cover-fallback.svg';}}/><div className="ai-book-name"><button className="ai-link" onClick={()=>openBook(book)}>{book.title}</button><span title={book.author||'Author not listed'}>{book.author||'Author not listed'}</span><code>{book.isbn||'No ISBN'}</code>{(book.synopsisStatus!=='present'||book.embeddingStatus!=='ready'||book.metadataStatus==='missing')&&<small className="ai-attention-reason">{[book.synopsisStatus!=='present'?'No synopsis':'',!book.isbn?'No ISBN for lookup':'',book.metadataStatus==='missing'?'Missing book details':'',book.embeddingStatus!=='ready'?'AI data needs update':''].filter(Boolean).join(' · ')}</small>}</div></div>
+        <div data-label="Synopsis"><AdminStatusChip tone={book.synopsisStatus==='present'?'success':book.synopsisStatus==='not_checked'?'warning':'danger'} title={book.synopsisStatus==='not_checked'?'No successful synopsis check is recorded.':undefined}>{synopsisLabel[book.synopsisStatus]}</AdminStatusChip></div>
+        <div data-label="Book details"><AdminStatusChip tone={book.metadataStatus==='ready'||book.metadataStatus==='manual'?'success':'danger'}>{book.metadataStatus==='ready'?'Found':statusLabel[book.metadataStatus]}</AdminStatusChip></div>
+        <div data-label="AI matching"><AdminStatusChip tone={book.embeddingStatus==='ready'?'success':'danger'}>{book.embeddingStatus==='ready'?'Ready':book.embeddingStatus==='failed'?'Failed':'Missing'}</AdminStatusChip></div>
+        <div className="ai-row-actions"><Button variant="outline" disabled={book.synopsisStatus==='not_checked'&&(running||!book.isbn)} onClick={()=>book.synopsisStatus==='not_checked'?onLookup(book.id):openBook(book)}>{book.synopsisStatus==='present'?'Edit':book.synopsisStatus==='not_checked'?'Retry lookup':'Add synopsis'}</Button><AdminRowMenu label={`Actions for ${book.title}`} items={[{label:'Preview recommendations',onSelect:()=>setPreviewBook(book)},{label:'Add or edit synopsis',onSelect:()=>openBook(book)},{label:book.isbn?'Fetch online for this book':'Lookup unavailable · no ISBN',disabled:running||!book.isbn,onSelect:()=>onLookup(book.id)},{label:'Open catalog record',onSelect:()=>window.location.assign(`/admin/catalog?tab=records&bookId=${book.id}`)}]}/></div>
+       </li>)}</ul><div className="ai-pagination"><span>Showing {Math.min(total,(page-1)*limit+1)}–{Math.min(page*limit,total)} of {total}</span><label>Rows per page <select aria-label="Rows per page" value={limit} onChange={e=>{setLimit(Number(e.target.value));setPage(1);}}>{[10,25,50].map(n=><option key={n}>{n}</option>)}</select></label><Button variant="outline" disabled={page<=1||booksQuery.isPlaceholderData} onClick={()=>setPage(page-1)}>Previous</Button><span>Page {page} of {totalPages}</span><Button variant="outline" disabled={page>=totalPages||booksQuery.isPlaceholderData} onClick={()=>setPage(page+1)}>Next</Button></div></>:!listError?<div className="ai-empty"><Check aria-hidden="true"/><p>{filter==='attention'?'All matching books are complete.':'No books match these filters.'}</p><Button variant="outline" onClick={()=>{clearFilter();setQuery('');setPage(1);}}>View all books</Button><Link className="ai-link" to="/admin/catalog">Open Catalog →</Link></div>:null}
       </section>
-
-      <Sheet open={Boolean(selectedBook)} onOpenChange={(open) => { if (!open) closeEditor(); }}>
-        <SheetContent className="admin-edit-sheet grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-[560px]" onEscapeKeyDown={(event) => { if (saving) event.preventDefault(); }}>
-          <SheetHeader className="shrink-0 border-b border-border bg-primary px-6 py-5 pr-12 text-left text-primary-foreground">
-            <SheetTitle className="text-primary-foreground">Add AI details</SheetTitle>
-            <SheetDescription className="text-primary-foreground/80">{selectedBook?.title || "Book"}{selectedBook?.author ? ` · ${selectedBook.author}` : ""}</SheetDescription>
-          </SheetHeader>
-          {loadingDetails ? <div className="space-y-4 p-6" aria-label="Loading book details"><div className="h-5 w-2/3 animate-pulse rounded bg-muted" /><div className="h-28 animate-pulse rounded bg-muted" /><div className="h-24 animate-pulse rounded bg-muted" /></div> : detailsQuery.isError ? <div role="alert" className="m-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{getApiErrorMessage(detailsQuery.error, "Book details could not be loaded.")}<Button type="button" variant="outline" size="sm" className="ml-3" onClick={() => void detailsQuery.refetch()}>Try again</Button></div> : (
-            <div className="flex min-h-0 flex-col overflow-y-auto">
-              <div className="flex-1 space-y-5 px-6 py-5">
+      <AdminDetailDrawer className="ai-preview-drawer" open={Boolean(previewBook)} onClose={()=>setPreviewBook(null)} title={`Recommendations for ${previewBook?.title||'Book'}`} description="The same suggestions shown in the public catalog. Uses saved book data; no patron history or external provider call.">
+       {previewQuery.isPending?<p role="status">Loading recommendations…</p>:previewQuery.isError?<p role="alert" className="ai-error">{getApiErrorMessage(previewQuery.error,'Could not preview recommendations.')}<Button variant="outline" onClick={()=>void previewQuery.refetch()}>Retry</Button></p>:previewQuery.data?.rows.length?<ul className="ai-preview-results">{previewQuery.data.rows.map(row=><li key={row.id}><Link className="ai-link" to={`/admin/catalog?tab=records&bookId=${row.id}`}>{row.title}</Link><p>{row.author||'Author not listed'} · {row.reason}</p><AdminStatusChip tone={row.source==='ai'?'success':'neutral'}>{row.source==='ai'?'AI match':'Catalog match'}</AdminStatusChip></li>)}</ul>:<p>No similar titles are available. Add useful book details and check eligible titles in the catalog.</p>}
+      </AdminDetailDrawer>
+      <AdminDetailDrawer className="ai-details-drawer" open={Boolean(selectedBook)} title={`Book details: ${selectedBook?.title||'Book'}`} description="Synopsis and details used for AI recommendations. Changes are recorded in the audit log." onClose={()=>void closeEditor()} footer={<><span role="status">{saving?'Saving…':guard.dirty?'Unsaved changes':'No unsaved changes'}</span><Button variant="outline" disabled={saving} onClick={()=>void closeEditor()}>Cancel</Button><Button type="submit" form="ai-details-editor" disabled={saving||loadingDetails||!details||!guard.dirty}>{saving?'Saving and updating…':'Save details'}</Button></>}>
+       {loadingDetails?<p role="status" className="text-sm text-muted-foreground">Loading book details…</p>:detailsQuery.isError?<div role="alert" className="ai-error">{getApiErrorMessage(detailsQuery.error,'Book details could not be loaded.')}<Button variant="outline" onClick={()=>void detailsQuery.refetch()}>Try again</Button></div>:<form id="ai-details-editor" className="space-y-5" onSubmit={e=>{e.preventDefault();void save();}}>
                 {selectedBook?.isbn ? <p className="text-xs text-muted-foreground">ISBN {selectedBook.isbn}</p> : <p className="text-xs text-muted-foreground">No ISBN is recorded. You can still add details below.</p>}
-                {metadataStatus === "failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The online details lookup failed{details?.metadataError ? `: ${details.metadataError}` : "."} This is separate from its AI embedding status. You can still add details below.</AlertDescription></Alert> : null}
-                {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Other book details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
+                {metadataStatus === "failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The online details lookup failed{details?.metadataError ? `: ${details.metadataError}` : "."} This is separate from its AI matching status. You can still add details below.</AlertDescription></Alert> : null}
+                {metadataStatus === "ready" ? <Alert><Sparkles className="size-4" /><AlertDescription>Book details were found online. Review them and correct anything that looks wrong.</AlertDescription></Alert> : null}
                 {metadataStatus === "manual" ? <Alert><Check className="size-4" /><AlertDescription>These details were added by library staff. You can update them here.</AlertDescription></Alert> : null}
-                {currentSynopsisStatus === "lookup_failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The synopsis lookup failed{details?.synopsisError ? `: ${details.synopsisError}` : ". You can retry Backfill later or add the synopsis manually."}</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "lookup_failed" ? <Alert variant="destructive"><CircleAlert className="size-4" /><AlertDescription>The synopsis lookup failed{details?.synopsisError ? `: ${details.synopsisError}` : ". You can retry Refresh book data later or add the synopsis manually."}</AlertDescription></Alert> : null}
                 {currentSynopsisStatus === "no_description" ? <Alert><Sparkles className="size-4" /><AlertDescription>The available online sources did not provide a synopsis. Add one manually if available.</AlertDescription></Alert> : null}
-                {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Backfill checks Open Library first, then Google Books, and Hardcover when configured.</AlertDescription></Alert> : null}
-                {currentSynopsisStatus === "missing" ? <Alert><CircleAlert className="size-4" /><AlertDescription>No AI synopsis is recorded. You can add one manually below.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Refresh book data checks Open Library first, then Google Books, and Hardcover when configured.</AlertDescription></Alert> : null}
+                {currentSynopsisStatus === "missing" ? <Alert><CircleAlert className="size-4" /><AlertDescription>No synopsis is recorded. You can add one manually below.</AlertDescription></Alert> : null}
 
                 <section aria-labelledby="other-book-details-heading" className="space-y-4 rounded-md border border-border bg-muted/20 p-4">
                   <div>
-                    <h3 id="other-book-details-heading" className="text-sm font-semibold text-foreground">Other book details</h3>
+                    <h3 id="other-book-details-heading" className="text-sm font-semibold text-foreground">Book details</h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{details?.source === "openlibrary_googlebooks" ? "Review and edit the details found during the ISBN lookup." : "Add any other details you know about the book."}</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -251,7 +203,7 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
                 </section>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ai-book-summary">What is this book about?</Label>
+                  <Label htmlFor="ai-book-summary">Synopsis · What is this book about?</Label>
                   <Textarea id="ai-book-summary" className="min-h-36 resize-y" maxLength={8000} placeholder="Write a few sentences about the book’s main ideas or story." value={summary} onChange={(event) => setSummary(event.target.value)} />
                   <p className="text-xs leading-5 text-muted-foreground">A short description is enough. Leave this blank if you only know the topics.</p>
                 </div>
@@ -261,15 +213,10 @@ const ManualBookMetadata = ({ backfillRevision = 0 }: { backfillRevision?: numbe
                   <p className="text-xs leading-5 text-muted-foreground">Add one topic per line. Enter at least one detail in this form to save.</p>
                 </div>
                 {formError ? <Alert variant={formError.startsWith("Your book details were saved") ? "default" : "destructive"}><CircleAlert className="size-4" /><AlertDescription>{formError}</AlertDescription></Alert> : null}
-              </div>
-              <SheetFooter className="sticky bottom-0 shrink-0 border-t border-border bg-background px-6 py-4">
-                <Button type="button" variant="outline" disabled={saving} onClick={closeEditor}>Cancel</Button>
-                <Button type="button" disabled={saving || loadingDetails || !details} onClick={() => void save()}>{saving ? <><LoaderCircle className="mr-2 size-4 animate-spin" />Saving and updating…</> : "Save details"}</Button>
-              </SheetFooter>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+
+       {details?.staffEditedAt&&<p className="text-xs text-muted-foreground">Last entered by {details.staffEditedBy||'staff'} · {formatAdminDate(details.staffEditedAt)}</p>}
+       </form>}
+      </AdminDetailDrawer>{guard.discardDialog}
     </>
   );
 };

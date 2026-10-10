@@ -1,0 +1,88 @@
+
+> vite_react_shadcn_ts@0.0.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 4348 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                      0.62 kB │ gzip:   0.39 kB
+dist/assets/index-DKAMTw_q.css                       0.27 kB │ gzip:   0.20 kB
+dist/assets/Index-C-coYUcI.css                       2.85 kB │ gzip:   0.92 kB
+dist/assets/AdminHolidays-C_iZiDTc.css               3.25 kB │ gzip:   0.95 kB
+dist/assets/AdminBookTypes-D4WKgw7R.css              4.40 kB │ gzip:   1.20 kB
+dist/assets/AdminNotifications-DrUKL5Hw.css          6.93 kB │ gzip:   1.56 kB
+dist/assets/AdminClearance-D5nFYEk5.css              6.99 kB │ gzip:   1.68 kB
+dist/assets/AdminAuditLogs-EGDBTCc_.css              7.72 kB │ gzip:   1.92 kB
+dist/assets/analytics-Dn-aSGU4.css                   8.68 kB │ gzip:   1.88 kB
+dist/assets/records-BGSolUrq.css                     8.98 kB │ gzip:   2.18 kB
+dist/assets/AdminReservations-Dez5RT13.css          10.37 kB │ gzip:   2.37 kB
+dist/assets/AdminBackup-BLalSwgW.css                11.07 kB │ gzip:   2.43 kB
+dist/assets/Index-CwcePckm.css                      21.48 kB │ gzip:   3.90 kB
+dist/assets/AdminContentManagement-tD1TP5PE.css     26.79 kB │ gzip:   4.95 kB
+dist/assets/Index-DjWUqvT1.css                      35.22 kB │ gzip:   6.15 kB
+dist/assets/index-B06QUtE3.css                     163.01 kB │ gzip:  28.46 kB
+dist/assets/QueryPreview-BQ2sTqId.js                 0.27 kB │ gzip:   0.20 kB
+dist/assets/ReportPreview-CGY6KqBz.js                0.28 kB │ gzip:   0.21 kB
+dist/assets/circle-check-BesEnigE.js                 0.34 kB │ gzip:   0.27 kB
+dist/assets/clock-3-_oQJuUcG.js                      0.35 kB │ gzip:   0.27 kB
+dist/assets/copy-CbP03GCf.js                         0.40 kB │ gzip:   0.31 kB
+dist/assets/api-CNzP2Jas.js                          0.41 kB │ gzip:   0.28 kB
+dist/assets/external-link-DLmjkw1G.js                0.42 kB │ gzip:   0.30 kB
+dist/assets/upload-DFWHK769.js                       0.43 kB │ gzip:   0.32 kB
+dist/assets/triangle-alert-B5yFL9Gh.js               0.43 kB │ gzip:   0.31 kB
+dist/assets/pencil-pQo-huEV.js                       0.45 kB │ gzip:   0.32 kB
+dist/assets/printer-Dt4Ss7z0.js                      0.49 kB │ gzip:   0.33 kB
+dist/assets/refresh-cw-CUjTvoOh.js                   0.49 kB │ gzip:   0.33 kB
+dist/assets/save-xOqWDwhe.js                         0.50 kB │ gzip:   0.33 kB
+dist/assets/useAdminUrlState-B1osfsGh.js             0.52 kB │ gzip:   0.36 kB
+dist/assets/adminAnalytics.api-x9E0Ax4U.js           0.57 kB │ gzip:   0.25 kB
+dist/assets/badge-CgQxzHY0.js                        0.71 kB │ gzip:   0.37 kB
+dist/assets/clearance.keys-BHI49zr0.js               1.07 kB │ gzip:   0.47 kB
+dist/assets/useUnsavedChanges-1ZAWsV_6.js            1.34 kB │ gzip:   0.75 kB
+dist/assets/CompactAdmin-C4QBW72I.js                 1.54 kB │ gzip:   0.59 kB
+dist/assets/useAdminConfirmDialog-TOY0raEm.js        1.64 kB │ gzip:   0.77 kB
+dist/assets/AdminDateTime-DpSnqzT3.js                1.68 kB │ gzip:   0.93 kB
+dist/assets/AdminPage-DCKoIOSF.js                    1.79 kB │ gzip:   0.70 kB
+dist/assets/RecordsPrint-Bn2l4o4M.js                 1.93 kB │ gzip:   0.92 kB
+dist/assets/library-settings.keys-BI05MocV.js        2.36 kB │ gzip:   0.58 kB
+dist/assets/AdminClearanceReceipt-Cz8WnerX.js        2.57 kB │ gzip:   1.03 kB
+dist/assets/AdminDateRange-CufFdZtZ.js               2.87 kB │ gzip:   1.35 kB
+dist/assets/EditProfile-CWkoycVc.js                  2.98 kB │ gzip:   1.07 kB
+dist/assets/catalog.api-CNwVRQqF.js                  4.65 kB │ gzip:   1.41 kB
+dist/assets/AdminDeskSystem-DQeM4nGX.js              5.04 kB │ gzip:   1.89 kB
+dist/assets/analytics-D41pNGSY.js                    5.69 kB │ gzip:   2.46 kB
+dist/assets/AdminUserGuide-_bcJGMGW.js               7.05 kB │ gzip:   2.53 kB
+dist/assets/AcademicSubscriptions-BTPKbnmD.js        7.44 kB │ gzip:   2.42 kB
+dist/assets/AdminIcon-D96Q2hsu.js                    7.51 kB │ gzip:   2.27 kB
+dist/assets/AdminHome-DElKVqww.js                    7.95 kB │ gzip:   2.45 kB
+dist/assets/records-oNaP1Wjv.js                      9.80 kB │ gzip:   3.66 kB
+dist/assets/Index-BzCFqeGB.js                       10.92 kB │ gzip:   4.24 kB
+dist/assets/Index-B0XN06id.js                       12.14 kB │ gzip:   4.18 kB
+dist/assets/AdminBookTypes-DXKJAzrx.js              12.66 kB │ gzip:   4.69 kB
+dist/assets/AdminReport-DmOpn4wT.js                 15.30 kB │ gzip:   5.34 kB
+dist/assets/index-KQUrcjTg.js                       18.17 kB │ gzip:   4.94 kB
+dist/assets/AdminNotifications-DW749SGe.js          18.95 kB │ gzip:   6.05 kB
+dist/assets/AdminHolidays-DRugnwB3.js               19.53 kB │ gzip:   6.90 kB
+dist/assets/AdminClearance-Chyj6Y51.js              20.79 kB │ gzip:   6.33 kB
+dist/assets/AdminReservations-Ab_SZePm.js           21.18 kB │ gzip:   6.88 kB
+dist/assets/AdminAuditLogs-grI_1OD9.js              22.25 kB │ gzip:   7.75 kB
+dist/assets/Index-2bT__L5g.js                       28.06 kB │ gzip:   9.35 kB
+dist/assets/index-DKlFXj5r.js                       32.52 kB │ gzip:   9.52 kB
+dist/assets/AdminBackup-Bd1qd9jo.js                 39.19 kB │ gzip:  12.34 kB
+dist/assets/Index-DZD5gY4V.js                       53.62 kB │ gzip:  14.98 kB
+dist/assets/AdminContentManagement-DBH3Wt0N.js      70.26 kB │ gzip:  19.88 kB
+dist/assets/Index-DmhUsVxU.js                      143.58 kB │ gzip:  40.71 kB
+dist/assets/AdminAnalytics-D5YW6U35.js             379.52 kB │ gzip: 103.93 kB
+dist/assets/index-DX92ikwi.js                      413.62 kB │ gzip: 109.64 kB
+dist/assets/index-BeONMxJs.js                    1,029.93 kB │ gzip: 315.42 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 47.22s

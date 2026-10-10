@@ -1,10 +1,87 @@
 import axiosInstance from "@/utils/AxiosInstance";
-
 export type AudienceType = "all" | "user" | "role";
-export interface AdminNotification { id: number; type: string; title: string; body: string; href: string | null; audience_type: AudienceType; audience_user_id: number | null; audience_user_name: string | null; audience_user_identifier: string | null; audience_role: string | null; created_at: string; expires_at: string | null; creator_name: string | null; }
-export interface NotificationRecipient { id: number; name: string; role: string; student_employee_id: string; library_card_number: string | null; student_number: string | null; employee_number: string | null; username: string | null; }
-export interface AdminNotificationStats { total_notifications: number; created_today: number; broadcast_notifications: number; direct_notifications: number; }
-export interface AdminNotificationsResponse { stats: AdminNotificationStats; notifications: AdminNotification[]; pagination: { page: number; limit: number; total: number; totalPages: number } }
-export const fetchAdminNotifications = async (page = 1, signal?: AbortSignal): Promise<AdminNotificationsResponse> => (await axiosInstance.get<AdminNotificationsResponse>("/api/admin/notifications", { params: { page, limit: 20 }, signal })).data;
-export const searchNotificationRecipients = async (query: string, signal?: AbortSignal): Promise<NotificationRecipient[]> => (await axiosInstance.get<{ recipients: NotificationRecipient[] }>("/api/admin/notifications/recipients", { params: { q: query }, signal })).data.recipients;
-export const createAdminNotification = async (payload: { type: string; title: string; body: string; href: string | null; audienceType: AudienceType; audienceUserId: number | null; audienceRole: string | null; expiresAt: string | null }): Promise<void> => { await axiosInstance.post("/api/admin/notifications", payload); };
+export interface AdminNotification {
+    audience_user_patron_id: string | null;
+    record_key: string;
+    id: number | null;
+    queue_id: string | null;
+    type: string;
+    title: string;
+    body: string;
+    href: string | null;
+    audience_type: AudienceType;
+    audience_user_id: number | null;
+    audience_user_name: string | null;
+    audience_user_identifier: string | null;
+    audience_role: string | null;
+    created_at: string;
+    expires_at: string | null;
+    scheduled_at: string | null;
+    creator_name: string | null;
+    origin: 'manual' | 'automatic';
+    delivery_status: 'available' | 'queued' | 'scheduled' | 'failed' | 'expired';
+    read_count: number;
+    group_reads: number;
+    group_count: number;
+    last_error: string | null;
+}
+export interface NotificationRecipient {
+    id: number;
+    name: string;
+    role: string;
+    student_employee_id: string;
+    library_card_number: string | null;
+    student_number: string | null;
+    employee_number: string | null;
+    username: string | null;
+}
+export interface AdminNotificationStats {
+    total_notifications: number;
+    created_today: number;
+    broadcast_notifications: number;
+    direct_notifications: number;
+}
+export interface AdminNotificationsResponse {
+    counts: {
+        manual: number;
+        automatic: number;
+        failed: number;
+        all: number;
+    };
+    notifications: AdminNotification[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+export interface FeedParams {
+    page: number;
+    limit?: number;
+    tab: string;
+    filter: string;
+    q: string;
+}
+export const fetchAdminNotifications = async (params: FeedParams, signal?: AbortSignal): Promise<AdminNotificationsResponse> => (await axiosInstance.get<AdminNotificationsResponse>("/api/admin/notifications", { params: { limit: 20, ...params }, signal })).data;
+export const searchNotificationRecipients = async (query: string, signal?: AbortSignal): Promise<NotificationRecipient[]> => (await axiosInstance.get<{
+    recipients: NotificationRecipient[];
+}>("/api/admin/notifications/recipients", { params: { q: query }, signal })).data.recipients;
+export interface NotificationCompose {
+    type: string;
+    title: string;
+    body: string;
+    href: string | null;
+    audienceType: AudienceType;
+    audienceUserId: number | null;
+    audienceRole: string | null;
+    expiresAt: string | null;
+    scheduledAt: string | null;
+    confirmedRecipientCount?: number;
+}
+export const createAdminNotification = async (payload: NotificationCompose): Promise<void> => { await axiosInstance.post('/api/admin/notifications', payload); };
+export const countNotificationRecipients = async (params: Pick<NotificationCompose, 'audienceType' | 'audienceUserId' | 'audienceRole'>, signal?: AbortSignal) => (await axiosInstance.get<{
+    count: number;
+}>('/api/admin/notifications/audience-count', { params, signal })).data.count;
+export const notificationDetails = async (key: string, signal?: AbortSignal) => (await axiosInstance.get<AdminNotification[]>(`/api/admin/notifications/${encodeURIComponent(key)}/details`, { signal })).data;
+export const notificationAction = async (key: string, action: 'resend' | 'expire', confirmedRecipientCount?: number) => { await axiosInstance.post(`/api/admin/notifications/${encodeURIComponent(key)}/${action}`, { confirmedRecipientCount }); };

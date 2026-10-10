@@ -5,8 +5,6 @@ import { cloneElement, createContext, useContext, useEffect, useId, useState, us
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AdminIcon } from "@/features/admin";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 const dateFormat = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" });
@@ -19,24 +17,7 @@ export function ContentField({ label, hint, children }: {
     hint?: string;
     children: ReactElement;
 }) { const id = useId(); return <div className="content-field"><Label htmlFor={id}>{label}</Label>{cloneElement(children, { id, "aria-describedby": hint ? id + "-hint" : undefined })}{hint && <p id={id + "-hint"} className="content-secondary">{hint}</p>}</div>; }
-export function ContentDateTime({ label, value, onChange, optional = false }: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    optional?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-    const id = useId();
-    const date = value ? new Date(value) : undefined;
-    const valid = date && Number.isFinite(date.getTime());
-    const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const time = valid ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}` : "09:00";
-    return <div className="content-field"><Label id={id}>{label}</Label><div className="publishing-date-time"><Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button variant="outline" aria-labelledby={id}><AdminIcon name="reservations"/>{valid ? formatContentDate(value, false) : "Choose date"}</Button></PopoverTrigger><PopoverContent className="w-auto p-3" align="start"><Calendar mode="single" selected={valid ? date : undefined} onSelect={selected => { if (selected) {
-        onChange(day(selected) + "T" + time + ":00");
-        setOpen(false);
-    } }} initialFocus/></PopoverContent></Popover><Input type="time" aria-label={`${label} time`} value={time} disabled={!valid} onChange={event => { if (valid)
-        onChange(day(date) + "T" + event.target.value + ":00"); }}/>{optional && value && <Button type="button" variant="ghost" size="icon" aria-label={`Clear ${label.toLowerCase()}`} onClick={() => onChange("")}><AdminIcon name="close"/></Button>}</div></div>;
-}
+export {AdminDateTime as ContentDateTime} from '@/features/admin';
 
 export function ContentImageUpload({label,value,onChange,alt="",onAltChange}:{label:string;value:string|null;onChange:(url:string|null,publicId?:string|null)=>void;alt?:string;onAltChange?:(alt:string)=>void}) {
  const id=useId(),upload=useCloudinaryUpload("library/website"),report=useContext(UploadActivityContext);

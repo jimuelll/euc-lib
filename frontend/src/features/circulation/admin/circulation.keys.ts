@@ -1,6 +1,8 @@
 import type { CirculationLogFilters } from "./circulation.api";
 
 export const normalizeCirculationFilters = (filters: CirculationLogFilters) => ({
+  policyId: filters.policyId ?? null,
+  previousTerms: Boolean(filters.previousTerms),
   status: filters.status ?? "all",
   search: filters.search?.trim() ?? "",
   page: Math.max(1, filters.page ?? 1),

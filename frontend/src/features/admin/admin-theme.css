@@ -297,3 +297,7 @@ body.admin-workspace [role="tablist"] [role="tab"][aria-selected="true"]:hover {
   .admin-workspace .admin-stack-results tbody td { display: table-cell; width: auto; padding: 12px 16px; }
   .admin-workspace .admin-stack-results tbody td::before { display: none; }
 }
+
+.admin-sidebar-design .admin-nav-link:not([data-active="true"]):hover{background:hsl(var(--sidebar-foreground)/.06);color:hsl(var(--sidebar-foreground))}
+/* Navigation scroll cues must never fade the active tool. */
+.admin-nav-region[data-more-below="true"] .admin-nav-scroll{mask-image:none}

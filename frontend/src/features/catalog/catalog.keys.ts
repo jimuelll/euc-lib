@@ -31,6 +31,6 @@ export const catalogKeys = {
   embeddings: () => [...catalogKeys.admin(), "embeddings"] as const,
   embeddingStatus: () => [...catalogKeys.embeddings(), "status"] as const,
   embeddingProgress: () => [...catalogKeys.embeddings(), "progress"] as const,
-  manualMetadataBooks: (filters: { query?: string; needsAttention?: boolean; page?: number }) => [...catalogKeys.embeddings(), "books", { query: filters.query?.trim() ?? "", needsAttention: filters.needsAttention ?? false, page: Math.max(1, filters.page ?? 1) }] as const,
+  manualMetadataBooks: (filters: { query?: string; needsAttention?: boolean; page?: number;limit?:number;synopsis?:string;embedding?:string;details?:string;sort?:string }) => [...catalogKeys.embeddings(), "books", { ...filters, query: filters.query?.trim() ?? "", needsAttention: filters.needsAttention ?? false, page: Math.max(1, filters.page ?? 1) }] as const,
   manualBookMetadata: (bookId: number) => [...catalogKeys.embeddings(), "book", bookId] as const,
 };

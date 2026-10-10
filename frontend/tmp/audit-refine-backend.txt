@@ -1,0 +1,18 @@
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+✔ audit redaction keeps policy names and numeric diffs while masking personal and nested secrets (2.9253ms)
+✔ audit filters bind actor, exact record and search, and reject reversed dates (7.7445ms)
+✔ feed retains captured routes after legacy enrichment and resolves policy links (337.0053ms)
+✔ CSV neutralizes spreadsheet formulas (0.7573ms)
+✔ export is released only after its audit succeeds: success (154.1562ms)
+✔ export is released only after its audit succeeds: failure (2.7293ms)
+✔ request context is captured and sanitized on direct audit writes (144.5755ms)
+✔ derived categories and high impact describe the changed fields, without classifying every policy (1.8494ms)
+✔ a contradictory patron summary cannot link to an unrelated book type policy (3.7105ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8791.53

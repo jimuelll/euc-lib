@@ -1,0 +1,5 @@
+
+> vite_react_shadcn_ts@0.0.0 test:architecture
+> node scripts/architecture-check.mjs
+
+Architecture check passed for 393 frontend source files.

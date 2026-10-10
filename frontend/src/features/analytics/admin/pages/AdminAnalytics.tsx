@@ -1,264 +1,96 @@
-import { useAdminUrlState } from "@/features/admin";
-import { useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
-import { AlertTriangle, BookCopy, BookMarked, Check, CheckCircle2, Coins, Copy, DoorOpen, Globe2, RefreshCcw, Sparkles } from "lucide-react";
-import { getApiErrorCode, getApiErrorMessage } from "@/utils/apiError";
-import { createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse } from "@/features/analytics/api/adminAnalytics.api";
-import { analyticsKeys } from "../../analytics.keys";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AdminPage } from "@/features/admin";
-
-export interface DashboardStats {
-  total_books: number; total_book_copies: number; active_accessioned_copies: number; needs_accession_copies: number; available_book_copies: number; borrowed_book_copies: number;
-  damaged_book_copies: number; lost_book_copies: number; active_users: number; total_users: number;
-  active_borrowings: number; overdue_borrowings: number; borrowings_today: number; returns_today: number;
-  active_reservations: number; ready_reservations: number; reservations_today: number; fulfilled_reservations_today: number;
-  attendance_today: number; borrowing_attendance_today: number; entry_exit_attendance_today: number;
-  unique_visitors_today: number; visit_hits_today: number; total_unique_visitors: number; total_visit_hits: number;
-  active_notifications: number; active_subscriptions: number; upcoming_holidays: number; settled_fines_total: number;
-  overdue_fine_per_hour: number; outstanding_fines: number;
-}
-export interface NamedValue { name: string; value: number }
-export interface TrendPoint {
-  label: string; unique_visitors?: number; visit_hits?: number; borrowed_count?: number; returned_count?: number;
-  entry_exit_count?: number; borrowing_count?: number; created_count?: number; fulfilled_count?: number;
-  cancelled_count?: number; settled_amount?: number;
-}
-export interface PopularBookPoint { name: string; total: number }
-export interface CategoryPoint { name: string; titles: number; copies: number }
-export interface DashboardResponse {
-  stats: DashboardStats;
-  charts: {
-    visitTrend: TrendPoint[]; circulationTrend: TrendPoint[]; attendanceTrend: TrendPoint[]; reservationTrend: TrendPoint[];
-    borrowingStatus: NamedValue[]; reservationStatus: NamedValue[]; userRoles: NamedValue[]; popularBooks: PopularBookPoint[];
-    catalogByCategory: CategoryPoint[]; copyCondition: NamedValue[]; borrowingByRole: NamedValue[]; fineCollectionTrend: TrendPoint[];
-  };
-}
-
-const emptyStats = Object.fromEntries([
-  "total_books", "total_book_copies", "active_accessioned_copies", "needs_accession_copies", "available_book_copies", "borrowed_book_copies", "damaged_book_copies", "lost_book_copies",
-  "active_users", "total_users", "active_borrowings", "overdue_borrowings", "borrowings_today", "returns_today", "active_reservations",
-  "ready_reservations", "reservations_today", "fulfilled_reservations_today", "attendance_today", "borrowing_attendance_today",
-  "entry_exit_attendance_today", "unique_visitors_today", "visit_hits_today", "total_unique_visitors", "total_visit_hits",
-  "active_notifications", "active_subscriptions", "upcoming_holidays", "settled_fines_total", "overdue_fine_per_hour", "outstanding_fines",
-].map((key) => [key, 0])) as unknown as DashboardStats;
-const emptyData: DashboardResponse = { stats: emptyStats, charts: { visitTrend: [], circulationTrend: [], attendanceTrend: [], reservationTrend: [], borrowingStatus: [], reservationStatus: [], userRoles: [], popularBooks: [], catalogByCategory: [], copyCondition: [], borrowingByRole: [], fineCollectionTrend: [] } };
-
-const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 2 });
-const chartPalette = ["#8f0000", "#b45309", "#0f766e", "#1d4ed8", "#6d28d9", "#be185d"];
-export type AnalyticsRange = "7d" | "30d" | "month" | "year";
-type AnalyticsTab = "overview" | "circulation" | "visitors" | "collection" | "ai-report";
-type ReportRange = "today" | "7d" | "30d" | "month" | "custom" | "all-time";
-type ReportNotice = "privacy" | "scope" | "date" | null;
-const RANGE_OPTIONS: { value: AnalyticsRange; label: string; shortLabel: string }[] = [
-  { value: "7d", label: "Last 7 days", shortLabel: "7 days" }, { value: "30d", label: "Last 30 days", shortLabel: "30 days" },
-  { value: "month", label: "This month", shortLabel: "Month" }, { value: "year", label: "This year", shortLabel: "Year" },
-];
-const REPORT_RANGE_OPTIONS: { value: ReportRange; label: string }[] = [
-  { value: "today", label: "Today" }, { value: "7d", label: "Past 7 days" },
-  { value: "30d", label: "Past 30 days" }, { value: "month", label: "This month" },
-  { value: "custom", label: "Custom" }, { value: "all-time", label: "All time" },
-];
-const REPORT_QUESTION_SUGGESTIONS = [
-  "What changed most during this period?",
-  "What was the most borrowed title?",
-  "How many people visited the library?",
-];
-const dateForInput = (date: Date) => { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 10); };
-const reportDatesFor = (range: Exclude<ReportRange, "custom" | "all-time">) => {
-  const today = new Date(); const end = dateForInput(today);
-  if (range === "today") return { dateFrom: end, dateTo: end };
-  if (range === "month") return { dateFrom: `${end.slice(0, 8)}01`, dateTo: end };
-  const start = new Date(today); start.setDate(start.getDate() - (range === "30d" ? 29 : 6));
-  return { dateFrom: dateForInput(start), dateTo: end };
-};
-const isCalendarDate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00`);
-  return !Number.isNaN(date.getTime()) && dateForInput(date) === value;
-};
-const inclusiveDays = (dateFrom: string, dateTo: string) => Math.round((new Date(`${dateTo}T00:00:00`).getTime() - new Date(`${dateFrom}T00:00:00`).getTime()) / 86_400_000) + 1;
-const reportDateFormatter = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" });
-const formatReportDate = (value: string) => reportDateFormatter.format(new Date(`${value}T00:00:00`));
-const formatReportPeriod = (dateFrom: string, dateTo: string) => `${formatReportDate(dateFrom)} – ${formatReportDate(dateTo)}`;
-const sum = (items: TrendPoint[], key: keyof TrendPoint) => items.reduce((total, item) => total + Number(item[key] || 0), 0);
-
-const AdminAnalytics = () => {
-  const [params, patchParams] = useAdminUrlState();
-  const activeTab = (["overview", "circulation", "visitors", "collection", "ai-report"].includes(params.get("tab") ?? "") ? params.get("tab") : "overview") as AnalyticsTab;
-  const setActiveTab = (tab: AnalyticsTab) => patchParams({ tab });
-  const range = (["7d", "30d", "month", "year"].includes(params.get("range") ?? "") ? params.get("range") : "7d") as AnalyticsRange;
-  const dashboardQuery = useQuery({ queryKey: analyticsKeys.dashboard(range), queryFn: ({ signal }) => fetchAdminDashboard(range, signal), placeholderData: (previousData) => previousData });
-  const data = dashboardQuery.data ?? emptyData;
-  const loading = dashboardQuery.isPending;
-  const refreshing = dashboardQuery.isFetching && !dashboardQuery.isPending;
-  const error = dashboardQuery.isError ? getApiErrorMessage(dashboardQuery.error, "Failed to load analytics.") : "";
-  const loadDashboard = async (_mode?: "refresh") => { await dashboardQuery.refetch(); };
-  const setRange = (range: AnalyticsRange) => patchParams({ range }); const [reportQuestion, setReportQuestion] = useState("");
-  const [reportRange, setReportRange] = useState<ReportRange>("7d");
-  const initialReportDates = useMemo(() => reportDatesFor("7d"), []);
-  const [customDateFrom, setCustomDateFrom] = useState(initialReportDates.dateFrom);
-  const [customDateTo, setCustomDateTo] = useState(initialReportDates.dateTo);
-  const [report, setReport] = useState<AiAnalyticsReportResponse | null>(null);
-  const reportMutation = useMutation({ mutationFn: createAiAnalyticsReport });
-  const reportLoading = reportMutation.isPending;
-  const [answeredQuestion, setAnsweredQuestion] = useState("");
-  const [reportError, setReportError] = useState(""); const [reportNotice, setReportNotice] = useState<ReportNotice>(null); const [copied, setCopied] = useState(false);
-  const rangeLabel = RANGE_OPTIONS.find((option) => option.value === range)?.label ?? "Selected period";
-  const reportDates = useMemo(() => reportRange === "custom" ? { dateFrom: customDateFrom, dateTo: customDateTo } : reportRange === "all-time" ? { dateFrom: "", dateTo: "" } : reportDatesFor(reportRange), [customDateFrom, customDateTo, reportRange]);
-  const performance = useMemo(() => ({
-    borrowed: sum(data.charts.circulationTrend, "borrowed_count"), returned: sum(data.charts.circulationTrend, "returned_count"),
-    attendance: sum(data.charts.attendanceTrend, "entry_exit_count") + sum(data.charts.attendanceTrend, "borrowing_count"),
-    visitors: sum(data.charts.visitTrend, "unique_visitors"),
-  }), [data]);
-  const clearReportResult = () => { setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false); };
-  const selectReportRange = (nextRange: ReportRange) => { setReportRange(nextRange); clearReportResult(); };
-  const updateCustomDate = (field: "from" | "to", value: string) => {
-    field === "from" ? setCustomDateFrom(value) : setCustomDateTo(value);
-    clearReportResult();
-  };
-  const updateReportQuestion = (value: string) => { setReportQuestion(value); setReportError(""); setReportNotice(null); };
-  const generateReport = async () => {
-    const question = reportQuestion.trim();
-    if (reportRange !== "all-time") {
-      if (!reportDates.dateFrom || !reportDates.dateTo) { setReportError("Choose both a start and end date."); setReportNotice(null); return; }
-      if (!isCalendarDate(reportDates.dateFrom) || !isCalendarDate(reportDates.dateTo)) { setReportError("Choose valid calendar dates."); setReportNotice(null); return; }
-      if (reportDates.dateFrom > reportDates.dateTo) { setReportError("The start date must be on or before the end date."); setReportNotice(null); return; }
-      if (inclusiveDays(reportDates.dateFrom, reportDates.dateTo) > 366) { setReportError("Choose a reporting period of 366 days or fewer."); setReportNotice(null); return; }
+import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AdminPageHeader, AdminPageTabs, AdminDateRange, AdminIcon, useAdminUrlState, formatPeso, formatAdminDate } from '@/features/admin';
+import { getApiErrorMessage } from '@/utils/apiError';
+import { createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse } from '../../api/adminAnalytics.api';
+import { Panel, DailyChart, Distribution, Snapshot, Sparkline, colors, shortDate } from '../AnalyticsCharts';
+import { saveBrief, printBrief } from '../SavedBriefs';
+import type { AnalyticsRange, TrendPoint } from '../analytics.types';
+export type { AnalyticsRange, DashboardResponse, DashboardStats, NamedValue, TrendPoint, PopularBookPoint, CategoryPoint } from '../analytics.types';
+import { analyticsRows, downloadAnalyticsCsv, printAnalytics } from '../analytics.export';
+import './analytics.css';
+const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const defaultDates = (range: string) => { const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ulaanbaatar',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()); const today=['year','month','day'].map(key=>parts.find(part=>part.type===key)?.value).join('-'); const end = new Date(today+'T12:00:00'), start = new Date(end); if (range === 'month')
+    start.setDate(1);
+else if (range === 'year')
+    start.setMonth(0, 1);
+else
+    start.setDate(start.getDate() - (range === '30d' ? 29 : 6)); return { dateFrom: localDate(start), dateTo: localDate(end) }; };
+const sum = (data: TrendPoint[], key: string) => data.reduce((total, row) => total + Number(row[key as keyof TrendPoint] || 0), 0);
+const suggestions = ['What changed most during this period?', 'What was the most borrowed title?', 'How many people visited the library?'];
+function Narrative({ text }: {
+    text: string;
+}) { const bold = (value: string): ReactNode => value.split(/(\*\*[^*]+\*\*|₱[\d,.]+|\b\d[\d,.]*\b)/g).map((part, index) => /^\*\*|^₱|^\d/.test(part) ? <strong key={index}>{part.replace(/\*\*/g, '')}</strong> : part); return <div className="analytics-narrative">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const lines = block.split('\n'); const first = lines[0].replace(/^#+\s*/, ''), heading = /^(Performance assessment|What changed|Key findings|Recommended follow-up|Summary):?$/i.test(first) || /^#+/.test(lines[0]); const body = heading ? lines.slice(1) : lines; return <section key={index}>{heading && <h3>{first.replace(/:$/, '')}</h3>}{body.every(line => /^\s*([-*]|\d+[.)])\s/.test(line)) ? <ul>{body.map((line, i) => <li key={i}>{bold(line.replace(/^\s*([-*]|\d+[.)])\s*/, ''))}</li>)}</ul> : <p>{body.map((line, i) => <span key={i}>{bold(line)}{i < body.length - 1 && <br />}</span>)}</p>}</section>; })}</div>; }
+export default function AdminAnalytics() {
+    const [params, patch] = useAdminUrlState(), tab = ['overview', 'circulation', 'visitors', 'collection', 'ai-report'].includes(params.get('tab') || '') ? params.get('tab')! : 'overview', range = (params.get('range') || '7d') as AnalyticsRange;
+    const allTime = params.get('period') === 'all-time', defaults = defaultDates(range), dateFrom = params.get('from') || defaults.dateFrom, dateTo = params.get('to') || defaults.dateTo, period = allTime ? { allTime: true } : { dateFrom, dateTo };
+    const query = useQuery({ queryKey: ['analytics', 'dashboard', period], queryFn: ({ signal }) => fetchAdminDashboard(range, signal, period) });
+    const data = query.data, charts = data?.charts;
+    const [question, setQuestion] = useState(''), [report, setReport] = useState<AiAnalyticsReportResponse | null>(null), [reportKey, setReportKey] = useState(''), [error, setError] = useState(''), [feedback, setFeedback] = useState(''), [recent, setRecent] = useState<string[]>(() => { try {
+        const stored = JSON.parse(localStorage.getItem('analytics.recent-questions') || '[]'); return Array.isArray(stored) ? stored.filter(item => typeof item === 'string').slice(0, 5) : [];
     }
-    setReport(null); setAnsweredQuestion(""); setReportError(""); setReportNotice(null); setCopied(false);
-    try {
-      const nextReport = await reportMutation.mutateAsync(reportRange === "all-time" ? { allTime: true, question: question || undefined } : { ...reportDates, question: question || undefined });
-      setReport(nextReport);
-      setAnsweredQuestion(nextReport.mode === "answer" ? question : "");
-    } catch (reportFailure: unknown) {
-      const errorCode = getApiErrorCode(reportFailure);
-      setReportNotice(errorCode === "AI_REPORT_PRIVACY_RESTRICTED" ? "privacy" : errorCode === "AI_REPORT_IRRELEVANT_QUESTION" ? "scope" : errorCode === "AI_REPORT_DATE_NOT_RECORDED" || errorCode === "AI_REPORT_DATE_OUTSIDE_RANGE" ? "date" : null);
-      setReportError(getApiErrorMessage(reportFailure, "Unable to generate the performance brief. Try again."));
+    catch {
+        return [];
+    } });
+    const mutation = useMutation({ mutationFn: createAiAnalyticsReport });
+    const selectionKey = JSON.stringify(period) + question.trim();
+    const stale = Boolean(report && selectionKey !== reportKey);
+    const currentPeriod = allTime ? (data?.period || { dateFrom, dateTo }) : { dateFrom, dateTo };
+    const periodLabel = `${shortDate(currentPeriod.dateFrom)} – ${shortDate(currentPeriod.dateTo)}${allTime ? ' · all recorded history' : ''}`;
+    const verifyHref = (tab: string) => '/admin/analytics?' + new URLSearchParams({ tab, from: report?.range.dateFrom || dateFrom, to: report?.range.dateTo || dateTo }).toString();
+    const selectTab = (value: string) => patch({ tab: value });
+    const generate = async () => { setError(''); setFeedback(''); try {
+        const result = await mutation.mutateAsync({ ...period, question: question.trim() || undefined });
+        setReport({ ...result, generatedAt: result.generatedAt || new Date().toISOString() });
+        setReportKey(selectionKey);
+        if (question.trim()) {
+            const next = [question.trim(), ...recent.filter(item => item !== question.trim())].slice(0, 8);
+            setRecent(next);
+            localStorage.setItem('analytics.recent-questions', JSON.stringify(next));
+        }
     }
-  };
-  const copyReport = async () => {
-    if (!report) return;
-    const period = formatReportPeriod(report.range.dateFrom, report.range.dateTo);
-    const copyText = report.mode === "answer"
-      ? [`Library analytics answer`, `Question: ${answeredQuestion}`, `Answer: ${report.report}`, `Period: ${period}`, "Source: Aggregate library operations data for this period."].join("\n")
-      : [`Library performance brief`, `Period: ${period}`, "", report.report, "", "Source: Aggregate library operations data for this period."].join("\n");
-    try { await navigator.clipboard.writeText(copyText); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
-    catch { setReportNotice(null); setReportError("Unable to copy the result. Select the text and copy it manually."); }
-  };
-
-  return <AdminPage title="Operations Analytics" actions={activeTab === "ai-report" ? undefined : <Button type="button" variant="outline" className="rounded-md" onClick={() => void loadDashboard("refresh")} disabled={loading || refreshing}><RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>}>
-    {activeTab !== "ai-report" ? <section className="flex flex-col gap-4 border-b border-border/80 pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="max-w-2xl"><h2 className="text-lg font-semibold text-foreground">How did the library perform?</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Choose one period. Performance views update together; inventory snapshots remain current.</p></div>
-      <div className="flex w-full overflow-x-auto border border-border bg-card p-1 lg:w-auto" role="group" aria-label="Analytics period">{RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRange(option.value)} className={`min-h-9 shrink-0 px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${range === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`} aria-pressed={range === option.value}>{option.shortLabel}</button>)}</div>
-    </section> : null}
-    {activeTab !== "ai-report" && error ? <div role="alert" className="border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalyticsTab)} className="space-y-5">
-      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-md border-b border-border bg-transparent p-0">{["overview", "circulation", "visitors", "collection", "ai-report"].map((tab) => <TabsTrigger key={tab} value={tab} className="min-h-11 shrink-0 gap-2 rounded-md border-b-2 border-transparent px-5 capitalize shadow-none data-[state=active]:border-action data-[state=active]:bg-transparent data-[state=active]:text-action data-[state=active]:shadow-none">{tab === "ai-report" ? <Sparkles className="h-4 w-4" /> : null}{tab === "ai-report" ? "AI Report" : tab}</TabsTrigger>)}</TabsList>
-
-      <TabsContent value="overview" className="mt-0 space-y-5">
-        <div className="grid border border-border/80 bg-card sm:grid-cols-2 xl:grid-cols-4">
-          <PerformanceMetric label="Borrowed" value={performance.borrowed} icon={BookCopy} loading={loading} period={rangeLabel} />
-          <PerformanceMetric label="Returned" value={performance.returned} icon={CheckCircle2} loading={loading} period={rangeLabel} />
-          <PerformanceMetric label="Library scans" value={performance.attendance} icon={DoorOpen} loading={loading} period={rangeLabel} />
-          <PerformanceMetric label="Site visitors" value={performance.visitors} icon={Globe2} loading={loading} period={rangeLabel} />
-        </div>
-        <AnalyticsPanel title="Current operational position" description="Today’s carryover items, kept separate from period performance."><div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0"><PositionItem icon={data.stats.overdue_borrowings ? AlertTriangle : CheckCircle2} label="Overdue loans" value={data.stats.overdue_borrowings} tone={data.stats.overdue_borrowings ? "critical" : "clear"} /><PositionItem icon={BookMarked} label="Ready reservations" value={data.stats.ready_reservations} tone={data.stats.ready_reservations ? "attention" : "clear"} /><PositionItem icon={Coins} label="Outstanding fines" value={money.format(data.stats.outstanding_fines)} tone={data.stats.outstanding_fines ? "attention" : "clear"} /></div></AnalyticsPanel>
-      </TabsContent>
-
-      <TabsContent value="circulation" className="mt-0 space-y-5"><SectionIntro title="Circulation performance" description={`Borrowing and reservation movement for ${rangeLabel.toLowerCase()}.`} /><div className="grid gap-5 xl:grid-cols-2">
-        <AnalyticsPanel title="Borrowed and returned" description="Daily circulation volume"><ChartContainer className="h-[280px] w-full" config={{ borrowed_count: { label: "Borrowed", color: "#8f0000" }, returned_count: { label: "Returned", color: "#0f766e" } }}><BarChart data={data.charts.circulationTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="borrowed_count" fill="var(--color-borrowed_count)" radius={[2, 2, 0, 0]} /><Bar dataKey="returned_count" fill="var(--color-returned_count)" radius={[2, 2, 0, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
-        <AnalyticsPanel title="Reservation outcomes" description="Created, fulfilled, and cancelled"><ChartContainer className="h-[280px] w-full" config={{ created_count: { label: "Created", color: "#8f0000" }, fulfilled_count: { label: "Fulfilled", color: "#0f766e" }, cancelled_count: { label: "Cancelled", color: "#b45309" } }}><LineChart data={data.charts.reservationTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="created_count" stroke="var(--color-created_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="fulfilled_count" stroke="var(--color-fulfilled_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="cancelled_count" stroke="var(--color-cancelled_count)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
-      </div><div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]"><AnalyticsPanel title="Current loan status"><DistributionList items={data.charts.borrowingStatus} /></AnalyticsPanel><AnalyticsPanel title="Most borrowed titles"><RankedList items={data.charts.popularBooks.map((item) => ({ label: item.name, value: item.total }))} emptyText="No borrowing history yet." /></AnalyticsPanel></div></TabsContent>
-
-      <TabsContent value="visitors" className="mt-0 space-y-5"><SectionIntro title="Visitor and engagement activity" description={`Physical visits, borrowing scans, and website usage for ${rangeLabel.toLowerCase()}.`} /><div className="grid gap-5 xl:grid-cols-2">
-        <AnalyticsPanel title="Library attendance" description="Entry/exit and borrowing-purpose scans"><ChartContainer className="h-[280px] w-full" config={{ entry_exit_count: { label: "Entry / exit", color: "#8f0000" }, borrowing_count: { label: "Borrowing", color: "#0f766e" } }}><LineChart data={data.charts.attendanceTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="entry_exit_count" stroke="var(--color-entry_exit_count)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="borrowing_count" stroke="var(--color-borrowing_count)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
-        <AnalyticsPanel title="Website activity" description="Unique visitors and tracked page hits"><ChartContainer className="h-[280px] w-full" config={{ unique_visitors: { label: "Unique visitors", color: "#8f0000" }, visit_hits: { label: "Page hits", color: "#b45309" } }}><LineChart data={data.charts.visitTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line type="monotone" dataKey="unique_visitors" stroke="var(--color-unique_visitors)" strokeWidth={2} dot={false} /><Line type="monotone" dataKey="visit_hits" stroke="var(--color-visit_hits)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel>
-      </div><div className="grid gap-5 xl:grid-cols-2"><AnalyticsPanel title="User role distribution"><DistributionList items={data.charts.userRoles} /></AnalyticsPanel><AnalyticsPanel title="Fine collections" description="Settled payments over the latest six months"><ChartContainer className="h-[250px] w-full" config={{ settled_amount: { label: "Settled fines", color: "#0f766e" } }}><LineChart data={data.charts.fineCollectionTrend}><CartesianGrid vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} /><YAxis tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent formatter={(value) => money.format(Number(value || 0))} />} /><Line type="monotone" dataKey="settled_amount" stroke="var(--color-settled_amount)" strokeWidth={2} dot={false} /></LineChart></ChartContainer></AnalyticsPanel></div></TabsContent>
-
-      <TabsContent value="collection" className="mt-0 space-y-5"><SectionIntro title="Collection performance" description="Inventory composition, condition, and who the collection is serving." /><div className="grid gap-5 xl:grid-cols-2">
-        <AnalyticsPanel title="Catalog by category" description="Titles and physical copies"><ChartContainer className="h-[310px] w-full" config={{ titles: { label: "Titles", color: "#8f0000" }, copies: { label: "Copies", color: "#b45309" } }}><BarChart data={data.charts.catalogByCategory} layout="vertical" margin={{ left: 12, right: 8 }}><CartesianGrid horizontal={false} /><XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} /><YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={100} /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Bar dataKey="titles" fill="var(--color-titles)" radius={[0, 2, 2, 0]} /><Bar dataKey="copies" fill="var(--color-copies)" radius={[0, 2, 2, 0]} /></BarChart></ChartContainer></AnalyticsPanel>
-        <AnalyticsPanel title="Physical copy condition"><div className="grid items-center gap-5 sm:grid-cols-[1fr_0.8fr]"><ChartContainer className="mx-auto h-[260px] w-full max-w-[300px]" config={{ value: { label: "Copies", color: "#8f0000" } }}><PieChart><ChartTooltip content={<ChartTooltipContent />} /><Pie data={data.charts.copyCondition} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={2}>{data.charts.copyCondition.map((item, index) => <Cell key={item.name} fill={chartPalette[index % chartPalette.length]} />)}</Pie></PieChart></ChartContainer><DistributionList items={data.charts.copyCondition} /></div></AnalyticsPanel>
-      </div><div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AnalyticsPanel title="Borrowing demand by role"><DistributionList items={data.charts.borrowingByRole} /></AnalyticsPanel><AnalyticsPanel title="Collection snapshot"><div className="divide-y divide-border/70"><SnapshotRow label="Catalog titles" value={data.stats.total_books} /><SnapshotRow label="Active physical copies" value={data.stats.total_book_copies} /><SnapshotRow label="Active accessioned" value={data.stats.active_accessioned_copies} /><SnapshotRow label="Needs accession" value={data.stats.needs_accession_copies} /><SnapshotRow label="Available to borrow" value={data.stats.available_book_copies} /><SnapshotRow label="Damaged" value={data.stats.damaged_book_copies} /><SnapshotRow label="Lost" value={data.stats.lost_book_copies} /></div></AnalyticsPanel></div></TabsContent>
-
-      <TabsContent value="ai-report" className="mt-0 space-y-5">
-        <section className="overflow-hidden border border-primary/30 bg-card">
-          <div className="bg-primary px-5 py-6 text-primary-foreground sm:px-8 sm:py-7">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="flex h-10 w-10 items-center justify-center border border-primary-foreground/25 bg-primary-foreground/10"><Sparkles className="h-5 w-5 text-warning" /></div>
-                <h2 className="mt-5 text-2xl font-semibold tracking-[-0.025em]">Ask your library data</h2>
-                <p className="mt-2 max-w-[65ch] text-sm leading-6 text-primary-foreground/80">Choose any reporting period here. Ask one focused question, or leave the question blank for a complete performance summary.</p>
-              </div>
-              <div className="shrink-0 border border-primary-foreground/20 bg-primary-foreground/10 px-4 py-3 text-sm">
-                <p className="font-medium">Independent report period</p>
-                <p className="mt-1 text-xs text-primary-foreground/70">This does not change the analytics dashboard.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
-            <div>
-              <p id="report-period-label" className="text-sm font-semibold text-foreground">Reporting period</p>
-              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-labelledby="report-period-label">{REPORT_RANGE_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => selectReportRange(option.value)} disabled={reportLoading} className={`min-h-10 border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${reportRange === option.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground"}`} aria-pressed={reportRange === option.value}>{option.label}</button>)}</div>
-            </div>
-
-            {reportRange === "custom" ? <div className="grid gap-4 border-y border-border/70 bg-muted/20 px-4 py-5 sm:grid-cols-2 sm:px-5">
-              <div><label htmlFor="report-date-from" className="text-sm font-medium text-foreground">Start date</label><Input id="report-date-from" type="date" value={customDateFrom} onChange={(event) => updateCustomDate("from", event.target.value)} disabled={reportLoading} className="mt-2 h-11 rounded-md bg-background" /></div>
-              <div><label htmlFor="report-date-to" className="text-sm font-medium text-foreground">End date</label><Input id="report-date-to" type="date" value={customDateTo} onChange={(event) => updateCustomDate("to", event.target.value)} disabled={reportLoading} className="mt-2 h-11 rounded-md bg-background" /></div>
-            </div> : null}
-
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div>
-                <label htmlFor="analytics-focus" className="text-sm font-semibold text-foreground">Question <span className="font-normal text-muted-foreground">(optional)</span></label>
-                <Input id="analytics-focus" value={reportQuestion} maxLength={500} onChange={(event) => updateReportQuestion(event.target.value)} disabled={reportLoading} placeholder="Ask about circulation, attendance, reservations, or collection activity" className="mt-2 h-12 rounded-md px-4" />
-                <div className="mt-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Try asking:</span>{REPORT_QUESTION_SUGGESTIONS.map((suggestion) => <button key={suggestion} type="button" onClick={() => updateReportQuestion(suggestion)} disabled={reportLoading} className="border border-border bg-muted/30 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">{suggestion}</button>)}</div>
-              </div>
-              <Button type="button" className="h-12 min-w-48 rounded-md px-6 font-semibold" onClick={() => void generateReport()} disabled={reportLoading}>{reportLoading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{reportLoading ? "Analyzing…" : reportQuestion.trim() ? "Answer question" : "Generate summary"}</Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">Selected: {reportRange === "all-time" ? "Entire recorded history" : isCalendarDate(reportDates.dateFrom) && isCalendarDate(reportDates.dateTo) ? formatReportPeriod(reportDates.dateFrom, reportDates.dateTo) : "Choose valid start and end dates"} · Uses aggregate data only</p>
-          </div>
-        </section>
-
-        {reportError ? <div role="alert" className={`flex items-start gap-3 border px-4 py-4 ${reportNotice ? "border-warning/40 bg-warning/10 text-foreground" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
-          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${reportNotice ? "text-warning" : "text-destructive"}`} />
-          <div><p className="text-sm font-semibold">{reportNotice === "privacy" ? "Privacy-protected request" : reportNotice === "scope" ? "Question outside report scope" : reportNotice === "date" ? "Check the requested date" : "Unable to generate report"}</p><p className={`mt-1 text-sm leading-6 ${reportNotice ? "text-muted-foreground" : "text-destructive"}`}>{reportError}</p></div>
-        </div> : null}
-
-        <section className="min-h-[330px] border border-border/80 bg-[linear-gradient(145deg,hsl(var(--primary)/0.055),transparent_52%)] px-5 py-6 sm:px-8 sm:py-8" aria-live="polite">
-          {report ? <div className="flex min-h-[270px] flex-col">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-5">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-primary-foreground"><Sparkles className="h-4 w-4" /></div>
-                <div><h3 className="text-lg font-semibold tracking-[-0.02em] text-foreground">{report.mode === "answer" ? "Library analytics answer" : "Performance brief"}</h3><p className="mt-1 text-xs text-muted-foreground">{formatReportPeriod(report.range.dateFrom, report.range.dateTo)}{report.mode === "summary" && !report.range.allTime ? ` · compared with the previous ${report.range.days} days` : report.range.allTime ? " · entire recorded history" : ""}</p></div>
-              </div>
-              <Button type="button" size="sm" variant="outline" className="rounded-md" onClick={() => void copyReport()}>{copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}{copied ? "Copied" : report.mode === "answer" ? "Copy answer" : "Copy brief"}</Button>
-            </div>
-            {report.mode === "answer" ? <div className="flex flex-1 flex-col justify-center py-7 sm:py-10"><p className="max-w-[70ch] text-sm leading-6 text-muted-foreground">{answeredQuestion}</p><ReportNarrative text={report.report} mode="answer" /></div> : <ReportNarrative text={report.report} mode="summary" />}
-            <div className="mt-auto flex flex-col gap-1 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>Based on aggregate library operations data; no patron identities are shared</span><span className="tabular-nums">{report.range.days} {report.range.days === 1 ? "day" : "days"} analyzed</span></div>
-          </div> : <div className="flex min-h-[270px] max-w-2xl flex-col justify-center">
-            <div className="flex h-11 w-11 items-center justify-center border border-primary/20 bg-primary/10 text-action">{reportLoading ? <RefreshCcw className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}</div>
-            <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-foreground">{reportLoading ? "Analyzing this reporting period…" : "Your report will appear here"}</h3>
-            <p className="mt-2 max-w-[65ch] text-sm leading-6 text-muted-foreground">{reportLoading ? "The answer will use only the aggregate evidence available within your selected dates." : "Ask a specific question for a direct, copy-ready answer. Leave it blank when you want the broader performance story."}</p>
-          </div>}
-        </section>
-      </TabsContent>
-    </Tabs>
-  </AdminPage>;
-};
-
-const AnalyticsPanel = ({ title, description, children }: { title: string; description?: string; children: ReactNode }) => <section className="min-w-0 border border-border/80 bg-card"><header className="border-b border-border/70 px-5 py-4"><h2 className="font-semibold text-foreground">{title}</h2>{description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}</header><div className="p-5">{children}</div></section>;
-const SectionIntro = ({ title, description }: { title: string; description: string }) => <div><h2 className="text-xl font-semibold tracking-[-0.02em] text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>;
-const PerformanceMetric = ({ label, value, icon: Icon, loading, period }: { label: string; value: number; icon: ComponentType<{ className?: string }>; loading: boolean; period: string }) => <div className="border-b border-border/70 p-5 sm:border-r sm:[&:nth-child(2n)]:border-r-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:[&:nth-child(2n)]:border-r xl:last:border-r-0"><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-action" /></div><p className="mt-3 text-3xl font-semibold tabular-nums text-foreground">{loading ? "—" : value.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">{period}</p></div>;
-const PositionItem = ({ icon: Icon, label, value, tone }: { icon: ComponentType<{ className?: string }>; label: string; value: number | string; tone: "clear" | "attention" | "critical" }) => { const styles = tone === "critical" ? "text-destructive" : tone === "attention" ? "text-warning" : "text-success"; return <div className="flex items-center gap-4 p-5"><Icon className={`h-5 w-5 shrink-0 ${styles}`} /><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p></div></div>; };
-const ReportNarrative = ({ text, mode }: { text: string; mode: "answer" | "summary" }) => mode === "answer" ? <p className="mt-4 max-w-[38ch] whitespace-pre-line text-2xl font-semibold leading-9 tracking-[-0.025em] text-foreground sm:text-3xl sm:leading-10">{text}</p> : <div className="mt-6 space-y-5">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const [first, ...rest] = block.split("\n"); const isHeading = /^(Performance assessment|What changed|Key findings|Recommended follow-up):?$/i.test(first.trim()); return <div key={`${first}-${index}`}>{isHeading ? <h3 className="text-sm font-semibold text-action">{first.replace(/:$/, "")}</h3> : null}<p className={`${isHeading ? "mt-1.5" : ""} max-w-[70ch] whitespace-pre-line text-sm leading-6 text-foreground`}>{isHeading ? rest.join("\n") : block}</p></div>; })}</div>;
-const DistributionList = ({ items }: { items: NamedValue[] }) => items.length ? <div className="space-y-3">{items.map((item, index) => { const max = Math.max(...items.map((entry) => entry.value), 1); return <div key={item.name}><div className="mb-1.5 flex items-center justify-between gap-4"><span className="text-sm capitalize text-foreground">{item.name.replace(/_/g, " ")}</span><span className="text-sm font-semibold tabular-nums text-foreground">{item.value}</span></div><div className="h-1.5 bg-muted"><div className="h-full" style={{ width: `${Math.max((item.value / max) * 100, item.value ? 3 : 0)}%`, backgroundColor: chartPalette[index % chartPalette.length] }} /></div></div>; })}</div> : <p className="text-sm text-muted-foreground">No data for this period.</p>;
-const RankedList = ({ items, emptyText }: { items: { label: string; value: number | string }[]; emptyText: string }) => items.length ? <ol className="divide-y divide-border/70">{items.map((item, index) => <li key={item.label} className="flex items-center gap-4 py-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center bg-muted text-xs font-semibold text-muted-foreground">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm text-foreground" title={item.label}>{item.label}</span><span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">{item.value}</span></li>)}</ol> : <p className="text-sm text-muted-foreground">{emptyText}</p>;
-const SnapshotRow = ({ label, value }: { label: string; value: number | string }) => <div className="flex items-center justify-between gap-4 py-3"><span className="text-sm text-muted-foreground">{label}</span><span className="font-semibold tabular-nums text-foreground">{value}</span></div>;
-
-export default AdminAnalytics;
+    catch (error) {
+        setError(getApiErrorMessage(error, 'Could not generate the report. Try again.'));
+    } };
+    const exportRows=data ? analyticsRows(data,tab,periodLabel,report) : [];
+    const exportMeta={libraryName:data?.libraryName || 'Library',generatedBy:data?.generatedBy || 'Administrator',title:`Operations Analytics · ${tab==='ai-report'?'AI Report':tab[0].toUpperCase()+tab.slice(1)}`,period:periodLabel,generatedAt:new Date(query.dataUpdatedAt || Date.now()).toISOString()};
+    const exportCsv=()=>downloadAnalyticsCsv(exportRows,exportMeta);
+    const exportPdf=()=>{try{printAnalytics(exportRows,exportMeta);}catch(error){setError((error as Error).message);}};
+    const canCompare=Boolean(data?.comparison?.available);
+    const cards = charts ? [{ label: 'Borrowed', value: sum(charts.circulationTrend, 'borrowed_count'), old: Number(data.previousActivity?.circulation.borrowed), values: charts.circulationTrend.map(row => Number(row.borrowed_count || 0)), tab: 'circulation', color: colors.blue }, { label: 'Returned', value: sum(charts.circulationTrend, 'returned_count'), old: Number(data.previousActivity?.circulation.returned), values: charts.circulationTrend.map(row => Number(row.returned_count || 0)), tab: 'circulation', color: colors.green }, { label: 'Library scans', value: sum(charts.attendanceTrend, 'entry_exit_count') + sum(charts.attendanceTrend, 'borrowing_count'), old: Number(data.previousActivity?.attendance.entry_exit_scans || 0) + Number(data.previousActivity?.attendance.borrowing_scans || 0), values: charts.attendanceTrend.map(row => Number(row.entry_exit_count || 0) + Number(row.borrowing_count || 0)), tab: 'visitors', color: colors.purple }, { label: 'Site visitors', value: sum(charts.visitTrend, 'unique_visitors'), old: Number(data.previousActivity?.site_activity.unique_visitors), values: charts.visitTrend.map(row => Number(row.unique_visitors || 0)), tab: 'visitors', color: colors.blue }] : [];
+    const collectionNotice = data && <div className="analytics-findings">{data.stats.needs_accession_copies > 0 && <Link className="analytics-finding analytics-finding-amber" to="/admin/catalog?tab=holdings&completion=missing"><AdminIcon name="arrowRight"/>{data.stats.needs_accession_copies} copies need accession</Link>}<Link to="/admin/catalog?tab=holdings&hstatus=available" className={'analytics-finding '+(data.stats.available_book_copies <= 1 ? 'analytics-finding-red' : 'analytics-finding-neutral')}>{data.stats.available_book_copies} of {data.stats.total_book_copies} copies available to borrow</Link></div>;
+    return <div className="analytics-workspace"><AdminPageHeader title="Operations Analytics" updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={() => void query.refetch()} actions={<><AdminDateRange presetMode="analytics" from={allTime ? '' : dateFrom} to={allTime ? '' : dateTo} labelOverride={periodLabel} onChange={(from, to) => patch({ from, to, period: from ? null : 'all-time' })}/><Button title={exportMeta.title+' · '+periodLabel} variant="outline" disabled={!data || query.isFetching || (tab==='ai-report' && (!report || stale))} onClick={exportCsv}><AdminIcon name="reports"/>CSV · Current tab</Button><Button title={exportMeta.title+' · '+periodLabel} variant="outline" disabled={!data || query.isFetching || (tab==='ai-report' && (!report || stale))} onClick={exportPdf}><AdminIcon name="reports"/>Print / PDF · Current tab</Button></>}/>
+ {error && tab!=='ai-report' && <p role="alert" className="analytics-notice">{error}</p>}
+ {query.isError && <p role="alert" className="analytics-notice">{getApiErrorMessage(query.error, 'Could not load analytics.')}<Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></p>}
+ <AdminPageTabs value={tab} onChange={selectTab} label="Analytics views" items={[{ value: 'overview', label: 'Overview', icon: 'dashboard' }, { value: 'circulation', label: 'Circulation', icon: 'circulation' }, { value: 'visitors', label: 'Visitors', icon: 'attendance' }, { value: 'collection', label: 'Collection', icon: 'catalog' }, { value: 'ai-report', label: 'AI Report', icon: 'recommendations' }]}>
+ {!data && query.isPending ? <p role="status" className="analytics-notice">Loading analytics…</p> : data && charts && <>
+ <TabsContent value="overview" className="analytics-tab"><div className="analytics-kpis">{cards.map(card => <button key={card.label} onClick={() => selectTab(card.tab)} title={card.label === 'Library scans' ? 'All recorded check-in, check-out and borrowing scans. Inside now is a separate live count.' : undefined}><span>{card.label}<AdminIcon name="arrowRight"/></span><strong>{card.value.toLocaleString()}</strong>{canCompare && <div><span>{data.comparison?.available && Number.isFinite(card.old) ? `${card.value - card.old >= 0 ? '+' : ''}${card.value - card.old} vs prior ${data.period?.days || 7} days` : 'No prior data to compare'}</span><Sparkline values={card.values} color={card.color}/></div>}</button>)}</div>{!canCompare && <p className="analytics-note">Comparison needs a complete prior {data.period?.days || 7}-day period of recorded data{allTime ? '; choose a shorter range to compare' : ''}.</p>}<div className="analytics-position"><Snapshot label="Overdue loans" value={data.stats.overdue_borrowings} href="/admin/clearance?tab=queue&filter=blocked" attention/><Snapshot label="Ready reservations" value={data.stats.ready_reservations} href="/admin/reservations?tab=queue&filter=ready"/><Snapshot label="All outstanding fines" value={formatPeso(data.stats.outstanding_fines)} href="/admin/clearance?tab=queue&filter=all" attention/></div><p className="analytics-note">Fines include live accrued balances on all unsettled loans, using the same ledger as Dashboard and Clearance. Snapshot figures are current.</p>{collectionNotice}<Panel title="Needs attention" total="Oldest overdue loans · current">{data.needsAttention?.length ? <ul className="analytics-attention-list">{data.needsAttention.map(item=><li key={item.borrowingId}><Link to="/admin/clearance?tab=queue&filter=blocked"><span><strong>{item.title}</strong><small>Due {formatAdminDate(item.dueDate,false)}</small></span><strong>{formatPeso(item.outstanding)}</strong><AdminIcon name="arrowRight"/></Link></li>)}</ul> : <p className="analytics-empty">No overdue loans need attention.</p>}</Panel></TabsContent>
+ <TabsContent value="circulation" className="analytics-tab"><div className="analytics-grid"><DailyChart periodLabel={periodLabel} title="Borrowed and returned" data={charts.circulationTrend} metrics={[{ key: 'borrowed_count', label: 'Borrowed', color: colors.blue }, { key: 'returned_count', label: 'Returned', color: colors.green }]}/><DailyChart periodLabel={periodLabel} title="Reservation outcomes" totalLabel={`${sum(charts.reservationTrend,'created_count')+sum(charts.reservationTrend,'fulfilled_count')+sum(charts.reservationTrend,'cancelled_count')} events · created + fulfilled + cancelled`} line data={charts.reservationTrend} metrics={[{ key: 'created_count', label: 'Created', color: colors.blue }, { key: 'fulfilled_count', label: 'Fulfilled', color: colors.green }, { key: 'cancelled_count', label: 'Cancelled', color: colors.amber }]}/><Panel title="Loan status snapshot"><Distribution items={charts.borrowingStatus} stacked/></Panel><Panel title="Most borrowed titles" total={sum(charts.circulationTrend, 'borrowed_count') + ' borrowings'}>{charts.popularBooks.length ? <ol className="analytics-ranking">{charts.popularBooks.map(item => <li key={item.name}><span>{item.name}</span><strong>{item.total}</strong></li>)}</ol> : <p className="analytics-note">No borrowings recorded.</p>}</Panel><DailyChart periodLabel={periodLabel} title="Fine collections · Philippine pesos" currency data={charts.fineCollectionTrend} metrics={[{ key: 'settled_amount', label: 'Settled payments', color: colors.green }]}/><Panel title="Borrowing demand by role"><Distribution items={charts.borrowingByRole}/></Panel></div></TabsContent>
+ <TabsContent value="visitors" className="analytics-tab"><div className="analytics-grid"><DailyChart periodLabel={periodLabel} title="Library arrivals" emptyMessage="No check-ins in this range" totalLabel={`${sum(charts.attendanceTrend,'library_entries')} check-ins`} data={charts.attendanceTrend} metrics={[{ key: 'library_entries', label: 'Check-ins', color: colors.blue }, { key: 'unique_library_visitors', label: 'Unique patrons each day', color: colors.purple }]}/><DailyChart periodLabel={periodLabel} title="Library scans" data={charts.attendanceTrend} metrics={[{ key: 'entry_exit_count', label: 'Check-in / check-out', color: colors.purple }, { key: 'borrowing_count', label: 'Borrowing scans', color: colors.blue }]}/><DailyChart periodLabel={periodLabel} title="Website activity" totalLabel={`${sum(charts.visitTrend,'visit_hits')} page hits · ${sum(charts.visitTrend,'unique_visitors')} daily unique visitors`} data={charts.visitTrend} metrics={[{ key: 'unique_visitors', label: 'Unique visitors each day', color: colors.blue }, { key: 'visit_hits', label: 'Page hits', color: colors.purple }]}/><Panel title="Registered users by role"><Distribution items={charts.userRoles}/></Panel></div><p className="analytics-note">Arrivals count check-ins in Attendance History. Scans also include check-outs and borrowing scans; “inside now” counts currently open visits. Website visitor totals add daily unique visitors, so a person visiting on two days counts twice.</p><Link to="/admin/attendance">Verify in Attendance</Link></TabsContent>
+ <TabsContent value="collection" className="analytics-tab">{collectionNotice}<p className="analytics-note">{data.stats.active_accessioned_copies} of {data.stats.total_book_copies} active copies are accessioned. Accessioning is required for borrowing; condition, policy and existing loans also affect the {data.stats.available_book_copies} copies available now.</p><div className="analytics-grid"><Panel title="Catalog by category" total={data.stats.total_books + ' titles'}>{charts.catalogByCategory.find(item => item.name === 'Uncategorized') && <Link className="analytics-notice" to="/admin/catalog?uncategorized=1">Uncategorized: {charts.catalogByCategory.find(item => item.name === 'Uncategorized')!.titles} titles · Review in Catalog</Link>}<Distribution items={charts.catalogByCategory.map(item => ({ name: item.name, value: item.titles }))}/></Panel><Panel title="Physical copy condition" total={data.stats.total_book_copies + ' copies'}>{charts.copyCondition.filter(item => item.value > 0).length === 1 ? <p>{charts.copyCondition.find(item => item.value > 0)!.value} of {data.stats.total_book_copies} copies in {charts.copyCondition.find(item => item.value > 0)!.name} condition</p> : <Distribution items={charts.copyCondition} stacked/>}</Panel><Panel title="Collection snapshot"><Snapshot label="Active accessioned" value={data.stats.active_accessioned_copies} href="/admin/catalog?tab=holdings&completion=complete"/><Snapshot label="Needs accession" value={data.stats.needs_accession_copies} href="/admin/catalog?tab=holdings&completion=missing" attention/><Snapshot label="Available to borrow" value={data.stats.available_book_copies} href="/admin/catalog?tab=holdings&hstatus=available" attention={data.stats.available_book_copies <= 1}/><Snapshot label="On loan" value={data.stats.borrowed_book_copies} href="/admin/borrowing?tab=return"/></Panel></div></TabsContent>
+ </>}
+ <TabsContent value="ai-report" className="analytics-tab"><Panel><p className="analytics-using-range">Using {periodLabel}</p><p className="analytics-note">Uses aggregate library data only. No patron identities are shared with the model.</p><label htmlFor="analytics-question" className="analytics-question-label">Question (optional)</label><div className="analytics-compose-row"><Input id="analytics-question" maxLength={500} value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask about borrowing, visits or fine collections"/><Button disabled={mutation.isPending || query.isFetching} onClick={() => void generate()}><AdminIcon name="recommendations"/>{mutation.isPending ? 'Generating report…' : report ? 'Regenerate' : 'Generate report'}</Button></div><div className="analytics-suggestions">{suggestions.map(item => <Button key={item} variant="outline" size="sm" onClick={() => setQuestion(item)}>{item}</Button>)}</div>{recent.length > 0 && <details className="analytics-recent"><summary>Recent questions</summary>{recent.map(item => <button key={item} onClick={() => setQuestion(item)}>{item}</button>)}</details>}{mutation.isPending && <p role="status" className="analytics-note">Preparing the evidence and writing your brief…</p>}{error && <p role="alert" className="analytics-notice">{error}</p>}{feedback && <p role="status" className="analytics-notice">{feedback}</p>}</Panel>
+ {report && <Panel title={report.mode === 'answer' ? 'Library analytics answer' : 'Performance brief'} total={<span className="analytics-note">Generated {formatAdminDate(report.generatedAt)}</span>}><p className="analytics-note">{shortDate(report.range.dateFrom)} – {shortDate(report.range.dateTo)}</p>{stale && <p role="status" className="analytics-notice">This brief uses an earlier period or question. Regenerate to update it.</p>}<div className="analytics-report-figures"><Snapshot label="Borrowed" value={report.evidence.activity.circulation.borrowed} href={verifyHref('circulation')}/><Snapshot label="Returned" value={report.evidence.activity.circulation.returned} href={verifyHref('circulation')}/><Snapshot label="Settled fines" value={formatPeso(report.evidence.activity.fine_collections.settled_amount)} href={verifyHref('circulation')}/><Snapshot label="Daily unique site visitors" value={report.evidence.activity.site_activity.unique_visitors} href={verifyHref('visitors')}/></div>{report.evidence.comparison?.available === false && <p className="analytics-notice">No prior data to compare.</p>}<Narrative text={report.report}/><div className="analytics-report-actions"><Button variant="outline" onClick={async () => { try {
+        await navigator.clipboard.writeText(report.report);
+        setFeedback('Brief copied.');
+    }
+    catch {
+        setError('Could not copy. Select the text and copy it manually.');
+    } }}><AdminIcon name="copy"/>Copy brief</Button><Button variant="outline" title="Open the print dialog and choose Save as PDF" onClick={() => { try {
+        printBrief(report, question || 'Library performance brief');
+    }
+    catch (error) {
+        setError((error as Error).message);
+    } }}><AdminIcon name="reports"/>Print / PDF</Button><Button disabled={stale} onClick={() => { try {
+        saveBrief(report, question);
+        setFeedback('Saved to Reports on this device.');
+    }
+    catch {
+        setError('Could not save on this device. Export a PDF instead.');
+    } }}>Save to reports</Button><Link to="/admin/query?tab=briefs">Saved briefs</Link></div><div className="analytics-verify"><Link to={verifyHref('circulation')}>Verify circulation figures</Link><Link to={verifyHref('visitors')}>Verify visitor figures</Link><Link to="/admin/clearance?tab=queue&filter=blocked">Review overdue loans</Link></div></Panel>}
+ </TabsContent></AdminPageTabs></div>;
+}

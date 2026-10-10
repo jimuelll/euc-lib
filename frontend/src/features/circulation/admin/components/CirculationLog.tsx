@@ -32,6 +32,8 @@ export default function CirculationLog({ refreshKey = 0 }: { refreshKey?: number
   const dateFrom = params.get("dateFrom") || "";
   const dateTo = params.get("dateTo") || "";
   const archived = params.get("archived") === "true";
+  const policyId = Number(params.get('policyId')) || undefined;
+  const previousTerms = params.get('previousTerms') === 'true';
   const setStatus = (value: string) => patchParams({ filter: value, status: null });
   const setSearch = (value: string) => patchParams({ search: value || null }, true);
   const [actionId, setActionId] = useState<number | null>(null);
@@ -41,7 +43,7 @@ export default function CirculationLog({ refreshKey = 0 }: { refreshKey?: number
   const { confirm, confirmDialog } = useAdminConfirmDialog();
   const debouncedSearch = useDebounce(search, 300);
   const invalidRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
-  const common = { search: debouncedSearch || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, archived: archived || undefined };
+  const common = { search: debouncedSearch || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined, archived: archived || undefined, policyId, previousTerms:previousTerms||undefined };
   const filters = { ...common, status: !archived && status !== "all" ? status : undefined, page, limit: 20 };
   const log = useQuery({ queryKey: circulationKeys.log(filters), queryFn: ({ signal }) => getCirculationLog(filters, signal), placeholderData: previous => previous, enabled: !invalidRange });
   // Counts must ignore the selected status, but respect search, dates and archive view.
@@ -49,7 +51,7 @@ export default function CirculationLog({ refreshKey = 0 }: { refreshKey?: number
   const counts = useQuery({ queryKey: circulationKeys.log(countFilters), queryFn: ({ signal }) => getCirculationLog(countFilters, signal), enabled: !invalidRange });
   const rows = log.data?.rows ?? [];
   const pages = log.data?.totalPages ?? 1;
-  useEffect(() => { setPage(1); }, [status, debouncedSearch, archived, dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [status, debouncedSearch, archived, dateFrom, dateTo, policyId, previousTerms]);
   useEffect(() => { if (refreshKey > 0) void client.invalidateQueries({ queryKey: circulationKeys.logs() }); }, [client, refreshKey]);
   const snapshot = async (id: number) => {
     await client.cancelQueries({ queryKey: circulationKeys.logs() });
@@ -71,6 +73,7 @@ export default function CirculationLog({ refreshKey = 0 }: { refreshKey?: number
   return <>
     {confirmDialog}<CompactPanel title={archived ? "Archived transactions" : "Circulation history"} id="circulation-history-heading">
       <div className="circulation-history-filters">
+        {policyId && <p>Showing {previousTerms?'active loans using previous terms':'loans'} for policy #{policyId}. <Button variant="ghost" onClick={()=>patchParams({policyId:null,previousTerms:null})}>Clear policy filter</Button></p>}
         {!archived && <div className="circulation-status-filters"><AdminFilterChips label="Loan status" value={status} onChange={setStatus} items={statuses.map(item => { const summary = counts.data?.summary; return { value: item.value, label: item.label, count: summary ? item.count === "needs_action" ? summary.borrowed_count + summary.overdue_count : summary[item.count] : undefined }; })} />{status === "today" && <button type="button" aria-pressed="true" onClick={() => setStatus("needs_action")}>Today's activity / Clear</button>}</div>}
         <div className="circulation-search-row"><div className="circulation-history-search"><label className="sr-only" htmlFor="circulation-history-search">Search circulation history</label><AdminIcon name="search" /><input id="circulation-history-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patron, book, ID or ISBN" /></div><CirculationDateRange from={dateFrom} to={dateTo} onChange={(from, to) => patchParams({ dateFrom: from, dateTo: to })} /></div>
       </div>

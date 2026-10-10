@@ -68,6 +68,11 @@ beforeEach(() => {
   api.archiveReservation.mockResolvedValue(undefined);
   api.restoreReservation.mockResolvedValue(undefined);
 });
+it('opens an exact reservation from an audit link even when it is not on the first unfiltered page',async()=>{
+ const {Wrapper}=createWrapper('/admin/reservations?recordId=52&filter=all');
+ renderHook(()=>useReservations(),{wrapper:Wrapper});
+ await waitFor(()=>expect(api.getAdminReservations).toHaveBeenCalledWith(expect.objectContaining({recordId:52}),expect.anything()));
+});
 
 afterEach(cleanup);
 

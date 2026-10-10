@@ -1,0 +1,23 @@
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[backup] Error: Use a name up to 120 characters and notes up to 500 characters.
+    at Object.saveSnapshot (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\backup.controller.ts:85:155)
+    at TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:28:350)
+    at async Test.run (node:internal/test_runner/test:1113:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+  status: 400
+}
+✔ restore requires the exact acknowledgement and the active super-admin password (57.4812ms)
+✔ restore impact counts added, changed and absent records instead of guessing losses from dates (34.2835ms)
+✔ daily and weekly schedules use UTC+08:00 and move strictly into the future (1607.8564ms)
+✔ pinned deletion is blocked before deleting records or cloud objects (2560.2873ms)
+✔ verification rejects a corrupted checksum instead of marking it verified (10.4701ms)
+✔ snapshot creation validates and passes optional names and notes into storage (1525.787ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11250.4871

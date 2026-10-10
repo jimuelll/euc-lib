@@ -1,0 +1,32 @@
+
+> vite_react_shadcn_ts@0.0.0 test:unit
+> vitest run --passWithNoTests src/features/catalog/admin/ManualBookMetadata.test.tsx src/features/catalog/admin/Index.test.tsx
+
+
+ RUN  v3.2.4 C:/Users/Jimuel Jean Untalan/Downloads/Capstone/frontend
+
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+stderr | src/features/catalog/admin/Index.test.tsx > AI Recommendations > explains overlapping coverage and filters the list from cards
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+stderr | src/features/catalog/admin/ManualBookMetadata.test.tsx > uses server-side readiness filters and preserves selected IDs
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/features/catalog/admin/ManualBookMetadata.test.tsx (2 tests) 3589ms
+   ✓ uses server-side readiness filters and preserves selected IDs  1570ms
+   ✓ shows staff attribution, protects dirty synopsis edits and saves only changed data  2017ms
+ ✓ src/features/catalog/admin/Index.test.tsx (5 tests) 4617ms
+   ✓ AI Recommendations > explains overlapping coverage and filters the list from cards  1700ms
+   ✓ AI Recommendations > previews selected scope before starting and passes the exact options  1383ms
+   ✓ AI Recommendations > restores active runs on arrival and requests cancellation without losing progress  614ms
+   ✓ AI Recommendations > blocks invalid limits and a failed impact preview  695ms
+
+ Test Files  2 passed (2)
+      Tests  7 passed (7)
+   Start at  21:18:26
+   Duration  163.92s (transform 4.62s, setup 0ms, collect 178.31s, tests 8.21s, environment 85.33s, prepare 51.19s)
+

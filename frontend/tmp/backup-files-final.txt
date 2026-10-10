@@ -1,0 +1,10 @@
+
+ RUN  v3.2.4 C:/Users/Jimuel Jean Untalan/Downloads/Capstone/frontend
+
+··
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  22:53:01
+   Duration  4.89s (transform 151ms, setup 0ms, collect 174ms, tests 584ms, environment 1ms, prepare 454ms)
+

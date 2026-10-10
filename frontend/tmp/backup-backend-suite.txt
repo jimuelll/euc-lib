@@ -1,0 +1,386 @@
+
+> test
+> node -r ts-node/register test/suite.test.js
+
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+✔ calendar dates and dashboard labels retain UTC+08 midnight boundaries (26.2172ms)
+✔ dashboard range defaults to seven days and supports configured ranges (1.5543ms)
+✔ analytics series fills missing labels with numeric zeroes (0.8707ms)
+✔ daily evidence preserves SQL dates at UTC+08 and keeps attendance and fine ledger totals (377.2392ms)
+✔ AI briefs use pesos and discard unrecorded prior-period growth claims (5.1931ms)
+✔ period charts use bounded event dates and borrowed_at for circulation demand (1.1536ms)
+✔ attendance visits pair scans before filtering and pagination; summary is not filtered by tile (2.7532ms)
+✔ empty visits have valid numeric zero counters (2.945ms)
+✔ time out all skips a changed visit and records only the confirmed check-in (2.4644ms)
+✔ scan lock, check and insert use the same connection; release is guaranteed (2.8993ms)
+✔ central rate-limit policy values and account scopes match the documented plan (1.1007ms)
+✖ account budgets are shared across resource IDs and aliases, but isolated by account (134.0197ms)
+✖ independent limiter instances reset after their configured window (13.9245ms)
+✖ IP identity normalizes IPv6 subnets and keeps IPv4 clients distinct (9.4011ms)
+✖ attendance and desk transactions use separate operator-account budgets (15.5323ms)
+✖ CORS exposes rate-limit headers and preflight passes without consuming API quota (16.9626ms)
+✖ refresh account identity is attached only from a successfully verified token (393.9041ms)
+✔ API rate limits are attached after authentication and before protected handlers (43.7679ms)
+✔ concurrent refresh attempts use one atomic rotation and only one can succeed (15.5679ms)
+✔ access tokens at or before the restore marker are rejected (1.0607ms)
+﹣ database: concurrent refresh rotation consumes the old session once and rejects expired or revoked sessions (0.245ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+✔ staff and admin mutation routes resolve to an explicit audit policy (3.0346ms)
+✔ batch audit entries summarize the affected record type and count (3.582ms)
+✔ body-less embedding backfill requests produce audit metadata safely (1.2347ms)
+✔ audit values keep numeric one separate from boolean Yes (4.2975ms)
+✔ holding audit snapshots show financial changes approved for super admins (2.7226ms)
+✔ voiding an accession audits the persisted Assigned to Voided transition without the reason (0.6104ms)
+✔ policy deletion audit records its name and affected book count (3.1069ms)
+✔ clearance audit reads persisted amounts and receipt references while redacting free text (2.2401ms)
+✔ copy audit summaries identify the book and stable barcode sequence (2.0389ms)
+✔ legacy copy audit summaries resolve current labels and use ID fallback for deleted copies (1.6606ms)
+✔ permanent accession audit labels remain stable across application snapshot restores (0.8725ms)
+✔ new copy audit labels remain stable after copy IDs are reused by restore (1.0102ms)
+✔ user audit changes hide personal values and distinguish no change from failed capture (2.1522ms)
+✔ audit capture refuses to attribute a concurrent later edit to an earlier update (4.6223ms)
+✔ new user audit entries store lookup names and keep personal changes redacted (1.5551ms)
+✔ event-time lookup resolves both sides of a changed reference and falls back clearly (2.8427ms)
+✔ holding programs, book policies, and book references resolve to their names (1.7953ms)
+✔ historical audit display resolves current names without rewriting stored metadata (2.8855ms)
+✔ historical book IDs resolve to current titles and missing rows keep labeled ID fallbacks (0.6926ms)
+✔ audit rows still display labeled ID fallbacks when lookup queries fail (0.702ms)
+﹣ database: accession collision is atomic, survives archive, and serializes concurrent assignment (0.1779ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test; fixtures permanently reserve accessions
+﹣ database: holdings audits preserve rapid before/after values and roll back when audit enqueue fails (0.1477ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: copy-count audit records the persisted pre-edit count and every retired copy label (0.1565ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: voided accessions stay attached and claimed while current lending excludes the copy (0.112ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: retained accession identity is barcode based after snapshot copy IDs change (0.0922ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: barcode retained by an orphaned claim cannot be reused by another book (0.0809ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout and exact-copy return resolve accession and QR barcode (0.085ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: count reduction retires copies, growth creates new identities, and restore is explicit (0.1785ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout and reduction serialize without retiring a loaned copy (0.1695ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: payment and patron archive serialize without archiving an unpaid account (0.1153ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: pending and ready reservations protect copy reduction and exact-copy fulfillment (0.1853ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: application restore retains a claim made after the saved snapshot (0.3784ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: concurrent renewal and return leave one returned loan and a consistent fine cycle (0.1849ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: count reduction retires unaccessioned and returned copies but preserves loan and reservation commitments (0.1066ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: pending reservations keep a preparation copy and preparation locks the catalog record (0.0948ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout racing reservation preparation cannot take the last committed copy (0.0841ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: cancelling an expired reservation races expiry synchronization to one terminal state (0.1043ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: OPAC, recommendations, inventory, and history follow the copy lifecycle (0.1086ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout commits with a durable notification event and cannot be duplicated while delivery is pending (0.1214ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: unpaid ledger balances block user, book, direct-edit, and loan archives until payment (0.1048ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: term assignment and concurrent Set Current preserve one current term (0.1858ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: program, department, and holiday lifecycle preserves references and restores archived settings (0.178ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: policy reassignment/deletion and archival keep historical previews, filters, exports, and aggregates (0.0996ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+✔ users service delegates persistence to its repository (3.287ms)
+✔ feature facades do not own database imports (5.1637ms)
+✔ repository-backed services delegate persistence to repositories (82.1137ms)
+✔ borrowing read service delegates SQL to its repository (1.9218ms)
+✔ database-aware helpers delegate persistence to repositories (3.6202ms)
+✔ backend transport and scheduled files respect database boundaries (125.2841ms)
+✔ module registry is the stable route registration boundary (1.604ms)
+✔ restore upgrades the previous snapshot version and adds newly registered tables (5.788ms)
+✔ restore upgrades v11 with holdings defaults and preserves tables that already exist (5.1755ms)
+✔ restore upgrades v12 loan provenance and preserves outbox, holdings, settings and delivery keys (2.3167ms)
+✔ restore preflight rejects malformed rows before restore can begin (3.862ms)
+✔ v13 upgrade derives permanent claims from the snapshot's existing holdings (1.974ms)
+✔ restore retains a claim made after the snapshot and reapplies the holding to the same barcode (2.9988ms)
+✔ restore reconciles a permanent claim by barcode when its prior copy ID was reused (0.966ms)
+✔ restore rejects an accession assigned to another physical copy (1.4294ms)
+✔ restore keeps claims orphaned when their physical copy is absent (0.6737ms)
+✔ restoring a snapshot from before a correction keeps the replacement accession current (1.0044ms)
+✔ restore retains void state and permanent claims made after an older snapshot (0.6045ms)
+✔ backup values preserve buffers and normalize JSON for restore (1.6767ms)
+✔ version 15 snapshots upgrade with empty private drafts and a verified checksum (0.7408ms)
+✔ backup validation and checksums reject malformed payloads (0.7787ms)
+✔ drafts allow incomplete records; publication validates dates, IDs, and safe URLs (3.4321ms)
+✔ individual publication retains other saved drafts; publish all rolls back every section on failure (23.1694ms)
+✔ published guide addresses cannot be changed (1.2547ms)
+✔ discard also restores a previously saved legacy guide draft (6.8654ms)
+✔ save, publish, conflicts, discard, and failed publication preserve transaction boundaries (9.0575ms)
+✔ notification scheduling validates dates, destinations, lengths and roles (3.3147ms)
+✔ broadcasts require the current count; scheduling queues without creating a public message (2.4825ms)
+✔ failed deliveries retry the original event and cannot resend an in-flight schedule (1.205ms)
+✔ borrowing pagination clamps invalid and oversized values (0.7698ms)
+✔ borrowing money values are rounded to cents (0.4528ms)
+✔ fine displays use saved loan terms and fall back only for legacy rows (3.1997ms)
+✔ fine detail lookup retains archived borrowing, patron, book, and copy labels (1.0881ms)
+✔ circulation history searches ISBN and keeps date filters in all count queries (1.3006ms)
+✔ copy lookup previews the configured loan policy instead of assuming seven days (0.7698ms)
+✔ admin queue filters live work while counts ignore status and preserve search (1.5117ms)
+✔ cancellation reason is appended without overwriting existing notes (1.3158ms)
+✔ borrowing archive checks ledger fines and commits its before/after audit with the state change (120.1802ms)
+✔ borrowing archive rolls back if its durable audit event cannot be enqueued (20.6986ms)
+✔ borrowing restore is transactional, records its actor, and checks affected rows (48.23ms)
+✔ desk undo tokens reject another actor, forged and expired intents (5.7722ms)
+✔ desk undo commits a correction and its audit together (249.8043ms)
+✔ desk undo rejects changed records and every fine-related record (97.4051ms)
+✔ return undo rejects re-borrowed copies, ready holds and pending queues (133.0143ms)
+✔ failed durable audit rolls back the reversal (23.4334ms)
+✔ history counts ignore status and repository sorts urgent work before pagination (0.9958ms)
+✔ copy count increases create new copy identities and never reactivate retired rows (2.3703ms)
+✔ catalog edit lock reads persisted title and core fields for an accurate audit snapshot (0.975ms)
+▶ copy count reduction names borrowed, prepared, and pending commitments
+  ✔ borrowed copies cannot be removed (0.9961ms)
+  ✔ prepared copies cannot be removed (0.3419ms)
+  ✔ pending copies cannot be removed (0.3151ms)
+✔ copy count reduction names borrowed, prepared, and pending commitments (3.5673ms)
+✔ copy count reduction retires unaccessioned copies and preserves one eligible copy per pending reservation (1.1714ms)
+✔ explicit copy retirement protects pending reservations and restoration is an explicit action (1.9638ms)
+✔ catalog status counts precede pagination and the needs-holdings predicate applies to list and total (4.5259ms)
+✔ adding copies locks inventory and increments it without retiring existing copies (1.7617ms)
+✔ holdings summary counts ignore the selected state while row filters apply (3.5085ms)
+✔ catalog image validation enforces supported image signatures and the 5 MB limit (1.9026ms)
+✔ book image routes require catalog staff authorization before upload handling (1.409ms)
+✔ cover replacement saves the new Cloudinary image before deleting the old image (4.722ms)
+✔ thesis image upload is rejected and removing a book image clears storage and Cloudinary (3.7412ms)
+✔ ISBN lookup queries both providers and uses Google Books for the cleaned synopsis (2019.4367ms)
+✔ ISBN lookup merges Google Books fields when Open Library search has gaps (4047.3514ms)
+✔ ISBN lookup keeps Open Library details when Google Books is unavailable (3028.063ms)
+✔ Google Books remains a fallback when Open Library is unavailable (4041.7338ms)
+✔ ISBN lookup keeps its unavailable error when both providers fail (4029.932ms)
+✔ Google Books synopsis cleaning removes markup, decodes entities, and caps its length (0.8093ms)
+✔ public catalogue filter builder combines search, format, availability, and category safely (2.4027ms)
+✔ public category facet counts one category per catalog record (1.1348ms)
+✔ public search returns server pagination, filter counts, cover URL, and empty pages (2.7988ms)
+✔ outbox retries notifications with the same idempotency key (9.7688ms)
+✔ outbox forwards stable event keys for audit records (6.4381ms)
+✔ fine calculation has no charge at the due instant and charges the next interval after it (0.7207ms)
+✔ daily fines round up at a day boundary and use the return time when present (0.4535ms)
+✔ invalid dates and missing due dates never produce NaN fines (0.4029ms)
+✔ clearance queue groups blocked first and retains counts across filters (226.9079ms)
+✔ confirmed partial payments allocate only the amount received and generate a receipt (55.2131ms)
+✔ a changed balance rejects the payment before ledger writes (32.838ms)
+✔ overpayments and invalid amounts never create ledger entries (40.6573ms)
+✔ full payment remains compatible and records all allocations atomically (36.2775ms)
+✔ users desk counts statuses across pages and adds authoritative borrowing balances (7.6307ms)
+✔ users desk filters attention before pagination and retains role counts (2.7502ms)
+✔ users desk refuses a role outside the operator's search scope (0.5314ms)
+✔ users academic reference filters constrain both rows and summary (4.9746ms)
+✔ holding saves validate accession uniqueness inputs and preserve cent values (6.2783ms)
+✔ existing accession cannot change while a copy is loaned or prepared (1.2117ms)
+✔ copy resolution accepts an accession or the existing QR barcode, and returns the exact copy loan (1.177ms)
+✔ historical patron borrowing rows keep the physical copy identity after copy archival (0.6948ms)
+✔ all checkout and reservation copy selectors filter to accessioned copies (4.9097ms)
+✔ global holdings search applies course, completion, and circulation filters (0.6372ms)
+✔ catalog visibility setting can be saved in both states (145.4469ms)
+✔ patron borrowing and recommendations follow the catalog visibility setting (116.0094ms)
+✔ desk checkout blocks unaccessioned QR copies and rejects reservation copy mismatches (148.37ms)
+✔ route IDs must be complete positive safe integers (0.3236ms)
+✔ catalog and reservation routes reject partial ID strings with 400 (0.8025ms)
+✔ pagination clamps fractions, invalid values, huge offsets, and page sizes (0.2554ms)
+✔ catalogue pagination accepts only numeric input and caps public page size (0.1966ms)
+✔ deleting an assigned policy is rejected without clearing active or archived assignments (0.8941ms)
+✔ deleting a missing policy rolls the transaction back (0.3495ms)
+✔ an unused policy deletes without changing books (2.3553ms)
+✔ policy management loads inactive policies with active and archived assignment counts (0.3928ms)
+✔ a permanently deleted policy name can be reused (3.2356ms)
+✔ copy availability requires an active book policy (0.3316ms)
+✔ new and reassigned books only accept active policies under a row lock (1.1385ms)
+✔ policy removal is super-admin only (0.3961ms)
+✔ needs-policy catalog filter is applied to both rows and pagination counts (1.6961ms)
+✔ reservation creation and preparation stop when the book has no active policy (67.3086ms)
+✔ renewal is blocked for an active loan whose book no longer has a policy (70.3322ms)
+✔ an active loan remains returnable after its book loses the current policy (52.6268ms)
+✔ query service exposes only approved operational datasets (1.8475ms)
+✔ clearance query narrows live exceptions without changing the source rows (1.4963ms)
+✔ query export date-times stop at minutes and dates remain date-only (0.9003ms)
+✔ query service validates date ranges and keeps catalog soft deletes out (1.7519ms)
+✔ query service rejects unsupported filter values (0.7969ms)
+✔ catalog query and availability filter share accessioned circulation eligibility (0.696ms)
+✔ borrowing history uses the saved policy snapshot and includes archived records (0.7286ms)
+✔ reservation reporting labels the live policy separately from historical loan policy (1.069ms)
+✔ seed and personal recommendations return book image URLs and null for missing covers (3.8615ms)
+✔ thesis recommendations serialize their image value for the thesis fallback (0.7072ms)
+✔ recommendation responses expose current available, checked out, reserved, and unavailable book statuses (1.0064ms)
+✔ AI backfill selects books with missing, stale, or failed embeddings (2.9146ms)
+✔ AI backfill reuses useful saved metadata when only an embedding needs repair (0.9577ms)
+✔ online metadata lookup failures are tracked separately from embedding failures (3022.7398ms)
+✔ Google Books can enrich a book when Open Library is unavailable (4025.0844ms)
+✔ Open Library ISBN search enriches books without a Google Books key (4060.0718ms)
+✔ an imported synopsis is saved privately and included in the generated embedding (3034.6069ms)
+✔ automatic ISBN enrichment does not replace staff-entered AI metadata (0.6606ms)
+✔ a successful Google Books check with no description is marked complete and remains visible to staff (2036.7256ms)
+✔ book details expose a safe online lookup error to staff (1.0175ms)
+✔ embedding status counts books with no embedding record (1.5765ms)
+✔ manual books with blank summaries stay in the attention list with a missing synopsis status (1.7449ms)
+✔ the attention-list query includes blank summaries independently of manual metadata (4.0264ms)
+✔ a 429 retries once then pauses the batch and leaves remaining books deferred (1997.2541ms)
+✔ Google Books lookup exposes long Retry-After values without waiting past the cap (0.6494ms)
+✔ provider failures finish with errors even when embeddings succeed (4011.1294ms)
+✔ book recommendation endpoints return eight unique picks and fill short AI sets with ranked rules (6.7248ms)
+✔ thesis recommendations stay capped at five (1.5858ms)
+✔ holdings inventory validates and composes its current snapshot filters (3.0066ms)
+✔ holdings inventory paginates and exports copy level rows without date filters (4.8342ms)
+✔ historical fine and usage reports retain archived loans and use saved policy names (3.2668ms)
+✔ active reservation views omit expired pending and ready rows consistently (2.8214ms)
+✔ reservation history synchronizes expired rows before reading history (0.9221ms)
+✔ reservation history bounds fractional pages, malformed pages, and oversized limits (1.9675ms)
+✔ exports validate selected columns and neutralize spreadsheet formulas (2.6314ms)
+✔ record exports require an administrator and audit before releasing personal records (6.1197ms)
+✔ report sorting uses dates and fine totals include rows outside the current page (1.0356ms)
+✔ report preview carries institutional metadata and preserves fine currency totals (1.2624ms)
+✔ term dates reject impossible dates and reversed ranges before any write (1.8652ms)
+✔ term peer validation blocks duplicate names and inclusive overlaps while holding locks (2.2907ms)
+✔ permanent removal checks current references and refuses without deleting (1.8439ms)
+✔ explicit archive retains an unused department for restoration (0.7478ms)
+✔ holiday imports roll back the whole batch and audit if one date conflicts (7.6352ms)
+✔ holiday imports reject invalid dates and oversized lists (1.246ms)
+✔ policy edits and audit enqueue are atomic (audit failure: false) (8.9883ms)
+✔ policy edits and audit enqueue are atomic (audit failure: true) (6.2245ms)
+✔ exact policy filter is used for Catalog counts and rows with correctly ordered parameters (3.2067ms)
+✔ usage counts preserve zero, exclude archived records from missing counts and inspect both scopes (1.433ms)
+✔ schema transaction: success (11.3849ms)
+✔ schema transaction: audit failure (5.1121ms)
+✔ schema transaction: stale revision (0.5047ms)
+✔ schema transaction: used deletion (0.9794ms)
+✔ schema transaction: unused deletion (5.8144ms)
+✔ dropdown duplicates are rejected on the server (2.5556ms)
+✔ retired choices cannot also be active or contain duplicates (1.9786ms)
+✔ option totals account for all stored values, including retired values (2.4045ms)
+✔ configuration record filters bind metadata keys and apply to totals and rows (3.457ms)
+✔ missing filters include absent/null/blank values and accession filter follows eligibility (4.4585ms)
+✔ backfill options reject unsupported scopes, excessive limits and empty selections (0.9803ms)
+✔ coverage total counts active books, including books without embeddings (0.7831ms)
+✔ readiness filters are applied before both count and pagination (3.2333ms)
+✔ selected backfill constrains IDs and limit and scopes avoid unrelated work (4.5667ms)
+✔ concurrent starts reserve one run and cancellation defers remaining books without provider calls (34.5852ms)
+✔ AI matching failures are persisted for failure-only retries (16.3782ms)
+✔ audit redaction keeps policy names and numeric diffs while masking personal and nested secrets (1.1544ms)
+✔ audit filters bind actor, exact record and search, and reject reversed dates (2.675ms)
+✔ feed retains captured routes after legacy enrichment and resolves policy links (428.3133ms)
+✔ CSV neutralizes spreadsheet formulas (0.8173ms)
+✔ export is released only after its audit succeeds: success (171.0647ms)
+✔ export is released only after its audit succeeds: failure (0.8597ms)
+✔ request context is captured and sanitized on direct audit writes (9.4035ms)
+✔ restore requires the exact acknowledgement and the active super-admin password (40.3229ms)
+✔ restore impact counts added, changed and absent records instead of guessing losses from dates (2.4784ms)
+✔ daily and weekly schedules use UTC+08:00 and move strictly into the future (163.9576ms)
+✔ pinned deletion is blocked before deleting records or cloud objects (506.1146ms)
+✔ verification rejects a corrupted checksum instead of marking it verified (18.0988ms)
+ℹ tests 249
+ℹ suites 0
+ℹ pass 219
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 24
+ℹ todo 0
+ℹ duration_ms 70892.1571
+
+✖ failing tests:
+
+test at test\rate-limit.test.js:63:1
+✖ account budgets are shared across resource IDs and aliases, but isolated by account (134.0197ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:72:19
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:70:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2125
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2125
+    }
+  }
+
+test at test\rate-limit.test.js:89:1
+✖ independent limiter instances reset after their configured window (13.9245ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:97:19
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:95:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2129
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2129
+    }
+  }
+
+test at test\rate-limit.test.js:104:1
+✖ IP identity normalizes IPv6 subnets and keeps IPv4 clients distinct (9.4011ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:112:5
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:110:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2131
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2131
+    }
+  }
+
+test at test\rate-limit.test.js:126:1
+✖ attendance and desk transactions use separate operator-account budgets (15.5323ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:136:19
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:134:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2133
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2133
+    }
+  }
+
+test at test\rate-limit.test.js:143:1
+✖ CORS exposes rate-limit headers and preflight passes without consuming API quota (16.9626ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:153:23
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:151:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2136
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2136
+    }
+  }
+
+test at test\rate-limit.test.js:180:1
+✖ refresh account identity is attached only from a successfully verified token (393.9041ms)
+  TypeError: fetch failed
+      at node:internal/deps/undici/undici:15845:13
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:208:19
+      at async withServer (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:21:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:206:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    [cause]: Error: connect EACCES 127.0.0.1:2143
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 2143
+    }
+  }

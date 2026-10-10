@@ -62,6 +62,7 @@ PRODUCT.md
 SKILL.md
 
 # Generated UML and one-off cross-system review artifacts
+/docs/
 /docs/generated/uml/
 /docs/cross-system-mutation-matrix.md
 /docs/defense-cross-system-audit.md

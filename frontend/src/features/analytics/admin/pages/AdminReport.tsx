@@ -1,23 +1,9 @@
-import { useAdminUrlState } from "@/features/admin";
-import { AdminPage } from "@/features/admin";
-import QueryExplorer from "@/features/query/QueryExplorer";
-import ReportWorkspace from "@/features/query/ReportWorkspace";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const AdminReport = () => {
-  const [params, patch] = useAdminUrlState();
-  return (
-  <AdminPage title="Reports & Records" description="Explore library records or choose a report, apply filters, then preview or download the results.">
-    <Tabs value={params.get("tab") === "reports" ? "reports" : "explore"} onValueChange={tab => patch({ tab })} className="space-y-5">
-      <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-md border-b border-border bg-transparent p-0">
-        <TabsTrigger value="explore" className="min-h-11 shrink-0 rounded-md border-b-2 border-transparent px-5 data-[state=active]:border-action data-[state=active]:bg-transparent data-[state=active]:text-action">Explore Records</TabsTrigger>
-        <TabsTrigger value="reports" className="min-h-11 shrink-0 rounded-md border-b-2 border-transparent px-5 data-[state=active]:border-action data-[state=active]:bg-transparent data-[state=active]:text-action">Reports</TabsTrigger>
-      </TabsList>
-      <TabsContent value="explore" className="mt-0"><QueryExplorer /></TabsContent>
-      <TabsContent value="reports" className="mt-0"><ReportWorkspace /></TabsContent>
-    </Tabs>
-  </AdminPage>
-);
-};
-
-export default AdminReport;
+import { useState } from 'react';
+import { useAdminUrlState, AdminPageHeader, AdminPageTabs } from '@/features/admin';
+import QueryExplorer from '@/features/query/QueryExplorer';
+import ReportWorkspace from '@/features/query/ReportWorkspace';
+import { SavedBriefs } from '../SavedBriefs';
+import { TabsContent } from '@/components/ui/tabs';
+import '@/features/query/records.css';
+import './analytics.css';
+export default function AdminReport() { const [params, patch] = useAdminUrlState(), [updated, setUpdated] = useState<number>(), [refreshToken,setRefreshToken] = useState(0); const tab = ['reports', 'briefs'].includes(params.get('tab') || '') ? params.get('tab')! : 'explore'; return <div className="records-page"><AdminPageHeader title="Reports & Records" subtitle="Explore is a live cross-module lookup; Reports creates named, dated outputs. Exports include all matching rows and the selected columns." updatedAt={updated} actions={tab !== "briefs" ? <button type="button" className="records-updated" title="Refresh the current results" aria-label="Refresh current results" onClick={()=>setRefreshToken(value=>value+1)}>{updated ? <>Updated <time dateTime={new Date(updated).toISOString()}>{new Date(updated).toLocaleTimeString("en-PH", {hour:"numeric",minute:"2-digit",timeZone:"Asia/Ulaanbaatar"})}</time></> : "Loading records…"}</button> : undefined}/><AdminPageTabs value={tab} onChange={tab => patch({ tab })} label="Reports and records views" items={[{ value: 'explore', label: 'Explore Records', icon: 'search' }, { value: 'reports', label: 'Reports', icon: 'reports' }, { value: 'briefs', label: 'Saved briefs', icon: 'recommendations' }]}><TabsContent className="records-tab" value="explore"><QueryExplorer onUpdated={setUpdated} refreshToken={refreshToken}/></TabsContent><TabsContent className="records-tab" value="reports"><ReportWorkspace onUpdated={setUpdated} refreshToken={refreshToken}/></TabsContent><TabsContent className="records-tab" value="briefs"><SavedBriefs /></TabsContent></AdminPageTabs></div>; }

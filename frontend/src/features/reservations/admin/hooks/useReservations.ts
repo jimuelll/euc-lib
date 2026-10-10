@@ -69,8 +69,9 @@ export const useReservations = () => {
     limit: PAGE_SIZE,
     ...(search.trim() ? { search: search.trim() } : {}),
     ...(showArchived ? { archived: true } : {}),
+    ...(Number(params.get('recordId'))>0?{recordId:Number(params.get('recordId'))}:{}),
     ...(!showArchived && statusFilter !== "all" ? { status: statusFilter } : {}),
-  }), [page, search, showArchived, statusFilter]);
+  }), [page, search, showArchived, statusFilter,params.get("recordId")]);
 
   const reservationsQuery = useQuery({
     queryKey: reservationsKeys.list(filters),

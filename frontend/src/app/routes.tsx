@@ -1,6 +1,7 @@
 import { useAdminTheme } from "@/features/admin/hooks/useAdminTheme";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import AdminUsersRedirect from "@/features/admin/manage/AdminUsersRedirect";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 import Home from "@/features/home/pages/Index";
 import About from "@/features/about";
@@ -68,6 +69,7 @@ export const AppRoutes = () => {
         <Route index element={<AdminHome />} />
         <Route path="analytics" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAnalytics /></ProtectedRoute>} />
         <Route path="manage" element={<AdminManage />} />
+        <Route path="users" element={<AdminUsersRedirect />} />
         <Route path="catalog" element={<AdminCatalog />} />
         <Route path="book-types" element={<ProtectedRoute roles={["super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
         <Route path="circulation" element={<AdminCirculation />} />

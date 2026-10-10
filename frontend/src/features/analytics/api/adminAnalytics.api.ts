@@ -3,6 +3,7 @@ import type { AnalyticsRange, DashboardResponse } from "../admin/pages/AdminAnal
 
 export interface AiReportEvidence {
   range: { dateFrom: string; dateTo: string; days: number; allTime?: boolean };
+  comparison?: {available:boolean;recordedFrom:string};
   previous_range: { dateFrom: string; dateTo: string; days: number };
   activity: {
     circulation: { borrowed: number; returned: number };
@@ -28,6 +29,9 @@ export interface AiReportEvidence {
 }
 
 export interface AiAnalyticsReportResponse {
+  generatedAt?:string;
+  generatedBy?:string | null;
+  libraryName?:string;
   report: string;
   mode: "answer" | "summary";
   range: AiReportEvidence["range"];
@@ -35,6 +39,9 @@ export interface AiAnalyticsReportResponse {
 }
 
 export interface AuditItem {
+  recorded_failures_today?:number;
+  impact_reason?:string;
+  id:number;actor_id?:number;route?:string;significant?:boolean;related_ids?:number[];target?:{id?:number;kind:string;label:string;url?:string|null;deleted?:boolean;unavailable?:boolean};
   occurred_at: string;
   category: string;
   action: string;
@@ -49,30 +56,35 @@ export interface AuditItem {
 }
 
 export interface AuditResponse {
+  quickCounts?:Record<string,number>;
+  unfilteredTotal?:number;latestId?:number;updatedAt?:string;
   rows: AuditItem[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
   filters: { category: string; action: string; query?: string; dateFrom: string; dateTo: string };
 }
 
 export interface AuditMetaResponse {
+  actors?:{id:number;name:string}[];guarantees?:{retention:string;readOnly:string;coverage:string};
   categories: string[];
   actions: string[];
   actionsByCategory: Record<string, string[]>;
 }
 
 /** Typed boundary for the admin dashboard contract. */
-export async function fetchAdminDashboard(range: AnalyticsRange, signal?: AbortSignal): Promise<DashboardResponse> {
-  return (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range }, signal })).data;
+export async function fetchAdminDashboard(range: AnalyticsRange, signal?: AbortSignal, period?:{dateFrom?:string;dateTo?:string;allTime?:boolean}): Promise<DashboardResponse> {
+  return (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { params: { range,...period }, signal })).data;
 }
 
 export async function createAiAnalyticsReport(input: { dateFrom?: string; dateTo?: string; allTime?: boolean; question?: string }): Promise<AiAnalyticsReportResponse> {
   return (await axiosInstance.post<AiAnalyticsReportResponse>("/api/admin/dashboard/ai-report", input)).data;
 }
 
-export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string }, signal?: AbortSignal): Promise<AuditResponse> {
+export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string;actor?:string;record?:string;important?:string;security?:string;event?:string;quick?:string }, signal?: AbortSignal): Promise<AuditResponse> {
   return (await axiosInstance.get<AuditResponse>("/api/admin/dashboard/audit", { params, signal })).data;
 }
 
 export async function fetchAuditMeta(signal?: AbortSignal): Promise<AuditMetaResponse> {
   return (await axiosInstance.get<AuditMetaResponse>("/api/admin/dashboard/audit/meta", { signal })).data;
 }
+
+export async function exportAuditLogs(filters:Record<string,string>){return (await axiosInstance.post('/api/admin/dashboard/audit/export',filters,{responseType:'blob'})).data as Blob;}

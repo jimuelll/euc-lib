@@ -1,0 +1,43 @@
+
+ RUN  v3.2.4 C:/Users/Jimuel Jean Untalan/Downloads/Capstone/frontend
+
+stderr | src/features/admin/__tests__/admin-sidebar.test.tsx > admin sidebar > shows exactly the permitted tools for staff without expanding groups
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/features/admin/__tests__/admin-sidebar.test.tsx (14 tests) 14192ms
+   ✓ admin sidebar > shows exactly the permitted tools for staff without expanding groups  1943ms
+   ✓ admin sidebar > shows exactly the permitted tools for admin without expanding groups  1315ms
+   ✓ admin sidebar > shows exactly the permitted tools for super_admin without expanding groups  913ms
+   ✓ admin sidebar > selects only the correct tool at /admin/catalog  950ms
+   ✓ admin sidebar > selects only the correct tool at /admin/catalog?tab=builder  724ms
+   ✓ admin sidebar > selects only the correct tool at /admin/catalog?tab=ai  640ms
+   ✓ admin sidebar > selects only the correct tool at /admin/clearance/receipt/TEST  835ms
+   ✓ admin sidebar > selects only the correct tool at /admin/restrictions  980ms
+   ✓ admin sidebar > retains accessible names and all tools when compact  1452ms
+   ✓ admin sidebar > signals hidden navigation and clears the cue at the end of the list  343ms
+   ✓ admin sidebar > labels the mobile drawer and closes it after navigating  1009ms
+   ✓ admin sidebar > preserves the My account account destination  1080ms
+   ✓ admin sidebar > preserves the Change password account destination  1024ms
+   ✓ admin sidebar > signs out from the account menu  963ms
+Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+stderr | src/features/analytics/admin/pages/AdminAuditLogs.test.tsx > shows numeric before/after values and stable identifiers behind an accessible toggle
+⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ ✓ src/features/analytics/admin/pages/AdminAuditLogs.test.tsx (8 tests) 6322ms
+   ✓ shows numeric before/after values and stable identifiers behind an accessible toggle  1719ms
+   ✓ restores deep filters and narrows action options by category  1259ms
+   ✓ applies debounced search to the URL without an Apply action  1049ms
+   ✓ keeps expansion on refresh with a single bottom pager  983ms
+   ✓ shows redacted field names and keeps revealing unavailable  385ms
+   ✓ does not show a new-events banner for an ID change without a matching count  398ms
+   ✓ dismisses a counted new-events notice  521ms
+
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+   Start at  23:17:53
+   Duration  42.42s (transform 5.53s, setup 0ms, collect 27.69s, tests 20.51s, environment 16.14s, prepare 4.49s)
+

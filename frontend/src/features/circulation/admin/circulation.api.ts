@@ -29,6 +29,8 @@ export interface CirculationLogEntry {
 }
 
 export interface CirculationLogFilters {
+  policyId?:number;
+  previousTerms?:boolean;
   status?: string;
   search?: string;
   page?: number;

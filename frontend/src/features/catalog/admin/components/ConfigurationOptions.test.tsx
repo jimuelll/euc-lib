@@ -1,0 +1,11 @@
+// @vitest-environment jsdom
+import {useState} from 'react';
+import {afterEach,it,expect} from 'vitest';
+import {cleanup,fireEvent,render,screen,within} from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import ConfigurationOptions from './ConfigurationOptions';
+afterEach(cleanup);
+function mount(){function App(){const [value,setValue]=useState(['Fiction','New Arrival']),[archived,setArchived]=useState<string[]>([]);return <ConfigurationOptions value={value} archived={archived} usage={{Fiction:2}} used={2} onChange={(v,a)=>{setValue(v);setArchived(a);}}/>;}render(<App/>);}
+it('explains real usage and skips duplicates in bulk paste',()=>{mount();expect(screen.getByText(/2 records use this field · 1 of 2 active options in use/)).toBeInTheDocument();fireEvent.paste(screen.getByPlaceholderText('Add an option'),{clipboardData:{getData:()=> 'Fiction, History,Science'}});expect(screen.getByText('Added 2 options, 1 duplicate skipped.')).toBeInTheDocument();});
+it('confirms used option archival, supports restore and undo',async()=>{mount();fireEvent.click(screen.getByRole('button',{name:'Archive option Fiction'}));const dialog=await screen.findByRole('alertdialog');expect(within(dialog).getByText(/This affects 2 records/)).toBeInTheDocument();fireEvent.click(within(dialog).getByRole('button',{name:'Archive option'}));expect(await screen.findByRole('button',{name:'Restore option Fiction'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Restore option Fiction'}));expect(screen.getByRole('button',{name:'Archive option Fiction'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Undo option change'}));expect(screen.getByRole('button',{name:'Restore option Fiction'})).toBeInTheDocument();});
+it('announces keyboard reordering and provides undo for unused removal',()=>{mount();fireEvent.keyDown(screen.getByRole('button',{name:'Reorder option New Arrival'}),{key:'ArrowUp'});expect(screen.getByText('New Arrival moved to position 1.')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Remove option New Arrival'}));expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Undo option change'}));expect(screen.getByRole('button',{name:'Remove option New Arrival'})).toBeInTheDocument();});

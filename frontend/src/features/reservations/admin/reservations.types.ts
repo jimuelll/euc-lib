@@ -45,6 +45,7 @@ export interface ReservationsResult {
 }
 
 export interface ReservationFilters {
+  recordId?:number;
   status?: string;
   search?: string;
   dateFrom?: string;

@@ -1,3 +1,4 @@
+import {useSearchParams} from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -31,6 +32,7 @@ const labels = { pending: "Pending", ready: "Ready", fulfilled: "Fulfilled", can
 
 export default function AdminReservations() {
   const desk = useReservations();
+  const [auditParams]=useSearchParams(),openedRecord=useRef(0);
   const [selected, setSelected] = useState<number[]>([]);
   const [detail, setDetail] = useState<AdminReservation | null>(null);
   const [cancelRows, setCancelRows] = useState<AdminReservation[]>([]);
@@ -39,6 +41,7 @@ export default function AdminReservations() {
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => setSelected([]), [desk.statusFilter, desk.page, desk.search, desk.showArchived]);
   const rows = desk.data?.rows ?? [];
+  useEffect(()=>{const id=Number(auditParams.get("recordId"));if(id&&openedRecord.current!==id){const match=rows.find(row=>row.id===id);if(match){openedRecord.current=id;setDetail(match);}}},[rows,auditParams]);
   const summary = desk.data?.summary;
   const busy = desk.actionId !== null || desk.bulkBusy || cancelBusy;
   const selectedRows = rows.filter(row => selected.includes(row.id) && !closed(row));

@@ -1,7 +1,7 @@
 import type { AnalyticsRange } from "./admin/pages/AdminAnalytics";
 
 export interface AuditFilters {
-  page: number;
+  page: number;limit?:number;actor?:string;record?:string;important?:string;security?:string;
   category: string;
   action: string;
   query: string;

@@ -1,0 +1,30 @@
+[
+  {
+    "device": "desktop",
+    "theme": "light",
+    "writes": 2,
+    "errors": [],
+    "overflow": []
+  },
+  {
+    "device": "desktop",
+    "theme": "dark",
+    "writes": 2,
+    "errors": [],
+    "overflow": []
+  },
+  {
+    "device": "mobile",
+    "theme": "light",
+    "writes": 0,
+    "errors": [],
+    "overflow": []
+  },
+  {
+    "device": "mobile",
+    "theme": "dark",
+    "writes": 0,
+    "errors": [],
+    "overflow": []
+  }
+]

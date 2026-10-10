@@ -73,6 +73,7 @@ DROP TABLE IF EXISTS
   `academic_programs`,
   `departments`,
   `backup_snapshots`,
+  `backup_schedule`,
   `user_guide_modules`,
   `users`;
 SET FOREIGN_KEY_CHECKS = 1;
@@ -242,7 +243,10 @@ CREATE TABLE `backup_snapshots` (
   `filename` varchar(255) NOT NULL,
   `size_bytes` bigint(20) UNSIGNED NOT NULL,
   `book_image_public_ids` json DEFAULT NULL,
-  `kind` enum('manual','pre_restore') NOT NULL DEFAULT 'manual',
+  `kind` enum('manual','scheduled','pre_restore') NOT NULL DEFAULT 'manual',
+  `label` varchar(120) DEFAULT NULL, `notes` varchar(500) DEFAULT NULL, `pinned` tinyint(1) NOT NULL DEFAULT 0,
+  `checksum` varchar(64) DEFAULT NULL, `snapshot_version` int DEFAULT NULL,
+  `verification_status` enum('unverified','verified','failed') NOT NULL DEFAULT 'unverified', `verified_at` datetime DEFAULT NULL,
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -515,6 +519,7 @@ CREATE TABLE `catalog_schema` (
   `key` varchar(64) NOT NULL,
   `label` varchar(255) NOT NULL,
   `type` enum('text','textarea','number','date','select','repeatable') NOT NULL DEFAULT 'text',
+  archived_options JSON NULL,
   `options` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`options`)),
   `required` tinyint(1) NOT NULL DEFAULT 0,
   `locked` tinyint(1) NOT NULL DEFAULT 0,
@@ -1578,3 +1583,15 @@ ALTER TABLE website_content_drafts ADD COLUMN IF NOT EXISTS item_meta_json longt
 ALTER TABLE site_content_settings ADD COLUMN IF NOT EXISTS hero_image_alt varchar(500) DEFAULT NULL;
 ALTER TABLE academic_subscriptions ADD COLUMN IF NOT EXISTS image_alt varchar(500) DEFAULT NULL;
 ALTER TABLE bulletin_posts ADD COLUMN IF NOT EXISTS image_alt varchar(500) DEFAULT NULL, ADD COLUMN IF NOT EXISTS gallery longtext DEFAULT NULL CHECK (gallery IS NULL OR json_valid(gallery));
+
+CREATE TABLE IF NOT EXISTS backup_schedule (
+ id tinyint NOT NULL PRIMARY KEY,
+ enabled tinyint(1) NOT NULL DEFAULT 0,
+ frequency enum('daily','weekly') NOT NULL DEFAULT 'daily',
+ hour tinyint NOT NULL DEFAULT 2, weekday tinyint NOT NULL DEFAULT 1,
+ next_run datetime DEFAULT NULL,last_run datetime DEFAULT NULL,
+ last_result varchar(20) DEFAULT NULL,last_error varchar(255) DEFAULT NULL,
+ updated_by bigint unsigned DEFAULT NULL
+);
+INSERT IGNORE INTO backup_schedule(id) VALUES(1);
+ALTER TABLE backup_snapshots MODIFY COLUMN kind enum('manual','scheduled','pre_restore') NOT NULL DEFAULT 'manual';

@@ -1,285 +1,62 @@
-import { useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { backupKeys } from "../backup.keys";
-import { ArchiveRestore, DatabaseBackup, Download, FileDown, Loader2, ShieldAlert, Upload } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { AdminPage, AdminPanel } from "@/features/admin";
-import { useAuth } from "@/context/AuthContext";
-import { checkBackupCompatibility, createBackupSnapshot, downloadBackup, downloadBackupSnapshot, fetchBackupSnapshots, fetchBackupStatus, fetchSnapshotCompatibility, restoreBackup, restoreBackupSnapshot, type Compatibility, type Snapshot } from "@/features/backup/api";
+import {useEffect,useRef,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {AlertTriangle,Check,ChevronDown,Download,Loader2,Pin,ShieldCheck,Upload,X} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Skeleton} from '@/components/ui/skeleton';
+import {toast} from '@/components/ui/sonner';
+import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel} from '@/components/ui/alert-dialog';
+import {AdminPageHeader,AdminDetailDrawer,AdminRowMenu,useAdminConfirmDialog,useUnsavedChanges} from '@/features/admin';
+import {useAuth} from '@/context/AuthContext';
+import {getApiErrorMessage} from '@/utils/apiError';
+import {backupKeys} from '../backup.keys';
+import * as api from '../api';
+import {backupAge,backupDate,backupSize,encryptBackup,readBackup} from '../backup.files';
+import RestoreReviewDialog from './RestoreReviewDialog';
+import './backup.css';
+type Source={id?:number;backup?:unknown;name:string;size:number;date?:string};
+const phaseNames:Record<string,string>={verifying:'Verifying compatibility',verifying_safety_snapshot:'Verifying safety snapshot',saving_safety_snapshot:'Saving safety snapshot',restoring:'Restoring library data',finishing:'Finishing and ending sessions',complete:'Restore complete',failed:'Restore failed'};
+export default function AdminBackup(){
+ const {logout}=useAuth(),client=useQueryClient(),fileInput=useRef<HTMLInputElement>(null);
+ const [busy,setBusy]=useState(''),[source,setSource]=useState<Source|null>(null),[review,setReview]=useState<api.Compatibility|null>(null),[reviewError,setReviewError]=useState(''),[noticeSent,setNoticeSent]=useState<{count:number;date:string}|null>(null),[restoreError,setRestoreError]=useState(''),[word,setWord]=useState(''),[password,setPassword]=useState(''),[file,setFile]=useState<File|null>(null),[filePassword,setFilePassword]=useState('');
+ const [scheduleOpen,setScheduleOpen]=useState(false),[scheduleEnabled,setScheduleEnabled]=useState(false),[frequency,setFrequency]=useState('daily'),[hour,setHour]=useState(2),[weekday,setWeekday]=useState(1);
+ const [saveOpen,setSaveOpen]=useState(false),[label,setLabel]=useState(''),[notes,setNotes]=useState(''),[rotationAck,setRotationAck]=useState(false),[download,setDownload]=useState<api.Snapshot|'current'|null>(null),[encrypted,setEncrypted]=useState(true),[backupPassword,setBackupPassword]=useState(''),[repeatPassword,setRepeatPassword]=useState('');
+ const [editing,setEditing]=useState<api.Snapshot|null>(null),[editLabel,setEditLabel]=useState(''),[editNotes,setEditNotes]=useState(''),[checks,setChecks]=useState<Record<number,api.Compatibility>>({}),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[sort,setSort]=useState('newest'),[recent,setRecent]=useState(0),[activity,setActivity]=useState<string[]>([]),[result,setResult]=useState<api.RestoreResult|null>(()=>{try{return JSON.parse(sessionStorage.getItem('backup-restore-result')||'null');}catch{return null;}});
+ const {confirm,confirmDialog}=useAdminConfirmDialog(),guard=useUnsavedChanges({label:editLabel,notes:editNotes},Boolean(editing),editing?.id);
+ const snapshotsQuery=useQuery({queryKey:backupKeys.snapshots(),queryFn:({signal})=>api.fetchBackupSnapshots(signal)}),statusQuery=useQuery({queryKey:backupKeys.status(),queryFn:({signal})=>api.fetchBackupStatus(signal),refetchInterval:busy==='restore'?1500:30000});
+ const snapshots=snapshotsQuery.data||[],status=statusQuery.data,restoring=busy==='restore'||status?.mode==='restoring',disabled=Boolean(busy)||restoring,latest=snapshots[0],unpinned=snapshots.filter(s=>!s.pinned),oldest=unpinned[unpinned.length-1],retention=status?.retention||30,rotate=unpinned.length>=retention,totalBytes=snapshots.reduce((sum,s)=>sum+s.sizeBytes,0),active=status?.activeSessions;
+ useEffect(()=>{if(!restoring)return;const unload=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';},click=(e:MouseEvent)=>{if((e.target as HTMLElement).closest('a[href]')){e.preventDefault();toast.error('Wait for the restore to finish before leaving this page.');}};window.addEventListener('beforeunload',unload);document.addEventListener('click',click,true);return()=>{window.removeEventListener('beforeunload',unload);document.removeEventListener('click',click,true);};},[restoring]);
+ const invalidate=()=>client.invalidateQueries({queryKey:backupKeys.snapshots()});
+ const feedback=(message:string)=>{toast.success(message);setActivity(items=>[message,...items].slice(0,5));};
+ const run=async(name:string,action:()=>Promise<void>)=>{setBusy(name);try{await action();}catch(error){toast.error(getApiErrorMessage(error,error instanceof Error?error.message:'Could not complete this action. Try again.'));}finally{setBusy('');}};
+ const create=()=>void run('save',async()=>{const saved=await api.createBackupSnapshot({label,notes});setRecent(saved.id);setSaveOpen(false);await invalidate();feedback(`Snapshot saved · ${backupSize(saved.sizeBytes)} · ${backupDate(saved.createdAt)}`);});
+ const inspect=async(next:Source)=>{setSource(next);setReview(null);setReviewError('');setNoticeSent(null);setRestoreError('');setWord('');setPassword('');setBusy('check');try{setReview(await api.previewRestore(next));}catch(error){setReviewError(getApiErrorMessage(error,'Could not check this backup. Retry before restoring.'));}finally{setBusy('');}};
+ const selectFile=async()=>{if(!file)return;await run('file',async()=>{const backup=await readBackup(file,status?.maxImportBytes||50*1024*1024,filePassword);setFile(null);setFilePassword('');await inspect({backup,name:file.name,size:file.size,date:(backup as {createdAt?:string}).createdAt});});};
+ const restore=()=>void run('restore',async()=>{if(!source||!review?.compatible||review.verification!=='verified'||word!=='RESTORE'||!password)return;let restored:api.RestoreResult;try{restored=source.id?await api.restoreBackupSnapshot(source.id,password,word):await api.restoreBackup(source.backup,password,word);}catch(error){setPassword('');const response=(error as {response?:{status?:number;data?:{liveDataChanged?:boolean;safetySnapshotId?:number}}}).response;setRestoreError(response?.status===403?'Password could not be verified. No data was replaced. Re-enter your password and try again.':response?.data?.liveDataChanged===false?'Restore failed. Live data was not replaced; attempted record changes were rolled back. '+getApiErrorMessage(error,'Refresh status before trying again.'):response?.data?.liveDataChanged===true?'The restore committed, but completion could not be confirmed. Sign in again and check the safety snapshot and Audit Logs.':'Could not confirm the restore outcome. Refresh maintenance status before retrying.');void statusQuery.refetch();throw error;}sessionStorage.setItem('backup-restore-result',JSON.stringify(restored));setResult(restored);setSource(null);setPassword('');setWord('');feedback('Restore completed. The safety snapshot is retained; all users must sign in again.');client.clear();await logout();});
+ const exportFile=()=>void run('download',async()=>{const response=download==='current'?await api.downloadBackup():await api.downloadBackupSnapshot(download!.id);const blob=encrypted?await encryptBackup(response.blob,backupPassword):response.blob;const name=response.contentDisposition?.match(/filename="?([^";]+)"?/)?.[1]||'euc-library-backup.json.gz';const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=encrypted?name.replace(/\.json\.gz$/i,'.encrypted.json'):name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setDownload(null);setBackupPassword('');setRepeatPassword('');feedback(`Backup file prepared · ${backupSize(blob.size)} · ${encrypted?'Password protected':'Unencrypted'} · download recorded in Audit Logs`);});
+ const verify=(s:api.Snapshot)=>void run(`verify-${s.id}`,async()=>{const check=await api.verifySnapshot(s.id);setChecks(previous=>({...previous,[s.id]:check}));await invalidate();feedback(`Snapshot #${s.id} verified${check.compatible?'':' · incompatible with the current system'}`);});
+ const pin=(s:api.Snapshot)=>void run(`pin-${s.id}`,async()=>{await api.updateSnapshot(s.id,{pinned:!s.pinned});await invalidate();feedback(`Snapshot ${s.pinned?'unpinned':'pinned'}`);});
+ const remove=async(s:api.Snapshot)=>{if(!await confirm({title:`Delete ${s.label||'snapshot #'+s.id}?`,description:'This removes the saved snapshot. Live library records are unchanged. This action cannot be undone.',actionLabel:'Delete snapshot',tone:'danger'}))return;await run('delete',async()=>{await api.deleteSnapshot(s.id);await invalidate();feedback('Snapshot deleted');});};
+ const openEdit=(s:api.Snapshot)=>{setEditing(s);setEditLabel(s.label||'');setEditNotes(s.notes||'');};
+ const rows=snapshots.filter(s=>(filter==='all'||filter==='pinned'&&s.pinned||filter===s.kind||filter===(s.verification||'unverified'))&&`${s.label||''} ${s.filename} ${s.createdBy||''} ${s.notes||''}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>sort==='oldest'?new Date(a.createdAt).getTime()-new Date(b.createdAt).getTime():sort==='size'?b.sizeBytes-a.sizeBytes:new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+ const closeReview=()=>{if(restoring)return;setSource(null);setReview(null);setPassword('');setWord('');};
+ return <div className="backup-workspace">{confirmDialog}{guard.discardDialog}<AdminPageHeader title="Backup & Restore" subtitle="Save snapshots and restore library data with a safety copy." updatedAt={snapshotsQuery.dataUpdatedAt} loading={snapshotsQuery.isFetching} onRefresh={()=>{void snapshotsQuery.refetch();void statusQuery.refetch();}} actions={<Button disabled={disabled||snapshotsQuery.isPending||snapshotsQuery.isError||statusQuery.isError||!status||status.mode!=='normal'} onClick={()=>{setLabel('');setNotes('');setRotationAck(false);setSaveOpen(true);}}>{busy==='save'?<Loader2 aria-hidden="true" className="animate-spin"/>:<ShieldCheck aria-hidden="true"/>}Save snapshot</Button>}/>
+ {statusQuery.isError&&<div className="backup-notice" role="alert">Maintenance status is unavailable. Refresh before creating or restoring a snapshot.<Button variant="outline" onClick={()=>void statusQuery.refetch()}>Retry status</Button></div>}
+ <section className="backup-card backup-health"><div className="backup-card-heading"><h2>Backup health</h2><span className="backup-status" data-warning={restoring} title="Normal allows library work. Restoring blocks library API access and backup changes until it finishes.">{restoring?<AlertTriangle aria-hidden="true"/>:<Check aria-hidden="true"/>}Maintenance: {statusQuery.isError?'Unavailable':!status?'Checking…':restoring?'Restoring':'Normal'}</span></div><p>{latest?<>Last snapshot: <strong>{backupAge(latest.createdAt)}</strong> · {latest.verification==='verified'?'Verified':latest.verification==='failed'?'Verification failed':'Not yet verified'}</>:'No snapshots yet. Save your first snapshot.'}</p><div className="backup-schedule-status"><span className="backup-status" data-warning={!status?.schedule?.enabled}>{status?.schedule?.enabled?<Check aria-hidden="true"/>:<AlertTriangle aria-hidden="true"/>}Scheduled backups: {status?.schedule?.enabled?'On':'Off'}</span>{status&&!status.schedule?.enabled&&<Button variant="ghost" disabled={disabled} onClick={()=>{setScheduleEnabled(true);setFrequency(status.schedule?.frequency||'daily');setHour(status.schedule?.hour??2);setWeekday(status.schedule?.weekday??1);setScheduleOpen(true);}}>Turn on</Button>}<Button variant="outline" disabled={disabled||!status} onClick={()=>{setScheduleEnabled(Boolean(status?.schedule?.enabled));setFrequency(status?.schedule?.frequency||'daily');setHour(status?.schedule?.hour??2);setWeekday(status?.schedule?.weekday??1);setScheduleOpen(true);}}>Schedule snapshots</Button></div>{latest&&Date.now()-new Date(latest.createdAt).getTime()>86400000&&<p className="backup-warning"><AlertTriangle aria-hidden="true"/>The latest snapshot is over 24 hours old.</p>}{status?.schedule?.lastError&&<p className="backup-warning" role="alert"><AlertTriangle aria-hidden="true"/>{status.schedule.lastError}</p>}<details><summary><ChevronDown aria-hidden="true"/>Health details</summary><p>{snapshots.length} snapshots saved ({unpinned.length} rotating, {snapshots.length-unpinned.length} pinned) · {retention} rotating slots · {backupSize(totalBytes)} stored.</p><p>{active?`${active.users} signed-in users · ${active.sessions} sessions (${active.staff} staff, ${active.patrons} patrons)`:'Session counts unavailable'}. Counts use valid, unrevoked refresh sessions; they do not prove users are online.</p><p>{status?.noticeRecipients??'—'} active accounts can receive notices. Pinned snapshots remain until unpinned. {status?.schedule?.enabled&&status.schedule.nextRun?`Next scheduled snapshot: ${backupDate(status.schedule.nextRun)} · UTC+08:00`:''}</p></details></section>
+ <section className="backup-card"><div className="backup-card-heading"><h2>Backup files</h2></div><div className="backup-file-actions"><Button variant="outline" disabled={disabled||!status||statusQuery.isError} onClick={()=>{setDownload('current');setEncrypted(true);setBackupPassword('');setRepeatPassword('');}}><Download aria-hidden="true"/>Download current data</Button><Button className="backup-danger" variant="outline" disabled={disabled||!status||statusQuery.isError} onClick={()=>fileInput.current?.click()}><Upload aria-hidden="true"/>Restore from file</Button><details><summary><ChevronDown aria-hidden="true"/>What happens when I restore?</summary><p>All library data is replaced and every user is signed out, including you. A verified safety snapshot is saved first. Audit history and permanent accession claims are retained. Maintenance blocks library APIs until the operation finishes.</p></details></div><input ref={fileInput} type="file" className="sr-only" tabIndex={-1} accept=".json,.gz,application/json,application/gzip" aria-label="Choose a backup file to restore" onChange={e=>{setFile(e.target.files?.[0]||null);setFilePassword('');e.target.value='';}}/></section>
+ {result&&<div className="backup-notice" role="status"><div><strong>Last restore completed</strong><p>Safety snapshot #{result.preRestoreSnapshot.id} · {result.preRestoreSnapshot.reversedEventCount??'Recorded'} post-snapshot changes reversed. <a href={`#snapshot-${result.preRestoreSnapshot.id}`}>Review the safety snapshot →</a></p><Link to={`/admin/audit-logs?category=backup&action=restored${result.preRestoreSnapshot.auditEventId?'&event='+result.preRestoreSnapshot.auditEventId:''}`}>View restore in Audit Logs →</Link></div><Button variant="outline" onClick={()=>{setResult(null);sessionStorage.removeItem('backup-restore-result');}}>Dismiss</Button></div>}
+ {restoring&&<section className="backup-notice" role="status" aria-live="polite"><Loader2 className="animate-spin" aria-hidden="true"/><div><strong>{phaseNames[status?.progress?.phase||'']||'Restore in progress'}</strong><p>Verifying → Saving safety snapshot → Restoring → Ending sessions. Keep this page open. Duration depends on the amount of data.</p></div></section>}
+ <section className="backup-card"><div className="backup-card-heading"><h2>Saved snapshots <span className="backup-muted">{snapshots.length}</span></h2><Link to="/admin/audit-logs?category=backup">View backup activity →</Link></div>{snapshots.length>0&&<div className="backup-filters"><Input type="search" aria-label="Search snapshots" placeholder="Search name, notes or creator…" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Filter snapshots" value={filter} onChange={e=>setFilter(e.target.value)}>{[['all','All snapshots'],['manual','Manual'],['scheduled','Scheduled'],['pre_restore','Pre-restore'],['pinned','Pinned'],['verified','Verified'],['unverified','Unverified'],['failed','Failed']].map(([value,name])=><option value={value} key={value}>{name} ({snapshots.filter(s=>value==='all'||value==='pinned'&&s.pinned||value===s.kind||value===(s.verification||'unverified')).length})</option>)}</select><label>Sort by<select aria-label="Sort snapshots" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="size">Largest first</option></select></label></div>}
+ {(filter!=='all'||query)&&<div className="backup-active-filters"><span>{rows.length} of {snapshots.length} snapshots</span><Button variant="outline" onClick={()=>{setFilter('all');setQuery('');}}>Clear filters<X aria-hidden="true"/></Button></div>}{unpinned.length>=retention-3&&<p className="backup-warning"><AlertTriangle aria-hidden="true"/>{rotate?`The next save will rotate out ${oldest?.label||'snapshot #'+oldest?.id}. Pin it to keep it.`:`${retention-unpinned.length} rotating slots left.`}</p>}
+ {snapshotsQuery.isError?<div role="alert" className="backup-notice">Could not load snapshots.<Button variant="outline" onClick={()=>void snapshotsQuery.refetch()}>Retry</Button></div>:snapshotsQuery.isPending?<div aria-label="Loading snapshots" role="status">{[1,2,3].map(n=><Skeleton className="h-24 mb-2" key={n}/>)}</div>:!rows.length?<div className="backup-empty"><p>{snapshots.length?'No snapshots match your filters.':'No snapshots yet. Save your first snapshot.'}</p><Button variant="outline" disabled={disabled} onClick={()=>snapshots.length?(setQuery(''),setFilter('all')):setSaveOpen(true)}>{snapshots.length?'Clear filters':'Save snapshot'}</Button></div>:<div className="backup-list">{rows.map(s=>{const check=checks[s.id],incompatible=check?.compatible===false,verified=s.verification==='verified'||check?.verification==='verified';return <article id={`snapshot-${s.id}`} key={s.id} className="backup-row" data-recent={s.id===recent||s.id===latest?.id}><div className="backup-row-main"><strong>{s.label||(s.kind==='pre_restore'?'Pre-restore snapshot':s.kind==='scheduled'?'Scheduled snapshot':'Manual snapshot')+' #'+s.id}</strong><div className="backup-badges"><span>{s.kind==='pre_restore'?'Pre-restore':s.kind==='scheduled'?'Scheduled':'Manual'}</span>{s.id===latest?.id&&<span>Latest</span>}{Boolean(s.pinned)&&<span data-kind="pinned"><Pin aria-hidden="true"/>Pinned</span>}<span data-kind={s.verification==='verified'?'verified':'unverified'}>{s.verification==='verified'?<ShieldCheck aria-hidden="true"/>:<AlertTriangle aria-hidden="true"/>}{s.verification==='verified'?'Verified':s.verification==='failed'?'Failed':'Unverified'}</span>{incompatible&&<span><AlertTriangle aria-hidden="true"/>Incompatible</span>}</div><p className="backup-muted"><time title={`${backupDate(s.createdAt)} · UTC+08:00`}>{backupDate(s.createdAt)} · {backupAge(s.createdAt)}</time> · {backupSize(s.sizeBytes)} · {s.createdBy||'Creator not recorded'}</p>{s.notes&&<p className="backup-muted">{s.notes}</p>}{incompatible&&<p className="backup-warning">{check.message}</p>}{s.restoreEventId&&<Link to={`/admin/audit-logs?category=backup&action=restored&event=${s.restoreEventId}`}>Created before restore{s.restoreOccurredAt?' on '+backupDate(s.restoreOccurredAt):''} · View event →</Link>}</div><div className="backup-row-actions"><Button variant="outline" disabled={disabled} aria-label={`Download snapshot ${s.label||backupDate(s.createdAt)}`} onClick={()=>{setDownload(s);setEncrypted(true);setBackupPassword('');setRepeatPassword('');}}><Download aria-hidden="true"/>Download</Button><>{!verified?<Button disabled={disabled} onClick={()=>verify(s)}><ShieldCheck aria-hidden="true"/>Verify now</Button>:<Button variant="outline" disabled={disabled||incompatible||!status||statusQuery.isError} title={incompatible?check.message:'Review impact and confirm before restoring'} aria-label={`Restore snapshot from ${backupDate(s.createdAt)}`} onClick={()=>void inspect({id:s.id,name:s.label||s.filename,size:s.sizeBytes,date:s.createdAt})}><AlertTriangle aria-hidden="true"/>Restore</Button>}</><AdminRowMenu label={`Actions for snapshot ${s.id}`} disabled={disabled} items={[{label:'Details / Rename',onSelect:()=>openEdit(s)},{label:s.pinned?'Unpin':'Pin / Keep',onSelect:()=>pin(s)},{label:'Verify checksum and compatibility',onSelect:()=>verify(s)},{label:'Copy snapshot ID',onSelect:()=>void navigator.clipboard.writeText(String(s.id)).then(()=>feedback('Snapshot ID copied')).catch(()=>toast.error('Could not copy snapshot ID'))},{label:'Delete snapshot',destructive:true,disabled:Boolean(s.pinned),onSelect:()=>void remove(s)}]}/></div></article>;})}</div>}</section>
+ {activity.length>0&&<section className="backup-card"><div className="backup-card-heading"><h2>This session</h2><Link to="/admin/audit-logs?category=backup">Audit Logs →</Link></div><ul className="backup-activity">{activity.map((text,i)=><li key={i}>{text}</li>)}</ul></section>}
+ <p className="backup-muted">Super admins can save, download, manage and restore snapshots. Storage: {status?.storage?.provider||'Provider unavailable'} · authenticated access. Region and encryption at rest have not been confirmed. Backup file passwords are processed only in your browser and cannot be recovered.</p>
+ <AdminDetailDrawer open={scheduleOpen} onClose={()=>!busy&&setScheduleOpen(false)} title="Schedule snapshots" description="Automatic snapshots run while the server is online. Times use UTC+08:00." footer={<><Button variant="outline" disabled={disabled} onClick={()=>setScheduleOpen(false)}>Cancel</Button><Button disabled={disabled} onClick={()=>void run('schedule',async()=>{await api.saveSchedule({enabled:scheduleEnabled,frequency,hour,weekday});await statusQuery.refetch();setScheduleOpen(false);feedback('Snapshot schedule saved');})}>Save schedule</Button></>}><div className="backup-fields"><label className="backup-check"><input type="checkbox" checked={scheduleEnabled} onChange={e=>setScheduleEnabled(e.target.checked)}/>Enable automatic snapshots</label><label>Frequency<select aria-label="Frequency" value={frequency} onChange={e=>setFrequency(e.target.value)}><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label><label>Hour (UTC+08:00)<Input type="number" min={0} max={23} value={hour} onChange={e=>setHour(Number(e.target.value))}/></label>{frequency==='weekly'&&<label>Day<select aria-label="Day" value={weekday} onChange={e=>setWeekday(Number(e.target.value))}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day,index)=><option value={index} key={day}>{day}</option>)}</select></label>}<p className="backup-muted">After downtime, one overdue run is attempted on restart. Failed runs show a warning and wait for the next scheduled time. Pre-restore safety snapshots are always automatic; scheduled restores are not enabled.</p></div></AdminDetailDrawer> <AdminDetailDrawer open={saveOpen} onClose={()=>!busy&&setSaveOpen(false)} title="Save snapshot" description="Create a cloud snapshot of the current library data." footer={<><Button variant="outline" disabled={Boolean(busy)} onClick={()=>setSaveOpen(false)}>Cancel</Button><Button disabled={disabled||rotate&&!rotationAck||!status||statusQuery.isError} onClick={create}>{busy==='save'?'Saving snapshot…':'Save snapshot'}</Button></>}><div className="backup-fields"><label>Snapshot name (optional)<Input value={label} maxLength={120} placeholder="e.g. Before term-end clearance" onChange={e=>setLabel(e.target.value)}/></label><label>Notes (optional)<textarea value={notes} maxLength={500} onChange={e=>setNotes(e.target.value)} placeholder="Why you are saving this snapshot"/></label>{rotate&&<div className="backup-notice"><p>The oldest unpinned snapshot, {oldest?.label||backupDate(oldest!.createdAt)}, will rotate out. Pin it first if you need it.</p><label><input type="checkbox" checked={rotationAck} onChange={e=>setRotationAck(e.target.checked)}/>I understand this snapshot will rotate out</label></div>}<p className="backup-muted">Saving does not replace live records. The new snapshot starts Unverified until its stored checksum is checked.</p></div></AdminDetailDrawer>
+ <AdminDetailDrawer open={Boolean(editing)} onClose={()=>void guard.confirmDiscard().then(ok=>ok&&setEditing(null))} title={`Snapshot #${editing?.id||''}`} description="Rename or add notes without changing the backup data." footer={<><span className="backup-muted">{guard.dirty?'Unsaved changes':'No unsaved changes'}</span><Button variant="outline" disabled={disabled} onClick={()=>void guard.confirmDiscard().then(ok=>ok&&setEditing(null))}>Cancel</Button><Button disabled={disabled||!guard.dirty} onClick={()=>void run('rename',async()=>{await api.updateSnapshot(editing!.id,{label:editLabel,notes:editNotes});setEditing(null);await invalidate();feedback('Snapshot details saved');})}>Save changes</Button></>}><div className="backup-fields"><label>Snapshot name<Input value={editLabel} maxLength={120} onChange={e=>setEditLabel(e.target.value)}/></label><label>Notes<textarea value={editNotes} maxLength={500} onChange={e=>setEditNotes(e.target.value)}/></label><dl><dt>Checksum (SHA-256)</dt><dd><code>{editing?.checksum||'Not recorded'}</code></dd><dt>System snapshot version</dt><dd>{editing?.version||'Not recorded'}</dd><dt>Last verified</dt><dd>{editing?.verifiedAt?backupDate(editing.verifiedAt)+' · UTC+08:00':'Never verified'}</dd><dt>File</dt><dd>{editing?.filename}</dd></dl><Link to={`/admin/audit-logs?category=backup&record=${encodeURIComponent('/api/admin/backup/snapshots/'+editing?.id)}`}>View changes to this snapshot →</Link></div></AdminDetailDrawer>
+ <AlertDialog open={Boolean(file)} onOpenChange={open=>!open&&!busy&&(setFile(null),setFilePassword(''))}><AlertDialogContent className="backup-dialog"><AlertDialogHeader><AlertDialogTitle>Review backup file</AlertDialogTitle><AlertDialogDescription>{file?.name} · {backupSize(file?.size||0)}. Checking the file does not change live data.</AlertDialogDescription></AlertDialogHeader><label className="backup-field">Backup file password (if encrypted)<Input type="password" autoComplete="off" value={filePassword} onChange={e=>setFilePassword(e.target.value)}/></label><AlertDialogFooter className="backup-dialog-footer"><AlertDialogCancel disabled={Boolean(busy)}>Cancel</AlertDialogCancel><Button disabled={Boolean(busy)} onClick={()=>void selectFile()}>{busy?'Checking…':'Check file'}</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
+ <AlertDialog open={Boolean(download)} onOpenChange={open=>!open&&!busy&&(setDownload(null),setBackupPassword(''),setRepeatPassword(''))}><AlertDialogContent className="backup-dialog"><AlertDialogHeader><AlertDialogTitle>Download backup file</AlertDialogTitle><AlertDialogDescription>This backup contains patron personal data and account information. Keep it private. Preparing the download is recorded in Audit Logs.</AlertDialogDescription></AlertDialogHeader><label className="backup-check"><input type="checkbox" checked={encrypted} onChange={e=>setEncrypted(e.target.checked)}/>Password protect this file (AES-256-GCM)</label>{encrypted?<div className="backup-fields"><label>Backup password<Input type="password" autoComplete="new-password" minLength={12} value={backupPassword} onChange={e=>setBackupPassword(e.target.value)}/></label><label>Confirm backup password<Input type="password" autoComplete="new-password" value={repeatPassword} onChange={e=>setRepeatPassword(e.target.value)}/></label><p className="backup-muted">Use at least 12 characters. Store the password separately; it cannot be recovered.</p></div>:<p className="backup-warning"><AlertTriangle aria-hidden="true"/>Anyone with this unencrypted file can read its contents.</p>}<AlertDialogFooter className="backup-dialog-footer"><AlertDialogCancel disabled={Boolean(busy)}>Cancel</AlertDialogCancel><Button disabled={disabled||encrypted&&(backupPassword.length<12||backupPassword!==repeatPassword)} onClick={exportFile}>{busy==='download'?'Preparing…':encrypted?'Download protected file':'Download unencrypted file'}</Button></AlertDialogFooter></AlertDialogContent></AlertDialog>
+ <RestoreReviewDialog source={source} review={review} reviewError={reviewError} restoreError={restoreError} status={statusQuery.isError?undefined:status} restoring={restoring} busy={disabled} word={word} password={password} noticeSent={noticeSent} onWord={setWord} onPassword={value=>{setPassword(value);setRestoreError('');}} onClose={closeReview} onRetry={()=>source&&void inspect(source)} onRestore={restore} onNotice={()=>void run('notice',async()=>{const sent=await api.sendRestoreNotice(status!.noticeRecipients!);setNoticeSent({count:sent.recipientCount,date:sent.sentAt||new Date().toISOString()});feedback(sent.message);})}/>
 
-const MAX_BACKUP_SIZE = 40 * 1024 * 1024;
-
-function filenameFromHeader(header?: string) {
-  return header?.match(/filename="?([^";]+)"?/)?.[1] ?? `euc-library-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+ </div>;
 }
-
-async function readBackupText(file: File, maxBytes: number) {
-  const source = file.name.toLowerCase().endsWith(".gz")
-    ? file.stream().pipeThrough(new DecompressionStream("gzip"))
-    : file.stream();
-  const reader = source.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new Error(`The expanded backup exceeds the server import limit of ${(maxBytes / 1024 / 1024).toFixed(0)} MB.`);
-    }
-    chunks.push(value);
-  }
-  const data = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.byteLength; }
-  return new TextDecoder().decode(data);
-}
-
-const AdminBackup = () => {
-  const { logout } = useAuth();
-  const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [exporting, setExporting] = useState(false);
-  const [restoring, setRestoring] = useState(false);
-  const snapshotsQuery = useQuery({ queryKey: backupKeys.snapshots(), queryFn: ({ signal }) => fetchBackupSnapshots(signal) });
-  const statusQuery = useQuery({ queryKey: backupKeys.status(), queryFn: ({ signal }) => fetchBackupStatus(signal), refetchInterval: 30_000 });
-  const snapshots: Snapshot[] = snapshotsQuery.data ?? [];
-  const loadingSnapshots = snapshotsQuery.isPending;
-  const snapshotMutation = useMutation({ mutationFn: createBackupSnapshot, onSuccess: () => queryClient.invalidateQueries({ queryKey: backupKeys.snapshots() }) });
-  const savingSnapshot = snapshotMutation.isPending;
-  const [snapshotToRestore, setSnapshotToRestore] = useState<Snapshot | null>(null);
-  const [snapshotCompatibility, setSnapshotCompatibility] = useState<Compatibility | null>(null);
-  const [checkingCompatibility, setCheckingCompatibility] = useState(false);
-  const maintenanceMode = statusQuery.data?.mode ?? "normal";
-  const maxImportBytes = statusQuery.data?.maxImportBytes ?? 50 * 1024 * 1024;
-  const [lastBackup, setLastBackup] = useState<{ name: string; size: number; createdAt: string } | null>(null);
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const response = await downloadBackup();
-      const name = filenameFromHeader(response.contentDisposition);
-      const url = URL.createObjectURL(response.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setLastBackup({ name, size: response.blob.size, createdAt: new Date().toLocaleString() });
-      toast.success("Database backup downloaded.");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not create the backup.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleCreateSnapshot = async () => {
-    try {
-      await snapshotMutation.mutateAsync();
-      toast.success("Snapshot saved securely.");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not save the snapshot.");
-    }
-  };
-
-  const handleDownloadSnapshot = async (snapshot: Snapshot) => {
-    try {
-      const response = await downloadBackupSnapshot(snapshot.id);
-      const url = URL.createObjectURL(response.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filenameFromHeader(response.contentDisposition);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not download the snapshot.");
-    }
-  };
-
-  const handleRestoreSnapshot = async () => {
-    if (!snapshotToRestore || !snapshotCompatibility?.compatible) return;
-    setRestoring(true);
-    try {
-      await restoreBackupSnapshot(snapshotToRestore.id);
-      queryClient.clear();
-      toast.success("Snapshot restored. All sessions, including yours, are ending now.");
-      setSnapshotToRestore(null);
-      await logout();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not restore the snapshot.");
-    } finally {
-      setRestoring(false);
-    }
-  };
-
-  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (file.size > Math.min(MAX_BACKUP_SIZE, maxImportBytes)) {
-      toast.error("The compressed backup file must be 40 MB or smaller.");
-      return;
-    }
-    try {
-      const contents = await readBackupText(file, maxImportBytes);
-      const backup = JSON.parse(contents);
-      const compatibility = await checkBackupCompatibility(backup);
-      if (!compatibility.compatible) { toast.error(compatibility.message); return; }
-      if (!window.confirm("Emergency restore: this will replace all current library data. Every user, including you, will be signed out immediately after a successful restore. The current state will be saved first as a recovery point. Continue?")) return;
-      setRestoring(true);
-      await restoreBackup(backup);
-      queryClient.clear();
-      toast.success("Database restored. All sessions, including yours, are ending now.");
-      await logout();
-    } catch (error: any) {
-      const message = error instanceof SyntaxError
-        ? "The selected file is not valid JSON."
-        : error.response?.data?.message || "Could not restore the backup.";
-      toast.error(message);
-    } finally {
-      setRestoring(false);
-    }
-  };
-
-  const inspectSnapshot = async (snapshot: Snapshot) => {
-    setCheckingCompatibility(true);
-    setSnapshotCompatibility(null);
-    try {
-      const data = await queryClient.fetchQuery({ queryKey: backupKeys.compatibility(snapshot.id), queryFn: ({ signal }) => fetchSnapshotCompatibility(snapshot.id, signal) });
-      setSnapshotToRestore(snapshot);
-      setSnapshotCompatibility(data);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not verify snapshot compatibility.");
-    } finally { setCheckingCompatibility(false); }
-  };
-
-  return (
-    <AdminPage
-      eyebrow="System"
-      title="Backup & Restore"
-      description="Save secure recovery points, download a portable copy, or restore the complete library database to a previous point in time."
-      contentWidth="wide"
-    >
-      <AdminPanel
-        title="Create a recovery point"
-        description="Saved snapshots are retained in secure cloud storage. The latest 30 are kept automatically."
-      >
-        <div className="admin-backup-actions mb-4 flex flex-wrap gap-2">
-            <Button type="button" onClick={handleCreateSnapshot} disabled={exporting || savingSnapshot || restoring}>
-              {savingSnapshot ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
-              {savingSnapshot ? "Saving snapshot..." : "Save Snapshot"}
-            </Button>
-            <Button type="button" variant="outline" onClick={handleExport} disabled={exporting || savingSnapshot || restoring}>
-              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseBackup className="mr-2 h-4 w-4" />}
-              {exporting ? "Creating download..." : "Download Backup"}
-            </Button>
-            <Button type="button" variant="outline" disabled={exporting || savingSnapshot || restoring} asChild>
-              <label htmlFor="restore-input" className="cursor-pointer">
-                {restoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                {restoring ? "Restoring..." : "Restore"}
-                <input ref={inputRef} id="restore-input" type="file" className="hidden" accept="application/json,application/gzip,.json,.gz" onChange={handleRestore} />
-              </label>
-            </Button>
-        </div>
-        <Label htmlFor="restore-input" className="sr-only">Restore from backup file</Label>
-        <p className="text-sm leading-6 text-muted-foreground">
-          Snapshot data uses the current metadata catalog model. Compatibility is verified before restoration; restoring never changes database structure and signs out every user.
-        </p>
-        <p className={`mt-3 text-xs font-medium ${maintenanceMode === "restoring" ? "text-warning" : "text-muted-foreground"}`}>
-          Maintenance status: {maintenanceMode === "restoring" ? "restore in progress" : "normal"}.
-        </p>
-      </AdminPanel>
-
-      <AdminPanel
-        title="Saved snapshots"
-        description="Choose a point in time to download or restore. Restoring first saves the current state as a recovery point, then signs out all users; incompatible snapshots remain available to download."
-      >
-        {snapshotsQuery.isError ? <p role="alert" className="mb-3 text-sm text-destructive">Could not load saved snapshots. <Button type="button" variant="outline" size="sm" onClick={() => void snapshotsQuery.refetch()}>Try again</Button></p> : null}
-        {loadingSnapshots ? (
-          <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading saved snapshots...</div>
-        ) : snapshots.length ? (
-          <div className="divide-y divide-border/70 border-y border-border/70">
-            {snapshots.map((snapshot) => (
-              <div key={snapshot.id} className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{new Date(snapshot.createdAt).toLocaleString()}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    {(snapshot.sizeBytes / 1024).toFixed(1)} KB · {snapshot.kind === "pre_restore" ? "Automatic pre-restore point" : "Manual snapshot"}
-                    {snapshot.createdBy ? ` · Saved by ${snapshot.createdBy}` : ""}
-                  </p>
-                </div>
-                <div className="admin-backup-actions flex shrink-0 flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadSnapshot(snapshot)} disabled={restoring}>
-                    <FileDown className="mr-2 h-3.5 w-3.5" /> Download
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void inspectSnapshot(snapshot)} disabled={restoring || checkingCompatibility}>
-                    <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> Restore
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm leading-6 text-muted-foreground">No saved snapshots yet. Save one before any major catalog or account changes.</p>
-        )}
-      </AdminPanel>
-
-      <AdminPanel
-        title="Latest export"
-        description="The browser saves each backup directly to your downloads folder."
-      >
-        {lastBackup ? (
-          <div className="flex flex-col gap-3 rounded-md border border-border/70 bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{lastBackup.name}</p>
-              <p className="text-xs leading-5 text-muted-foreground">
-                {(lastBackup.size / 1024).toFixed(1)} KB • {lastBackup.createdAt}
-              </p>
-            </div>
-            <Download className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No backup has been exported in this session.</p>
-        )}
-      </AdminPanel>
-
-      <AlertDialog open={Boolean(snapshotToRestore)} onOpenChange={(open) => !open && !restoring && setSnapshotToRestore(null)}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive"><ShieldAlert className="h-5 w-5" /></div>
-            <AlertDialogTitle>Restore this snapshot?</AlertDialogTitle>
-            <AlertDialogDescription className="leading-6">
-              {snapshotCompatibility?.compatible ? "Compatible: " : "Incompatible: "}{snapshotCompatibility?.message ?? "Checking compatibility…"} This will replace all current library records with the state from {snapshotToRestore ? new Date(snapshotToRestore.createdAt).toLocaleString() : "this snapshot"}. The current state will be saved automatically first, then every user—including you—will sign in again.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={restoring}>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={restoring || !snapshotCompatibility?.compatible} onClick={(event) => { event.preventDefault(); void handleRestoreSnapshot(); }}>
-              {restoring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Restore snapshot
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </AdminPage>
-  );
-};
-
-export default AdminBackup;

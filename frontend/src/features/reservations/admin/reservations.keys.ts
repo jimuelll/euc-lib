@@ -11,6 +11,7 @@ export function normalizeReservationFilters(
   const dateTo = filters.dateTo?.trim();
 
   return {
+    ...(filters.recordId?{recordId:filters.recordId}:{}),
     page: Math.max(1, Math.floor(Number(filters.page) || 1)),
     limit: Math.max(1, Math.floor(Number(filters.limit) || PAGE_SIZE)),
     ...(status && status !== "all" ? { status } : {}),

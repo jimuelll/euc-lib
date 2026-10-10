@@ -92,7 +92,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const departments: Department[] = departmentsQuery.data ?? [];
   const terms: AcademicTerm[] = termsQuery.data ?? [];
   const programs: AcademicProgram[] = programsQuery.data ?? [];
-  const filters = { query: debouncedSearch, role: roleFilter, status: statusFilter, archived: showArchived, page: currentPage, access: accessFilter, sort };
+  const filters = { programId: params.get("programId") || undefined, departmentId: params.get("departmentId") || undefined, termId: params.get("termId") || undefined, query: debouncedSearch, role: roleFilter, status: statusFilter, archived: showArchived, page: currentPage, access: accessFilter, sort };
   const usersQuery = useQuery({ queryKey: manageKeys.userSearch(filters), queryFn: ({ signal }) => searchUsers(filters, signal), enabled: Boolean(user), placeholderData: (previousData) => previousData });
   const searchResults: User[] = usersQuery.data?.rows ?? [];
   const userPagination = usersQuery.data?.pagination ?? { page: currentPage, limit: 25, total: 0, totalPages: 1 };

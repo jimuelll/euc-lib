@@ -1,0 +1,102 @@
+[
+  {
+    "theme": "light",
+    "device": "desktop",
+    "focus": {
+      "start": 14,
+      "end": 14,
+      "length": 14
+    },
+    "metrics": {
+      "navBg": "rgb(246, 247, 248)",
+      "navBottom": 189,
+      "previewTop": 258,
+      "current": "Preview",
+      "drawerOverflow": false,
+      "bodyOverflow": false,
+      "pageOverflow": false,
+      "rows": [
+        72,
+        72,
+        72,
+        72
+      ]
+    },
+    "errors": []
+  },
+  {
+    "theme": "light",
+    "device": "mobile",
+    "focus": {
+      "start": 14,
+      "end": 14,
+      "length": 14
+    },
+    "metrics": {
+      "navBg": "rgb(246, 247, 248)",
+      "navBottom": 189,
+      "previewTop": 201,
+      "current": "Preview",
+      "drawerOverflow": false,
+      "bodyOverflow": false,
+      "pageOverflow": false,
+      "rows": [
+        509,
+        509,
+        509,
+        509
+      ]
+    },
+    "errors": []
+  },
+  {
+    "theme": "dark",
+    "device": "desktop",
+    "focus": {
+      "start": 14,
+      "end": 14,
+      "length": 14
+    },
+    "metrics": {
+      "navBg": "rgb(20, 22, 26)",
+      "navBottom": 189,
+      "previewTop": 258,
+      "current": "Preview",
+      "drawerOverflow": false,
+      "bodyOverflow": false,
+      "pageOverflow": false,
+      "rows": [
+        72,
+        72,
+        72,
+        72
+      ]
+    },
+    "errors": []
+  },
+  {
+    "theme": "dark",
+    "device": "mobile",
+    "focus": {
+      "start": 14,
+      "end": 14,
+      "length": 14
+    },
+    "metrics": {
+      "navBg": "rgb(20, 22, 26)",
+      "navBottom": 189,
+      "previewTop": 201,
+      "current": "Preview",
+      "drawerOverflow": false,
+      "bodyOverflow": false,
+      "pageOverflow": false,
+      "rows": [
+        509,
+        509,
+        509,
+        509
+      ]
+    },
+    "errors": []
+  }
+]

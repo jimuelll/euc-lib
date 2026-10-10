@@ -1,370 +1,57 @@
-import { useState, type ChangeEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Activity, RefreshCcw, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Label } from "@/components/ui/label";
-import { AdminPage, AdminPanel } from "@/features/admin";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { fetchAuditLogs, fetchAuditMeta } from "@/features/analytics/api/adminAnalytics.api";
-import { analyticsKeys } from "../../analytics.keys";
-
-const emptyFilters = {
-  query: "",
-  category: "all",
-  action: "",
-  dateFrom: "",
-  dateTo: "",
-};
-
-const categoryOptions = [
-  { value: "all", label: "All categories" },
-  { value: "auth", label: "Auth" },
-  { value: "users", label: "Users" },
-  { value: "catalog", label: "Catalog & policies" },
-  { value: "academic_settings", label: "Academic settings" },
-  { value: "attendance", label: "Attendance" },
-  { value: "borrowing", label: "Borrowing" },
-  { value: "reservation", label: "Reservation" },
-  { value: "bulletin", label: "Bulletin" },
-  { value: "events", label: "Events" },
-  { value: "content", label: "Content" },
-  { value: "subscriptions", label: "Subscriptions" },
-  { value: "notifications", label: "Notifications" },
-  { value: "backup", label: "Backup" },
-  { value: "clearance", label: "Clearance & payments" },
-  { value: "system", label: "System" },
-];
-
-const categoryTone: Record<string, string> = {
-  auth: "border-primary/20 bg-primary/5 text-action",
-  users: "border-warning/20 bg-warning/10 text-warning",
-  attendance: "border-success/20 bg-success/10 text-success",
-  borrowing: "border-sky-500/20 bg-sky-500/10 text-sky-600",
-  reservation: "border-amber-500/20 bg-amber-500/10 text-amber-700",
-  bulletin: "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-700",
-  subscriptions: "border-emerald-500/20 bg-emerald-500/10 text-emerald-700",
- notifications: "border-rose-500/20 bg-rose-500/10 text-rose-700",
-  backup: "border-slate-500/20 bg-slate-500/10 text-slate-700",
-  clearance: "border-lime-500/20 bg-lime-500/10 text-lime-700",
-  system: "border-border bg-muted/30 text-foreground",
-  catalog: "border-violet-500/20 bg-violet-500/10 text-violet-700",
-  academic_settings: "border-orange-500/20 bg-orange-500/10 text-orange-700",
-  events: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700",
-  content: "border-indigo-500/20 bg-indigo-500/10 text-indigo-700",
-};
-
-const formatDateTime = (value: string) =>
-  new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-
-const formatRole = (role: string | null) => (role ? role.replace(/_/g, " ") : "System");
-type AuditChange = { field: string; value?: string; before?: string; after?: string; current_name?: boolean };
-const formatAuditChange = (change: AuditChange) => `${change.field}${change.current_name ? " (current name)" : ""}: ${change.before !== undefined ? `${change.before} → ${change.after}` : change.value ?? "Changed"}`;
-const auditChanges = (metadata: unknown, displayChanges?: AuditChange[]): AuditChange[] => {
-  if (!metadata) return [];
-  try {
-    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-
-    const { changes, ...fields } = parsed as {
-      changes?: unknown;
-      [key: string]: unknown;
-    };
-    const directFields = Object.entries(fields)
-      .filter(([field, value]) => !["target_id", "detail_status", "affected_record_count", "affected_record_type"].includes(field) && ["string", "number", "boolean"].includes(typeof value))
-      .map(([field, value]) => ({
-        field: field.replace(/_/g, " "),
-        value: String(value),
-      }));
-    const resolvedChanges = Array.isArray(displayChanges) ? displayChanges : changes;
-    const changedFields = Array.isArray(resolvedChanges)
-      ? resolvedChanges
-                        .filter((change): change is AuditChange =>
-          !!change
-          && typeof change === "object"
-          && typeof change.field === "string"
-          && (
-            typeof change.value === "string"
-            || (typeof change.before === "string" && typeof change.after === "string")
-          )
-        )
-      : [];
-
-    return [...directFields, ...changedFields];
-  } catch { return []; }
-};
-
-const auditDetailStatus = (metadata: unknown) => {
-  if (!metadata) return "";
-  try {
-    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.detail_status === "string" ? parsed.detail_status : "";
-  } catch { return ""; }
-};
-
-const auditAffectedSummary = (metadata: unknown) => {
-  if (!metadata) return null;
-  try {
-    const parsed = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const count = Number(parsed.affected_record_count);
-    const kind = typeof parsed.affected_record_type === "string" ? parsed.affected_record_type : "records";
-    return Number.isFinite(count) ? `Affected ${count} ${kind}` : `Affected ${kind}`;
-  } catch { return null; }
-};
-
-const AdminAuditLogs = () => {
-  const [filters, setFilters] = useState(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
-  const [page, setPage] = useState(1);
-  const auditQuery = useQuery({
-    queryKey: analyticsKeys.auditPage({ page, ...appliedFilters }),
-    queryFn: ({ signal }) => fetchAuditLogs({
-      page,
-      limit: 10,
-      category: appliedFilters.category,
-      action: appliedFilters.action || undefined,
-      query: appliedFilters.query || undefined,
-      dateFrom: appliedFilters.dateFrom || undefined,
-      dateTo: appliedFilters.dateTo || undefined,
-    }, signal),
-    placeholderData: (previousData) => previousData,
-  });
-  const metaQuery = useQuery({ queryKey: analyticsKeys.auditMeta(), queryFn: ({ signal }) => fetchAuditMeta(signal), staleTime: 5 * 60_000 });
-  const rows = auditQuery.data?.rows ?? [];
-  const pagination = auditQuery.data?.pagination ?? { page: 1, limit: 10, total: 0, totalPages: 1 };
-  const loading = auditQuery.isPending;
-  const refreshing = auditQuery.isFetching && !auditQuery.isPending;
-  const error = auditQuery.isError ? (auditQuery.error as any)?.response?.data?.message || "Failed to load audit log" : "";
-  const actionOptions = metaQuery.data?.actions ?? [];
-  const actionsByCategory = metaQuery.data?.actionsByCategory ?? {};
-
-  const handleFilterChange = (key: keyof typeof emptyFilters) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFilters((current) => ({ ...current, [key]: event.target.value }));
-  };
-
-  const handleCategoryChange = (value: string) => {
-    setFilters((current) => ({
-      ...current,
-      category: value,
-      action: "",
-    }));
-  };
-
-  const visibleActionOptions =
-    filters.category && filters.category !== "all"
-      ? (actionsByCategory[filters.category] ?? [])
-      : actionOptions;
-
-  const applyFilters = () => {
-    setPage(1);
-    setAppliedFilters({ ...filters });
-  };
-
-  const resetFilters = () => {
-    setFilters(emptyFilters);
-    setPage(1);
-    setAppliedFilters(emptyFilters);
-  };
-
-  const goToPage = (nextPage: number) => {
-    setPage(nextPage);
-  };
-
-  return (
-    <AdminPage
-      eyebrow="Reports"
-      title="Audit Log"
-      description="A durable, actor-aware record of every successful change made through the system."
-      actions={
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-md"
-          onClick={() => void auditQuery.refetch()}
-          disabled={loading || refreshing}
-        >
-          <RefreshCcw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh Audit Feed
-        </Button>
-      }
-    >
-      <AdminPanel title="Filters" description="Search actors, actions, descriptions, and record details, or narrow the feed by category and date.">
-        <form className="space-y-4" onSubmit={(event) => {
-          event.preventDefault();
-          applyFilters();
-        }}>
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_auto]">
-            <div className="space-y-2">
-              <Label htmlFor="audit-search" className="text-xs font-semibold text-muted-foreground">
-                Search audit logs
-              </Label>
-              <div className="relative">
-                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="audit-search" type="search" autoComplete="off" className="rounded-md pl-9" value={filters.query} onChange={handleFilterChange("query")} placeholder="Actor, action, description…" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audit-category" className="text-xs font-semibold  text-muted-foreground">
-                Category
-              </Label>
-              <Select value={filters.category} onValueChange={handleCategoryChange}>
-                <SelectTrigger id="audit-category" className="rounded-md">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
-                  {categoryOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audit-action" className="text-xs font-semibold  text-muted-foreground">
-                Action
-              </Label>
-              <Select value={filters.action || "all"} onValueChange={(value) => setFilters((current) => ({ ...current, action: value === "all" ? "" : value }))}>
-                <SelectTrigger id="audit-action" className="rounded-md">
-                  <SelectValue placeholder="All actions" />
-                </SelectTrigger>
-                <SelectContent onWheelCapture={(event) => event.stopPropagation()}>
-                  <SelectItem value="all">All actions</SelectItem>
-                  {visibleActionOptions.map((action) => (
-                    <SelectItem key={action} value={action}>
-                      {action.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audit-start-date" className="text-xs font-semibold  text-muted-foreground">
-                Start date
-              </Label>
-              <Input id="audit-start-date" type="date" className="rounded-md" value={filters.dateFrom} onChange={handleFilterChange("dateFrom")} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="audit-end-date" className="text-xs font-semibold  text-muted-foreground">
-                End date
-              </Label>
-              <Input id="audit-end-date" type="date" className="rounded-md" value={filters.dateTo} onChange={handleFilterChange("dateTo")} />
-            </div>
-
-            <div className="flex items-end gap-2">
-              <Button type="submit" className="rounded-md" variant="outline">
-                Apply
-              </Button>
-              <Button type="button" variant="ghost" className="rounded-md" onClick={resetFilters}>
-                Reset
-              </Button>
-            </div>
-          </div>
-        </form>
-      </AdminPanel>
-
-      <AdminPanel
-        title="Audit Feed"
-        description="Each item records the completed action, its category, time, and responsible account when one is available."
-      >
-        {loading ? <div className="space-y-3" aria-label="Loading audit records">{[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-20 w-full rounded-md" />)}</div> : null}
-        {error ? (
-          <div className="border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
-        {!error && !loading && rows.length === 0 ? (
-          <div className="border border-dashed border-border/80 px-4 py-8 text-sm text-muted-foreground">
-            No audit items are available for the selected filters.
-          </div>
-        ) : null}
-
-        {!error && rows.length > 0 ? (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-              <p>
-                Showing page {pagination.page} of {pagination.totalPages} with {pagination.total} audit item(s).
-              </p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1">
-                {filters.query.trim() && <p className="max-w-full truncate">Search: {filters.query.trim()}</p>}
-                <p>Date filter: {filters.dateFrom || filters.dateTo ? `${filters.dateFrom || "Any"} to ${filters.dateTo || "Any"}` : "All dates"}</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {rows.map((item, index) => (
-                <div
-                  key={`${item.occurred_at}-${item.category}-${item.action}-${index}`}
-                  className="border border-border/80 bg-background px-4 py-4"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center border px-2.5 py-1 text-xs font-bold  ${
-                            categoryTone[item.category] ?? "border-border bg-muted/30 text-foreground"
-                          }`}
-                          style={{ fontFamily: "var(--font-heading)" }}
-                        >
-                          <Activity className="mr-1.5 h-3 w-3" />
-                          {item.category}
-                        </span>
-                        <span className="text-xs  text-muted-foreground">
-                          {item.action.replace(/_/g, " ")}
-                        </span>
-                      </div>
-
-                      <p className="text-sm font-medium leading-6 text-foreground">{item.copy_display_description ?? item.description}</p>
-                      {auditChanges(item.metadata, item.display_changes).length ? <details className="max-w-full border border-border/70 bg-muted/15 px-3 py-2 text-xs"><summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 font-medium text-foreground"><span className="min-w-0 break-words whitespace-normal">{auditChanges(item.metadata, item.display_changes).map(formatAuditChange).join(" · ")}</span><span className="shrink-0 text-muted-foreground">View details</span></summary><dl className="mt-2 grid gap-x-5 gap-y-2 text-muted-foreground sm:grid-cols-2">{auditChanges(item.metadata, item.display_changes).map((change) => <div key={change.field} className="min-w-0"><dt className="font-medium text-foreground">{change.field}{change.current_name ? " (current name)" : ""}</dt><dd className="break-words whitespace-normal">{change.before !== undefined ? `${change.before} → ${change.after}` : change.value}</dd></div>)}</dl></details> : auditDetailStatus(item.metadata) === "no_field_changes" ? <p className="text-xs font-medium text-muted-foreground">No field changes</p> : auditDetailStatus(item.metadata) === "details_unavailable" ? <p className="text-xs font-medium text-muted-foreground">Details unavailable</p> : auditDetailStatus(item.metadata) === "affected_record_summary" ? <p className="text-xs font-medium text-muted-foreground">{auditAffectedSummary(item.metadata)}</p> : null}
-                      {item.restore_status === "reversed" ? <p className="inline-flex w-fit border border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive">Reversed by snapshot restore{item.reversed_at ? ` · ${formatDateTime(item.reversed_at)}` : ""}</p> : null}
-                      <p className="text-xs text-muted-foreground">
-                        {item.actor_name ? `Actor: ${item.actor_name} (${formatRole(item.actor_role)})` : "Actor: System or unauthenticated action"}
-                      </p>
-                    </div>
-
-                    <p className="shrink-0 text-xs text-muted-foreground">{formatDateTime(item.occurred_at)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-md"
-                disabled={refreshing || pagination.page <= 1}
-                onClick={() => goToPage(pagination.page - 1)}
-              >
-                Previous
-              </Button>
-
-              <p className="text-sm text-muted-foreground">
-                Page {pagination.page} of {pagination.totalPages}
-              </p>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-md"
-                disabled={refreshing || pagination.page >= pagination.totalPages}
-                onClick={() => goToPage(pagination.page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </AdminPanel>
-    </AdminPage>
-  );
-};
-
-export default AdminAuditLogs;
+import {useEffect,useState,useRef} from 'react';
+import {useSearchParams} from 'react-router-dom';
+import {useQuery} from '@tanstack/react-query';
+import {Download,Shield,AlertTriangle,X,Check,SlidersHorizontal,Settings2} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Skeleton} from '@/components/ui/skeleton';
+import {toast} from '@/components/ui/sonner';
+import {AdminPageHeader,AdminDateRange,AdminDetailDrawer,useAdminConfirmDialog} from '@/features/admin';
+import {fetchAuditLogs,fetchAuditMeta,exportAuditLogs} from '../../api/adminAnalytics.api';
+import {analyticsKeys} from '../../analytics.keys';
+import AuditEvent from '../AuditEvent';
+import {actionLabel,categoryLabel,dayKey,dayTitle,eventCount,hasAuditDetails} from '../audit-log';
+import {getApiErrorMessage} from '@/utils/apiError';
+import './audit-logs.css';
+const filterKeys=['query','category','action','dateFrom','dateTo','actor','record','important','security','event','quick'] as const;
+const names:Record<string,string>={quick:'Quick filter',event:'Event ID',query:'Search',category:'Category',action:'Action',dateFrom:'From',dateTo:'To',actor:'Actor',record:'Record',important:'High impact',security:'Security'};
+export default function AdminAuditLogs(){
+ const [params,setParams]=useSearchParams(),[search,setSearch]=useState(params.get('query')||''),[filterSheet,setFilterSheet]=useState(false),[view,setView]=useState(false),[density,setDensity]=useState('compact'),[expanded,setExpanded]=useState<Set<number>>(new Set()),[exporting,setExporting]=useState(false),[message,setMessage]=useState(''),[dismissed,setDismissed]=useState('');
+ const [columns,setColumns]=useState<string[]>(['actor','category','time','record']);
+ const [savedViews,setSavedViews]=useState<Array<{name:string;query:string}>>(()=>{try{const saved=JSON.parse(localStorage.getItem('audit-saved-views')||'[]');return Array.isArray(saved)?saved.filter(view=>view&&typeof view.name==='string'&&typeof view.query==='string').slice(-20):[];}catch{return [];}}),[viewName,setViewName]=useState('');
+ const expandedSeen=useRef(new Set<number>());
+ const {confirm,confirmDialog}=useAdminConfirmDialog();
+ const patch=(values:Record<string,string|null>,reset=true)=>setParams(current=>{const next=new URLSearchParams(current);for(const [key,value] of Object.entries(values)){if(value&&value!=='all')next.set(key,value);else next.delete(key);}if(reset)next.delete('page');return next;},{replace:true});
+ const query=params.get('query')||'';useEffect(()=>setSearch(query),[query]);useEffect(()=>{if(search===query)return;const timer=setTimeout(()=>patch({query:search.trim().slice(0,120)}),350);return()=>clearTimeout(timer);},[search,query]);
+ const filters=Object.fromEntries(filterKeys.map(key=>[key,params.get(key)||''])) as Record<typeof filterKeys[number],string>,page=Math.max(1,Number(params.get('page'))||1),limit=[10,20,50].includes(Number(params.get('limit')))?Number(params.get('limit')):20;
+ const data=useQuery({queryKey:analyticsKeys.auditPage({page,limit,...filters}),queryFn:({signal})=>fetchAuditLogs({page,limit,...filters},signal),placeholderData:previous=>previous});
+ const meta=useQuery({queryKey:analyticsKeys.auditMeta(),queryFn:({signal})=>fetchAuditMeta(signal),staleTime:300000});
+ const probe=useQuery({queryKey:['audit-new-events',filters],queryFn:({signal})=>fetchAuditLogs({page:1,limit:1,...filters},signal),refetchInterval:30000});
+ const rows=data.data?.rows||[],pagination=data.data?.pagination||{page,limit,total:0,totalPages:1},active=filterKeys.filter(key=>Boolean(filters[key])&&filters[key]!=='all');
+ const expandable=rows.filter(hasAuditDetails);
+ useEffect(()=>{const fresh=rows.filter(row=>!expandedSeen.current.has(row.id));fresh.forEach(row=>expandedSeen.current.add(row.id));if(fresh.some(row=>row.significant))setExpanded(current=>new Set([...current,...fresh.filter(row=>row.significant&&hasAuditDetails(row)).map(row=>row.id)]));},[data.dataUpdatedAt]);
+ const invalidDates=Boolean(filters.dateFrom&&filters.dateTo&&filters.dateTo<filters.dateFrom),newCount=data.isPlaceholderData?0:Math.max(0,(probe.data?.pagination.total||0)-pagination.total),newKey=JSON.stringify([filters,probe.data?.latestId]),seen=useRef(0);
+ useEffect(()=>{if(data.dataUpdatedAt&&data.dataUpdatedAt!==seen.current){seen.current=data.dataUpdatedAt;setMessage(`${eventCount(data.data?.pagination.total||0)} loaded.`);}},[data.dataUpdatedAt]);
+ const refresh=async()=>{await data.refetch();await probe.refetch();void meta.refetch();};
+ const clear=()=>{setSearch('');patch(Object.fromEntries(filterKeys.map(key=>[key,null])));};
+ const actions=filters.category?(meta.data?.actionsByCategory[filters.category]||[]):meta.data?.actions||[],categories=meta.data?.categories.filter(c=>c!=='all')||[];
+ const toggle=(id:number)=>setExpanded(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next;});
+ const download=async()=>{if(!await confirm({title:`Export ${eventCount(pagination.total)}?`,description:`${eventCount(pagination.total)}, current filters, across every page. Redacted values stay redacted and the export is logged. The maximum is 10,000 events.`,actionLabel:'Export CSV'}))return;setExporting(true);try{const blob=await exportAuditLogs(filters),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='audit-logs.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast.success('Filtered audit export prepared and recorded');void probe.refetch();}catch(error){toast.error(getApiErrorMessage(error,'Could not export audit events. Narrow the filters or try again.'));}finally{setExporting(false);}};
+ const range=pagination.total?`${(pagination.page-1)*limit+1}–${Math.min(pagination.page*limit,pagination.total)} of ${pagination.total}`:'0';
+ const filterControls=<><label>Category<select aria-label="Category" value={filters.category||'all'} onChange={e=>patch({category:e.target.value,action:null})}><option value="all">All categories</option>{categories.map(category=><option key={category} value={category}>{categoryLabel(category)}</option>)}</select></label><label>Action<select aria-label="Action" value={filters.action||'all'} onChange={e=>patch({action:e.target.value})}><option value="all">All actions</option>{actions.map(action=><option key={action} value={action}>{actionLabel(action)}</option>)}</select></label><label>Date range<AdminDateRange from={filters.dateFrom} to={filters.dateTo} presetMode="audit" labelOverride={!filters.dateFrom?'All dates':undefined} onChange={(from,to)=>patch({dateFrom:from,dateTo:to})}/></label><div className="audit-quick-filters"><Button variant="outline" aria-pressed={filters.important==='true'} onClick={()=>patch({important:filters.important?'':'true'})}>{filters.important?<Check aria-hidden="true"/>:<AlertTriangle aria-hidden="true"/>}High impact</Button><Button variant="outline" aria-pressed={filters.security==='true'} onClick={()=>patch({security:filters.security?'':'true'})}>{filters.security?<Check aria-hidden="true"/>:<Shield aria-hidden="true"/>}Security</Button></div><label>Actor<select aria-label="Actor" value={filters.actor||'all'} onChange={e=>patch({actor:e.target.value})}><option value="all">All actors</option>{meta.data?.actors?.map(actor=><option key={actor.id} value={actor.id}>{actor.name||`Account #${actor.id}`}</option>)}</select></label><label>Record reference<Input aria-label="Record reference" value={filters.record} placeholder="Paste a captured record route" onChange={e=>patch({record:e.target.value})}/></label><p className="audit-muted">Find the captured route in an event’s Technical details. Filters apply immediately.</p></>;
+ const allOpen=expandable.length>0&&expandable.every(r=>expanded.has(r.id)),someOpen=expandable.some(r=>expanded.has(r.id));
+ const groups=rows.reduce<Array<{key:string;title:string;rows:typeof rows}>>((list,item)=>{const key=dayKey(item.occurred_at),last=list[list.length-1];if(last?.key===key)last.rows.push(item);else list.push({key,title:dayTitle(item.occurred_at),rows:[item]});return list;},[]);
+ return <div className="audit-workspace" data-density={density} data-hide-actor={!columns.includes('actor')} data-hide-category={!columns.includes('category')} data-hide-time={!columns.includes('time')} data-hide-record={!columns.includes('record')}><AdminPageHeader title="Audit Logs" subtitle="Who changed what, and when. Entries cannot be edited or deleted in this application." updatedAt={data.dataUpdatedAt} loading={data.isFetching} onRefresh={()=>void refresh()} actions={<Button variant="outline" disabled={exporting||data.isFetching||data.isPending||data.isError||invalidDates||pagination.total>10000||!pagination.total} onClick={()=>void download()} title="All matching events across pages. Redacted values stay redacted; exports are logged. Every export requires confirmation; maximum 10,000."><Download aria-hidden="true"/>{exporting?'Exporting…':`Export ${eventCount(pagination.total)} (CSV)`}</Button>}/>
+  <div className="audit-quick-filters" role="group" aria-label="Quick audit filters">{[['important','High impact'],['money','Money'],['loans','Loans'],['identity','Identity'],['auth','Auth'],['mine','Mine'],['test','Test accounts']].map(([key,label])=><Button key={key} variant="outline" aria-pressed={filters.quick===key} onClick={()=>patch({quick:filters.quick===key?null:key})}>{filters.quick===key&&<Check aria-hidden="true"/>}{label} <span>{data.data?.quickCounts?.[key]??'—'}</span></Button>)}</div>
+  <div className="audit-toolbar"><form onSubmit={event=>{event.preventDefault();patch({query:search.trim()});}}><Input type="search" aria-label="Search audit events" placeholder="Search actor, event ID, action or record…" value={search} onChange={e=>setSearch(e.target.value)}/></form><Button variant="outline" onClick={()=>setFilterSheet(true)}><SlidersHorizontal aria-hidden="true"/>Filters{active.length>0&&<span className="audit-filter-count">{active.length}</span>}</Button><div className="audit-view-controls"><Button variant="outline" aria-expanded={view} onClick={()=>setView(!view)}><Settings2 aria-hidden="true"/>View</Button><div className="audit-expand-controls" role="group" aria-label="Expand or collapse events"><Button variant="outline" disabled={!expandable.length||allOpen} onClick={()=>setExpanded(current=>new Set([...current,...expandable.map(row=>row.id)]))}>Expand all</Button><Button variant="outline" disabled={!someOpen} onClick={()=>setExpanded(current=>{const next=new Set(current);rows.forEach(row=>next.delete(row.id));return next;})}>Collapse all</Button></div></div></div>
+  {view&&<div className="audit-view-options"><label>Row density<select aria-label="Row density" value={density} onChange={e=>setDensity(e.target.value)}><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select></label><div className="audit-column-picker" role="group" aria-label="Visible audit columns">{['actor','category','time','record'].map(column=><label key={column}><input type="checkbox" checked={columns.includes(column)} onChange={e=>setColumns(current=>e.target.checked?[...current,column]:current.filter(c=>c!==column))}/>{column[0].toUpperCase()+column.slice(1)}</label>)}</div><label>Saved view<select aria-label="Saved audit view" value="" onChange={e=>{if(e.target.value)setParams(new URLSearchParams(e.target.value));}}><option value="">Choose a saved view</option>{savedViews.map(saved=><option key={saved.name} value={saved.query}>{saved.name}</option>)}</select></label><Input aria-label="Saved view name" placeholder="Name this view" value={viewName} maxLength={50} onChange={e=>setViewName(e.target.value)}/><Button variant="outline" disabled={!viewName.trim()} onClick={()=>{const next=[...savedViews.filter(saved=>saved.name!==viewName.trim()),{name:viewName.trim(),query:params.toString()}].slice(-20);setSavedViews(next);localStorage.setItem('audit-saved-views',JSON.stringify(next));setViewName('');toast.success('View saved on this device');}}>Save view</Button>{savedViews.map(saved=><Button key={saved.name} variant="ghost" aria-label={`Delete saved view ${saved.name}`} onClick={()=>{const next=savedViews.filter(view=>view.name!==saved.name);setSavedViews(next);localStorage.setItem('audit-saved-views',JSON.stringify(next));}}>Remove {saved.name}<X aria-hidden="true"/></Button>)}<span className="audit-muted">Expand / Collapse applies to this page. Expansion is kept when paging back.</span></div>}
+  {active.length>0&&<div className="audit-active-filters" aria-label="Active filters"><span>{eventCount(pagination.total)} match</span>{active.map(key=><Button key={key} variant="outline" aria-label={`Remove ${key} filter`} onClick={()=>{if(key==='query')setSearch('');patch({[key]:null});}}>{names[key]}{!['important','security'].includes(key)?`: ${key==='quick'?({important:'High impact',money:'Money',loans:'Loans',identity:'Identity',auth:'Auth',mine:'Mine',test:'Test accounts'}[filters[key]]||filters[key]):key==='category'?categoryLabel(filters[key]):key==='action'?actionLabel(filters[key]):key==='actor'?meta.data?.actors?.find(actor=>String(actor.id)===filters[key])?.name||filters[key]:filters[key]}`:''}<X aria-hidden="true"/></Button>)}<Button variant="ghost" onClick={clear}>Reset filters</Button></div>}
+  {newCount>0&&dismissed!==newKey&&<div className="audit-new-events" role="status" aria-live="polite"><span>{eventCount(newCount)} newly available</span><Button variant="ghost" onClick={()=>void refresh()}>Load</Button><Button variant="ghost" aria-label="Dismiss new events notice" onClick={()=>setDismissed(newKey)}><X aria-hidden="true"/></Button></div>}
+  {invalidDates&&<p className="audit-error" role="alert">End date must be on or after start date. <Button variant="outline" onClick={()=>patch({dateFrom:null,dateTo:null})}>Clear dates</Button></p>}
+  {data.isError&&<div className="audit-error" role="alert">{getApiErrorMessage(data.error,'Audit events could not be loaded.')}<Button variant="outline" onClick={()=>void refresh()}>Retry</Button></div>}
+  {data.isPending?<div aria-label="Loading audit events" role="status">{[1,2,3,4].map(n=><Skeleton key={n} className="h-24 mb-2"/>)}</div>:!data.isError&&<>{!rows.length?<div className="audit-empty"><p>{active.length?'No events match these filters.':'No audit events recorded yet.'}</p>{active.length?<Button variant="outline" onClick={clear}>Reset filters</Button>:<Button variant="outline" onClick={()=>void refresh()}>Refresh</Button>}</div>:<div className="audit-feed" aria-busy={data.isFetching}>{groups.map(group=><section key={group.key} aria-label={group.title}><h2 className="audit-day-heading">{group.title}<span>{eventCount(group.rows.length)} on this page</span></h2>{group.rows.map(item=><AuditEvent key={item.id} item={item} open={expanded.has(item.id)} toggle={()=>toggle(item.id)}/>)}</section>)}</div>}
+  <p className="audit-result-range">Showing {rows.length} of {pagination.total} events · Current filters</p><div className="audit-pagination" role="group" aria-label="Bottom pagination"><Button variant="outline" disabled={data.isFetching||pagination.page<=1} aria-label="Bottom previous page" onClick={()=>patch({page:String(page-1)},false)}>Previous</Button><span>{range}<span className="audit-pagination-unit"> events</span></span><Button variant="outline" disabled={data.isFetching||pagination.page>=pagination.totalPages} aria-label="Bottom next page" onClick={()=>patch({page:String(page+1)},false)}>Next</Button><label>Rows per page<select aria-label="Bottom rows per page" value={limit} onChange={e=>patch({limit:e.target.value})}>{[10,20,50].map(n=><option key={n}>{n}</option>)}</select></label></div></>}
+  <details className="audit-guarantees"><summary>Audit coverage, privacy and retention</summary><p>{meta.data?.guarantees?.retention||'Retention policy is not available.'}</p><p>{meta.data?.guarantees?.readOnly||'Audit events are read-only in this application.'}</p><p>{meta.data?.guarantees?.coverage||'Loading logging coverage…'}</p><p>Passwords, tokens, session identifiers and sensitive personal field values are redacted. No application role can reveal these values. Historical missing technical data cannot be reconstructed. High impact identifies captured changes to money, loan terms, permissions, patron-visible data, or deletions.</p><p>CSV contains event ID, timestamp, actor, category, action, recorded summary, captured route and redacted recorded metadata. It covers every matching page, up to 10,000 events. The export is itself logged.</p></details>
+  <AdminDetailDrawer className="audit-filter-drawer" open={filterSheet} onClose={()=>setFilterSheet(false)} title="Filter audit events" description={`${eventCount(pagination.total)} match · Filters apply immediately`} footer={<><Button variant="outline" disabled={!active.length} onClick={clear}>Reset filters</Button><Button onClick={()=>setFilterSheet(false)}>Show events</Button></>}><div className="audit-filter-fields">{filterControls}</div></AdminDetailDrawer>{confirmDialog}<p className="sr-only" role="status" aria-live="polite">{message}</p>
+ </div>;
+}

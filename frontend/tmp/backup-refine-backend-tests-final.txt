@@ -1,0 +1,88 @@
+[dotenv@17.3.1] injecting env (20) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+✔ audit redaction keeps policy names and numeric diffs while masking personal and nested secrets (5.8094ms)
+✔ audit filters bind actor, exact record and search, and reject reversed dates (17.9274ms)
+✔ feed retains captured routes after legacy enrichment and resolves policy links (337.5941ms)
+✔ CSV neutralizes spreadsheet formulas (1.0115ms)
+✔ export is released only after its audit succeeds: success (189.997ms)
+✔ export is released only after its audit succeeds: failure (5.7304ms)
+✔ request context is captured and sanitized on direct audit writes (478.1546ms)
+✔ derived categories and high impact describe the changed fields, without classifying every policy (2.5316ms)
+✔ a contradictory patron summary cannot link to an unrelated book type policy (2.0984ms)
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+✔ restore upgrades the previous snapshot version and adds newly registered tables (12.996ms)
+✔ restore upgrades v11 with holdings defaults and preserves tables that already exist (10.6849ms)
+✔ restore upgrades v12 loan provenance and preserves outbox, holdings, settings and delivery keys (1.4782ms)
+✔ restore preflight rejects malformed rows before restore can begin (4956.7733ms)
+[dotenv@17.3.1] injecting env (20) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[backup] Error: Use a name up to 120 characters and notes up to 500 characters.
+    at Object.saveSnapshot (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\backup.controller.ts:87:155)
+    at TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:28:350)
+    at async Test.run (node:internal/test_runner/test:1113:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+  status: 400
+}
+✔ restore requires the exact acknowledgement and the active super-admin password (297.5756ms)
+✔ restore impact counts added, changed and absent records instead of guessing losses from dates (154.2321ms)
+✔ daily and weekly schedules use UTC+08:00 and move strictly into the future (2170.5148ms)
+✔ pinned deletion is blocked before deleting records or cloud objects (2435.4942ms)
+✔ verification rejects a corrupted checksum instead of marking it verified (132.0388ms)
+✔ snapshot creation validates and passes optional names and notes into storage (1718.8175ms)
+✔ impact includes settings and holdings using their actual primary keys and excludes retained registries (1.9749ms)
+✖ safety snapshot must verify before replacement (failure: false) (103.1305ms)
+✖ safety snapshot must verify before replacement (failure: true) (48.5414ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 20
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22954.6286
+
+✖ failing tests:
+
+test at test\backup.safety.test.js:35:45
+✖ safety snapshot must verify before replacement (failure: false) (103.1305ms)
+  Error
+      at PromisePool.query (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\node_modules\mysql2\lib\promise\pool.js:36:22)
+      at setMaintenance (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\restore.repository.ts:55:12)
+      at Object.performRestore (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\snapshot.restore.service.ts:44:11)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:40:277)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    code: 'EACCES',
+    errno: undefined,
+    sql: undefined,
+    sqlState: undefined,
+    sqlMessage: undefined,
+    safetySnapshotId: undefined,
+    restoreCommitted: false
+  }
+
+test at test\backup.safety.test.js:35:45
+✖ safety snapshot must verify before replacement (failure: true) (48.5414ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  Error
+      at processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:40:131)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error
+        at PromisePool.query (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\node_modules\mysql2\lib\promise\pool.js:36:22)
+        at setMaintenance (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\restore.repository.ts:55:12)
+        at Object.performRestore (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\snapshot.restore.service.ts:44:11)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:40:131)
+        at async Test.run (node:internal/test_runner/test:1113:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:788:7),
+    operator: 'rejects',
+    diff: 'simple'
+  }
