@@ -36,18 +36,24 @@ export async function getConfigurationImpact() {
   if (fields.some((field:any) => field.archived)) {
     // Read the last archive transition for each still-archived field. Older
     // events without captured changes intentionally have no invented attribution.
-    const [archives] = await db.query(`SELECT s.\`key\`, e.actor_name, e.occurred_at
-      FROM catalog_schema s JOIN audit_events e ON e.id = (
-        SELECT MAX(a.id) FROM audit_events a
-        JOIN JSON_TABLE(a.metadata, '$.changes[*]' COLUMNS (
-          field_name VARCHAR(512) PATH '$.field', after_value VARCHAR(32) PATH '$.after'
-        )) changeset
-        WHERE a.route = '/api/admin/catalog-schema'
-          AND RIGHT(changeset.field_name, CHAR_LENGTH(CONCAT('(', s.\`key\`, ') · archived'))) = CONCAT('(', s.\`key\`, ') · archived')
-          AND changeset.after_value = 'Yes'
-      ) WHERE s.archived = 1`);
-    for (const row of archives) {
-      if (summaries[row.key]) Object.assign(summaries[row.key],{archivedBy:row.actor_name,archivedAt:row.occurred_at});
+    // JSON_TABLE is unavailable on older MariaDB installations. Decode the
+    // captured changes here, keeping the same latest-event (highest id) rule.
+    const [archives] = await db.query(`SELECT actor_name, occurred_at, metadata
+      FROM audit_events WHERE route = ? ORDER BY id DESC`, ['/api/admin/catalog-schema']);
+    const pending = new Set<string>(fields.filter((field:any) => field.archived).map((field:any) => field.key));
+    for (const event of archives) {
+      let metadata;
+      try { metadata = typeof event.metadata === 'string' ? JSON.parse(event.metadata) : event.metadata; }
+      catch { continue; }
+      if (!Array.isArray(metadata?.changes)) continue;
+      for (const key of pending) {
+        const suffix = `(${key}) · archived`;
+        if (metadata.changes.some((change:any) => typeof change?.field === 'string' && change.field.endsWith(suffix) && change.after === 'Yes')) {
+          Object.assign(summaries[key], {archivedBy:event.actor_name,archivedAt:event.occurred_at});
+          pending.delete(key);
+        }
+      }
+      if (!pending.size) break;
     }
   }
   return {fields:summaries,activeRecords:{book:records.filter((r:any)=>!r.deleted_at&&r.material_type!=='thesis').length,thesis:records.filter((r:any)=>!r.deleted_at&&r.material_type==='thesis').length},unheldBooks:Number(unheld.total),generatedAt:new Date().toISOString()};

@@ -76,7 +76,19 @@ test('required Theses fields do not block Books but are enforced for Theses',asy
 });
 test('archive attribution is taken from captured audit transitions',async()=>{
  const original=db.query;
- db.query=async(sql)=>{if(sql.includes('FROM catalog_schema s'))return [[{key:'publisher',actor_name:'Library Administrator',occurred_at:'2026-10-10T08:00:00Z'}]];if(sql.includes('FROM catalog_schema'))return [[{key:'publisher',type:'text',scope:'book',archived:1}]];if(sql.includes('SELECT material_type'))return [[{material_type:'book',metadata:{publisher:'Press'}}]];return [[{total:0}]];};
- try{const result=await configuration.getConfigurationImpact();assert.equal(result.fields.publisher.archivedBy,'Library Administrator');assert.equal(result.fields.publisher.archivedAt,'2026-10-10T08:00:00Z');assert.equal(result.fields.publisher.used,1);}finally{db.query=original;}
+ db.query=async(sql,params)=>{if(sql.includes('FROM audit_events')){assert.doesNotMatch(sql,/JSON_TABLE/);assert.match(sql,/ORDER BY id DESC/);assert.deepEqual(params,['/api/admin/catalog-schema']);return [[
+  {actor_name:'Unrelated editor',metadata:JSON.stringify({changes:[{field:'Publisher (publisher) · public',after:'Yes'},{field:'Other (other_publisher) · archived',after:'Yes'}]})},
+  {actor_name:'Restore editor',metadata:{changes:[{field:'Publisher (publisher) · archived',after:'No'}]}},
+  {metadata:'invalid legacy JSON'}, {metadata:null}, {metadata:{changes:{field:'invalid shape'}}},
+  {actor_name:'Library Administrator',occurred_at:'2026-10-10T08:00:00Z',metadata:JSON.stringify({changes:[{field:'Renamed publisher (publisher) · archived',after:'Yes'}]})},
+  {actor_name:'Earlier editor',occurred_at:'2026-01-01',metadata:{changes:[{field:'Publisher (publisher) · archived',after:'Yes'}]}},
+ ]];}if(sql.includes('FROM catalog_schema'))return [[{key:'publisher',type:'text',scope:'book',archived:1},{key:'legacy',type:'text',scope:'book',archived:1},{key:'active',type:'text',scope:'book',archived:0}]];if(sql.includes('SELECT material_type'))return [[{material_type:'book',metadata:{publisher:'Press'}}]];return [[{total:0}]];};
+ try{const result=await configuration.getConfigurationImpact();assert.equal(result.fields.publisher.archivedBy,'Library Administrator');assert.equal(result.fields.publisher.archivedAt,'2026-10-10T08:00:00Z');assert.equal(result.fields.publisher.used,1);assert.equal(result.fields.legacy.archivedBy,undefined);assert.equal(result.fields.active.archivedBy,undefined);}finally{db.query=original;}
+});
+
+test('configuration impact skips audit history when no fields are archived',async()=>{
+ const original=db.query;
+ db.query=async(sql)=>{assert.doesNotMatch(sql,/audit_events|JSON_TABLE/);if(sql.includes('FROM catalog_schema'))return [[{key:'title',type:'text',scope:'shared',archived:0}]];if(sql.includes('SELECT material_type'))return [[]];return [[{total:0}]];};
+ try{const result=await configuration.getConfigurationImpact();assert.equal(result.fields.title.used,0);}finally{db.query=original;}
 });
 if(require.main===module)test.after(()=>db.end());
