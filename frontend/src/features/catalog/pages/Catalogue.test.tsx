@@ -12,7 +12,6 @@ const { fetchPublicCatalogSchema, searchPublicCatalogue } = vi.hoisted(() => ({
 vi.mock("@/features/catalog/api", () => ({ fetchPublicCatalogSchema, searchPublicCatalogue }));
 vi.mock("@/components/layout/Navbar", () => ({ default: () => null }));
 vi.mock("@/components/layout/Footer", () => ({ default: () => null }));
-vi.mock("@/components/layout/PublicPageMasthead", () => ({ default: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
 vi.mock("@/features/recommendations", () => ({ RecommendationStrip: () => <div data-testid="related-recommendations" /> }));
 
 import Catalogue from "./Catalogue";

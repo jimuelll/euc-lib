@@ -188,13 +188,13 @@
 [data-library-design][data-library-design] .admin-compact-metric-label { font:700 11px/1.5 var(--font-body); text-transform:uppercase; letter-spacing:.1em; color:hsl(var(--muted-foreground)); }
 
 /* Ledger and slips retain each screen's actual columns and interactions. */
-[data-library-design][data-library-design] :is(.library-ledger,.users-records,.attendance-records,.audit-feed,.analytics-panel,.admin-panel,.admin-compact-panel,.reservations-table,.circulation-history,.backup-panel,.records-panel,.content-panel,.academic-panel) { border-radius: 0; box-shadow: none; background: hsl(var(--card)); }
+[data-library-design][data-library-design] :is(.library-ledger,.users-records,.attendance-records,.audit-feed,.analytics-panel,.admin-panel,.admin-compact-panel,.circulation-history,.backup-panel,.records-panel,.content-panel,.academic-panel) { border-radius: 0; box-shadow: none; background: hsl(var(--card)); }
 [data-library-design][data-library-design] :is(.users-avatar,.users-role,.admin-status-chip,.admin-desk-status,.audit-category,.audit-significant) { border-radius: 0; }
 [data-library-design][data-library-design] :is(.admin-status-chip,.admin-desk-status,.audit-category) { background: transparent !important; border: 0; padding-inline: 0; gap: 6px; }
 [data-library-design][data-library-design] .admin-desk-status::before { content: ""; width: 6px; height: 6px; flex: 0 0 6px; border: 1px solid currentColor; }
 [data-library-design][data-library-design] .admin-desk-status[data-tone="red"]::before { background: currentColor; }
 [data-library-design][data-library-design] :is(.users-column-head,.audit-day-heading) { background: hsl(var(--background)); }
-[data-library-design][data-library-design] :is(.users-name,.reservations-book-title,.circulation-book-title) { font-family: var(--font-heading); font-size: 16px; }
+[data-library-design][data-library-design] :is(.users-name,.circulation-book-title) { font-family: var(--font-heading); font-size: 16px; }
 [data-library-design][data-library-design] :is(.admin-dashboard-transactions li,.admin-dashboard-quick-links > a) { min-height:44px; padding:9px 14px; gap:10px; }
 [data-library-design][data-library-design] .admin-dashboard-transactions time { font: 12px/1.6 ui-monospace,monospace; }
 [data-library-design][data-library-design] :is(.admin-record-header,.admin-record-footer,.publishing-footer) { background: hsl(var(--card)); border-color: hsl(var(--border)); box-shadow: none; }
@@ -446,11 +446,8 @@
   .reservation-dialog,
   .reservation-empty,
   .reservation-error,
-  .reservation-filter-chips,
   .reservation-search,
   .reservation-status,
-  .reservation-summary-icon,
-  .reservation-summary-tile,
   .users-avatar,
   .users-bulk-bar,
   .users-error,
