@@ -1,3 +1,4 @@
+import { useLibraryDesign } from "./library-design";
 import * as React from "react";
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
 
@@ -12,6 +13,7 @@ const HoverCardContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
   <HoverCardPrimitive.Content
+      data-library-design={useLibraryDesign() || undefined}
     ref={ref}
     align={align}
     sideOffset={sideOffset}

@@ -1,6 +1,6 @@
 import { useUnsavedChanges } from "@/features/admin/hooks/useUnsavedChanges";
 import { useState } from "react";
-import { Archive, Users } from "lucide-react";
+import { Archive, Users } from "@/components/ui/library-glyphs";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -124,7 +124,7 @@ const AdminManageBuilder = ({
               {sheetMode === "create" ? "Create an account and assign its library access role." : `${selectedUser?.student_employee_id || ""} · Account details and access.`}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6">
+          <div className="admin-record-body flex-1 overflow-y-auto">
             {sheetMode === "create" ? (
               <CreateForm embedded form={form} showPassword={showPassword} allowedRoles={allowedRoles} programs={programs} terms={terms} departments={departments} loading={loading} onField={onField} onTogglePassword={onTogglePassword} onSubmit={async () => { if (await onCreateUser()) setSheetMode(null); }} onReset={onResetForm} />
             ) : selectedUser ? (

@@ -193,7 +193,7 @@ async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = 
         OR bk.isbn LIKE ?)
        ${visibilityFilter}
      GROUP BY bk.id
-     ORDER BY bk.title ASC${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
+     ORDER BY ${query.trim() ? "bk.title ASC" : "available DESC, bk.title ASC"}${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
     paged ? [like, like, like, safeLimit, offset] : [like, like, like]
   );
   return paged

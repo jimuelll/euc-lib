@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "@/components/ui/library-glyphs";
 import {Link} from 'react-router-dom';
 import {useAdminConfirmDialog} from '@/features/admin';
 import { Switch } from "@/components/ui/switch";

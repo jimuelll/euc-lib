@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
-import {Lock,Archive} from 'lucide-react';
+import {Lock,Archive} from '@/components/ui/library-glyphs';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
@@ -29,7 +29,14 @@ export default function ConfigurationFieldEditor({draft,editor,errors,usage,tota
  const missingCount=(draft.scope!=='thesis'?(usage?.missingBooks??totals?.book??0):0)+(draft.scope!=='book'?(usage?.missingTheses??totals?.thesis??0):0);
  const material=missing?(draft.scope==='shared'?'all':draft.scope||'all'):narrowing?(draft.scope==='book'?'thesis':'book'):(editor?.scope==='shared'?'all':editor?.scope||'all');
  return <>
-  <nav ref={navRef} className="config-editor-nav" aria-label="Field sections">{sections.map(name=><Button type="button" variant="ghost" key={name} aria-current={section===name?'location':undefined} onClick={()=>jump(name)}>{name}</Button>)}</nav>
+  <nav ref={navRef} className="config-editor-nav" aria-label="Field sections" onKeyDown={event=>{
+    const buttons=Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));
+    const index=buttons.indexOf(event.target as HTMLButtonElement);
+    if(index<0)return;
+    const next=event.key==='ArrowRight'?(index+1)%buttons.length:event.key==='ArrowLeft'?(index+buttons.length-1)%buttons.length:event.key==='Home'?0:event.key==='End'?buttons.length-1:-1;
+    if(next<0)return;
+    event.preventDefault();buttons[next].focus();buttons[next].click();
+  }}>{sections.map(name=><Button type="button" variant="ghost" key={name} aria-current={section===name?'location':undefined} onClick={()=>jump(name)}>{name}</Button>)}</nav>
   <section className="config-editor-section"><h3 id="field-basics">Basics</h3>
    <div className="config-input"><Label htmlFor="field-label">Field label *</Label><Input ref={labelRef} id="field-label" required maxLength={255} value={draft.label} placeholder="e.g. Publication place" aria-invalid={Boolean(errors.label)} aria-describedby="label-error" onChange={e=>change('label',e.target.value)} onBlur={validate}/><p id="label-error" className="config-error">{errors.label}</p></div>
    <div className="config-input"><span id="field-key-label">Field key · read-only</span><div id="field-key" className="config-fixed config-readonly-value" aria-labelledby="field-key-label" aria-describedby="key-help"><Lock aria-hidden="true"/><code>{key||'Generated from the label'}</code></div><p id="key-help" className={errors.key?'config-error':'config-help'}>{errors.key||'Retained after creation so stored values stay connected.'}</p></div>

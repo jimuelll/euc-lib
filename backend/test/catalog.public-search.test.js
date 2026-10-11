@@ -43,6 +43,20 @@ test("public category facet counts one category per catalog record", () => {
   ]);
 });
 
+test("publication year filters are parameterized and availability sorting uses the recorded count", () => {
+  const filters = normalizePublicCatalogFilters({ year_from: "2021", sort: "most_available" });
+  const where = buildPublicCatalogWhere(filters);
+  assert.match(where.clause, /CAST\(JSON_UNQUOTE\(JSON_EXTRACT\(bk\.metadata, '\$\.publication_year'\)\) AS UNSIGNED\) >= \?/);
+  assert.deepEqual(where.params, [2021]);
+  assert.deepEqual(buildPublicCatalogWhere(filters, { omitFacets: true }).params, [2021]);
+  assert.equal(publicCatalogOrder(filters), "available DESC, bk.title ASC, bk.id ASC");
+  for (const value of ["2021 OR 1=1", "NaN", "-1", "9999", "20", ""]) {
+    const invalid = normalizePublicCatalogFilters({ year_from: value });
+    assert.equal(invalid.yearFrom, null);
+    assert.doesNotMatch(buildPublicCatalogWhere(invalid).clause, /publication_year/);
+  }
+});
+
 test("public search returns server pagination, filter counts, cover URL, and empty pages", async () => {
   const savedQuery = db.query;
   const calls = [];

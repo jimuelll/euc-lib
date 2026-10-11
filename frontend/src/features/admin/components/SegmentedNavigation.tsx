@@ -30,6 +30,18 @@ export function SegmentedNavigation<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            onKeyDown={(event) => {
+              const index = segments.findIndex(segment => segment.value === segmentValue);
+              const next = event.key === "ArrowRight" ? (index + 1) % segments.length
+                : event.key === "ArrowLeft" ? (index + segments.length - 1) % segments.length
+                : event.key === "Home" ? 0 : event.key === "End" ? segments.length - 1 : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              onChange(segments[next].value);
+              const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+              buttons?.[next]?.focus();
+            }}
             onClick={() => onChange(segmentValue)}
             className={`flex h-11 flex-1 items-center justify-center gap-2 border-r border-border text-sm font-semibold transition-colors last:border-r-0 ${
               active

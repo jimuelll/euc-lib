@@ -1,35 +1,12 @@
-import SectionLabel from "./ui/SectionLabel";
-import SectionHeading from "./ui/SectionHeading";
+interface MissionHistoryProps { missionTitle: string; missionText: string; historyTitle: string; historyText: string; }
 
-interface MissionHistoryProps {
-  missionTitle: string;
-  missionText: string;
-  historyTitle: string;
-  historyText: string;
+export default function MissionHistory({ missionTitle, missionText, historyTitle, historyText }: MissionHistoryProps) {
+  return <>{[
+    ["about-mission", "Mission & vision", missionTitle, missionText],
+    ["about-history", "Library history", historyTitle, historyText],
+  ].map(([id, label, title, text]) => <section className="library-about-chapter" id={id} key={id} aria-labelledby={id + "-title"}>
+    <div className="library-information-kicker">{label}</div>
+    <h2 className="library-information-section-title" id={id + "-title"}>{title}</h2>
+    <div className="library-about-body">{text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+  </section>)}</>;
 }
-
-const MissionHistory = ({
-  missionTitle,
-  missionText,
-  historyTitle,
-  historyText,
-}: MissionHistoryProps) => (
-  <div className="border-b border-border">
-    <div className="container px-4 sm:px-6">
-      <div className="grid md:grid-cols-2 border-l border-t border-border">
-        <div className="border-r border-b border-border bg-background p-8 md:p-10">
-          <SectionLabel>Mission & Vision</SectionLabel>
-          <SectionHeading>{missionTitle}</SectionHeading>
-          <p className="text-sm text-muted-foreground leading-relaxed">{missionText}</p>
-        </div>
-        <div className="border-r border-b border-border bg-background p-8 md:p-10">
-          <SectionLabel>Library History</SectionLabel>
-          <SectionHeading>{historyTitle}</SectionHeading>
-          <p className="text-sm text-muted-foreground leading-relaxed">{historyText}</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-export default MissionHistory;

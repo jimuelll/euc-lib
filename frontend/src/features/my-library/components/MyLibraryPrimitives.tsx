@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { ExternalLink, GraduationCap } from "lucide-react";
+import { ExternalLink, GraduationCap } from "@/components/ui/library-glyphs";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { DashboardSubscription } from "../types";
+import { LibraryLedger, LibrarySlip } from "@/components/ui/library-patterns";
 
 export function Surface({
   title,
@@ -18,12 +19,12 @@ export function Surface({
   children: ReactNode;
 }) {
   return (
-    <section
+    <LibrarySlip
       id={id}
       aria-label={title}
-      className="min-w-0 scroll-mt-24 overflow-hidden rounded-xl border border-border bg-card"
+      className="min-w-0 scroll-mt-24 overflow-hidden border border-border bg-card"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-5 sm:px-6">
+      <div className="library-slip-heading flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-3 text-lg font-semibold tracking-tight">
           {title}
           {count !== undefined && (
@@ -35,7 +36,7 @@ export function Surface({
         {actions}
       </div>
       {children}
-    </section>
+    </LibrarySlip>
   );
 }
 
@@ -63,7 +64,7 @@ export function EmptyPanel({
 }
 
 export function PanelList({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-border">{children}</div>;
+  return <LibraryLedger className="divide-y divide-border">{children}</LibraryLedger>;
 }
 
 export function LoadingPanel({

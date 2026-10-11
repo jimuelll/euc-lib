@@ -3,7 +3,7 @@ import { visibleSidebarSections } from "@/features/admin";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, BookOpenCheck, CircleHelp, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpenCheck, CircleHelp, Search } from "@/components/ui/library-glyphs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

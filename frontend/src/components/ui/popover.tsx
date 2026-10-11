@@ -1,3 +1,4 @@
+import { useLibraryDesign } from "./library-design";
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 
@@ -13,6 +14,8 @@ const PopoverContent = React.forwardRef<
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
   <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
+      data-library-design={useLibraryDesign() || undefined}
+      data-library-ui="popover"
       ref={ref}
       align={align}
       sideOffset={sideOffset}

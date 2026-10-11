@@ -1,5 +1,5 @@
-import { Clock, MapPin, Mail, Phone } from "lucide-react";
-import { motion } from "framer-motion";
+import { Clock, MapPin, Mail, Phone } from "@/components/ui/library-glyphs";
+import { motion, useReducedMotion } from "framer-motion";
 import { useSiteContent } from "../useSiteContent";
 
 const hours = [
@@ -15,18 +15,19 @@ const contactDetails = [
 ];
 
 const LibraryHoursSection = () => {
+  const reducedMotion = useReducedMotion();
   const { data: content } = useSiteContent();
   const visibleHours = content?.hours || hours;
   const visibleContact = content ? [
     { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },
   ] : contactDetails;
   return (
-    <section className="border-b border-border bg-background py-16 sm:py-20">
+    <section id="library-hours" data-library-design className="border-b border-border bg-background py-16 sm:py-20">
       <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Section label ── */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={reducedMotion ? false : { opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
@@ -45,7 +46,7 @@ const LibraryHoursSection = () => {
 
           {/* ── Operating Hours — left column, maroon header band ── */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
@@ -67,7 +68,7 @@ const LibraryHoursSection = () => {
               {visibleHours.map((row, i) => (
                 <motion.div
                   key={row.day}
-                  initial={{ opacity: 0 }}
+                  initial={reducedMotion ? false : { opacity: 0 }}
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: i * 0.08 }}
@@ -100,7 +101,7 @@ const LibraryHoursSection = () => {
 
           {/* ── Contact Details — right column ── */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -124,7 +125,7 @@ const LibraryHoursSection = () => {
                 return (
                   <motion.div
                     key={item.label}
-                    initial={{ opacity: 0 }}
+                    initial={reducedMotion ? false : { opacity: 0 }}
                     whileInView={{ opacity: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.3, delay: i * 0.08 }}
@@ -158,7 +159,7 @@ const LibraryHoursSection = () => {
 
         {/* ── Gold bottom rule — sealing the section like a document footer ── */}
         <motion.div
-          initial={{ scaleX: 0 }}
+          initial={reducedMotion ? false : { scaleX: 0 }}
           whileInView={{ scaleX: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}

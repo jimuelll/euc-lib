@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { ImageIcon, Upload, X } from "lucide-react";
+import { ImageIcon, Upload, X } from "@/components/ui/library-glyphs";
 import { FONT, LABEL_CLS } from "../subscriptions.styles";
 
 // ─── Props ────────────────────────────────────────────────────────────────────

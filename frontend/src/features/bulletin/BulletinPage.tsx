@@ -2,12 +2,9 @@ import { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import PublicPageMasthead from "@/components/layout/PublicPageMasthead";
-import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "@/components/ui/library-glyphs";
 import { useAuth } from "@/context/AuthContext";
-import { motion } from "framer-motion";
 import { useDebounce } from "@/hooks/use-debounce";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -15,16 +12,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PostCard, cardVariants } from "./components/PostCard";
+import { PostCard } from "./components/PostCard";
 import { PostModal } from "./components/PostModal";
 import { CreatePostModal } from "./components/CreatePostModal";
 import { BulletinSidebar } from "./components/BulletinSidebar";
 import { useBulletinPosts } from "./hooks/useBulletinPosts";
 import type { BulletinPost } from "./types";
 import { BulletinListSkeleton } from "@/components/ui/content-skeletons";
+import "./bulletin-board.css";
 
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
-const POSTS_PER_PAGE = 6;
+const POSTS_PER_PAGE = 10;
 
 const getPageItems = (currentPage: number, totalPages: number): Array<number | "start-gap" | "end-gap"> => {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -92,177 +90,62 @@ export function BulletinPage() {
     setShowLoginPrompt(true);
   }, []);
 
+  const featuredPost = !debouncedSearch.trim() && currentPage === 1
+    ? posts.find((post) => post.is_pinned)
+    : undefined;
+  const notices = posts.filter((post) => post.id !== featuredPost?.id);
+  const monthGroups = notices.reduce<Record<string, BulletinPost[]>>((groups, post) => {
+    const date = new Date(post.date);
+    const month = Number.isNaN(date.getTime()) ? "More notices" : date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    (groups[month] ??= []).push(post);
+    return groups;
+  }, {});
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <PublicPageMasthead
-        title="Bulletin Board"
-        description="Library announcements, notices, and upcoming events."
-      >
-          <div className="flex flex-wrap items-center gap-4">
-            {canPost && (
-              <button
-                onClick={() => setShowCreate(true)}
-                className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 border border-warning/50 text-warning hover:bg-warning/10 transition-colors duration-150"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span className="text-xs font-bold uppercase tracking-[0.15em]">New Post</span>
-              </button>
-            )}
-          </div>
-      </PublicPageMasthead>
-
-      <main className="bg-background">
-        <div className="container px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-16">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-            <div className="flex-1 min-w-0">
-              <div className="mb-5 flex flex-col gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="max-w-xl">
-                  <p
-                    className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Search Posts
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Search by title, post content, or author name.
-                  </p>
-                </div>
-
-                <div className="relative w-full sm:max-w-sm">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search bulletin posts"
-                    className="h-11 border-border pl-10 text-sm focus-visible:ring-warning"
-                  />
-                </div>
-              </div>
-
-              {loading && (
-                <BulletinListSkeleton rows={POSTS_PER_PAGE} />
-              )}
-
-              {error && !loading && (
-                <div className="flex flex-col items-center gap-5 py-16 border border-destructive/20 bg-destructive/[0.02]">
-                  <div className="flex gap-0">
-                    <div className="w-[3px] bg-destructive shrink-0" />
-                    <p
-                      className="px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-destructive"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {error}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => fetchPosts(currentPage, debouncedSearch)}
-                    className="px-5 py-2.5 border border-border text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {!loading && !error && posts.length === 0 && (
-                <div className="flex flex-col items-center py-20 border border-dashed border-border gap-5">
-                  <p
-                    className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    {search.trim() ? "No matching posts" : "No posts yet"}
-                  </p>
-                  {canPost && !search.trim() && (
-                    <button
-                      onClick={() => setShowCreate(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span className="text-xs font-bold uppercase tracking-[0.15em]">
-                        Create the first post
-                      </span>
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {!loading && !error && posts.length > 0 && (
-                <>
-                  <div className="flex items-center justify-between pb-4 mb-0 border-b border-border">
-                    <span
-                      className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {posts.length} post{posts.length !== 1 ? "s" : ""} - Page {currentPage} of {totalPages}
-                    </span>
-                  </div>
-
-                  <motion.div
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                      hidden: {},
-                      visible: { transition: { staggerChildren: 0.06 } },
-                    }}
-                    className="border-x border-border"
-                  >
-                    {posts.map((post) => (
-                      <motion.div key={post.id} variants={cardVariants}>
-                        <PostCard
-                          post={post}
-                          variant="list"
-                          onClick={() => setSelectedPost(post)}
-                          onArchived={handleArchived}
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-
-                  {totalPages > 1 && (
-                    <div className="flex border border-border">
-                      <button
-                        disabled={currentPage === 1}
-                        onClick={() => setCurrentPage(currentPage - 1)}
-                        className="h-10 w-10 flex items-center justify-center border-r border-border text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors shrink-0"
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                      </button>
-
-                      <div className="flex flex-1 overflow-x-auto">
-                        {getPageItems(currentPage, totalPages).map((item) => typeof item === "number" ? (
-                          <button
-                            key={item}
-                            onClick={() => setCurrentPage(item)}
-                            className={`h-10 min-w-[2.5rem] flex-1 flex items-center justify-center border-r border-border text-xs font-bold tracking-[0.1em] transition-colors ${
-                              currentPage === item
-                                ? "bg-primary text-primary-foreground"
-                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                            }`}
-                            style={{ fontFamily: "var(--font-heading)" }}
-                          >
-                            {item}
-                          </button>
-                        ) : <span key={item} className="flex h-10 min-w-[2.5rem] items-center justify-center border-r border-border text-xs text-muted-foreground">…</span>)}
-                      </div>
-
-                      <button
-                        disabled={currentPage === totalPages}
-                        onClick={() => setCurrentPage(currentPage + 1)}
-                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors shrink-0"
-                      >
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
+      <main data-library-design className="bulletin-board">
+        <div className="bulletin-container">
+          <header className="bulletin-page-heading">
+            <div>
+              <h1>Bulletin Board</h1>
+              <p>Library announcements, notices, and upcoming events.</p>
             </div>
-
-            <BulletinSidebar />
+            <div className="bulletin-toolbar">
+              <label className="bulletin-search">
+                <Search aria-hidden="true" />
+                <span className="sr-only">Search title, content or author</span>
+                <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title, content or author" />
+              </label>
+              {canPost && <button type="button" className="bulletin-new-post" onClick={() => setShowCreate(true)}><Plus aria-hidden="true" />New post</button>}
+            </div>
+          </header>
+          <div className="bulletin-wall" aria-busy={loading}>
+            {loading && <BulletinListSkeleton rows={POSTS_PER_PAGE} />}
+            {error && !loading && <div className="bulletin-empty" role="alert"><p>{error}</p><button className="bulletin-outline-button" onClick={() => void fetchPosts(currentPage, debouncedSearch)}>Retry</button></div>}
+            {!loading && !error && <>
+              {!debouncedSearch.trim() && <div className={`bulletin-hero ${featuredPost ? "" : "without-feature"}`}>
+                {featuredPost && <PostCard post={featuredPost} variant="notice-featured" onClick={() => setSelectedPost(featuredPost)} onArchived={handleArchived} />}
+                <BulletinSidebar />
+              </div>}
+              {posts.length === 0 && <div className="bulletin-empty">
+                <p>{search.trim() ? `No posts match “${search.trim()}”. Try a title, a word from the post, or an author name.` : "No posts yet. Library updates will appear here as they are published."}</p>
+                {canPost && !search.trim() && <button className="bulletin-outline-button" onClick={() => setShowCreate(true)}><Plus aria-hidden="true" />Create the first post</button>}
+              </div>}
+              {debouncedSearch.trim() ? <section aria-label="Search results">
+                {posts.length > 0 && <h2 className="bulletin-month">Search results <small>for “{debouncedSearch.trim()}”</small></h2>}
+                <div className="bulletin-columns">{notices.map((post) => <PostCard key={post.id} post={post} variant="notice" onClick={() => setSelectedPost(post)} onArchived={handleArchived} />)}</div>
+              </section> : Object.entries(monthGroups).map(([month, groupedPosts]) => <section key={month} aria-label={month}>
+                <h2 className="bulletin-month">{month}<small>{groupedPosts.length} notice{groupedPosts.length === 1 ? "" : "s"}</small></h2>
+                <div className="bulletin-columns">{groupedPosts.map((post) => <PostCard key={post.id} post={post} variant="notice" onClick={() => setSelectedPost(post)} onArchived={handleArchived} />)}</div>
+              </section>)}
+              {totalPages > 1 && <nav className="bulletin-pagination" aria-label="Bulletin pages">
+                <button aria-label="Previous page" disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}><ChevronLeft aria-hidden="true" /></button>
+                {getPageItems(currentPage, totalPages).map((item) => typeof item === "number" ? <button key={item} aria-label={`Page ${item}`} aria-current={currentPage === item ? "page" : undefined} onClick={() => setCurrentPage(item)}>{item}</button> : <span key={item}>…</span>)}
+                <button aria-label="Next page" disabled={currentPage === totalPages} onClick={() => setCurrentPage(currentPage + 1)}><ChevronRight aria-hidden="true" /></button>
+              </nav>}
+            </>}
           </div>
         </div>
       </main>

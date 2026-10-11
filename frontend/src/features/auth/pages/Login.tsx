@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, BookOpen, CalendarDays, Eye, EyeOff, HelpCircle } from "lucide-react";
+import { Bell, BookOpen, CalendarDays, Eye, EyeOff, HelpCircle } from "@/components/ui/library-glyphs";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,7 @@ const Login = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="bg-background">
+      <main data-library-design className="bg-background">
         <div className="container grid min-h-[calc(100svh-3.75rem)] items-center gap-12 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16 lg:py-20 xl:gap-28">
           <section className="hidden max-w-xl lg:block" aria-labelledby="login-support-heading">
             <div className="h-px w-8 bg-warning" />

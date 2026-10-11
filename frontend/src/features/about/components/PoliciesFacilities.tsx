@@ -1,50 +1,9 @@
-import SectionLabel from "./ui/SectionLabel";
-import SectionHeading from "./ui/SectionHeading";
-
-interface PoliciesFacilitiesProps {
-  policies: string[];
-  facilities: string[];
+export default function PoliciesFacilities({ policies, facilities }: { policies: string[]; facilities: string[] }) {
+  if (!policies.length && !facilities.length) return null;
+  return <section className="library-about-chapter" id="about-rules" aria-labelledby="about-rules-title">
+    <div className="library-information-kicker">Rules &amp; policies</div>
+    <h2 className="library-information-section-title" id="about-rules-title">Library rules and resources</h2>
+    {policies.length > 0 && <details className="library-about-details" open><summary>Borrowing guidelines</summary><ol>{policies.map((policy, index) => <li key={index}>{policy}</li>)}</ol></details>}
+    {facilities.length > 0 && <details className="library-about-details"><summary>Facilities &amp; resources</summary><ol>{facilities.map((facility, index) => <li key={index}>{facility}</li>)}</ol></details>}
+  </section>;
 }
-
-const NumberedList = ({
-  items,
-  accentClass,
-}: {
-  items: string[];
-  accentClass: string;
-}) => (
-  <div className="space-y-0 border-t border-border mt-6">
-    {items.map((item, i) => (
-      <div key={i} className="flex items-start gap-4 border-b border-border py-3.5">
-        <span
-          className={`text-xs font-bold tracking-[0.15em] mt-0.5 shrink-0 ${accentClass}`}
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {String(i + 1).padStart(2, "0")}
-        </span>
-        <p className="text-sm text-muted-foreground leading-relaxed">{item}</p>
-      </div>
-    ))}
-  </div>
-);
-
-const PoliciesFacilities = ({ policies, facilities }: PoliciesFacilitiesProps) => (
-  <div className="border-b border-border">
-    <div className="container px-4 sm:px-6">
-      <div className="grid md:grid-cols-2 border-l border-t border-border">
-        <div className="border-r border-b border-border bg-background p-8 md:p-10">
-          <SectionLabel>Rules & Policies</SectionLabel>
-          <SectionHeading>Borrowing Guidelines</SectionHeading>
-          <NumberedList items={policies} accentClass="text-primary/50" />
-        </div>
-        <div className="border-r border-b border-border bg-background p-8 md:p-10">
-          <SectionLabel>Facilities & Resources</SectionLabel>
-          <SectionHeading>What We Offer</SectionHeading>
-          <NumberedList items={facilities} accentClass="text-warning/60" />
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-export default PoliciesFacilities;

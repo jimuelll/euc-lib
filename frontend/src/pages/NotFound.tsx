@@ -4,7 +4,7 @@ const NotFound = () => {
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div data-library-design className="flex min-h-screen items-center justify-center bg-background">
 
       {/* Subtle horizontal line texture — same grammar as primary panels */}
       <div

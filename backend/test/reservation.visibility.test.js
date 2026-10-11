@@ -5,6 +5,29 @@ const reservationRepository = require("../modules/reservation/reservation.reposi
 const clearanceRepository = require("../modules/clearance/clearance.repository");
 const myLibraryRepository = require("../modules/my-library/my-library.repository");
 const reservationService = require("../modules/reservation/reservation.service");
+const reservationController = require("../modules/reservation/reservation.controller");
+
+test("reservation browse accepts an empty query and keeps paged availability ordering", async () => {
+  const originalSearch = reservationService.searchCatalogue;
+  const originalQuery = db.query;
+  const calls = [];
+  try {
+    reservationService.searchCatalogue = async (query, options) => { calls.push({ query, options }); return { rows: [] }; };
+    let payload;
+    const response = { json: value => { payload = value; } };
+    await reservationController.searchCatalogue({ query: { page: "1", limit: "20" } }, response);
+    assert.equal(calls[0].query, "");
+    assert.deepEqual(payload, { rows: [] });
+    let status;
+    await reservationController.searchCatalogue({ query: { query: ["bad"] } }, { status: value => { status = value; return response; } });
+    assert.equal(status, 400);
+    db.query = async (sql, params) => { calls.push({ sql, params }); return sql.includes("COUNT(*) AS total") ? [[{ total: 3 }], []] : [[], []]; };
+    const result = await reservationRepository.searchCatalogue("", { page: 1, limit: 20 });
+    assert.equal(result.pagination.total, 3);
+    assert.match(calls.at(-1).sql, /ORDER BY available DESC, bk.title ASC LIMIT \? OFFSET \?/);
+    assert.deepEqual(calls.at(-1).params, ["%%", "%%", "%%", 20, 0]);
+  } finally { reservationService.searchCatalogue = originalSearch; db.query = originalQuery; }
+});
 
 test("active reservation views omit expired pending and ready rows consistently", async () => {
   const originalQuery = db.query;

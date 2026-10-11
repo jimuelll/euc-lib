@@ -15,9 +15,9 @@ function mount(){return render(<MemoryRouter><BookTypesSettings/></MemoryRouter>
 describe('book type policies',()=>{
  beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.fetchBookTypes).mockResolvedValue([policy]);vi.mocked(api.updateBookType).mockResolvedValue(policy);});
  it('shows readable units, currency, fine arithmetic and an exact Catalog link',async()=>{
-  mount();expect(await screen.findByText('7 days')).toBeInTheDocument();
-  expect(screen.getByText('₱0.00 when overdue, then ₱1.00 per hour')).toBeInTheDocument();
-  const example=screen.getByText(/Overdue by 3 hours = ₱3.00/);expect(example.closest('details')).not.toHaveAttribute('open');fireEvent.click(screen.getByText('Fine example'));expect(example).toHaveTextContent('Example:');
+  mount();expect((await screen.findByText('7')).parentElement).toHaveTextContent('7 days');
+  expect(screen.getByText('₱0.00').closest('td')).toHaveTextContent('₱0.00 when overdue, then ₱1.00 / hour');
+  const example=screen.getByText(/Overdue by 3 hours = ₱3.00/);expect(example.closest('details')).toBeNull();expect(example).toBeVisible();expect(example).toHaveTextContent('Example:');expect(screen.getByRole('img',{name:'3 of 3 assigned books'})).toBeInTheDocument();
   expect(screen.getByRole('link',{name:/3 books/})).toHaveAttribute('href','/admin/catalog?tab=records&bookTypeId=7&status=all');
  });
  it('only enables Save after a valid edit and saves whole minutes',async()=>{

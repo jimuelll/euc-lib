@@ -67,6 +67,12 @@ SKILL.md
 /docs/cross-system-mutation-matrix.md
 /docs/defense-cross-system-audit.md
 COPY-ACCESSION-LIFECYCLE-REVIEW.md
+DESIGN-REFERENCE-AUDIT.md
+DESIGN-VALIDATION.md
+DESIGN.md
 
 # Local synthetic-data admin preview
 /frontend/scripts/admin-preview.mjs
+
+# Local redesign screenshots and verification logs
+/frontend/tmp/library-redesign/

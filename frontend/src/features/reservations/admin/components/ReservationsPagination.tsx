@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "@/components/ui/library-glyphs";
 import { PAGE_SIZE } from "../reservations.types";
 
 interface ReservationsPaginationProps {

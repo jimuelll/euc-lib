@@ -35,6 +35,27 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("copy holdings editor", () => {
+  it("does not substitute another copy when the controlled copy is missing", async () => {
+    render(<MemoryRouter><BookHoldingsEditor bookId={4} bookTitle="Atlas" copyId={999} guardRef={{current:null}} onManageCopies={vi.fn()} /></MemoryRouter>,{wrapper:createTestQueryClientWrapper()});
+    expect(await screen.findByRole("alert")).toHaveTextContent("This copy is no longer available");
+    expect(screen.queryByLabelText(/Accession number/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Save holding"})).not.toBeInTheDocument();
+  });
+  it("keeps existing retired-copy and staff accession permissions", async () => {
+    vi.mocked(fetchBookHoldings).mockResolvedValue([{...copies[0],is_active:0}]);
+    renderEditor();
+    expect(await screen.findByText(/This copy is retired. Its accession is permanent/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Accession number/)).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Price")).toBeEnabled();
+    expect(screen.queryByRole("button",{name:"Void mistaken accession"})).not.toBeInTheDocument();
+  });
+  it("does not render a numeric false flag as a stray zero below the policy", async () => {
+    vi.mocked(fetchBookHoldings).mockResolvedValue([{ ...copies[0], accession_voided: 0 }]);
+    renderEditor();
+    await screen.findByText("Accession ACC-1");
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+    expect(screen.getByText("Permanent after first save")).toBeInTheDocument();
+  });
   it("navigates between separate physical copies with Previous and Next", async () => {
     renderEditor();
     expect(await screen.findByText("Accession ACC-1")).toBeTruthy();

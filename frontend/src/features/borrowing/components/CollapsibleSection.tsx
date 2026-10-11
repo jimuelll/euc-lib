@@ -1,5 +1,5 @@
 import { useState, type ElementType, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/ui/library-glyphs";
 
 interface CollapsibleSectionProps {
   title: string;

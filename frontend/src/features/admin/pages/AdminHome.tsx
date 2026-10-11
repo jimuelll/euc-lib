@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LibraryShelf } from "@/components/ui/library-patterns";
 import { useAuth } from "@/context/AuthContext";
 import { fetchAdminDashboard, type DashboardStats, type RecentActivity } from "@/features/admin/api";
 import { AdminIcon, type AdminIconName } from "../components/AdminIcon";
@@ -70,11 +71,11 @@ export default function Dashboard() {
 }
 
 function OutstandingItems({ stats }: { stats: DashboardStats }) {
-  return <CompactPanel title="Outstanding items" id="outstanding-items-heading" className="admin-dashboard-outstanding-panel"><div className="admin-dashboard-outstanding">
-    <AdminSummaryTile label="Overdue loans" value={stats.overdue_borrowings} tone="red" icon="overdue" href="/admin/circulation?tab=history&filter=overdue" heading />
-    <AdminSummaryTile label="Unpaid fines" value={stats.outstanding_fines} currency tone="red" icon="fines" href="/admin/clearance?tab=queue&filter=all" heading />
-    <AdminSummaryTile label="Ready reservations" value={stats.ready_reservations} tone="green" icon="reservations" href="/admin/reservations?filter=ready" heading />
-  </div></CompactPanel>;
+  return <CompactPanel title="Outstanding items" id="outstanding-items-heading" className="admin-dashboard-outstanding-panel"><LibraryShelf className="admin-dashboard-outstanding">
+    <AdminSummaryTile label="Overdue loans" value={stats.overdue_borrowings} tone="red" icon="overdue" hint={stats.overdue_borrowings ? `View ${stats.overdue_borrowings.toLocaleString("en-PH")} loans` : "No overdue loans"} href="/admin/circulation?tab=history&filter=overdue" heading />
+    <AdminSummaryTile label="Unpaid fines" value={stats.outstanding_fines} currency tone="red" icon="fines" hint="Review outstanding balances" href="/admin/clearance?tab=queue&filter=all" heading />
+    <AdminSummaryTile label="Ready reservations" value={stats.ready_reservations} tone="green" icon="reservations" hint={stats.ready_reservations ? "Prepared holds awaiting pickup" : "Nothing waiting"} href="/admin/reservations?filter=ready" heading />
+  </LibraryShelf></CompactPanel>;
 }
 
 function TransactionList({ activity }: { activity: RecentActivity[] }) {

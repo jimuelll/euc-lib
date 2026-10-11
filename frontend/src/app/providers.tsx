@@ -14,6 +14,7 @@ import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AppRoutes } from "./routes";
 import { loadAcademicSubscriptions, loadAdminCatalog, loadAdminContentManagement, loadAdminHome, loadAdminLayout, loadAdminManage, loadLibraryServices, loadStudentDashboard } from "./route-loaders";
 import { queryClient } from "./query-client";
+import { LibraryDesignProvider } from "@/components/ui/library-design";
 
 function RoutePrefetcher() {
   const { user, loading } = useAuth();
@@ -37,15 +38,13 @@ export default function AppProviders() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
+          <LibraryDesignProvider><div data-library-design><Toaster /><Sonner /></div></LibraryDesignProvider>
           <BrowserRouter>
             <ScrollToTop />
             <AuthProvider>
               <NotificationsProvider>
                 <RoutePrefetcher />
-                <PasswordChangeGate />
-                <TermRevalidationNotice />
+                <LibraryDesignProvider><PasswordChangeGate /><TermRevalidationNotice /></LibraryDesignProvider>
                 <SiteVisitTracker />
                 <AppRoutes />
               </NotificationsProvider>

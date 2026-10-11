@@ -15,8 +15,8 @@ const sendError = (res: Response, error: unknown, fallback: string): void => {
 const searchCatalogue: RequestHandler = async (req, res) => {
   try {
     const query = req.query.query;
-    if (typeof query !== "string" || !query.trim()) return void res.status(400).json({ message: "Search query is required" });
-    const books = await service.searchCatalogue(query.trim(), { page: req.query.page, limit: req.query.limit });
+    if (query !== undefined && typeof query !== "string") return void res.status(400).json({ message: "Search query must be text" });
+    const books = await service.searchCatalogue((query ?? "").trim(), { page: req.query.page, limit: req.query.limit });
     res.json(books);
   } catch (error: unknown) {
     logError("[reservation] searchCatalogue:", error);

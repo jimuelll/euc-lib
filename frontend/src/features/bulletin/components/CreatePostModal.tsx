@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ImagePlus, X, Loader2, AlertCircle, Pin } from "lucide-react";
+import { ImagePlus, X, Loader2, AlertCircle, Pin } from "@/components/ui/library-glyphs";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useAuth } from "@/context/AuthContext";
 import { createBulletinPost } from "../api";

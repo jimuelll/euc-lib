@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, Pin, Archive, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Pin, Archive, Loader2 } from "@/components/ui/library-glyphs";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import type { BulletinPost } from "../types";
@@ -9,7 +9,7 @@ import { archiveBulletinPost } from "../api";
 interface PostCardProps {
   post: BulletinPost;
   onClick: () => void;
-  variant?: "featured" | "grid" | "list" | "homepage";
+  variant?: "featured" | "grid" | "list" | "homepage" | "notice" | "notice-featured";
   /** Called after the post is successfully archived */
   onArchived?: (postId: number) => void;
 }
@@ -30,6 +30,8 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
   const isFeatured = variant === "featured";
   const isHomepage = variant === "homepage";
   const hasImage = Boolean(post.image_url);
+  const excerpt = post.content?.trim();
+  const hasExcerpt = Boolean(excerpt && !/^[\s–—-]+$/.test(excerpt));
   const { user } = useAuth();
 
   const canArchive =
@@ -57,22 +59,50 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
     finally { setArchiveBusy(false); setArchiveConfirm(false); }
   };
 
+  if (variant === "notice" || variant === "notice-featured") {
+    const featured = variant === "notice-featured";
+    return (
+      <article className={`bulletin-slip ${featured ? "bulletin-featured" : ""} ${post.is_pinned ? "is-pinned" : ""} ${hasImage ? "has-image" : ""}`}>
+        {post.is_pinned && <span className="bulletin-pin-tag">Pinned</span>}
+        <button type="button" className="bulletin-slip-open" onClick={onClick}>
+          {featured && hasImage && <img className="bulletin-slip-image" src={post.image_url} alt={post.image_alt ?? post.title} />}
+          <div className="bulletin-slip-copy">
+            <div className="bulletin-byline">
+              <span className="bulletin-avatar" aria-hidden="true">{getInitials(post.author_name)}</span>
+              <div className="bulletin-author"><b title={post.author_name}>{post.author_name}</b><span>{post.date}</span></div>
+            </div>
+            {featured ? <h2>{post.title}</h2> : <h3>{post.title}</h3>}
+            {!featured && hasImage && <img className="bulletin-slip-image" src={post.image_url} alt={post.image_alt ?? post.title} loading="lazy" />}
+            {hasExcerpt && <p className="bulletin-excerpt">{excerpt}</p>}
+            <div className="bulletin-slip-meta">
+              <span><Heart aria-hidden="true" className={post.liked_by_me ? "fill-current" : ""} />{post.likes}<span className="sr-only"> likes</span></span>
+              <span><MessageCircle aria-hidden="true" />{post.comment_count}<span className="sr-only"> comments</span></span>
+              <span className="bulletin-read">Read post</span>
+            </div>
+          </div>
+        </button>
+      </article>
+    );
+  }
+
   return (
     <motion.div
       variants={cardVariants}
-      className={`group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
-        isList || isHomepage ? "flex-row" : isFeatured ? "flex-col lg:flex-row" : "flex-col"
+      data-post-variant={variant}
+      data-post-image={hasImage ? "true" : "false"}
+      className={`library-post-card group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
+        isList ? "flex-row" : isFeatured && hasImage ? "flex-col lg:flex-row" : "flex-col"
       } ${post.is_pinned ? isFeatured ? "border-l-2 border-l-warning" : "border-t-2 border-t-warning" : ""}`}
     >
       {/* Clickable area — everything except the archive button */}
       <button
         onClick={onClick}
-        className={`flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning ${
-          isList || isHomepage ? "flex-row" : isFeatured ? "flex-col lg:flex-row" : "flex-col"
+        className={`library-post-open flex min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-warning ${
+          isList ? "flex-row" : isFeatured && hasImage ? "flex-col lg:flex-row" : "flex-col"
         }`}
       >
         {/* Image posts keep their media panel; text-only posts use the full card for the announcement. */}
-        {hasImage ? (
+        {isHomepage ? null : hasImage ? (
           <div
             className={`relative shrink-0 overflow-hidden bg-muted/50 ${
               isList ? "h-40 w-36 sm:w-48 md:w-56" : isHomepage ? "m-4 mr-0 h-28 w-32 border border-border sm:m-5 sm:mr-0 sm:h-32 sm:w-40" : isFeatured ? "h-64 w-full lg:h-72 lg:w-[55%]" : "h-56 w-full"
@@ -103,7 +133,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
         )}
 
         {/* Content panel */}
-        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? "p-5 sm:p-6 lg:w-[45%] lg:justify-center" : "p-4 sm:p-5"} ${canArchive ? "pr-16 sm:pr-[4.5rem]" : ""}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${isList ? "p-4 sm:p-5" : isHomepage ? "p-4 sm:p-5" : isFeatured ? `p-5 sm:p-6 ${hasImage ? "lg:w-[45%]" : "w-full"} lg:justify-center` : "p-4 sm:p-5"} ${canArchive && !isHomepage ? "pr-16 sm:pr-[4.5rem]" : ""}`}>
           {!hasImage && post.is_pinned ? (
             <div className="mb-3 flex items-center gap-1 text-xs font-bold uppercase tracking-[0.18em] text-warning" style={{ fontFamily: "var(--font-heading)" }}>
               <Pin className="h-3 w-3" /> Pinned
@@ -111,16 +141,17 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           ) : null}
 
           {/* Author row */}
-          <div className={`flex items-center gap-2.5 ${isHomepage ? "mb-2" : "mb-3"}`}>
+          <div className={`flex min-w-0 items-center gap-2.5 ${isHomepage ? `mb-3 ${canArchive ? "pr-10" : ""}` : "mb-3"}`}>
             <div
               className="flex h-6 w-6 shrink-0 items-center justify-center bg-primary text-primary-foreground text-xs font-bold"
               style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.04em" }}
             >
               {getInitials(post.author_name)}
             </div>
-            <div className={`min-w-0 ${isHomepage || isFeatured ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
+            <div className={`library-post-meta min-w-0 ${isHomepage ? "flex-1" : ""} ${isHomepage || isFeatured ? "flex flex-col items-start gap-0.5" : "flex items-baseline gap-2"}`}>
               <span
-                className={`text-xs font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage || isFeatured ? "break-words" : "truncate"}`}
+                title={isHomepage ? post.author_name : undefined}
+                className={`text-xs font-bold uppercase tracking-[0.08em] text-foreground/70 ${isHomepage ? "w-full truncate" : isFeatured ? "break-words" : "truncate"}`}
                 style={{ fontFamily: "var(--font-heading)" }}
               >
                 {post.author_name}
@@ -131,7 +162,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
 
           {/* Title */}
           <p
-            className={`font-bold leading-snug text-foreground group-hover:text-primary transition-colors ${
+            className={`library-post-title font-bold leading-snug text-foreground group-hover:text-primary transition-colors ${
               isList ? "text-sm sm:text-base" : isHomepage ? "text-base" : isFeatured ? "text-xl sm:text-2xl" : "text-sm"
             }`}
             style={{ fontFamily: "var(--font-heading)" }}
@@ -139,19 +170,25 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
             {post.title}
           </p>
 
-          <p className={`mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-3 sm:text-sm" : "line-clamp-2"}`}>
-            {post.content}
-          </p>
+          {isHomepage && hasImage && (
+            <div className="library-post-image-band my-3 aspect-video w-full shrink-0 overflow-hidden border border-border bg-muted/50">
+              <img src={post.image_url!} alt={post.image_alt ?? post.title} className="h-full w-full object-cover object-top" loading="lazy" />
+            </div>
+          )}
+
+          {hasExcerpt && <p className={`library-post-excerpt mt-2 text-xs leading-relaxed text-muted-foreground ${isFeatured ? "line-clamp-3 sm:text-sm" : "line-clamp-2"}`}>
+            {excerpt}
+          </p>}
 
           {/* Footer — stats */}
-          <div className={`mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
+          <div className={`library-post-footer mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
             <span
               className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
                 post.liked_by_me ? "text-primary" : "text-muted-foreground"
               }`}
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <Heart className={`h-3 w-3 transition-all duration-150 ${post.liked_by_me ? "fill-current text-primary" : ""}`} />
+              <Heart aria-label={`${post.likes} likes${post.liked_by_me ? ", liked by you" : ""}`} role="img" className={`h-3 w-3 transition-all duration-150 ${post.liked_by_me ? "fill-current text-primary" : ""}`} />
               {post.likes}
             </span>
 
@@ -159,7 +196,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
               className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <MessageCircle className="h-3 w-3" />
+              <MessageCircle aria-label={`${post.comment_count} comments`} role="img" className="h-3 w-3" />
               {post.comment_count}
             </span>
 

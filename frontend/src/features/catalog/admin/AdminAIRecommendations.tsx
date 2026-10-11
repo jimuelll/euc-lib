@@ -1,7 +1,7 @@
 import {useState,useEffect,useRef} from 'react';
 import {Link} from 'react-router-dom';
 import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
-import {Check,CircleAlert,FileText,Sparkles,LoaderCircle} from 'lucide-react';
+import {Check,CircleAlert,FileText,Sparkles,LoaderCircle} from '@/components/ui/library-glyphs';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter} from '@/components/ui/alert-dialog';
@@ -12,13 +12,14 @@ import {catalogKeys} from '../catalog.keys';
 import {fetchEmbeddingStatus,fetchBackfillProgress,backfillEmbeddings,previewBackfill,cancelBackfill,type BackfillOptions} from './catalog.api';
 import ManualBookMetadata from './ManualBookMetadata';
 import './ai-recommendations.css';
+import './ai-restyle.css';
 
 export const runLabel=(status:string)=>({idle:'Never run',running:'Running',completed:'Completed',completed_with_errors:'Completed with failures',paused_rate_limited:'Paused · rate limited',cancelled:'Cancelled',interrupted:'Interrupted by server restart'}[status]||status);
 export default function AdminAIRecommendations(){
  const client=useQueryClient(),status=useQuery({queryKey:catalogKeys.embeddingStatus(),queryFn:({signal})=>fetchEmbeddingStatus(signal)});
- const progress=useQuery({queryKey:catalogKeys.embeddingProgress(),queryFn:({signal})=>fetchBackfillProgress(signal),refetchInterval:q=>q.state.data?.status==='running'?2000:15000});
+ const progress=useQuery({queryKey:catalogKeys.embeddingProgress(),queryFn:({signal})=>fetchBackfillProgress(signal),enabled:q=>status.data?.lastBackfill?.status==='running'||q.state.data?.status==='running',refetchInterval:q=>(q.state.data??status.data?.lastBackfill)?.status==='running'?2000:false});
  const [filter,setFilter]=useState('all'),[selectedIds,setSelectedIds]=useState<number[]>([]),[runIds,setRunIds]=useState<number[]>([]),[scope,setScope]=useState<BackfillOptions['scope']>('attention'),[limit,setLimit]=useState(100),[retryFailures,setRetryFailures]=useState(false),[dialog,setDialog]=useState(false),[revision,setRevision]=useState(0),[failure,setFailure]=useState('');
- const last=progress.data&&progress.data.status!=='idle'?progress.data:status.data?.lastBackfill;
+ const last=progress.data??status.data?.lastBackfill;
  const start=useMutation({mutationFn:backfillEmbeddings,onSuccess:result=>client.setQueryData(catalogKeys.embeddingProgress(),result)}),cancel=useMutation({mutationFn:cancelBackfill,onSuccess:result=>client.setQueryData(catalogKeys.embeddingProgress(),result)});
  const running=start.isPending||last?.status==='running',options:BackfillOptions={scope,limit,bookIds:runIds,retryFailures};
  const validLimit=Number.isInteger(limit)&&limit>=1&&limit<=1000;
@@ -27,7 +28,7 @@ export default function AdminAIRecommendations(){
  useEffect(()=>{if(!last||last.status==='idle'||last.status==='running')return;const identity=last.runId||`${last.status}-${last.completed}-${last.synopsesAdded}`;if(notified.current===identity)return;notified.current=identity;setRevision(n=>n+1);void client.invalidateQueries({queryKey:catalogKeys.embeddingStatus()});if(last.status==='completed')toast.success(`Book data refreshed: ${last.synopsesAdded} synopses added; ${last.missingSynopses} still need staff input.`);},[last,client]);
  const open=(ids=selectedIds)=>{setRunIds(ids);setFailure('');setDialog(true);};
  const run=async()=>{setFailure('');try{await start.mutateAsync(options);setDialog(false);}catch(error){setFailure(getApiErrorMessage(error,'Book data refresh could not start. Try again.'));}};
- const refresh=()=>{void status.refetch();void progress.refetch();void client.invalidateQueries({queryKey:[...catalogKeys.embeddings(),'books']});};
+ const refresh=()=>{void status.refetch();if(last?.status==='running')void progress.refetch();void client.invalidateQueries({queryKey:[...catalogKeys.embeddings(),'books']});};
  const data=status.data,total=data?.total||0,completed=last?.completed||0,runTotal=last?.total||0;
  const auditUrl=last?.auditEventId?`/admin/audit-logs?event=${last.auditEventId}`:last?.runId?`/admin/audit-logs?query=${encodeURIComponent(last.runId)}`:'/admin/audit-logs?query=AI%20backfill';
  return <div className="ai-workspace"><AdminPageHeader title="AI Recommendations" subtitle="Maintain book details that help the AI recommend similar reading." updatedAt={status.dataUpdatedAt} loading={status.isFetching} onRefresh={refresh}/>
@@ -37,7 +38,7 @@ export default function AdminAIRecommendations(){
    {key:'synopses',label:'Missing synopsis',count:data?.missingSynopses,Icon:FileText,help:'Add or look up the book’s synopsis.',tone:'attention'},
    {key:'details',label:'Missing book details',count:data?.missingDetails,Icon:CircleAlert,help:'No useful saved synopsis or book details, or the details lookup failed.',tone:'attention'},
    {key:'matching',label:'Missing AI data',count:data?data.total-data.ready:undefined,Icon:Check,help:'AI matching data is missing, outdated or failed.',tone:'neutral'}
-  ].map(({key,label,count,Icon,help,tone})=><button key={key} className="ai-coverage-card" data-tone={tone} aria-pressed={filter===key} aria-label={`${label}: ${count??'loading'} of ${total} books. Filter list.`} onClick={()=>setFilter(filter===key?'all':key)} disabled={status.isPending||status.isError}><Icon aria-hidden="true"/><div><span>{label}{filter===key&&<small className="ai-filtered-label"> · Filtered</small>}</span><strong>{count??'—'} <small>of {total}</small></strong><p>{help}</p><div className="ai-progress" aria-hidden="true"><span style={{transform:`scaleX(${total?(count??0)/total:0})`}}/></div></div></button>)}</div><p className="ai-readiness-note">AI ready means stored matching data exists. Saving or editing a book can generate it independently of a bulk refresh. It does not confirm that a synopsis exists.</p></section>
+  ].map(({key,label,count,Icon,help,tone})=><button key={key} className="ai-coverage-card" data-tone={tone} data-attention={tone==='attention'&&(count??0)>0} aria-pressed={filter===key} aria-label={`${label}: ${count??'loading'} of ${total} books. Filter list.`} onClick={()=>setFilter(filter===key?'all':key)} disabled={status.isPending||status.isError}><Icon aria-hidden="true"/><div><span>{label}{filter===key&&<small className="ai-filtered-label"> · Filtered</small>}</span><strong>{count??'—'} <small>of {total}</small></strong><p>{help}</p><div className="ai-progress" aria-hidden="true"><span style={{transform:`scaleX(${total?(count??0)/total:0})`}}/></div></div></button>)}</div><p className="ai-readiness-note">AI ready means stored matching data exists. Saving or editing a book can generate it independently of a bulk refresh. It does not confirm that a synopsis exists.</p></section>
   <section className="ai-backfill" aria-labelledby="ai-backfill-title"><div className="ai-panel-title"><div><h2 id="ai-backfill-title">Refresh book data</h2><p>Check online synopses and refresh AI matching data when needed.</p></div><Button disabled={running||status.isError||status.isPending||total===0} onClick={()=>open()}>{running?<LoaderCircle aria-hidden="true" className="animate-spin"/>:<Sparkles aria-hidden="true"/>}{running?`Running · ${completed} of ${runTotal}`:'Refresh book data'}</Button></div>
    <p className="ai-last-run">Last refresh: {last?.startedAt?`${formatAdminDate(last.startedAt)} · ${last.actorName||'Actor not recorded'} · ${runLabel(last.status)}`:'Never run'}</p>
    <details className="ai-how"><summary>How refreshing works</summary><p>Synopsis lookup: Open Library → Google Books → Hardcover (when configured). Other book-detail lookups may run together.</p><ul><li>Staff-entered details are preserved.</li><li>Useful saved details and current AI matching data are reused.</li><li>Books without ISBNs or without online synopses still need staff input.</li></ul><p><strong>Embedding</strong>: searchable book data the AI uses to match similar reading.</p></details>
@@ -53,7 +54,7 @@ export default function AdminAIRecommendations(){
     {last.status==='paused_rate_limited'&&<p className="ai-error">Google Books rate limit reached.{last.rateLimitRetryAt?` Retry after ${formatAdminDate(last.rateLimitRetryAt)}.`:' Wait before retrying.'}</p>}
     {last.providers?.length? <details className="ai-how"><summary>Sources that responded or failed</summary><ul>{last.providers.map(attempt=><li key={attempt}>{attempt}</li>)}</ul></details>:null}
     {Boolean(last.failed||last.lookupFailed)&&<div className="ai-error" role="alert"><p>{last.lookupFailed} online lookup failures · {last.failed} AI matching failures</p><ul>{[...last.lookupErrors||[],...last.errors||[]].map((message,i)=><li key={i}>{message}</li>)}</ul><p>Check provider configuration, retry failures, or add synopses manually.</p></div>}{last.auditError&&<p role="alert" className="ai-error">{last.auditError}</p>}
-   </div>}{progress.isError&&<p className="ai-error" role="status">Progress could not be loaded. The run may still be active. <Button variant="outline" onClick={()=>void progress.refetch()}>Retry progress</Button></p>}{failure&&!dialog&&<p className="ai-error" role="alert">{failure}</p>}
+   </div>}{progress.isError&&last?.status==='running'&&<p className="ai-error" role="status">Live progress could not be loaded. Last known status: running. Retry to check whether the run has finished. <Button variant="outline" onClick={()=>void progress.refetch()}>Retry progress</Button></p>}{failure&&!dialog&&<p className="ai-error" role="alert">{failure}</p>}
   </section>
   {selectedIds.length>0&&<div className="ai-bulk"><span>{selectedIds.length} selected</span><Button variant="outline" disabled={running} onClick={()=>{setScope('selected');setLimit(Math.min(1000,selectedIds.length));open();}}>Refresh selected</Button><Button variant="outline" onClick={()=>setSelectedIds([])}>Clear selection</Button></div>}
   <ManualBookMetadata backfillRevision={revision} filter={filter} onFilter={setFilter} coverage={data} clearFilter={()=>setFilter('all')} selectedIds={selectedIds} onSelection={setSelectedIds} running={running} onLookup={id=>{setScope('selected');setLimit(1);open([id]);}}/>

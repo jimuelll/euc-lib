@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LibraryDesignProvider } from "@/components/ui/library-design";
 
 type PublicPageMastheadProps = {
   title: string;
@@ -8,6 +9,7 @@ type PublicPageMastheadProps = {
 
 /** Shared public-route masthead: a single maroon field, gold rule, and clear page task. */
 const PublicPageMasthead = ({ title, description, children }: PublicPageMastheadProps) => (
+  <LibraryDesignProvider enabled={false}>
   <section className="relative overflow-hidden border-b border-warning/70 bg-primary text-primary-foreground">
     <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_0%,rgb(0_0_0_/_0.16)_100%)]" />
     <div className="relative h-[2px] bg-warning" />
@@ -18,6 +20,7 @@ const PublicPageMasthead = ({ title, description, children }: PublicPageMasthead
       {children ? <div className="mt-5">{children}</div> : null}
     </div>
   </section>
+  </LibraryDesignProvider>
 );
 
 export default PublicPageMasthead;

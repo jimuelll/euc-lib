@@ -1,3 +1,4 @@
+import { useLibraryDesign } from "./library-design";
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
@@ -14,6 +15,7 @@ const TooltipContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
   <TooltipPrimitive.Content
+      data-library-design={useLibraryDesign() || undefined}
     ref={ref}
     sideOffset={sideOffset}
     className={cn(

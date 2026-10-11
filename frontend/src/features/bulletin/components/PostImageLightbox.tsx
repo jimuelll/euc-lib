@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Download, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut } from "@/components/ui/library-glyphs";
 import type { RefObject } from "react";
 import type { BulletinPost } from "../types";
 

@@ -38,7 +38,7 @@ const backfill: RequestHandler = async (req, res) => {
 };
 
 const backfillProgress: RequestHandler = async (_req, res) => {
-  try { const result=await service.restoredBackfillProgress();const last=await require('./recommendations.run-log').latestRun();res.json({...result,...(last?.runId===result.runId?{actorName:last.actorName,auditEventId:last.auditEventId}:{})}); }
+  try { const result=await service.restoredBackfillProgress();const last=await require('./recommendations.run-log').latestRun();res.json({...result,...(last&&last.runId===result.runId?{actorName:last.actorName,auditEventId:last.auditEventId}:{})}); }
   catch (error: unknown) { sendError(res, error, "Failed to fetch embedding progress"); }
 };
 

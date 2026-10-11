@@ -1,4 +1,4 @@
-import { BookMarked, CalendarClock, MapPin, User } from "lucide-react";
+import { BookMarked, CalendarClock, MapPin, User } from "@/components/ui/library-glyphs";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReservationRow from "./ReservationRow";
 import ReservationRowActions from "./ReservationRowActions";

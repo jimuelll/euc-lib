@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Lock } from "lucide-react";
+import { Eye, EyeOff, Lock } from "@/components/ui/library-glyphs";
 import { useAuth } from "@/context/AuthContext";
 
 interface PasswordChangeModalProps {

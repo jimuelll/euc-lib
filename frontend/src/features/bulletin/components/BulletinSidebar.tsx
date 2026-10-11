@@ -2,16 +2,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AdminDateTime } from "@/features/admin";
 import type { UpcomingEvent } from "../types";
 import { createEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
 import { siteContentKeys } from "@/features/site-content";
-
-const upcomingEvents: UpcomingEvent[] = [
-  { title: "Research Writing Workshop", date: "March 25, 2026", time: "2:00 PM – 4:00 PM" },
-  { title: "Book Fair 2026",            date: "April 5–7, 2026",  time: "9:00 AM – 5:00 PM" },
-  { title: "Digital Literacy Seminar",  date: "April 15, 2026",   time: "10:00 AM – 12:00 PM" },
-  { title: "Author Meet & Greet",       date: "April 22, 2026",   time: "3:00 PM – 5:00 PM" },
-];
 
 export function BulletinSidebar() {
   const { user } = useAuth();
@@ -19,80 +13,71 @@ export function BulletinSidebar() {
   const canManage = ["admin", "super_admin"].includes(user?.role ?? "");
   const eventsQuery = useQuery({ queryKey: siteContentKeys.eventList(false), queryFn: ({ signal }) => fetchEvents(false, signal) });
   const createMutation = useMutation({ mutationFn: createEvent, onSuccess: () => queryClient.invalidateQueries({ queryKey: siteContentKeys.events() }) });
-  const events: UpcomingEvent[] = eventsQuery.data ? eventsQuery.data.map((event: SiteEvent) => {
+  const events: UpcomingEvent[] = eventsQuery.data ? [...eventsQuery.data].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()).map((event: SiteEvent) => {
     const start = new Date(event.starts_at);
     const end = event.ends_at ? new Date(event.ends_at) : null;
+    const sameMonth = end && start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
     return {
       id: event.id,
       title: event.title,
-      date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
-      time: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${end ? ` – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}`,
+      dateDay: `${start.getDate()}${sameMonth && start.getDate() !== end.getDate() ? `–${end.getDate()}` : ""}`,
+      dateMonth: `${start.toLocaleDateString("en-US", { month: "short" })}${end && !sameMonth ? `–${end.toLocaleDateString("en-US", { month: "short" })}` : ""}`,
+      date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end && start.toDateString() !== end.toDateString() ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
     };
-  }) : upcomingEvents;
+  }) : [];
+  const [showAll, setShowAll] = useState(false);
+  const [nextEvent, ...remainingEvents] = events;
+  const visibleEvents = showAll ? remainingEvents : remainingEvents.slice(0, 3);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
-  const save = async () => { if (!title.trim() || !startsAt) return; await createMutation.mutateAsync({ title, starts_at: startsAt, ends_at: endsAt || null }); setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false); };
+  const [saveError, setSaveError] = useState("");
+  const save = async () => {
+    if (!title.trim() || !startsAt || createMutation.isPending) return;
+    if (endsAt && endsAt < startsAt) { setSaveError("End date must be on or after the start date."); return; }
+    setSaveError("");
+    try {
+      await createMutation.mutateAsync({
+        title: title.trim(),
+        starts_at: new Date(`${startsAt}T00:00:00`).toISOString(),
+        ends_at: new Date(`${endsAt || startsAt}T23:59:59`).toISOString(),
+      });
+      setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false);
+    } catch { setSaveError("The event could not be added. Please try again."); }
+  };
   return (
-    <aside className="w-full self-start lg:sticky lg:top-[4.5rem] lg:w-72 lg:shrink-0">
-
-      {/* ── Upcoming Events ── */}
-      <div id="upcoming-events" className="border border-border">
-
-        {/* Section header — same primary-band grammar as page header, compressed */}
-        <div className="bg-primary px-4 py-3 flex items-center gap-3 border-b border-primary-foreground/10">
-          <div className="h-px w-4 bg-warning shrink-0" />
-          <span
-            className="text-xs font-bold uppercase tracking-[0.3em] text-warning"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Upcoming Events
-          </span>
-          {canManage ? <button onClick={() => setOpen(true)} className="ml-auto text-xs font-bold uppercase tracking-[0.14em] text-primary-foreground/70 hover:text-warning">Update</button> : null}
-        </div>
-
-        {/* Event list — flush rows separated by ruled lines */}
-        <div className="divide-y divide-border">
-          {events.map((event, i) => (
-            <div
-              key={event.title}
-              className="group flex gap-0 transition-colors duration-200 hover:bg-secondary/50"
-            >
-              {/* Index column — like a numbered register */}
-              <div
-                className="w-8 shrink-0 flex items-start justify-center pt-4 border-r border-border"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                <span className="text-xs font-bold text-warning/60 tabular-nums">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0 px-3.5 py-3.5">
-                <p
-                  className="text-[12px] font-bold leading-snug text-foreground group-hover:text-primary transition-colors"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {event.title}
-                </p>
-                <p className="mt-1 text-xs leading-tight text-muted-foreground">
-                  {event.date}
-                </p>
-                <p className="text-xs leading-tight text-muted-foreground/80">
-                  {event.time}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Footer rule */}
-        <div className="h-[3px] w-full bg-warning" />
-      </div>
-
-      <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader><div className="space-y-3"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={startsAt} onChange={(e) => setStartsAt(e.target.value)} type="datetime-local" aria-label="Event start" className="h-10 w-full border border-border bg-background px-3 text-sm" /><input value={endsAt} min={startsAt || undefined} onChange={(e) => setEndsAt(e.target.value)} type="datetime-local" aria-label="Event end" className="h-10 w-full border border-border bg-background px-3 text-sm" /><p className="text-xs text-muted-foreground">Leave the end blank for a single-date event.</p><button onClick={() => void save()} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground">Add event</button></div></DialogContent></Dialog>
+    <aside className="bulletin-agenda" aria-labelledby="bulletin-agenda-heading">
+      <div className="bulletin-agenda-heading"><h2 id="bulletin-agenda-heading">Coming up</h2><span>{events.length} event{events.length === 1 ? "" : "s"}</span></div>
+      {eventsQuery.isPending && <p role="status" className="bulletin-agenda-status">Loading upcoming events…</p>}
+      {eventsQuery.isError && <div role="alert" className="bulletin-agenda-status"><p>Upcoming events could not be loaded.</p><button className="bulletin-text-button" onClick={() => void eventsQuery.refetch()}>Try again</button></div>}
+      {!eventsQuery.isPending && !eventsQuery.isError && !events.length && <p className="bulletin-agenda-status">No upcoming events.</p>}
+      {nextEvent && <div className="bulletin-next-event">
+        <div className="bulletin-next-date" aria-hidden="true">{nextEvent.dateDay}<small>{nextEvent.dateMonth}</small></div>
+        <div className="bulletin-next-copy"><span>Next</span><b>{nextEvent.title}</b><p>{nextEvent.date}</p></div>
+      </div>}
+      {visibleEvents.map((event) => <div key={event.id ?? `${event.title}-${event.date}`} className="bulletin-event-row">
+        <div className="bulletin-event-date" aria-hidden="true">{event.dateDay}<small>{event.dateMonth}</small></div>
+        <div><b>{event.title}</b><span>{event.date}</span></div>
+      </div>)}
+      {(events.length > 4 || canManage) && <div className="bulletin-agenda-actions">
+        {events.length > 4 && <button className="bulletin-text-button" onClick={() => setShowAll((value) => !value)} aria-expanded={showAll}>{showAll ? "Show fewer" : `Show all ${events.length} events`}</button>}
+        {canManage && <button className="bulletin-text-button" onClick={() => setOpen(true)}>Update</button>}
+      </div>}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader>
+          <form className="bulletin-event-form space-y-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+            <label className="block text-sm font-medium" htmlFor="bulletin-event-title">Event title</label>
+            <input id="bulletin-event-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" required className="h-10 w-full border border-border bg-background px-3 text-sm" />
+            <AdminDateTime label="Start date" value={startsAt} onChange={setStartsAt} dateOnly />
+            <AdminDateTime label="End date (optional)" value={endsAt} onChange={setEndsAt} dateOnly optional />
+            <p className="text-xs text-muted-foreground">Leave the end blank for a single-date event.</p>
+            {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+            <button type="submit" disabled={!title.trim() || !startsAt || createMutation.isPending} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground disabled:opacity-50">{createMutation.isPending ? "Adding event…" : "Add event"}</button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
     </aside>
   );

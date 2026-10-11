@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { QrCode } from "lucide-react";
+import { QrCode } from "@/components/ui/library-glyphs";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
@@ -145,7 +145,7 @@ const ScanQR = () => {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 bg-background py-14">
+      <main data-library-design className="flex-1 bg-background py-14">
         <div className="container px-4 sm:px-6 flex justify-center">
           <AnimatePresence mode="wait">
             {scanMode === "idle" && (

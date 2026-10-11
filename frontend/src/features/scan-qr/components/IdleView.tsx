@@ -1,4 +1,4 @@
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut } from "@/components/ui/library-glyphs";
 import { motion } from "framer-motion";
 import type { AttendanceType } from "../types";
 

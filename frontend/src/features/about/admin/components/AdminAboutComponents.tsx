@@ -2,7 +2,7 @@ import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
 import { Button }   from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, UploadCloud, X } from "lucide-react";
+import { Plus, Trash2, UploadCloud, X } from "@/components/ui/library-glyphs";
 import { useRef } from "react";
 import type { StaffMember, LibrarySpace } from "@/features/about/api/about.service";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";

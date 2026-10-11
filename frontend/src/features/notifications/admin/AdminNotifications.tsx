@@ -132,7 +132,7 @@ export default function AdminNotifications() {
                     break;
                 index++;
             }
-            const cell = (value: unknown) => '"' + String(value ?? '').replace(/^[\s]*[=+@\-]/, "'$&").replace(/"/g, '""') + '"';
+            const cell = (value: unknown) => '"' + String(value ?? '').replace(/^[\s]*[=+@-]/, "'$&").replace(/"/g, '""') + '"';
             const csv = [['Title', 'Message', 'Type', 'Audience', 'Delivery', 'Read', 'Group size', 'Created', 'Scheduled', 'Expires'], ...collected.map(item => [item.title, item.body, label(item.type), item.audience_user_name || item.audience_role || 'All active users', item.delivery_status, item.group_reads || item.read_count, item.group_count || 1, time(item.created_at), time(item.scheduled_at), time(item.expires_at)])].map(row => row.map(cell).join(',')).join('\r\n');
             const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
             const anchor = document.createElement('a');

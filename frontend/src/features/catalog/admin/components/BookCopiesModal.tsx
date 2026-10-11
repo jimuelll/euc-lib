@@ -4,7 +4,7 @@ import { toast } from "@/components/ui/sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { BrowserMultiFormatReader } from "@zxing/browser";
-import { X, ScanLine, Loader2, Download, Printer, BookOpen, Archive, ArchiveRestore } from "lucide-react";
+import { X, ScanLine, Loader2, Download, Printer, BookOpen, Archive, ArchiveRestore } from "@/components/ui/library-glyphs";
 import { printCodeLabel } from "@/utils/printCodeLabel";
 import { fetchCatalogBarcode, fetchCatalogBookCopies, fetchCatalogCopy, updateCatalogCopyCondition, retireCatalogCopy, restoreCatalogCopy, addCatalogCopies } from "../catalog.api";
 import { catalogKeys } from "../../catalog.keys";

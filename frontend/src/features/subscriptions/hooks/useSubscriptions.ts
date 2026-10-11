@@ -7,12 +7,14 @@ interface UseSubscriptionsReturn {
   subscriptions: Subscription[];
   status: FetchStatus;
   error: string | null;
+  refetch: () => Promise<unknown>;
 }
 
-export function useSubscriptions(): UseSubscriptionsReturn {
+export function useSubscriptions(enabled = true): UseSubscriptionsReturn {
   const query = useQuery({
     queryKey: subscriptionsKeys.public(),
     queryFn: ({ signal }) => fetchSubscriptions(signal),
+    enabled,
   });
 
   const status: FetchStatus = query.isPending ? "loading" : query.isError ? "error" : "success";
@@ -20,5 +22,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     subscriptions: query.data ?? [],
     status,
     error: query.isError ? "Failed to load subscriptions. Please try again." : null,
+    refetch: query.refetch,
   };
 }

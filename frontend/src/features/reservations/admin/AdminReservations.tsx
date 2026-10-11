@@ -1,3 +1,4 @@
+import { LibraryAvailability } from "@/components/ui/library-patterns";
 import {useSearchParams} from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ export default function AdminReservations() {
       <div className="reservation-book">
         {!desk.showArchived && !closed(row) && <AdminSelectionCheckbox label={`Select reservation ${row.id} for ${row.user_name}`} checked={selected.includes(row.id)} disabled={busy || desk.loading} onChange={checked => setSelected(ids => checked ? [...ids, row.id] : ids.filter(id => id !== row.id))} />}
         <span className="reservation-book-icon"><AdminIcon name="catalog" /></span><div><button id={`reservation-detail-${row.id}`} className="reservation-title" title={row.book_title} onClick={() => showDetails(row)}>{row.book_title}</button><p className="reservation-secondary">{row.book_author}</p>
-          {row.status === "pending" && <p className="reservation-secondary">{row.available_copies === undefined ? "Copy availability unavailable" : Number(row.available_copies) === 0 ? "No copy available" : `${row.available_copies} ${Number(row.available_copies) === 1 ? "copy" : "copies"} available`}{row.queue_position !== undefined && Number(row.queue_position) > 1 ? ` · Queue #${row.queue_position}` : ""}</p>}
+          {row.status === "pending" && <p className="reservation-secondary">{row.available_copies === undefined ? <>Copy availability unavailable{row.queue_position !== undefined && Number(row.queue_position) > 1 ? ` · Queue #${row.queue_position}` : ""}</> : <LibraryAvailability available={Number(row.available_copies)}><span data-unavailable={Number(row.available_copies) === 0 ? true : undefined}>{Number(row.available_copies) === 0 ? "No copy available" : `${row.available_copies} ${Number(row.available_copies) === 1 ? "copy" : "copies"} available`}{row.queue_position !== undefined && Number(row.queue_position) > 1 ? ` · Queue #${row.queue_position}` : ""}</span></LibraryAvailability>}</p>}
           {row.book_location && <p className="reservation-secondary">{row.book_location}</p>}</div>
       </div>
       <div className="reservation-patron"><strong>{row.user_name}</strong><span className="reservation-id">{row.student_employee_id}</span><span className="reservation-secondary">Reserved {day(row.reserved_at)}</span></div>
@@ -77,7 +78,7 @@ export default function AdminReservations() {
     {!desk.showArchived && <section aria-label="Outstanding reservations" className="reservation-summary">{[
       { label: "Ready for pickup", filter: "ready", tone: "green", icon: "reservations" as const, count: counts.ready, hint: summary?.soonest_expiry ? `Soonest expiry ${stamp(summary.soonest_expiry)}` : "Prepared holds awaiting pickup" },
       { label: "Pending to prepare", filter: "pending", tone: "amber", icon: "clock" as const, count: counts.pending, hint: "Oldest requests first" },
-      { label: "Expiring soon / expired", filter: "attention", tone: "red", icon: "overdue" as const, count: counts.attention, hint: "Pickup deadlines within 24 hours or ended" },
+      { label: "Expiring soon / expired", filter: "attention", tone: "red", icon: "expiring" as const, count: counts.attention, hint: "Pickup deadlines within 24 hours or ended" },
     ].map(tile => <AdminSummaryTile key={tile.filter} label={tile.label} value={tile.count} tone={tile.tone as "red" | "green" | "amber"} icon={tile.icon} ariaLabel={`${tile.label}: ${tile.count === undefined ? "unavailable" : tile.count}`} hint={tile.hint} selected={desk.statusFilter === tile.filter} disabled={busy} onSelect={() => desk.handleStatusChange(tile.filter)} />)}</section>}
     <div className="reservation-filters">{!desk.showArchived && <AdminFilterChips label="Reservation status" value={desk.statusFilter} disabled={busy} onChange={desk.handleStatusChange} items={[{value:"needs_action",label:"Needs action",count:counts.needs_action},{value:"closed",label:"Closed",count:counts.closed},{value:"all",label:"All",count:counts.all}]} />}<label className="reservation-search"><AdminIcon name="search" /><span className="sr-only">Search reservations</span><input placeholder="Search patron, ID, book or author" value={desk.search} disabled={busy} onChange={event => desk.handleSearchChange(event.target.value)} /></label></div>
     {desk.showArchived && <p className="reservation-secondary">Archived records can be restored to the reservation list.</p>}

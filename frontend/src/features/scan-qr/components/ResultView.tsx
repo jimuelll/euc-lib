@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, XCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock3, XCircle, RefreshCw } from "@/components/ui/library-glyphs";
 import { motion } from "framer-motion";
 import type { AttendanceResult, AttendanceNotice, AttendanceType } from "../types";
 import { AUTO_RESET_DELAY } from "../utils";

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
-import {render,screen,fireEvent,within,cleanup} from '@testing-library/react';
+import {render,screen,fireEvent,within,cleanup,waitFor} from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {MemoryRouter} from 'react-router-dom';
 import {createTestQueryClientWrapper} from '@/test-utils/query-client';
@@ -12,5 +12,30 @@ const status={total:60,ready:60,stale:0,failed:0,missing:0,missingSynopses:60,mi
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.fetchEmbeddingStatus).mockResolvedValue(status);vi.mocked(api.fetchBackfillProgress).mockResolvedValue(run);vi.mocked(api.previewBackfill).mockResolvedValue({total:60,missingSynopses:60,synopsisLookups:60,embeddings:0,estimatedSeconds:null});vi.mocked(api.fetchManualMetadataBooks).mockResolvedValue({rows:[],pagination:{page:1,limit:25,total:0,totalPages:1}});});
 afterEach(cleanup);
 const mount=()=>render(<MemoryRouter><AdminAIRecommendations/></MemoryRouter>,{wrapper:createTestQueryClientWrapper()});
+it.each([undefined,run])('does not request progress or show run warnings before a run exists (%j)',async(lastBackfill)=>{
+ vi.mocked(api.fetchEmbeddingStatus).mockResolvedValue({...status,lastBackfill});
+ vi.mocked(api.fetchBackfillProgress).mockRejectedValue(new Error('offline'));
+ mount();
+ expect(await screen.findByText('60 active books')).toBeInTheDocument();
+ expect(api.fetchBackfillProgress).not.toHaveBeenCalled();
+ expect(screen.queryByRole('button',{name:'Retry progress'})).not.toBeInTheDocument();
+ expect(screen.queryByText(/run may still be active/i)).not.toBeInTheDocument();
+ expect(screen.getByText('Last refresh: Never run')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Refresh book data'})).toBeEnabled();
+ expect(api.backfillEmbeddings).not.toHaveBeenCalled();
+ expect(api.backfillEmbeddings).not.toHaveBeenCalled();
+});
+it('preserves the last known running state when live progress fails',async()=>{
+ vi.mocked(api.fetchEmbeddingStatus).mockResolvedValue({...status,lastBackfill:{...run,status:'running',runId:'active-run',total:60}});
+ vi.mocked(api.fetchBackfillProgress).mockRejectedValue(new Error('offline'));
+ mount();
+ expect(await screen.findByText(/Last known status: running/)).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Running · 0 of 60'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Cancel run'})).toBeInTheDocument();
+ expect(api.backfillEmbeddings).not.toHaveBeenCalled();
+ vi.mocked(api.fetchBackfillProgress).mockResolvedValue({...run,status:'running',runId:'active-run',total:60});
+ fireEvent.click(screen.getByRole('button',{name:'Retry progress'}));
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Retry progress'})).not.toBeInTheDocument());
+});
 it('explains stored readiness separately from runs and previews scoped external data before refreshing',async()=>{mount();expect(await screen.findByText('60 active books')).toBeInTheDocument();expect(screen.getByText(/Saving or editing a book can generate/)).toBeInTheDocument();expect(screen.getByRole('button',{name:/Missing AI data: 0 of 60/})).toBeInTheDocument();expect(screen.getByText(/Google Gemini needs setup/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Refresh book data'}));const dialog=await screen.findByRole('alertdialog');expect(await within(dialog).findByText(/60 have no synopsis/)).toBeInTheDocument();expect(within(dialog).getByText(/No patron data is sent/)).toBeInTheDocument();fireEvent.change(within(dialog).getByLabelText('Refresh scope'),{target:{value:'synopses'}});expect(api.backfillEmbeddings).not.toHaveBeenCalled();expect(within(dialog).getByRole('option',{name:/Only missing synopses/})).toBeInTheDocument();});
-it('links the completed run to its exact audit entry and filters remaining synopsis work',async()=>{vi.mocked(api.fetchBackfillProgress).mockResolvedValue({...run,status:'completed',runId:'abc',auditEventId:42,actorName:'Library Staff',startedAt:'2026-10-10T02:00:00Z',completed:60,total:60,missingSynopses:22,synopsesAdded:38});mount();expect(await screen.findByRole('link',{name:/View run in audit log/})).toHaveAttribute('href','/admin/audit-logs?event=42');expect(screen.getByText(/Library Staff · Completed/)).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'View 22 books missing a synopsis'}));expect(screen.getByRole('button',{name:/Needs synopsis 60/})).toHaveAttribute('aria-pressed','true');});
+it('loads completed run history without polling and filters remaining synopsis work',async()=>{vi.mocked(api.fetchEmbeddingStatus).mockResolvedValue({...status,lastBackfill:{...run,status:'completed',runId:'abc',auditEventId:42,actorName:'Library Staff',startedAt:'2026-10-10T02:00:00Z',completed:60,total:60,missingSynopses:22,synopsesAdded:38}});mount();expect(await screen.findByRole('link',{name:/View run in audit log/})).toHaveAttribute('href','/admin/audit-logs?event=42');expect(screen.getByText(/Library Staff · Completed/)).toBeInTheDocument();expect(api.fetchBackfillProgress).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'View 22 books missing a synopsis'}));expect(screen.getByRole('button',{name:/Needs synopsis 60/})).toHaveAttribute('aria-pressed','true');});

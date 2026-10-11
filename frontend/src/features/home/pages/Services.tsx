@@ -1,125 +1,32 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, GraduationCap, Lock } from "lucide-react";
+import { ArrowRight, BookOpen, GraduationCap } from "@/components/ui/library-glyphs";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import PublicPageMasthead from "@/components/layout/PublicPageMasthead";
 import { useAuth } from "@/context/AuthContext";
+import "@/components/layout/library-pages.css";
 
 const services = [
-  {
-    icon: BookOpen,
-    title: "Borrowing & Reservation",
-    description: "Manage your book borrowing activity and reservations through your library account.",
-    requiresLogin: true,
-    link: "/services/borrowing",
-  },
-  {
-    icon: GraduationCap,
-    title: "Academic Subscriptions",
-    description: "Explore academic resources and research materials through your library account.",
-    requiresLogin: true,
-    link: "/services/subscriptions",
-  },
+  { icon: BookOpen, title: "Borrowing & Reservation", description: "Manage your book borrowing activity and reservations through your library account.", link: "/services/borrowing" },
+  { icon: GraduationCap, title: "Academic Subscriptions", description: "Explore academic resources and research materials through your library account.", link: "/services/subscriptions" },
 ];
+const steps = [["Sign in", "Use your library account"], ["Find a book", "Search the catalogue"], ["Reserve", "Hold it for pickup"], ["Pick up", "At the circulation desk"]];
 
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex items-center gap-3 mb-6">
-    <div className="h-px w-6 bg-warning shrink-0" />
-    <p
-      className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
-      style={{ fontFamily: "var(--font-heading)" }}
-    >
-      {children}
-    </p>
-  </div>
-);
-
-const Services = () => {
+export default function Services() {
   const { isLoggedIn } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-
-      <PublicPageMasthead title="Library Services" description="Explore the services that support your academic journey." />
-
-      <main className="bg-background">
-        <div className="border-b border-border py-12 sm:py-16">
-          <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div
-              className="border-l border-t border-border"
-              style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 420px), 1fr))" }}
-            >
-              {services.map((s, index) => {
-                const Icon = s.icon;
-                const needsAuth = s.requiresLogin && !isLoggedIn;
-                const href = needsAuth ? "/login" : (s.link ?? "/");
-
-                return (
-                  <div
-                    key={s.title}
-                    className="flex flex-col border-r border-b border-border bg-background p-7 sm:p-9 lg:p-10"
-                  >
-                    <div className="mb-7 flex items-start justify-between">
-                      <div className="flex h-11 w-11 items-center justify-center bg-primary border border-primary/20 shrink-0">
-                        <Icon className="h-4 w-4 text-primary-foreground" />
-                      </div>
-                      <span
-                        className="text-xs font-bold tracking-[0.2em] text-border"
-                        style={{ fontFamily: "var(--font-heading)" }}
-                      >
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-
-                    <div className="flex-1 border-t border-border pt-6">
-                      <SectionLabel>{s.requiresLogin ? "Requires Login" : "Open Access"}</SectionLabel>
-                      <h2 className="text-xl font-bold tracking-tight text-foreground mb-4" style={{ fontFamily: "var(--font-heading)" }}>
-                        {s.title}
-                      </h2>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{s.description}</p>
-                    </div>
-
-                    <div className="mt-8 border-t border-border pt-5">
-                      <Link to={href}>
-                        <button
-                          className="group flex w-full items-center justify-between px-5 py-3.5 border text-xs font-bold uppercase tracking-[0.15em] transition-colors duration-150"
-                          style={{
-                            fontFamily: "var(--font-heading)",
-                            ...(needsAuth
-                              ? { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))", backgroundColor: "transparent" }
-                              : { borderColor: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", backgroundColor: "hsl(var(--primary))" }),
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = needsAuth
-                              ? "hsl(var(--secondary))"
-                              : "hsl(var(--primary) / 0.85)";
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.backgroundColor = needsAuth
-                              ? "transparent"
-                              : "hsl(var(--primary))";
-                          }}
-                        >
-                          <span>{needsAuth ? "Login to Access" : "View Service"}</span>
-                          {needsAuth
-                            ? <Lock className="h-3.5 w-3.5" />
-                            : <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
-                          }
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
-  );
-};
-
-export default Services;
+  return <div className="min-h-screen bg-background">
+    <Navbar />
+    <main data-library-design className="library-information-page"><div className="library-information-inner">
+      <header className="library-information-heading"><div className="library-information-kicker">EUC Library</div><h1>Library services</h1><p>Explore the services that support your academic journey.</p></header>
+      {!isLoggedIn && <div className="library-service-note"><p>Services below need a library account.</p><Link to="/login" className="library-information-button is-outline">Sign in</Link></div>}
+      <div className="library-service-list">{services.map(({ icon: Icon, title, description, link }) => <article className="library-service-row" key={title}>
+        <div className="library-service-plate" aria-hidden="true"><Icon /></div>
+        <div><h2>{title}</h2><p>{description}</p></div>
+        <Link to={isLoggedIn ? link : "/login"} className="library-information-button" aria-label={`${isLoggedIn ? "Open" : "Sign in to open"} ${title}`}>{isLoggedIn ? "Open" : "Sign in to open"}<ArrowRight aria-hidden="true" /></Link>
+      </article>)}</div>
+      <section className="library-borrowing-guide" aria-labelledby="borrowing-guide-title">
+        <h2 id="borrowing-guide-title" className="library-information-section-title">How borrowing works</h2>
+        <ol className="library-borrowing-steps">{steps.map(([title, description], index) => <li key={title}><b aria-hidden="true">{index + 1}</b><span>{title}</span><small>{description}</small></li>)}</ol>
+      </section>
+    </div></main><Footer />
+  </div>;
+}

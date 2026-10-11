@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import {
   EmptyPanel,

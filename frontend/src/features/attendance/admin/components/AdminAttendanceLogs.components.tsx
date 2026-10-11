@@ -1,4 +1,4 @@
-import { ChevronDown, Clock, AlertTriangle, Loader2, LogIn, LogOut, Search } from "lucide-react";
+import { ChevronDown, Clock, AlertTriangle, Loader2, LogIn, LogOut, Search } from "@/components/ui/library-glyphs";
 import type { AttendanceLog, AttendanceStats, FilterType } from "../AdminAttendanceLogs.types";
 import {
   FILTER_OPTIONS,

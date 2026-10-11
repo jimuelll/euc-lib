@@ -1,4 +1,4 @@
-import { BookOpen, ExternalLink } from "lucide-react";
+import { BookOpen, ExternalLink } from "@/components/ui/library-glyphs";
 import { AdminRowMenu } from "@/features/admin";
 import type { Subscription } from "../subscriptions.types";
 

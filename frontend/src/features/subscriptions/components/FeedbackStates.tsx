@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpen } from "lucide-react";
+import { AlertTriangle, BookOpen } from "@/components/ui/library-glyphs";
 import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 
 // ─── Loading ──────────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { LibraryDesignProvider } from "@/components/ui/library-design";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -597,4 +598,6 @@ const MobileActionButton = ({
   </button>
 );
 
-export default Navbar;
+export default function ProtectedNavbar() {
+  return <LibraryDesignProvider enabled={false}><Navbar /></LibraryDesignProvider>;
+}

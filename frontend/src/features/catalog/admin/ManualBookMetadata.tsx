@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchManualBookMetadata, fetchManualMetadataBooks, saveManualBookMetadata, type ManualBookMetadata, type ManualMetadataBook,type EmbeddingStatus,fetchRecommendationPreview } from "./catalog.api";
-import { Check, CircleAlert, Sparkles } from "lucide-react";
+import { Check, CircleAlert, Sparkles } from "@/components/ui/library-glyphs";
 import { catalogKeys } from "../catalog.keys";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -156,7 +156,7 @@ const ManualBookMetadata = ({ backfillRevision = 0,filter='all',onFilter=()=>{},
     <>
       <section aria-labelledby="manual-ai-details-heading" className="ai-book-list">
        <div className="ai-list-title"><h2 id="manual-ai-details-heading">Book readiness</h2><span className="ai-muted">{total} active books match</span></div>
-       <div className="ai-list-sticky"><Input aria-label="Search books by title, author, or ISBN" placeholder="Search title, author or ISBN…" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
+       <div className="ai-list-sticky"><label className="ai-search-label" htmlFor="ai-book-search">Search</label><Input id="ai-book-search" aria-label="Search books by title, author, or ISBN" placeholder="Search title, author or ISBN…" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/>
         <div className="ai-list-filters" role="group" aria-label="Book data filters">{[
          ['attention','Needs attention',coverage?.needsAttention],['synopses','Needs synopsis',coverage?.missingSynopses],['details','Needs book details',coverage?.missingDetails],['matching','Needs matching',coverage?coverage.total-coverage.ready:undefined],['all','All',coverage?.total]
         ].map(([value,label,count])=><Button key={String(value)} variant="outline" aria-pressed={filter===value} onClick={()=>onFilter(String(value))}>{filter===value&&<Check aria-hidden="true"/>}{label} {count??'—'}</Button>)}<label>Sort by<select aria-label="Sort books" value={sort} onChange={e=>{setSort(e.target.value);setPage(1);}}><option value="attention">Needs attention first</option><option value="title">Title</option><option value="author">Author</option></select></label></div>
@@ -188,7 +188,7 @@ const ManualBookMetadata = ({ backfillRevision = 0,filter='all',onFilter=()=>{},
                 {currentSynopsisStatus === "not_checked" ? <Alert><Sparkles className="size-4" /><AlertDescription>No synopsis has been imported yet. Refresh book data checks Open Library first, then Google Books, and Hardcover when configured.</AlertDescription></Alert> : null}
                 {currentSynopsisStatus === "missing" ? <Alert><CircleAlert className="size-4" /><AlertDescription>No synopsis is recorded. You can add one manually below.</AlertDescription></Alert> : null}
 
-                <section aria-labelledby="other-book-details-heading" className="space-y-4 rounded-md border border-border bg-muted/20 p-4">
+                <section aria-labelledby="other-book-details-heading" className="ai-metadata-section space-y-4">
                   <div>
                     <h3 id="other-book-details-heading" className="text-sm font-semibold text-foreground">Book details</h3>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{details?.source === "openlibrary_googlebooks" ? "Review and edit the details found during the ISBN lookup." : "Add any other details you know about the book."}</p>

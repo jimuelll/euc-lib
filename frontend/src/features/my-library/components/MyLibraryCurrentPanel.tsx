@@ -4,7 +4,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
-} from "lucide-react";
+} from "@/components/ui/library-glyphs";
 import { Surface, EmptyPanel, PanelList } from "./MyLibraryPrimitives";
 import {
   deadlineLabel,

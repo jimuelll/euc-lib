@@ -1,4 +1,4 @@
-import { BookMarked, User, CalendarClock, MapPin } from "lucide-react";
+import { BookMarked, User, CalendarClock, MapPin } from "@/components/ui/library-glyphs";
 import { RESERVATION_STATUS_CONFIG } from "../reservations.types";
 import type { AdminReservation } from "../reservations.types";
 import ReservationRowActions from "./ReservationRowActions";

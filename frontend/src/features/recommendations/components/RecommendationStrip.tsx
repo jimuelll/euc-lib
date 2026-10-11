@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, Sparkles, X } from "@/components/ui/library-glyphs";
 import { toast } from "@/components/ui/sonner";
 import { dismissRecommendation, fetchRecommendations, type RecommendationsResponse } from "../api";
 import { recommendationsKeys } from "../recommendations.keys";
@@ -17,7 +17,7 @@ function RecommendationCover({ book }: { book: Recommendation }) {
   const failed = failedImageKey === imageKey;
   const src = book.material_type === "thesis" || failed || !book.image_url ? fallback : book.image_url;
   const alt = book.material_type === "thesis" ? "Generic thesis cover" : book.image_url && !failed ? `Cover of ${book.title}` : "Generic book cover";
-  return <img src={src} alt={alt} onError={() => setFailedImageKey(imageKey)} className="h-[124px] w-[82px] shrink-0 border border-border bg-muted/20 object-contain sm:h-[144px] sm:w-[96px] 2xl:h-[132px] 2xl:w-[88px]" />;
+  return <img src={src} alt={alt} onError={() => setFailedImageKey(imageKey)} className="h-20 w-14 shrink-0 border border-border bg-muted/20 object-contain" />;
 }
 export function RecommendationStrip({ materialType, seedBookId, personal = false, title }: { materialType: "book" | "thesis"; seedBookId?: number | null; personal?: boolean; title?: string }) {
   const queryClient = useQueryClient();
@@ -84,32 +84,32 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
       default: return book.needs_policy ? "Unavailable" : Number(book.available || 0) > 0 ? "Available" : "Unavailable";
     }
   };
-  return <section ref={sectionRef} className="overflow-hidden border border-border bg-card" aria-label={heading}>
-    <div className="flex min-h-[68px] flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-muted/20 px-3 py-2.5 sm:px-5 sm:py-3">
-      {materialType === "book" ? <BookMarked className="h-5 w-5 shrink-0 text-warning" /> : <BrainCircuit className="h-5 w-5 shrink-0 text-warning" />}
-      <div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold text-foreground sm:text-base" style={{ fontFamily: "var(--font-heading)" }}>{heading}</h2><p className="mt-0.5 text-[10px] uppercase tracking-[0.13em] text-muted-foreground">{materialType === "book" ? "Books selected for relevance" : "Reference-only research"}</p></div>
-      {!loading && pageCount > 1 ? <nav className="ml-auto flex shrink-0 items-center gap-1" aria-label={`${heading} pages`}>
-        <button type="button" onClick={() => setPageIndex(Math.max(0, activePage - 1))} disabled={activePage === 0} aria-label="Previous recommendations" className="grid size-11 place-items-center border border-border text-foreground transition-colors hover:border-warning hover:text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:cursor-not-allowed disabled:opacity-40"><ArrowLeft className="h-4 w-4" aria-hidden="true" /></button>
-        <span className="min-w-[68px] px-1 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite">{activePage + 1} of {pageCount}</span>
-        <button type="button" onClick={() => setPageIndex(Math.min(pageCount - 1, activePage + 1))} disabled={activePage >= pageCount - 1} aria-label="Next recommendations" className="grid size-11 place-items-center border border-border text-foreground transition-colors hover:border-warning hover:text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:cursor-not-allowed disabled:opacity-40"><ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
-      </nav> : null}
+  return <section ref={sectionRef} className="library-recommendations border border-border bg-card" aria-label={heading}>
+    <div className="library-recommendation-heading flex items-start gap-2 border-b border-border bg-background px-3.5 py-2">
+      {materialType === "book" ? <BookMarked className="size-4 shrink-0" /> : <BrainCircuit className="size-4 shrink-0" />}
+      <div className="min-w-0 flex-1"><h2>{heading}</h2><p className="mt-1 text-xs text-muted-foreground">{materialType === "book" ? "Books selected for relevance" : "Reference-only research"}</p></div>
     </div>
-    {loading ? <div className="flex h-28 items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-warning" /></div> : <div className="grid gap-2.5 p-2.5 sm:gap-3 sm:p-4" style={{ gridTemplateColumns: `repeat(${cardsPerPage}, minmax(0, 1fr))` }}>
+    {loading ? <div className="flex h-28 items-center justify-center" role="status" aria-label="Loading recommendations"><Loader2 className="h-4 w-4 animate-spin text-warning" /></div> : <div className="grid gap-3 p-3" style={{ gridTemplateColumns: `repeat(${cardsPerPage}, minmax(0, 1fr))` }}>
       {visibleRows.map((book) => <article key={book.id} className="group relative flex min-w-0 flex-col border border-border bg-card transition-colors hover:border-primary/50 hover:bg-muted/20">
-        {personal ? <button type="button" onClick={() => void dismiss(book.id)} aria-label={`Not interested in ${book.title}`} className="absolute right-2 top-2 z-10 rounded-sm bg-card/90 p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"><X className="h-3.5 w-3.5" /></button> : null}
-        <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className={`flex min-h-[148px] min-w-0 flex-1 items-start gap-3 p-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning sm:min-h-[166px] sm:gap-3.5 sm:p-3 ${personal ? "pr-9" : ""}`}>
+        <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="flex min-w-0 flex-1 items-start gap-3 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           <RecommendationCover book={book} />
           <div className="flex min-w-0 flex-1 flex-col py-0.5">
-            {book.source === "ai" ? <span className="mb-1.5 inline-grid size-6 place-items-center rounded-full border border-warning/50 bg-primary text-primary-foreground" role="img" aria-label="AI recommendation" title="AI recommendation"><Sparkles className="h-3 w-3 text-warning" aria-hidden="true" /></span> : null}
-            <p className="line-clamp-2 break-words text-[13px] font-bold leading-5 text-foreground group-hover:text-primary sm:text-sm" style={{ fontFamily: "var(--font-heading)" }}>{book.title}</p>
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{book.author || "Unknown author"}</p>
-            <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{book.reason}</p>
+            {book.source === "ai" ? <span className="library-recommendation-marker mb-1.5 inline-grid size-6 place-items-center rounded-full border border-warning/50 bg-primary text-primary-foreground" role="img" aria-label="AI recommendation" title="AI recommendation"><Sparkles className="h-3 w-3 text-warning" aria-hidden="true" /></span> : null}
+            <p className="library-recommendation-title break-words text-base font-bold leading-5 text-foreground group-hover:text-primary">{book.title}</p>
+            <p className="mt-1 break-words text-[13px] leading-5 text-muted-foreground">{book.author || "Unknown author"}</p>
+            <p className="mt-2 break-words text-[13px] leading-5 text-muted-foreground">{book.reason}</p>
           </div>
         </Link>
-        <div className={`border-t border-border px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.1em] ${book.material_type === "thesis" ? "text-warning" : book.availability_status === "available" || (!book.availability_status && Number(book.available || 0) > 0) ? "text-success" : book.availability_status === "unavailable" || (!book.availability_status && book.needs_policy) ? "text-destructive" : "text-muted-foreground"}`}>
-          {availabilityLabel(book)}
+        <div className={`flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${book.material_type === "thesis" ? "text-warning" : book.availability_status === "available" || (!book.availability_status && Number(book.available || 0) > 0) ? "text-success" : book.availability_status === "unavailable" || (!book.availability_status && book.needs_policy) ? "text-destructive" : "text-muted-foreground"}`}>
+          <span>{availabilityLabel(book)}</span>
+          {personal ? <button type="button" onClick={() => void dismiss(book.id)} aria-label={`Not interested in ${book.title}`} className="grid size-11 shrink-0 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"><X className="size-4" /></button> : null}
         </div>
       </article>)}
     </div>}
+    {!loading && pageCount > 1 ? <nav className="library-recommendation-pagination flex items-center justify-between gap-3 border-t border-border px-3.5 py-2" aria-label={`${heading} pages`}>
+      <span className="text-xs text-muted-foreground" aria-live="polite">{activePage + 1} of {pageCount}</span><div className="flex gap-1">
+        <button type="button" onClick={() => setPageIndex(Math.max(0, activePage - 1))} disabled={activePage === 0} aria-label="Previous recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ArrowLeft className="size-4" /></button>
+        <button type="button" onClick={() => setPageIndex(Math.min(pageCount - 1, activePage + 1))} disabled={activePage >= pageCount - 1} aria-label="Next recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ArrowRight className="size-4" /></button>
+      </div></nav> : null}
   </section>;
 }

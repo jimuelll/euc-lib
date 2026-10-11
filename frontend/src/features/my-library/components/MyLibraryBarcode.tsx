@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import type { useMyLibraryBarcode } from "../hooks/useMyLibraryBarcode";
 

@@ -8,6 +8,7 @@ interface PublicCatalogOptions extends Record<string, any> {
   title?: unknown;
   author?: unknown;
   isbn?: unknown;
+  year_from?: unknown;
   format?: unknown;
   materialType?: unknown;
   availability?: unknown;
@@ -21,10 +22,11 @@ interface PublicCatalogFilters {
   title: string;
   author: string;
   isbn: string;
+  yearFrom: number | null;
   materialType: "book" | "thesis" | "all";
   availability: "available" | "unavailable" | "all";
   category: string;
-  sort: "title_asc" | "title_desc" | "newest" | "relevance";
+  sort: "title_asc" | "title_desc" | "most_available" | "newest" | "relevance";
   page: number;
   limit: number;
 }
@@ -44,10 +46,11 @@ function normalizePublicCatalogFilters(options: PublicCatalogOptions = {}): Publ
     title: cleanText(options.title),
     author: cleanText(options.author),
     isbn: cleanText(options.isbn),
+    yearFrom: /^\d{4}$/.test(String(options.year_from ?? "")) && Number(options.year_from) >= 1000 && Number(options.year_from) <= 3000 ? Number(options.year_from) : null,
     materialType: materialType === "book" || materialType === "thesis" ? materialType : "all",
     availability: availability === "available" || availability === "unavailable" ? availability : "all",
     category: cleanText(options.category),
-    sort: sort === "title_asc" || sort === "title_desc" || sort === "newest" ? sort : "relevance",
+    sort: sort === "title_asc" || sort === "title_desc" || sort === "most_available" || sort === "newest" ? sort : "relevance",
     page: pagination.safePage,
     limit: pagination.safeLimit,
   };
@@ -79,6 +82,11 @@ function buildPublicCatalogWhere(filters: PublicCatalogFilters, { showUnheldInOp
     }
   }
 
+  if (filters.yearFrom !== null) {
+    conditions.push("CAST(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.publication_year')) AS UNSIGNED) >= ?");
+    params.push(filters.yearFrom);
+  }
+
   if (!omitFacets && filters.materialType !== "all") {
     conditions.push("bk.material_type = ?");
     params.push(filters.materialType);
@@ -98,6 +106,7 @@ function buildPublicCatalogWhere(filters: PublicCatalogFilters, { showUnheldInOp
 function publicCatalogOrder(filters: PublicCatalogFilters): string {
   if (filters.sort === "title_asc") return "bk.title ASC, bk.id ASC";
   if (filters.sort === "title_desc") return "bk.title DESC, bk.id DESC";
+  if (filters.sort === "most_available") return "available DESC, bk.title ASC, bk.id ASC";
   if (filters.sort === "newest") return "bk.created_at DESC, bk.title ASC";
   if (!filters.query) return "bk.title ASC, bk.id ASC";
   return "CASE WHEN bk.title = ? THEN 0 WHEN bk.title LIKE ? THEN 1 WHEN bk.author LIKE ? THEN 2 WHEN bk.isbn LIKE ? THEN 3 ELSE 4 END, bk.title ASC, bk.id ASC";

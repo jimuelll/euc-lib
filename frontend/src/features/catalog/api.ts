@@ -19,7 +19,7 @@ export interface PublicCatalogSearchResponse {
 }
 export const fetchPublicCatalogSchema = async (signal?: AbortSignal): Promise<PublicCatalogSchemaField[]> => (await axiosInstance.get<PublicCatalogSchemaField[]>("/api/catalogue/schema", { signal })).data;
 export interface PublicCatalogSearchParams {
-  query?: string; title?: string; author?: string; isbn?: string; format?: string;
+  query?: string; title?: string; author?: string; isbn?: string; year_from?: string; format?: string;
   availability?: string; category?: string; sort?: string; page?: number;
 }
 export const searchPublicCatalogue = async (params: PublicCatalogSearchParams, signal?: AbortSignal): Promise<PublicCatalogSearchResponse> =>

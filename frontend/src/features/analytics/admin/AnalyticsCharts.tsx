@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { AdminIcon, formatPeso } from '@/features/admin';
 import type { NamedValue, TrendPoint } from './analytics.types';
+import { LibrarySpineChart } from '@/components/ui/library-patterns';
 export const colors = { blue: 'hsl(var(--admin-tone-blue))', green: 'hsl(var(--admin-tone-green))', red: 'hsl(var(--admin-tone-red))', amber: 'hsl(var(--admin-tone-amber))', purple: 'hsl(var(--admin-tone-purple))' };
 export const shortDate = (value: string) => new Date(value.length === 7 ? value + '-01T12:00:00' : value + 'T12:00:00').toLocaleDateString('en-PH', { month: 'short', day: value.length === 7 ? undefined : 'numeric' });
 export function Panel({ title, total, children }: {
@@ -38,5 +39,5 @@ export function Snapshot({ label, value, href, attention = false }: {
 export function Sparkline({ values, color }: {
     values: number[];
     color: string;
-}) { const max = Math.max(...values, 1), points = values.map((value, index) => `${values.length > 1 ? index / (values.length - 1) * 100 : 50},${28 - value / max * 24}`).join(' '); return <svg viewBox="0 0 100 32" role="img" aria-label="Daily activity trend" className="analytics-spark"><polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke"/>{values.length === 1 && <circle cx="50" cy={28 - values[0] / max * 24} r="2" fill={color}/>}</svg>; }
+}) { return <span className="analytics-spark" style={{ color }}><LibrarySpineChart values={values} label="Daily activity trend" /></span>; }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Library, Loader2, Search, FileText, RefreshCw, Trash2 } from "lucide-react";
+import { ImagePlus, Library, Loader2, Search, FileText, RefreshCw, Trash2 } from "@/components/ui/library-glyphs";
 import { SegmentedNavigation } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import type { BookType, CatalogFormValue, CatalogFormValues, FormField } from "../AdminCatalog.types";

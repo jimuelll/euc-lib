@@ -1,7 +1,11 @@
 import type { ReactNode, SVGProps } from "react";
 
+import { useLibraryDesign } from "@/components/ui/library-design";
+import { LibraryIcon } from "@/components/ui/library-icon";
+
 const gold = "var(--admin-icon-accent, currentColor)";
 const drawings = {
+  expiring: <><path d="M6 2h12M6 22h12M7 2c0 6 5 7 5 10s-5 4-5 10M17 2c0 6-5 7-5 10s5 4 5 10"/><path d="M10 18h4v3h-4z" fill={gold} stroke="none"/></>,
   eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>,
   home: <><path d="m3 10 9-7 9 7v11H3zM9 21v-8h6v8" /></>,
   information: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6" /><circle cx="12" cy="7" r=".7" fill="currentColor" /></>,
@@ -63,6 +67,8 @@ export const adminIconByUrl: Record<string, AdminIconName> = {
 };
 
 export function AdminIcon({ name, accent = false, ...props }: SVGProps<SVGSVGElement> & { name: AdminIconName; accent?: boolean }) {
+  const redesigned = useLibraryDesign();
+  if (redesigned) return <LibraryIcon name={name} fallback={drawings[name]} {...props} />;
   return <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...props} data-accent={accent ? "gold" : undefined} aria-hidden="true" focusable="false">{drawings[name]}</svg>;
 }
 

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { Camera, Keyboard, Loader2, AlertTriangle } from "lucide-react";
+import { Camera, Keyboard, Loader2, AlertTriangle } from "@/components/ui/library-glyphs";
 import { motion } from "framer-motion";
 import { useZxingScanner } from "../hooks/useZxingScanner";
 import type { AttendanceType, ScanMode } from "../types";

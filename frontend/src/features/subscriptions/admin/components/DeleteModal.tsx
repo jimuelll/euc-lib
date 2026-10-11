@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Trash2 } from "@/components/ui/library-glyphs";
 import { FONT, LABEL_CLS } from "../subscriptions.styles";
 import type { Subscription } from "../subscriptions.types";
 

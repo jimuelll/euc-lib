@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
-    <footer className="relative overflow-hidden border-t border-primary-foreground/15 bg-primary">
+    <footer data-library-design className="library-footer relative overflow-hidden border-t border-primary-foreground/15 bg-primary">
 
       <div className="h-[2px] w-full bg-warning" />
 

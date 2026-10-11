@@ -5,6 +5,7 @@ export const normalizeCatalogSearch = (params: PublicCatalogSearchParams) => ({
   title: params.title?.trim() ?? "",
   author: params.author?.trim() ?? "",
   isbn: params.isbn?.trim() ?? "",
+  year_from: params.year_from?.trim() ?? "",
   format: params.format ?? "all",
   availability: params.availability ?? "all",
   category: params.category?.trim() ?? "",

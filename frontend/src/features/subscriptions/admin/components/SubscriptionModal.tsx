@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import {
   AlertTriangle, Check, Eye, EyeOff, Loader2, X,
-} from "lucide-react";
+} from "@/components/ui/library-glyphs";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { FONT, LABEL_CLS } from "../subscriptions.styles";
 import type { FormState, ModalMode } from "../subscriptions.types";

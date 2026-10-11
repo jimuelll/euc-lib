@@ -38,38 +38,46 @@ const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catal
 };
 
 describe("catalogue recommendation action", () => {
+  it("disables loaded zero-result choices while keeping the selected choice and reset usable", async () => {
+    renderCatalogue("book", "/catalogue?format=thesis");
+    await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
+    expect(screen.getByRole("button", { name: /^Unavailable/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Theses/ })).toBeEnabled();
+    const reset = screen.getByRole("button", { name: /^All formats/ });
+    expect(reset).toBeEnabled();
+    fireEvent.click(reset);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Theses/ })).toBeDisabled(), { timeout: 10000 });
+  }, 20000);
   it("opens and closes recommendations from the View similar books result action", async () => {
     renderCatalogue("book");
-    const result = await screen.findByRole("button", { name: /Sample catalogue title/ }, { timeout: 10000 });
+    const result = await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
     const allFormats = screen.getByRole("button", { name: /All formats/ });
     expect(allFormats).toHaveAttribute("aria-pressed", "true");
-    expect(allFormats.firstElementChild).toHaveClass("border-warning", "bg-primary", "text-warning");
-    expect(screen.getAllByText("View similar books")).toHaveLength(2);
-    expect(screen.getAllByText("View similar books")[0].parentElement).toHaveClass("sm:hidden");
+    const similarAction = screen.getByRole("button", { name: "View similar books for Sample catalogue title" });
+    expect(similarAction).toHaveAttribute("aria-expanded", "false");
     expect(result).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(result);
+    fireEvent.click(similarAction);
     expect(await screen.findByTestId("related-recommendations")).toBeInTheDocument();
-    const openResult = screen.getByRole("button", { name: /Sample catalogue title/ });
+    const openResult = screen.getByRole("button", { name: "Sample catalogue title" });
     expect(openResult).toHaveAttribute("aria-expanded", "true");
-    expect(openResult).toHaveClass("border-warning");
     fireEvent.click(openResult);
     expect(screen.queryByTestId("related-recommendations")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sample catalogue title/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Sample catalogue title" })).toHaveAttribute("aria-expanded", "false");
   }, 20000);
 
   it("labels the thesis action View related theses and toggles its recommendations", async () => {
     renderCatalogue("thesis");
-    const result = await screen.findByRole("button", { name: /Sample catalogue title/ }, { timeout: 10000 });
-    expect(screen.getAllByText("View related theses")).toHaveLength(2);
+    const result = await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
+    expect(screen.getByRole("button", { name: "View related theses for Sample catalogue title" })).toBeInTheDocument();
     fireEvent.click(result);
     expect(await screen.findByTestId("related-recommendations")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Sample catalogue title/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Sample catalogue title" }));
     expect(screen.queryByTestId("related-recommendations")).not.toBeInTheDocument();
   }, 20000);
 
   it("searches the recommended title when navigating from an existing catalogue search", async () => {
     renderCatalogue("book", "/catalogue?q=Earlier%20search", true);
-    await screen.findByRole("button", { name: /Sample catalogue title/ }, { timeout: 10000 });
+    await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
     await new Promise((resolve) => setTimeout(resolve, 400));
     searchPublicCatalogue.mockClear();
 

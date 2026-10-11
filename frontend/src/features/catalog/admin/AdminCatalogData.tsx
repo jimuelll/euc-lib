@@ -4,6 +4,7 @@ import "@/features/admin/compact-admin.css";
 import "./catalog.css";
 import { useAdminUrlState, queryPage } from "@/features/admin";
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import { invalidateServerState } from "@/app/server-state";
@@ -13,11 +14,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { FormField, Book, type BookType, type CatalogFormValue, type CatalogFormValues } from "./AdminCatalog.types";
-import { archiveCatalogBook, createCatalogBook, fetchBookTypes, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook, uploadCatalogBookImage } from "./catalog.api";
+import { archiveCatalogBook, createCatalogBook, fetchBookTypes, fetchBookHoldings, lookupBookIsbn, restoreCatalogBook, searchCatalogBooks, updateCatalogBook, uploadCatalogBookImage } from "./catalog.api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import CatalogCreateForm from "./components/CatalogCreateForm";
 import CatalogEditForm from "./components/CatalogEditForm";
 import BookCopiesWorkspace from "./components/BookCopiesWorkspace";
+import BookHoldingsEditor from "./components/BookHoldingsEditor";
 
 
 import { TabsContent } from "@/components/ui/tabs";
@@ -36,9 +38,10 @@ const getServerFieldErrors = (error: unknown): Record<string, string> =>
 
 const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [params,patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
-  const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | null>(null);
+  const [sheetMode,     setSheetMode]     = useState<"create" | "edit" | "copy" | null>(null);
   const [sheetSection,  setSheetSection]  = useState<"details" | "image" | "copies">("details");
   const [materialType,  setMaterialType]  = useState<"book" | "thesis">("book");
   const [formValues,    setFormValues]    = useState<CatalogFormValues>({});
@@ -53,6 +56,15 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const catalogStatus = statusParam === "archived" ? "archived" : statusParam === "all" ? "all" : "active";
   const policyStatus = params.get("policy") === "needs" ? "needs_policy" : "all";
   const [initialHoldingCopyId, setInitialHoldingCopyId] = useState<number | null>(null);
+  const [initialAddOpen, setInitialAddOpen] = useState(false);
+  // Snapshot the page at entry: a saved copy may disappear from the active filter.
+  const [copyQueue, setCopyQueue] = useState<CatalogHolding[]>([]);
+  const [copyPosition, setCopyPosition] = useState(0);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [holdingActionsHost,setHoldingActionsHost] = useState<HTMLDivElement|null>(null);
+  const focusedCopy = copyQueue[copyPosition];
+  const originRef = useRef<{ element: HTMLElement | null; selector: string; scroll: { element: HTMLElement; top: number; left: number }[]; x: number; y: number } | null>(null);
+  const openingRef = useRef(false);
   const holdingGuardRef = useRef<(() => Promise<boolean>) | null>(null);
   const { confirm, confirmDialog } = useAdminConfirmDialog();
   const searchFilters: Parameters<typeof searchCatalogBooks>[0] = {bookId:params.get("bookId")?Number(params.get("bookId")):undefined,fieldKey:params.get("fieldKey")||undefined,fieldUsage:params.get("fieldUsage")==="missing"?"missing":params.get("fieldUsage")==="used"?"used":undefined,unheld:params.get("unheld")==="1",bookTypeId:params.get("bookTypeId")?Number(params.get("bookTypeId")):undefined, query: debouncedSearch, materialType: catalogFilter, page: currentPage, status: catalogStatus, policyStatus, uncategorized:params.get("uncategorized")==="1", holdingStatus: ["needs_holdings","needs-holdings"].includes(statusParam??"") ? "needs" : "all" };
@@ -67,19 +79,59 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const isbnLookupMutation = useMutation({ mutationFn: lookupBookIsbn });
   const isbnLookup = isbnLookupMutation.isPending;
 
-  const { dirty, confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode !== null, `${sheetMode}-${selectedBook?.id ?? "new"}`);
+  const { dirty, confirmDiscard, discardDialog } = useUnsavedChanges({ formValues, hasCoverImage: Boolean(coverFile) }, sheetMode === "edit" || sheetMode === "create", `${sheetMode}-${selectedBook?.id ?? "new"}`, undefined, {guardLinks:false});
+  const rememberOrigin = (selector = "") => {
+    if (sheetMode !== null || openingRef.current) return;
+    const element = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const scroll: { element: HTMLElement; top: number; left: number }[] = [];
+    const row = selector ? document.querySelector<HTMLElement>(selector) : element;
+    for (let parent = row?.parentElement; parent; parent = parent.parentElement) {
+      if (parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) scroll.push({element:parent,top:parent.scrollTop,left:parent.scrollLeft});
+    }
+    originRef.current = {element,selector,scroll,x:window.scrollX,y:window.scrollY};
+  };
+  const restoreOrigin = () => {
+    const origin = originRef.current;
+    if (!origin) return;
+    requestAnimationFrame(() => {
+      origin.scroll.forEach(({element,top,left}) => { element.scrollTop=top; element.scrollLeft=left; });
+      if (window.scrollX !== origin.x || window.scrollY !== origin.y) window.scrollTo(origin.x,origin.y);
+      const target = origin.element?.isConnected && origin.element !== document.body ? origin.element : origin.selector ? document.querySelector<HTMLElement>(origin.selector) : null;
+      const fallback = document.querySelector<HTMLElement>('.catalog-record-title, [role="tab"][aria-selected="true"]');
+      (target ?? fallback)?.focus({preventScroll:true});
+    });
+  };
   const requestClose = async () => {
-    if (loading || !await confirmDiscard()) return;
+    if (loading || copyBusy || !await confirmDiscard()) return;
     if (holdingGuardRef.current && !await holdingGuardRef.current()) return;
     closeSheet();
   };
+  // One navigation guard checks both drafts; two independent link guards can
+  // otherwise navigate after only one of the two discard confirmations.
+  useEffect(() => {
+    if (sheetMode === null) return;
+    const link = (event: MouseEvent) => {
+      const anchor=(event.target as Element)?.closest?.("a[href]") as HTMLAnchorElement|null;
+      if(!anchor||anchor.target==="_blank"||anchor.hasAttribute("download")||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0)return;
+      const url=new URL(anchor.href);
+      if(url.origin!==location.origin||(url.pathname===location.pathname&&url.search===location.search))return;
+      event.preventDefault();event.stopPropagation();
+      void (async()=>{
+        if(loading||copyBusy||!await confirmDiscard())return;
+        if(holdingGuardRef.current&&!await holdingGuardRef.current())return;
+        navigate(url.pathname+url.search+url.hash);
+      })();
+    };
+    document.addEventListener("click",link,true);
+    return()=>document.removeEventListener("click",link,true);
+  },[sheetMode,loading,copyBusy,confirmDiscard,navigate]);
 
   const activeFields = fields.filter((f) => !f.archived);
   const sortedFields = [...activeFields].sort((a, b) => a.order - b.order);
   const fieldsForMaterial = (type: "book" | "thesis") => sortedFields.filter((field) => (field.scope ?? "shared") === "shared" || field.scope === type);
   const setField     = (key: string, value: CatalogFormValue) => { setFormValues((p) => ({ ...p, [key]: value })); setFieldErrors((errors) => { const next = { ...errors }; delete next[key]; return next; }); };
   const clearForm = () => { setFormValues({}); setFieldErrors({}); setCoverFile(null); };
-  const closeSheet = () => { setSheetMode(null); setSelectedBook(null); setSheetSection("details"); setInitialHoldingCopyId(null); clearForm(); };
+  const closeSheet = () => { setSheetMode(null); setSelectedBook(null); setSheetSection("details"); setInitialHoldingCopyId(null); setInitialAddOpen(false); setCopyQueue([]); clearForm(); };
 
   const lookupIsbn = async () => {
     const isbn = String(formValues.isbn ?? "").trim();
@@ -155,6 +207,7 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   };
 
   const handleUpdateBook = async () => {
+    if (loading || copyBusy || (holdingGuardRef.current && !await holdingGuardRef.current())) return;
     const selectedMaterial = selectedBook?.material_type === "thesis" ? "thesis" : "book";
     if (!selectedBook || !validateRequired(selectedMaterial, selectedMaterial !== "book" || !selectedBook.needs_policy)) return;
     setLoading(true);
@@ -207,7 +260,9 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   };
 
   const selectBookForEdit = (b: Book) => {
+    rememberOrigin(`[data-record-id="${b.id}"]`);
     setInitialHoldingCopyId(null);
+    setInitialAddOpen(false);
     setSelectedBook(b);
     const vals: CatalogFormValues = {};
     fieldsForMaterial(b.material_type === "thesis" ? "thesis" : "book").filter(f=>f.key!=="copies").forEach((f) => { vals[f.key] = (b[f.key] as CatalogFormValue) ?? b.metadata?.[f.key] ?? ""; });
@@ -224,11 +279,44 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   };
   useEffect(()=>{const id=Number(params.get('record'));if(!Number.isInteger(id)||id<=0)return;let cancelled=false;void searchCatalogBooks({query:'',status:'all',materialType:'all',bookId:id,page:1}).then(result=>{if(cancelled)return;const book=result.rows.find(row=>row.id===id);if(book)selectBookForEdit(book);else toast.error('Catalog record not found.');patchParams({record:null},true);}).catch(error=>{if(!cancelled){toast.error(getApiErrorMessage(error,'Could not open this record.'));patchParams({record:null},true);}});return()=>{cancelled=true;};},[params.get('record')]);
   const openCopies = (book: Book) => { selectBookForEdit(book); setSheetSection("copies"); };
-  const openHoldings = (book: Book, copyId: number | null = null) => { selectBookForEdit(book); setInitialHoldingCopyId(copyId); setSheetSection("copies"); };
-  const handleOpenHolding = async (holding: CatalogHolding) => { try { const result = await searchCatalogBooks({query:"",materialType:"all",status:"all",page:1,bookId:holding.book_id}); const record=result.rows.find(row=>row.id===holding.book_id); if(!record)throw new Error("Record not found"); openHoldings(record,holding.copy_id); } catch(error){toast.error(getApiErrorMessage(error,"Could not load this record"));} };
-  const openCreate = () => { setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setCoverFile(null); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
+  const openHoldings = async (book: Book) => {
+    if (openingRef.current) return;
+    rememberOrigin(`[data-record-id="${book.id}"]`);
+    openingRef.current = true;
+    try {
+      const copies = await queryClient.fetchQuery({queryKey:catalogKeys.bookHoldings(book.id),queryFn:({signal})=>fetchBookHoldings(book.id,signal)});
+      openCopies(book);
+      setInitialHoldingCopyId(copies.find(copy=>Boolean(copy.is_active)&&!copy.accession_voided&&!copy.accession_number?.trim())?.copy_id??null);
+      setInitialAddOpen(copies.length===0);
+    } catch (error) { toast.error(getApiErrorMessage(error,"Could not load copies. Please retry.")); }
+    finally { openingRef.current=false; }
+  };
+  const handleOpenHolding = (holding: CatalogHolding, queue: CatalogHolding[]) => {
+    rememberOrigin(`[data-copy-id="${holding.copy_id}"]`);
+    setCopyQueue([...queue]); setCopyPosition(Math.max(0,queue.findIndex(copy=>copy.copy_id===holding.copy_id))); setSheetMode("copy");
+  };
+  const moveCopy = async (position: number) => {
+    if (copyBusy || position<0 || position>=copyQueue.length || position===copyPosition) return;
+    if (holdingGuardRef.current && !await holdingGuardRef.current()) return;
+    setCopyPosition(position);
+  };
+  const editFocusedRecord = async () => {
+    if (!focusedCopy || openingRef.current || copyBusy) return;
+    if (holdingGuardRef.current && !await holdingGuardRef.current()) return;
+    openingRef.current=true; setCopyBusy(true);
+    try {
+      const result=await searchCatalogBooks({query:"",materialType:"all",status:"all",page:1,bookId:focusedCopy.book_id});
+      const record=result.rows.find(row=>row.id===focusedCopy.book_id);
+      if(!record)throw new Error("Record not found");
+      selectBookForEdit(record);
+    } catch(error) {toast.error(getApiErrorMessage(error,"Could not load this record. Please retry."));}
+    finally {openingRef.current=false;setCopyBusy(false);}
+  };
+  const openCreate = () => { rememberOrigin(); setSelectedBook(null); setMaterialType("book"); setFormValues({ material_type: "book", copies: "1" }); setCoverFile(null); setFieldErrors({}); setSheetSection("details"); setSheetMode("create"); };
   const changeSheetSection = async (section: "details" | "image" | "copies") => {
+    if (loading || copyBusy) return;
     if (sheetSection === "copies" && section !== "copies" && holdingGuardRef.current && !await holdingGuardRef.current()) return;
+    if (section !== "copies") setInitialAddOpen(false);
     setSheetSection(section);
   };
 
@@ -238,13 +326,12 @@ const AdminCatalogData = ({ fields, isSuperAdmin }: Props) => {
   const archiveBlocked=Number(operationalBook?.active_loans)>0 || Number(operationalBook?.active_reservations)>0;
   const archived=Boolean(selectedBook?.deleted_at);
   const editForm = selectedBook && <fieldset disabled={archived || loading} className="catalog-edit-fields"><CatalogEditForm inSheet book={operationalBook??selectedBook} fields={fields} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} onFieldChange={setField} onUpdate={()=>void handleUpdateBook()} onArchive={()=>void handleDeleteBook()} onDeselect={()=>void requestClose()} onCopies={()=>void changeSheetSection("copies")} archiveBlocked={archiveBlocked} dirty={dirty}/></fieldset>;
-  const viewBookHoldings=async()=>{const id=selectedBook?.id;if(!id)return;if(holdingGuardRef.current&&!await holdingGuardRef.current())return;if(!await confirmDiscard())return;setSheetMode(null);setSelectedBook(null);patchParams({tab:"holdings",bookId:id,hq:null,hstatus:"all",completion:"all",hpage:null});};
   const metric=(label:string,value?:number)=> <div data-tone={value && label==="Needs accession"?"amber":value && label==="Overdue loans"?"red":undefined}><span>{label}</span><strong>{value===undefined?"—":Number(value).toLocaleString("en-PH")}</strong></div>;
   return <div className="catalog-page">{confirmDialog}{discardDialog}{(params.get("fieldKey")||params.get("unheld")==="1")&&<div className="flex justify-between gap-4 rounded-md border border-border bg-muted/30 p-3 text-sm"><span>{params.get("unheld")==="1"?"Books without eligible accessioned copies":`${params.get("fieldUsage")==="missing"?"Records missing a value for":"Records using"} ${params.get("fieldKey")}`}</span><Button variant="outline" onClick={()=>patchParams({fieldKey:null,fieldUsage:null,unheld:null,page:null})}>Clear configuration filter</Button></div>}{params.get("bookTypeId")&&<div className="flex justify-between gap-4 rounded-md border border-border bg-muted/30 p-3 text-sm"><span>Showing books assigned to {bookTypesQuery.data?.find(type=>type.id===Number(params.get("bookTypeId")))?.name||"this policy"}</span><Button variant="outline" onClick={()=>patchParams({bookTypeId:null,page:null})}>Clear policy filter</Button></div>}{params.get("uncategorized")==="1"&&<div className="flex justify-between gap-4 rounded-md border border-border bg-muted/30 p-3 text-sm"><span>Showing uncategorized titles</span><Button variant="outline" onClick={()=>patchParams({uncategorized:null,page:null})}>Clear category filter</Button></div>}
-   <CatalogRecords query={catalogQuery} filters={searchFilters} fields={fields} policies={bookTypes} onCreate={openCreate} onEdit={selectBookForEdit} onCopies={openCopies} onHoldings={openHoldings} onHolding={holding=>void handleOpenHolding(holding)} onRestore={book=>void handleRestoreBook(book)} onRefresh={invalidateCatalog}/>
-   <AdminDetailDrawer open={sheetMode!==null} onClose={()=>void requestClose()} title={sheetMode==="create"?"Add catalog record":selectedBook?.title||"Catalog record"} description={sheetMode==="create"?"Create a descriptive record and its initial physical copies.":"Edit the record or manage physical copies and accession details."} className="catalog-record-drawer" footer={<><span role="status" className="catalog-secondary">{dirty?"Unsaved changes":archived?"Archived record":sheetSection==="copies"?"Copy actions are saved separately":"No unsaved changes"}</span><div className="admin-record-footer-actions"><Button variant="outline" disabled={loading} onClick={()=>void requestClose()}>Cancel</Button>{archived&&selectedBook?<Button disabled={loading} onClick={()=>void handleRestoreBook(selectedBook)}>Restore record</Button>:sheetMode==="edit"&&sheetSection==="copies"&&!dirty?null:<Button disabled={loading || (sheetMode==="edit"&&!dirty)} onClick={()=>void(sheetMode==="create"?handleCreateBook():handleUpdateBook())}>{loading?"Saving…":sheetMode==="create"?"Add record":"Save changes"}</Button>}</div></>}>
+   <CatalogRecords query={catalogQuery} filters={searchFilters} fields={fields} policies={bookTypes} onCreate={openCreate} onEdit={selectBookForEdit} onCopies={openCopies} onHoldings={book=>void openHoldings(book)} onHolding={handleOpenHolding} onRestore={book=>void handleRestoreBook(book)} onRefresh={invalidateCatalog}/>
+   <AdminDetailDrawer open={sheetMode!==null} onClose={()=>void requestClose()} onAfterClose={restoreOrigin} title={sheetMode==="create"?"Add catalog record":sheetMode==="copy"?focusedCopy?.title||"Copy holdings":selectedBook?.title||"Catalog record"} description={sheetMode==="create"?"Create a descriptive record and its initial physical copies.":sheetMode==="copy"?"Edit this physical copy. Navigation follows the current results page.":"Edit the record or manage physical copies and accession details."} headerActions={sheetMode==="copy"?<Button variant="outline" disabled={copyBusy} onClick={()=>void editFocusedRecord()}>Edit record details</Button>:undefined} className="catalog-record-drawer" footer={sheetMode==="copy"?<><div className="catalog-focused-save-host" ref={setHoldingActionsHost}/><Button variant="outline" disabled={copyBusy} onClick={()=>void requestClose()}>Close copy</Button></>:<><span role="status" className="catalog-secondary">{dirty?"Unsaved changes":archived?"Archived record":sheetSection==="copies"?"Copy actions are saved separately":"No unsaved changes"}</span><div className="admin-record-footer-actions"><Button variant="outline" disabled={loading||copyBusy} onClick={()=>void requestClose()}>Cancel</Button>{archived&&selectedBook?<Button disabled={loading} onClick={()=>void handleRestoreBook(selectedBook)}>Restore record</Button>:sheetMode==="edit"&&sheetSection==="copies"&&!dirty?null:<Button disabled={loading || copyBusy || (sheetMode==="edit"&&!dirty)} onClick={()=>void(sheetMode==="create"?handleCreateBook():handleUpdateBook())}>{loading?"Saving…":sheetMode==="create"?"Add record":"Save changes"}</Button>}</div></>}>
     {sheetMode==="edit"&&selectedBook&&<div className="catalog-book-status" aria-label="Book status">{metric("Available",operationalBook?.available)}{metric("Active loans",operationalBook?.active_loans)}{metric("Reservations",operationalBook?.active_reservations)}{Number(operationalBook?.overdue_loans)>0&&metric("Overdue loans",operationalBook?.overdue_loans)}{metric("Needs accession",operationalBook?.unaccessioned_copies===undefined?undefined:Math.max(0,operationalBook.unaccessioned_copies-Number(operationalBook.voided_copies??0)))}</div>}
-    {sheetMode==="edit"&&selectedBook?.material_type!=="thesis"&&!archived?<AdminPageTabs value={sheetSection} onChange={value=>void changeSheetSection(value as "details"|"image"|"copies")} label="Catalog record sections" items={[{value:"details",label:"Details",icon:"transactions"},{value:"image",label:"Image",icon:"image"},{value:"copies",label:"Copies",icon:"copy"}]}><TabsContent value="details" className="catalog-drawer-tab">{editForm}</TabsContent><TabsContent value="image" className="catalog-drawer-tab">{selectedBook&&<CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage}/>}</TabsContent><TabsContent value="copies" className="catalog-drawer-tab"><BookCopiesWorkspace key={`${selectedBook!.id}-${initialHoldingCopyId??"list"}`} bookId={selectedBook!.id} bookTitle={selectedBook!.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} isSuperAdmin={isSuperAdmin} onViewHoldings={()=>void viewBookHoldings()}/></TabsContent></AdminPageTabs>:sheetMode==="create"?<CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} coverFile={coverFile} onCoverFileChange={setCoverFile} onMaterialChange={value=>{setMaterialType(value);if(value!=="book")setCoverFile(null);setFieldErrors({});setFormValues(value==="book"?{material_type:value,copies:"1"}:{material_type:value});}} onFieldChange={setField} onLookupIsbn={()=>void lookupIsbn()} onSubmit={()=>void handleCreateBook()} onClear={clearForm}/>:editForm}
+    {sheetMode==="copy"&&focusedCopy?<BookHoldingsEditor key={focusedCopy.copy_id} actionsHost={holdingActionsHost} bookId={focusedCopy.book_id} bookTitle={focusedCopy.title} copyId={focusedCopy.copy_id} guardRef={holdingGuardRef} isSuperAdmin={isSuperAdmin} onBusyChange={setCopyBusy} onManageCopies={()=>void editFocusedRecord()} navigation={{position:copyPosition,total:copyQueue.length,label:"Copies in this results page",onPrevious:()=>void moveCopy(copyPosition-1),onNext:()=>void moveCopy(copyPosition+1)}} onSavedNext={()=>setCopyPosition(position=>Math.min(position+1,copyQueue.length-1))}/>:sheetMode==="edit"&&selectedBook?.material_type!=="thesis"&&!archived?<AdminPageTabs value={sheetSection} onChange={value=>void changeSheetSection(value as "details"|"image"|"copies")} label="Catalog record sections" items={[{value:"details",label:"Details",icon:"transactions"},{value:"image",label:"Image",icon:"image"},{value:"copies",label:"Copies",icon:"copy"}]}><TabsContent value="details" className="catalog-drawer-tab">{editForm}</TabsContent><TabsContent value="image" className="catalog-drawer-tab">{selectedBook&&<CatalogImageEditor book={selectedBook} onImageChange={updateSelectedBookImage}/>}</TabsContent><TabsContent value="copies" className="catalog-drawer-tab"><BookCopiesWorkspace key={selectedBook!.id} bookId={selectedBook!.id} bookTitle={selectedBook!.title} initialCopyId={initialHoldingCopyId} guardRef={holdingGuardRef} isSuperAdmin={isSuperAdmin} initialAddOpen={initialAddOpen} onBusyChange={setCopyBusy} onSelectionChange={setInitialHoldingCopyId}/></TabsContent></AdminPageTabs>:sheetMode==="create"?<CatalogCreateForm inSheet fields={fields} materialType={materialType} values={formValues} errors={fieldErrors} bookTypes={bookTypes} loading={loading} isbnLookup={isbnLookup} coverFile={coverFile} onCoverFileChange={setCoverFile} onMaterialChange={value=>{setMaterialType(value);if(value!=="book")setCoverFile(null);setFieldErrors({});setFormValues(value==="book"?{material_type:value,copies:"1"}:{material_type:value});}} onFieldChange={setField} onLookupIsbn={()=>void lookupIsbn()} onSubmit={()=>void handleCreateBook()} onClear={clearForm}/>:editForm}
    </AdminDetailDrawer>
   </div>;
 };

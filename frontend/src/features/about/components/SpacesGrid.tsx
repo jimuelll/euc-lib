@@ -1,45 +1,23 @@
-import type { AboutSettings } from "@/features/about/api/about.service";
-import SectionLabel from "./ui/SectionLabel";
-import SectionHeading from "./ui/SectionHeading";
+import { useRef, useState } from "react";
+import type { AboutSettings, LibrarySpace } from "../api/about.service";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { LibraryDesignProvider } from "@/components/ui/library-design";
 
-interface SpacesGridProps {
-  spaces: AboutSettings["spaces"];
+export default function SpacesGrid({ spaces }: { spaces: AboutSettings["spaces"] }) {
+  const [selected, setSelected] = useState<LibrarySpace | null>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  if (!spaces.length) return null;
+  return <section className="library-about-chapter" id="about-spaces" aria-labelledby="about-spaces-title">
+    <div className="library-information-kicker">Library spaces</div><h2 className="library-information-section-title" id="about-spaces-title">Our facilities</h2>
+    <div className="library-about-facilities">{spaces.map((space, index) => <button type="button" className="library-about-facility" key={space.name + index} onClick={(event) => { trigger.current = event.currentTarget; setSelected(space); }} aria-label={`View ${space.name}`}>
+      <div className="library-about-facility-image">{space.image_url && <img src={space.image_url} alt={space.image_alt ?? space.name} loading="lazy" />}</div>
+      <div className="library-about-facility-copy"><b>{space.name}</b><p>{space.description}</p></div>
+    </button>)}</div>
+    <LibraryDesignProvider><Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+      <DialogContent hideClose data-library-ui="facility-preview" className="library-facility-dialog" onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus(); }}>
+        {selected && <><div className="library-facility-dialog-image">{selected.image_url && <img src={selected.image_url} alt={selected.image_alt ?? selected.name} />}</div>
+          <div className="library-facility-dialog-copy"><DialogClose className="library-facility-dialog-close">Close</DialogClose><DialogTitle>{selected.name}</DialogTitle><DialogDescription>{selected.description}</DialogDescription></div></>}
+      </DialogContent>
+    </Dialog></LibraryDesignProvider>
+  </section>;
 }
-
-const SpacesGrid = ({ spaces }: SpacesGridProps) => (
-  <div className="border-b border-border bg-background">
-    <div className="container px-4 sm:px-6 py-10 md:py-14">
-      <SectionLabel>Library Spaces</SectionLabel>
-      <SectionHeading>Our Facilities</SectionHeading>
-      <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4 border-l border-t border-border">
-        {spaces.map((space) => (
-          <div
-            key={space.name}
-            className="border-r border-b border-border bg-background flex flex-col overflow-hidden"
-          >
-            <div className="relative h-40 overflow-hidden">
-              <img
-                src={space.image_url}
-                alt={space.image_alt??space.name}
-                className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-primary/20" />
-            </div>
-            <div className="p-5 flex flex-col gap-1.5 flex-1">
-              <h3
-                className="text-[12px] font-bold uppercase tracking-[0.08em] text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {space.name}
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{space.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-export default SpacesGrid;

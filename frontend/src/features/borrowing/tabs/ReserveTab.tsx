@@ -1,314 +1,78 @@
-import { useState } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { BookMarked, Clock, CheckCircle2, X, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Clock, CheckCircle2, Loader2 } from "@/components/ui/library-glyphs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
-import BookRow from "../components/BookRow";
-import CollapsibleSection from "../components/CollapsibleSection";
+import { getApiErrorMessage } from "@/utils/apiError";
 import type { CatalogBook, ActiveReservation } from "../types";
-import { reservationStatusConfig } from "../types";
 import { cancelReservation, reserveBook } from "../api";
+import ReservationPagination from "../components/ReservationPagination";
 
 interface ReserveTabProps {
-  catalog: CatalogBook[];
-  activeReservations: ActiveReservation[];
-  catalogLoading: boolean;
-  dataLoading: boolean;
-  hasSearched: boolean;
-  pagination: { page: number; totalPages: number; total: number };
-  onPageChange: (page: number) => void;
-  onReserveSuccess: (reservation: ActiveReservation, bookId: number) => void;
-  onCancelSuccess: (reservationId: number) => void;
+  catalog: CatalogBook[]; activeReservations: ActiveReservation[]; catalogLoading: boolean; dataLoading: boolean; hasSearched: boolean;
+  catalogError: string | null; activeError: string | null; onRetryCatalog: () => void; onRetryActive: () => void; searchField: ReactNode;
+  pagination: { page: number; totalPages: number; total: number }; onPageChange: (page: number) => void;
+  onReserveSuccess: (reservation: ActiveReservation, bookId: number) => void; onCancelSuccess: (id: number) => void;
 }
-
-const ReserveTab = ({
-  catalog,
-  activeReservations,
-  catalogLoading,
-  dataLoading,
-  hasSearched,
-  pagination,
-  onPageChange,
-  onReserveSuccess,
-  onCancelSuccess,
-}: ReserveTabProps) => {
-  const [reservingId, setReservingId]   = useState<number | null>(null);
+const colors = ["#7a0000", "#5c1a1a", "#3d2b3d", "#4a2c1c", "#2b3a42"];
+function expiryLabel(value: string | null, now: number) {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  const minutes = Math.floor((timestamp - now) / 60000);
+  return { date: new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }), remaining: minutes <= 0 ? "Expired" : minutes >= 1440 ? `in ${Math.floor(minutes / 1440)} d ${Math.floor(minutes % 1440 / 60)} h` : `in ${Math.floor(minutes / 60)} h ${minutes % 60} m` };
+}
+export default function ReserveTab(props: ReserveTabProps) {
+  const { catalog, activeReservations, catalogLoading, dataLoading, hasSearched, pagination, onPageChange, onReserveSuccess, onCancelSuccess } = props;
+  const [reservingId, setReservingId] = useState<number | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
   const reserveMutation = useMutation({ mutationFn: reserveBook });
   const cancelMutation = useMutation({ mutationFn: cancelReservation });
-
-  const reservedBookTitles = new Set(activeReservations.map((r) => r.title));
-
+  const reservedTitles = new Set(activeReservations.map(res => res.title));
+  const busy = reservingId !== null || cancellingId !== null;
   const handleReserve = async (book: CatalogBook) => {
-    setReservingId(book.id);
+    setReservingId(book.id); setMessage("");
     try {
-      const res = await reserveMutation.mutateAsync(book.id);
-      toast.success(`"${book.title}" reserved — pick up before ${
-        res.expiresAt
-          ? new Date(res.expiresAt).toLocaleString()
-          : "expiry"
-      }`);
-      const newReservation: ActiveReservation = {
-        id:          res.reservationId,
-        title:       book.title,
-        author:      book.author,
-        location:    book.location,
-        status:      "pending",
-        reserved_at: new Date().toISOString(),
-        expires_at:  res.expiresAt,
-      };
-      onReserveSuccess(newReservation, book.id);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Failed to reserve book");
-    } finally {
-      setReservingId(null);
-    }
+      const result = await reserveMutation.mutateAsync(book.id);
+      const notice = `Reserved “${book.title}”. Check your reservation for its pickup deadline.`;
+      setMessage(notice); toast.success(notice);
+      onReserveSuccess({ id: result.reservationId, title: book.title, author: book.author, location: book.location, status: "pending", reserved_at: new Date().toISOString(), expires_at: result.expiresAt }, book.id);
+    } catch (error) { const notice = getApiErrorMessage(error, "Failed to reserve book"); setMessage(notice); toast.error(notice); }
+    finally { setReservingId(null); }
   };
-
-  const handleCancel = async (reservationId: number, title: string) => {
-    setCancellingId(reservationId);
-    try {
-      await cancelMutation.mutateAsync(reservationId);
-      toast.success(`Reservation for "${title}" cancelled`);
-      onCancelSuccess(reservationId);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message ?? "Failed to cancel reservation");
-    } finally {
-      setCancellingId(null);
-    }
+  const handleCancel = async (res: ActiveReservation) => {
+    setCancellingId(res.id); setMessage("");
+    try { await cancelMutation.mutateAsync(res.id); onCancelSuccess(res.id); setConfirmId(null); setMessage(`Reservation for “${res.title}” cancelled.`); toast.success("Reservation cancelled"); }
+    catch (error) { const notice = getApiErrorMessage(error, "Failed to cancel reservation"); setMessage(notice); toast.error(notice); }
+    finally { setCancellingId(null); }
   };
-
-  return (
-    <div className="space-y-5">
-
-      {/* Info banner — info/5 tint with left accent bar */}
-      <div className="flex gap-0 border border-info/20 bg-info/[0.04] overflow-hidden">
-        <div className="w-[3px] bg-info/40 shrink-0" />
-        <div className="flex items-start gap-2.5 px-4 py-3">
-          <Clock className="h-3.5 w-3.5 text-info shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Reservations are held for{" "}
-            <span
-              className="font-bold text-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              48 hours
-            </span>
-                    . Bring your student or employee ID to the front desk to claim your book.
-            Unclaimed reservations expire automatically.
-          </p>
-        </div>
-      </div>
-
-      {/* ── Catalogue results ─────────────────────────────────────────────── */}
-      <div className="space-y-2.5">
-
-        {/* Loading */}
-        {catalogLoading && (
-          <div className="space-y-2.5">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-20 w-full rounded-none" />)}</div>
-        )}
-
-        {/* Pre-search prompt */}
-        {!catalogLoading && !hasSearched && (
-          <div className="flex flex-col items-center justify-center py-14 gap-2 border border-dashed border-border bg-card">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-px w-6 bg-border" />
-              <BookMarked className="h-4 w-4 text-muted-foreground/30" />
-              <div className="h-px w-6 bg-border" />
-            </div>
-            <p
-              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Search the catalogue above to find a book
-            </p>
-          </div>
-        )}
-
-        {/* No results */}
-        {!catalogLoading && hasSearched && catalog.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-14 gap-2 border border-dashed border-border bg-card">
-            <p
-              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/70"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              No books found matching your search
-            </p>
-          </div>
-        )}
-
-        {/* Results list */}
-        {!catalogLoading &&
-          catalog.map((book) => {
-            const alreadyReserved = reservedBookTitles.has(book.title);
-            return (
-              <BookRow
-                key={book.id}
-                icon={BookMarked}
-                title={book.title}
-                author={book.author}
-                meta={
-                  <div className="text-right">
-                    <p
-                      className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {book.canReserve === false && book.material_type !== "thesis" ? "Unavailable" : "Available"}
-                    </p>
-                    <p
-                      className={`mt-0.5 text-[12px] font-bold ${
-                        book.available > 0 ? "text-success" : "text-destructive"
-                      }`}
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {book.available} / {book.registered_copies ?? 0}
-                    </p>
-                    {book.location && (
-                      <p className="mt-0.5 text-xs text-muted-foreground/60">
-                        {book.location}
-                      </p>
-                    )}
-                  </div>
-                }
-                action={
-                   book.canReserve === false ? (
-                     <span className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/70" style={{ fontFamily: "var(--font-heading)" }}>{book.material_type === "thesis" ? "Reference only" : "Unavailable · no accessioned copies"}</span>
-                   ) : alreadyReserved ? (
-                    <span
-                      className="shrink-0 text-xs font-bold uppercase tracking-[0.1em] text-muted-foreground/50"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      Reserved
-                    </span>
-                  ) : (
-                    <button
-                      disabled={reservingId === book.id}
-                      onClick={() => handleReserve(book)}
-                      className="flex h-9 shrink-0 items-center gap-1.5 bg-primary px-4 text-xs font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                      style={{ fontFamily: "var(--font-heading)" }}
-                    >
-                      {reservingId === book.id ? (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Reserving…</span>
-                        </>
-                      ) : (
-                        "Reserve"
-                      )}
-                    </button>
-                  )
-                }
-              />
-            );
-          })}
-        {!catalogLoading && pagination.totalPages > 1 ? <div className="flex items-center justify-between gap-2 border-t border-border pt-3"><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>Previous</button><span className="text-center text-xs text-muted-foreground">Page {pagination.page} of {pagination.totalPages}</span><button type="button" className="min-h-11 px-3 text-xs font-semibold text-primary disabled:opacity-40" disabled={pagination.page >= pagination.totalPages} onClick={() => onPageChange(pagination.page + 1)}>Next</button></div> : null}
-      </div>
-
-      {/* ── My active reservations ────────────────────────────────────────── */}
-      <CollapsibleSection
-        title="My Reservations"
-        icon={BookMarked}
-        count={activeReservations.length}
-      >
-        {dataLoading ? (
-          <div className="flex items-center gap-2 py-4 text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span
-              className="text-xs font-bold uppercase tracking-[0.15em]"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Loading…
-            </span>
-          </div>
-        ) : activeReservations.length === 0 ? (
-          <p
-            className="py-4 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground/50"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            No active reservations
-          </p>
-        ) : (
-          activeReservations.map((res) => (
-            <div
-              key={res.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4 first:pt-0 last:pb-0 sm:flex-nowrap"
-            >
-              {/* Title + author */}
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-[13px] font-bold text-foreground truncate"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {res.title}
-                </p>
-                <p className="mt-0.5 text-xs uppercase tracking-[0.12em] text-muted-foreground/80 truncate"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {res.author}
-                </p>
-                {res.location && (
-                  <p className="mt-0.5 text-xs text-muted-foreground/70">{res.location}</p>
-                )}
-              </div>
-
-              {/* Expiry — hidden on mobile */}
-              <div className="order-3 w-full border-t border-border/60 pt-2 sm:order-none sm:w-auto sm:shrink-0 sm:border-0 sm:pt-0 sm:text-right">
-                <p
-                  className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {res.status === "ready" ? "Pick up by" : "Expires"}
-                </p>
-                <p
-                  className="mt-0.5 text-xs font-bold text-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {res.expires_at
-                    ? new Date(res.expires_at).toLocaleString([], {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "—"}
-                </p>
-              </div>
-
-              {/* Status badge */}
-              <Badge
-                variant="outline"
-                className={`text-xs font-bold uppercase tracking-[0.1em] shrink-0 ${reservationStatusConfig[res.status].className}`}
-                style={{ fontFamily: "var(--font-heading)", borderRadius: 0 }}
-              >
-                {res.status === "ready"
-                  ? <CheckCircle2 className="mr-1 h-3 w-3" />
-                  : <Clock className="mr-1 h-3 w-3" />
-                }
-                {reservationStatusConfig[res.status].label}
-              </Badge>
-
-              {/* Cancel button */}
-              {res.status === "pending" && (
-                <button
-                  onClick={() => handleCancel(res.id, res.title)}
-                  disabled={cancellingId === res.id}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground/65 transition-colors duration-200 hover:bg-destructive/5 hover:text-destructive disabled:opacity-30"
-                  title="Cancel reservation"
-                  aria-label={`Cancel reservation for ${res.title}`}
-                >
-                  {cancellingId === res.id
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <X className="h-3.5 w-3.5" />
-                  }
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </CollapsibleSection>
-    </div>
-  );
-};
-
-export default ReserveTab;
+  return <div className="reservation-layout"><section className="reservation-catalogue" aria-label="Books to reserve">
+    {props.searchField}<p className="reservation-message" role="status">{message}</p>
+    <h2 className="reservation-section-label">{hasSearched ? `${pagination.total} result${pagination.total === 1 ? "" : "s"}` : "Browse books to reserve"}</h2>
+    {props.catalogError ? <div className="service-error" role="alert"><p>{props.catalogError}</p><button className="service-link" onClick={props.onRetryCatalog}>Try again</button></div> : catalogLoading ? <div className="service-loading" role="status" aria-label="Loading books">{[0, 1, 2].map(id => <Skeleton key={id} className="h-24 w-full" />)}</div> : catalog.length === 0 ? <p className="service-empty">{hasSearched ? "No titles match. Try a title, an author, or an ISBN." : "No books are currently listed for reservation."}</p> : catalog.map(book => {
+      const reserved = reservedTitles.has(book.title);
+      const eligible = book.material_type !== "thesis" && book.canReserve !== false && Number(book.canReserve) !== 0 && Number(book.registered_copies ?? book.copies) > 0;
+      const initials = book.title.replace(/^(the|a)\s/i, "").split(/\s+/).slice(0, 2).map(word => word[0]).join("").toUpperCase();
+      return <article className="reservation-book" key={book.id}>
+        <div className="reservation-cover" aria-hidden="true" style={{ "--reservation-cover-color": colors[book.id % colors.length] } as CSSProperties}>{initials}</div>
+        <div className="reservation-book-copy"><h3>{book.title}</h3><small>{book.author || "Unknown author"}</small><p className={"reservation-book-availability " + (book.available > 0 ? "is-available" : "")}>{book.material_type === "thesis" ? "Reference only" : book.registered_copies === 0 ? "Not on the shelf yet" : `${book.available} of ${book.registered_copies ?? book.copies} copies available`}</p>{book.location && <small>{book.location}</small>}</div>
+        <button className="service-button" disabled={busy || dataLoading || !!props.activeError || reserved || !eligible} onClick={() => void handleReserve(book)}>{reservingId === book.id ? <><Loader2 className="animate-spin" aria-hidden="true" />Reserving…</> : reserved ? "Reserved" : !eligible ? "Unavailable" : "Reserve"}</button>
+      </article>;
+    })}
+    {!catalogLoading && !props.catalogError && <ReservationPagination pagination={pagination} onPageChange={onPageChange} />}
+  </section><aside className="reservation-sidebar" aria-label="Your reservations">
+    <div className="reservation-sidebar-heading"><h2>Your reservations <span className="service-chip">{dataLoading || props.activeError ? "—" : activeReservations.length}</span></h2><p>Held for 48 hours. Bring your student or employee ID to the front desk to claim a book. Unclaimed reservations expire automatically.</p></div>
+    {props.activeError ? <div className="service-error" role="alert"><p>{props.activeError}</p><button className="service-link" onClick={props.onRetryActive}>Try again</button></div> : dataLoading ? <p className="service-empty" role="status">Loading your reservations…</p> : !activeReservations.length ? <p className="service-empty">No active reservations. Reserve a book from the list.</p> : activeReservations.map(res => {
+      const expiry = expiryLabel(res.expires_at, now);
+      return <div className="reservation-held" key={res.id}><h3>{res.title}</h3><small>{res.author}</small>{res.location && <small>{res.location}</small>}
+        <div className="reservation-held-meta"><div><small>{res.status === "ready" ? "Pick up by" : "Expires"}</small><br /><strong>{expiry?.date ?? "Not yet set"}</strong>{expiry && <small> · {expiry.remaining}</small>}</div><span className={"reservation-status " + (res.status === "ready" ? "is-ready" : "")}>{res.status === "ready" ? <CheckCircle2 aria-hidden="true" /> : <Clock aria-hidden="true" />}{res.status === "ready" ? "Ready" : "Pending"}</span></div>
+        {res.notes && <p className="reservation-notes">{res.notes}</p>}
+        {res.status === "pending" && (confirmId === res.id ? <div className="reservation-confirm"><span>Cancel this reservation?</span><button className="service-button is-outline" disabled={busy} onClick={() => void handleCancel(res)}>{cancellingId === res.id ? "Cancelling…" : "Yes, cancel"}</button><button className="service-link" disabled={busy} onClick={() => setConfirmId(null)}>Keep it</button></div> : <button className="service-link" disabled={busy} aria-label={`Cancel reservation for ${res.title}`} onClick={() => setConfirmId(res.id)}>Cancel reservation</button>)}
+      </div>;
+    })}
+  </aside></div>;
+}

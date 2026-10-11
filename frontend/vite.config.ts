@@ -7,12 +7,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     hmr: {
-      host: "localhost",  
-      port: 8080,        
+      host: "localhost",
+      port: 8080,
       overlay: false,
     },
     proxy: {
-      "/api": "http://localhost:4000",
+      "/api": "http://localhost:8080",
     },
   },
   plugins: [react()],

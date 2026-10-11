@@ -1,4 +1,4 @@
-import { AlertTriangle, Globe } from "lucide-react";
+import { AlertTriangle, Globe } from "@/components/ui/library-glyphs";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Subscription } from "../subscriptions.types";
 import { SubscriptionRow } from "./SubscriptionRow";

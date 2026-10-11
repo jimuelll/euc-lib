@@ -69,5 +69,6 @@ export interface UpcomingEvent {
   id?: number;
   title: string;
   date: string;
-  time: string;
+  dateDay?: string;
+  dateMonth?: string;
 }

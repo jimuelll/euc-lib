@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { AdminPage, AdminPanel } from "@/features/admin";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { UserCog } from "lucide-react";
+import { UserCog } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,12 +20,12 @@ const EditProfile = () => {
     .slice(0, 2)
     .toUpperCase();
 
-  if (["staff", "admin", "super_admin"].includes(user?.role ?? "")) return <main className="mx-auto max-w-3xl px-4 py-8"><Link to="/admin" className="mb-6 inline-block text-sm text-action">Back to library desk</Link><AdminPage title="My account" description="Your signed-in library account."><AdminPanel title="Account details"><dl className="grid gap-5 sm:grid-cols-2"><div><dt className="text-sm text-muted-foreground">Name</dt><dd className="mt-1 font-medium">{userName}</dd></div><div><dt className="text-sm text-muted-foreground">Role</dt><dd className="mt-1 font-medium capitalize">{user?.role.replace(/_/g, " ")}</dd></div></dl><p className="mt-6 text-sm text-muted-foreground">Contact an authorized administrator to update your account details.</p><Button asChild className="mt-5"><Link to="/change-password">Change password</Link></Button></AdminPanel></AdminPage></main>;
+  if (["staff", "admin", "super_admin"].includes(user?.role ?? "")) return <main data-library-design className="min-h-screen px-4 py-8"><div className="mx-auto max-w-3xl"><Link to="/admin" className="mb-6 inline-block text-sm text-action">Back to library desk</Link><AdminPage title="My account" description="Your signed-in library account."><AdminPanel title="Account details"><dl className="grid gap-5 sm:grid-cols-2"><div><dt className="text-sm text-muted-foreground">Name</dt><dd className="mt-1 font-medium">{userName}</dd></div><div><dt className="text-sm text-muted-foreground">Role</dt><dd className="mt-1 font-medium capitalize">{user?.role.replace(/_/g, " ")}</dd></div></dl><p className="mt-6 text-sm text-muted-foreground">Contact an authorized administrator to update your account details.</p><Button asChild className="mt-5"><Link to="/change-password">Change password</Link></Button></AdminPanel></AdminPage></div></main>;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="py-16">
+      <main data-library-design className="py-16">
         <div className="container max-w-lg">
           <div className="flex items-center gap-3">
             <UserCog className="h-6 w-6 text-primary" />

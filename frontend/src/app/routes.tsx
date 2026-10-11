@@ -1,5 +1,6 @@
 import { useAdminTheme } from "@/features/admin/hooks/useAdminTheme";
 import { lazy, Suspense } from "react";
+import { LibraryDesignProvider } from "@/components/ui/library-design";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminUsersRedirect from "@/features/admin/manage/AdminUsersRedirect";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
@@ -49,7 +50,7 @@ const RouteFallback = () => (
 export const AppRoutes = () => {
   useAdminTheme();
   return (
-  <Suspense fallback={<RouteFallback />}>
+  <LibraryDesignProvider><Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/about" element={<About />} />
@@ -93,6 +94,6 @@ export const AppRoutes = () => {
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
-  </Suspense>
+  </Suspense></LibraryDesignProvider>
 );
 };

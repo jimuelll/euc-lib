@@ -1,0 +1,47 @@
+/* Recommendations content only; the administration top bar stays independent. */
+[data-library-design][data-library-design] .ai-workspace { gap:24px; }
+[data-library-design][data-library-design] .ai-workspace :is(.ai-coverage,.ai-backfill,.ai-book-list) { border-radius:0; border-top:3px double hsl(var(--foreground)); box-shadow:none; }
+[data-library-design][data-library-design] .ai-workspace h2 { font:600 20px/1.3 var(--font-heading); }
+[data-library-design][data-library-design] .ai-workspace p { font-size:14px; line-height:1.5; }
+[data-library-design][data-library-design] .ai-coverage-heading { padding:18px 22px; }
+[data-library-design][data-library-design] .ai-coverage-heading strong { color:hsl(var(--destructive)); }
+[data-library-design][data-library-design] .ai-coverage-card { padding:20px 22px; min-height:190px; }
+[data-library-design][data-library-design] .ai-coverage-card > svg { display:none; }
+[data-library-design][data-library-design] .ai-coverage-card > div { gap:12px; height:100%; }
+[data-library-design][data-library-design] .ai-coverage-card > div > span { font:700 11px/1.4 var(--font-body); letter-spacing:.12em; text-transform:uppercase; color:hsl(var(--muted-foreground)); }
+[data-library-design][data-library-design] .ai-coverage-card strong { font:700 52px/1 var(--font-heading); letter-spacing:-.02em; }
+[data-library-design][data-library-design] .ai-coverage-card strong small { font:12px/1.4 ui-monospace,monospace; letter-spacing:0; }
+[data-library-design][data-library-design] .ai-coverage-card[data-attention=true] { background:var(--library-danger-surface); }
+[data-library-design][data-library-design] .ai-coverage-card[data-attention=true] :is(strong,div > span) { color:hsl(var(--destructive)); }
+[data-library-design][data-library-design] .ai-coverage-card .ai-progress { margin-top:auto; border-radius:0; }
+[data-library-design][data-library-design] .ai-coverage-card[data-attention=true] .ai-progress > span { background:hsl(var(--destructive)); }
+[data-library-design][data-library-design] .ai-readiness-note { padding:12px 22px; border-top-style:dashed; }
+[data-library-design][data-library-design] .ai-backfill { padding:22px; gap:14px; }
+[data-library-design][data-library-design] .ai-how { padding-top:12px; border-top:1px dashed hsl(var(--border)); }
+[data-library-design][data-library-design] .ai-how summary { min-height:32px; color:hsl(var(--foreground)); }
+[data-library-design][data-library-design] .ai-last-run { font:12px/1.5 ui-monospace,monospace; }
+[data-library-design][data-library-design] .ai-data-note { max-width:none; display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding-top:12px; border-top:1px dashed hsl(var(--border)); }
+[data-library-design][data-library-design] .ai-list-title { padding:18px 22px 8px; }
+[data-library-design][data-library-design] .ai-list-sticky { padding:12px 22px 0; }
+[data-library-design][data-library-design] .ai-list-filters { gap:8px; margin:14px 0 18px; }
+[data-library-design][data-library-design] .ai-list-filters button { border-radius:0; font-size:13px; padding-inline:12px; gap:8px; }
+[data-library-design][data-library-design] .ai-list-filters label { flex:0 0 auto; min-width:0; }
+[data-library-design][data-library-design] .ai-list-filters select { width:200px; }
+[data-library-design][data-library-design] .ai-search-label { display:block; margin-bottom:6px; font:700 11px/1.4 var(--font-body); letter-spacing:.12em; text-transform:uppercase; color:hsl(var(--muted-foreground)); }
+[data-library-design][data-library-design] .ai-book-head { background:hsl(var(--background)); margin:0 -22px; padding:12px 22px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+[data-library-design][data-library-design] .ai-book-row { padding:14px 22px; }
+[data-library-design][data-library-design] .ai-book-identity > img { border-radius:0; }
+[data-library-design][data-library-design] .ai-book-name button { font:600 16px/1.4 var(--font-body); }
+[data-library-design][data-library-design] .ai-book-row .admin-status-chip { border:0; background:transparent; padding:0; }
+[data-library-design][data-library-design] .ai-book-row .admin-status-chip :is(svg,span) { color:inherit; }
+[data-library-design][data-library-design] .ai-workspace .ai-pagination { padding:14px 22px; font-size:12px; }
+@media(max-width:640px) {
+  [data-library-design][data-library-design] .ai-workspace :is(.ai-backfill,.ai-coverage-heading,.ai-list-title) { padding:16px; }
+  [data-library-design][data-library-design] .ai-coverage-card { min-height:0; padding:16px; }
+  [data-library-design][data-library-design] .ai-coverage-card > div { height:auto; display:flex; }
+  [data-library-design][data-library-design] .ai-coverage-card strong { font-size:40px; }
+  [data-library-design][data-library-design] .ai-list-sticky { padding:12px 16px 0; }
+  [data-library-design][data-library-design] .ai-list-filters label { flex-basis:100%; }
+  [data-library-design][data-library-design] .ai-book-head { margin:0; padding:0; }
+  [data-library-design][data-library-design] .ai-book-row { padding:14px 16px; }
+}

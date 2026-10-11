@@ -83,6 +83,8 @@ components:
     padding: "0.25rem 0.625rem"
 ---
 
+> Visual system update: the repository-level DESIGN.md and scoped library-design.css supersede the earlier colors, typography, corners, cards, icons and tabs below for page content. All active content tabs use bookmark ribbons. Existing workflow, data, accessibility and permission requirements remain in force; protected navigation, mastheads and the homepage hero retain their original design.
+
 # Design System: My Library
 
 ## Overview

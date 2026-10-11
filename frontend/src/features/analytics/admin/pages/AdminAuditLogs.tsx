@@ -1,7 +1,7 @@
 import {useEffect,useState,useRef} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
-import {Download,Shield,AlertTriangle,X,Check,SlidersHorizontal,Settings2} from 'lucide-react';
+import {Download,Shield,AlertTriangle,X,Check,SlidersHorizontal,Settings2} from '@/components/ui/library-glyphs';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Skeleton} from '@/components/ui/skeleton';
@@ -19,7 +19,6 @@ export default function AdminAuditLogs(){
  const [params,setParams]=useSearchParams(),[search,setSearch]=useState(params.get('query')||''),[filterSheet,setFilterSheet]=useState(false),[view,setView]=useState(false),[density,setDensity]=useState('compact'),[expanded,setExpanded]=useState<Set<number>>(new Set()),[exporting,setExporting]=useState(false),[message,setMessage]=useState(''),[dismissed,setDismissed]=useState('');
  const [columns,setColumns]=useState<string[]>(['actor','category','time','record']);
  const [savedViews,setSavedViews]=useState<Array<{name:string;query:string}>>(()=>{try{const saved=JSON.parse(localStorage.getItem('audit-saved-views')||'[]');return Array.isArray(saved)?saved.filter(view=>view&&typeof view.name==='string'&&typeof view.query==='string').slice(-20):[];}catch{return [];}}),[viewName,setViewName]=useState('');
- const expandedSeen=useRef(new Set<number>());
  const {confirm,confirmDialog}=useAdminConfirmDialog();
  const patch=(values:Record<string,string|null>,reset=true)=>setParams(current=>{const next=new URLSearchParams(current);for(const [key,value] of Object.entries(values)){if(value&&value!=='all')next.set(key,value);else next.delete(key);}if(reset)next.delete('page');return next;},{replace:true});
  const query=params.get('query')||'';useEffect(()=>setSearch(query),[query]);useEffect(()=>{if(search===query)return;const timer=setTimeout(()=>patch({query:search.trim().slice(0,120)}),350);return()=>clearTimeout(timer);},[search,query]);
@@ -29,7 +28,6 @@ export default function AdminAuditLogs(){
  const probe=useQuery({queryKey:['audit-new-events',filters],queryFn:({signal})=>fetchAuditLogs({page:1,limit:1,...filters},signal),refetchInterval:30000});
  const rows=data.data?.rows||[],pagination=data.data?.pagination||{page,limit,total:0,totalPages:1},active=filterKeys.filter(key=>Boolean(filters[key])&&filters[key]!=='all');
  const expandable=rows.filter(hasAuditDetails);
- useEffect(()=>{const fresh=rows.filter(row=>!expandedSeen.current.has(row.id));fresh.forEach(row=>expandedSeen.current.add(row.id));if(fresh.some(row=>row.significant))setExpanded(current=>new Set([...current,...fresh.filter(row=>row.significant&&hasAuditDetails(row)).map(row=>row.id)]));},[data.dataUpdatedAt]);
  const invalidDates=Boolean(filters.dateFrom&&filters.dateTo&&filters.dateTo<filters.dateFrom),newCount=data.isPlaceholderData?0:Math.max(0,(probe.data?.pagination.total||0)-pagination.total),newKey=JSON.stringify([filters,probe.data?.latestId]),seen=useRef(0);
  useEffect(()=>{if(data.dataUpdatedAt&&data.dataUpdatedAt!==seen.current){seen.current=data.dataUpdatedAt;setMessage(`${eventCount(data.data?.pagination.total||0)} loaded.`);}},[data.dataUpdatedAt]);
  const refresh=async()=>{await data.refetch();await probe.refetch();void meta.refetch();};

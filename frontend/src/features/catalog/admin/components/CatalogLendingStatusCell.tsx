@@ -1,3 +1,4 @@
+import { LibraryAvailability } from "@/components/ui/library-patterns";
 import { Button } from "@/components/ui/button";
 import type { Book } from "../AdminCatalog.types";
 import { getCatalogLendingStatus } from "../catalogLendingStatus";
@@ -20,6 +21,7 @@ export default function CatalogLendingStatusCell({ book, archived, onAddHoldings
 
   const status = getCatalogLendingStatus(book);
   return <>
+    {book.available !== undefined && <LibraryAvailability available={Number(book.available)} total={book.accessioned_copies === undefined ? undefined : Number(book.accessioned_copies)}><span className="sr-only">Copy availability</span></LibraryAvailability>}
     <span className={status.tone === "available" ? "font-semibold text-success" : "font-semibold text-foreground"}>{status.label}</span>
     <p className="mt-1 text-xs text-muted-foreground">{status.detail}</p>
     {!archived && status.needsHoldings && <Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0 text-xs" onClick={(event) => { event.stopPropagation(); onAddHoldings(book); }} onKeyDown={(event) => event.stopPropagation()}>Add holdings</Button>}

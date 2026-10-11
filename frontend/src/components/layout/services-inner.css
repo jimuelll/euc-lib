@@ -1,0 +1,89 @@
+/* Scoped reproduction of services-inner.html; global navigation stays outside. */
+.service-inner-page[data-library-design][data-library-design] { font:15px/1.55 "DM Sans",system-ui,sans-serif; }
+.service-inner-container { max-width:1160px; margin:0 auto; padding:30px 24px 80px; }
+.service-inner-page svg { width:18px; height:18px; flex:none; }
+.service-back { display:inline-flex; align-items:center; gap:8px; min-height:44px; color:hsl(var(--action)); font-weight:700; }
+.service-back:hover,.service-link:hover { text-decoration:underline; text-underline-offset:4px; }
+.service-inner-page[data-library-design][data-library-design] .service-inner-heading { margin:6px 0 28px; padding-bottom:18px; border-bottom:2px solid hsl(var(--foreground)); }
+.service-inner-page[data-library-design][data-library-design] .service-inner-heading h1 { margin:0 0 10px; font:700 clamp(38px,5.5vw,58px)/1 "Fraunces",Georgia,serif; letter-spacing:-.02em; text-wrap:wrap; }
+.service-inner-heading p { margin:0; max-width:62ch; font-size:17px; color:hsl(var(--muted-foreground)); }
+.service-button { display:inline-flex; justify-content:center; align-items:center; gap:8px; min-height:44px; padding:0 20px; border:1px solid var(--library-maroon); background:var(--library-maroon); color:#fff; font-size:14px; font-weight:700; text-align:center; }
+.service-button:hover { background:transparent; color:hsl(var(--action)); }
+.service-inner-page[data-library-design][data-library-design] .service-button.is-outline { border-color:hsl(var(--foreground)); background:transparent; color:inherit; }
+.service-button.is-outline:hover { background:hsl(var(--foreground)); color:hsl(var(--background)); }
+.service-inner-page[data-library-design][data-library-design] .service-button:disabled { background:transparent; border-color:hsl(var(--border)); color:hsl(var(--muted-foreground)); cursor:default; }
+.service-link { display:inline-flex; align-items:center; min-height:44px; padding:0; border:0; background:transparent; color:hsl(var(--action)); font-weight:700; text-align:left; }
+.service-link:disabled { opacity:.5; cursor:default; text-decoration:none; }
+.service-chip { display:inline-block; padding:2px 10px; border:1px solid hsl(var(--border)); background:hsl(var(--background)); color:hsl(var(--muted-foreground)); font:700 11px/1.55 "DM Sans",system-ui,sans-serif; letter-spacing:.12em; text-transform:uppercase; overflow-wrap:anywhere; }
+.service-inner-page[data-library-design][data-library-design] .service-search { display:flex; border:2px solid hsl(var(--foreground)); background:hsl(var(--card)); margin:14px 0; }
+.service-inner-page[data-library-design][data-library-design] .service-search:focus-within { border-color:var(--library-gold); }
+.service-search > svg { margin:16px 0 0 16px; }
+.service-search input { flex:1; min-width:0; min-height:50px; padding:0 16px; border:0; background:transparent; color:inherit; font:400 16px "DM Sans",system-ui,sans-serif; outline:0; }
+.service-inner-page .service-search input:focus-visible { outline:0; }
+.service-notice { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:14px 18px; margin-top:28px; border:1px dashed hsl(var(--border)); color:hsl(var(--muted-foreground)); }
+.service-notice p,.service-error p,.service-empty p { margin:0; }
+.service-error { margin:16px 0; padding:16px; border:1px solid hsl(var(--destructive)); color:hsl(var(--destructive)); }
+.service-empty { padding:24px 20px; color:hsl(var(--muted-foreground)); }
+.service-loading { display:grid; gap:16px; padding:16px 0; }
+.subscription-summary { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:4px; color:hsl(var(--muted-foreground)); font-weight:700; }
+.subscription-filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.subscription-filters button { min-height:44px; padding:0 16px; border:1px solid hsl(var(--border)); background:hsl(var(--card)); color:inherit; }
+.service-inner-page[data-library-design][data-library-design] .subscription-filters button[aria-pressed=true] { border-color:var(--library-gold); background:var(--library-maroon); color:#fff; }
+.subscription-row { display:grid; grid-template-columns:180px minmax(0,1fr) 190px; align-items:center; gap:28px; padding:26px 0; border-bottom:1px solid hsl(var(--border)); }
+.service-inner-page[data-library-design][data-library-design] .subscription-logo { display:grid; place-items:center; aspect-ratio:16/10; border:1px solid hsl(var(--foreground)); background:var(--subscription-color); color:#fff; box-shadow:4px 5px 0 #1b141622; font:700 28px "Fraunces",Georgia,serif; letter-spacing:.02em; }
+.subscription-logo span { max-width:100%; padding:12px; text-align:center; overflow-wrap:anywhere; }
+.subscription-logo.is-long span { font-size:22px; }
+.subscription-logo img { width:100%; height:100%; min-height:0; object-fit:contain; background:hsl(var(--card)); }
+.subscription-copy { min-width:0; }
+.service-inner-page[data-library-design][data-library-design] .subscription-copy h2 { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 8px; font:700 28px/1.15 "Fraunces",Georgia,serif; text-wrap:wrap; overflow-wrap:anywhere; }
+.subscription-copy p { margin:10px 0 0; max-width:62ch; color:hsl(var(--muted-foreground)); overflow-wrap:anywhere; }
+.subscription-action { display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0; }
+.subscription-action .service-button { overflow-wrap:anywhere; padding:8px 16px; }
+.subscription-action small { text-align:center; color:hsl(var(--muted-foreground)); }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs { display:inline-flex; width:auto; max-width:100%; height:auto; justify-content:start; margin-bottom:24px; padding:0; border:1px solid hsl(var(--foreground)); border-radius:0; background:hsl(var(--card)); }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs button { display:inline-flex; gap:10px; min-height:46px; padding:0 22px; border:0; border-radius:0; background:transparent; color:hsl(var(--foreground)); font:700 15px "DM Sans",system-ui,sans-serif; box-shadow:none; }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs button[data-state=active] { background:var(--library-maroon); color:#fff; }
+.reservation-tabs b { padding:0 7px; background:var(--library-gold); color:#1b1416; font:700 12px ui-monospace,Menlo,monospace; }
+/* Override the shared bookmark tabs only inside these reference-driven pages. */
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs[role=tablist] { display:inline-flex !important; width:auto; padding:0 !important; background:hsl(var(--card)) !important; }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs[role=tablist] [role=tab] { min-height:46px; padding:0 22px !important; border:0 !important; background:transparent !important; color:hsl(var(--foreground)) !important; font-weight:700; }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs[role=tablist] [role=tab][data-state=active] { background:var(--library-maroon) !important; color:#fff !important; }
+.service-inner-page[data-library-design][data-library-design] .reservation-tabs[role=tablist] [role=tab]::before { display:none; }
+.reservation-tab-panel { margin-top:0; }
+.reservation-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; align-items:start; gap:44px; }
+.reservation-catalogue { min-width:0; }
+.reservation-catalogue > .service-search { margin-top:0; }
+.reservation-message { min-height:24px; margin:0 0 10px; color:hsl(var(--action)); font-weight:700; overflow-wrap:anywhere; }
+.service-inner-page[data-library-design][data-library-design] .reservation-section-label { margin:18px 0 4px; color:hsl(var(--muted-foreground)); font:700 12px/1.55 "DM Sans",system-ui,sans-serif; letter-spacing:.14em; text-transform:uppercase; }
+.reservation-book { display:grid; grid-template-columns:52px minmax(0,1fr) auto; align-items:center; gap:18px; padding:16px 0; border-bottom:1px solid hsl(var(--border)); }
+.service-inner-page[data-library-design][data-library-design] .reservation-cover { display:grid; place-items:center; width:52px; height:76px; border:1px solid hsl(var(--foreground)); background:var(--reservation-cover-color); color:#f0c060; font:700 17px "Fraunces",Georgia,serif; }
+.service-inner-page[data-library-design][data-library-design] :is(.reservation-book,.reservation-history-row) h3 { margin:0; font:700 19px/1.2 "Fraunces",Georgia,serif; text-wrap:wrap; overflow-wrap:anywhere; }
+.reservation-book-copy small,.reservation-history-row small { display:block; color:hsl(var(--muted-foreground)); overflow-wrap:anywhere; }
+.reservation-book-availability { margin:4px 0 0; font-size:13px; font-weight:700; color:hsl(var(--muted-foreground)); }
+.reservation-book-availability.is-available { color:hsl(var(--success)); }
+.service-inner-page[data-library-design][data-library-design] .reservation-sidebar { position:sticky; top:84px; min-width:0; border:1px solid hsl(var(--foreground)); border-top:6px solid var(--library-maroon); background:hsl(var(--card)); box-shadow:5px 6px 0 #1b141622; }
+.reservation-sidebar-heading { padding:16px 20px 12px; border-bottom:1px solid hsl(var(--border)); }
+.service-inner-page[data-library-design][data-library-design] .reservation-sidebar-heading h2 { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:0; font:700 22px/1.2 "Fraunces",Georgia,serif; text-wrap:wrap; }
+.reservation-sidebar-heading p { margin:6px 0 0; color:hsl(var(--muted-foreground)); font-size:13px; }
+.reservation-held { padding:16px 20px; border-bottom:1px dashed hsl(var(--border)); }
+.reservation-held:last-child { border-bottom:0; }
+.service-inner-page[data-library-design][data-library-design] .reservation-held h3 { margin:0; font:700 18px/1.2 "Fraunces",Georgia,serif; text-wrap:wrap; overflow-wrap:anywhere; }
+.reservation-held small { color:hsl(var(--muted-foreground)); }
+.reservation-held > small { display:block; }
+.reservation-held-meta { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.reservation-held-meta strong { font:700 15px "Fraunces",Georgia,serif; }
+.reservation-status { display:inline-flex; align-items:center; gap:6px; justify-self:start; padding:3px 10px; border:1px solid hsl(var(--border)); background:hsl(var(--background)); color:hsl(var(--action)); font:700 11px/1.55 "DM Sans",system-ui,sans-serif; letter-spacing:.12em; text-transform:uppercase; }
+.service-inner-page[data-library-design][data-library-design] .reservation-status.is-ready { background:var(--library-success-surface); color:hsl(var(--success)); border-color:transparent; }
+.reservation-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
+.reservation-notes { margin:10px 0; font-size:13px; overflow-wrap:anywhere; }
+.reservation-ready { margin:0 0 20px; padding:14px 18px; border:1px solid hsl(var(--success)); color:hsl(var(--success)); background:var(--library-success-surface); }
+.reservation-history-row { display:grid; grid-template-columns:minmax(0,1fr) 140px 120px; align-items:center; gap:16px; padding:16px 0; border-bottom:1px solid hsl(var(--border)); }
+.reservation-history-row time { color:hsl(var(--muted-foreground)); }
+.reservation-pagination { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.reservation-pagination span { color:hsl(var(--muted-foreground)); font-size:13px; }
+.service-inner-page :is(a,button,input,[role=tab]):focus-visible { outline:2px solid var(--library-gold); outline-offset:2px; }
+.dark .service-inner-page .subscription-logo { box-shadow:4px 5px 0 #000a; }
+.dark .service-inner-page .reservation-sidebar { box-shadow:5px 6px 0 #000a; }
+@media(max-width:900px) { .reservation-layout { grid-template-columns:minmax(0,1fr); } .reservation-sidebar { position:static !important; order:-1; } .subscription-row { grid-template-columns:140px minmax(0,1fr); } .subscription-action { grid-column:1/-1; } }
+@media(max-width:640px) { .subscription-row { grid-template-columns:minmax(0,1fr); } .subscription-logo { width:100%; max-width:240px; } .reservation-book { grid-template-columns:52px minmax(0,1fr); } .reservation-book > button { grid-column:2; justify-self:start; } .reservation-history-row { grid-template-columns:minmax(0,1fr); } }
+@media(prefers-reduced-motion:reduce) { .service-inner-page * { transition:none !important; } }

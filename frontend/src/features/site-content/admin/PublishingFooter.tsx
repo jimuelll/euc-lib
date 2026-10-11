@@ -1,4 +1,4 @@
-import { Loader2, Save, Send, Undo2 } from "lucide-react";
+import { Loader2, Save, Send, Undo2 } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import { formatContentDate } from "./PublishingFields";
 export interface PublishingFooterProps {

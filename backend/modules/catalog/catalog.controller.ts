@@ -87,6 +87,7 @@ const getBooks = async (req: CatalogHttpRequest, res: Response) => {
         title: String(req.query.title ?? "").trim(),
         author: String(req.query.author ?? "").trim(),
         isbn: String(req.query.isbn ?? "").trim(),
+        year_from: String(req.query.year_from ?? "").trim(),
         format: String(req.query.format ?? req.query.materialType ?? "all"),
         availability: String(req.query.availability ?? "all"),
         category: String(req.query.category ?? ""),

@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, Plus, RefreshCw } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { AdminPage, AdminPanel } from "@/features/admin";

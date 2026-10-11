@@ -7,7 +7,7 @@ import {
   QrCode,
   Search,
   X,
-} from "lucide-react";
+} from "@/components/ui/library-glyphs";
 import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -92,7 +92,7 @@ export default function MyLibrary() {
     <Dialog open={qrOpen} onOpenChange={setQrOpen}>
       <div className="min-h-screen bg-background text-foreground">
         <Navbar />
-        <main className="my-library-workspace mx-auto max-w-[1440px] px-4 pb-12 pt-8 sm:px-8 sm:pt-10 lg:px-10">
+        <main data-library-design className="my-library-workspace mx-auto max-w-[1440px] px-4 pb-12 pt-8 sm:px-8 sm:pt-10 lg:px-10">
           <header className="flex flex-wrap items-center justify-between gap-5 border-b border-border pb-7">
             <div className="min-w-0">
               <h1 className="text-3xl font-semibold tracking-tight">
@@ -125,7 +125,20 @@ export default function MyLibrary() {
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-[184px_minmax(0,1fr)] lg:gap-8">
             <nav
               aria-label="My Library sections"
-              className="grid grid-cols-4 gap-1 rounded-lg bg-muted/60 p-1 lg:sticky lg:top-24 lg:grid-cols-1 lg:gap-1 lg:bg-transparent lg:p-0"
+              className="library-section-tabs grid grid-cols-4 gap-1 rounded-lg bg-muted/60 p-1 lg:sticky lg:top-24 lg:grid-cols-1 lg:gap-1 lg:bg-transparent lg:p-0"
+              onKeyDown={(event) => {
+                const links = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>("a"));
+                const index = links.indexOf(event.target as HTMLAnchorElement);
+                if (index < 0) return;
+                const next = event.key === "ArrowRight" ? (index + 1) % links.length
+                  : event.key === "ArrowLeft" ? (index + links.length - 1) % links.length
+                  : event.key === "Home" ? 0 : event.key === "End" ? links.length - 1 : -1;
+                if (next < 0) return;
+                event.preventDefault();
+                links[next].focus();
+                links[next].scrollIntoView?.({ block: "nearest", inline: "nearest" });
+                links[next].click();
+              }}
             >
               {sections.map(({ value, label, Icon }) => (
                 <Link

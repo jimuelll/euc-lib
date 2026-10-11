@@ -1,5 +1,5 @@
 import {useState,type KeyboardEvent} from 'react';
-import {GripVertical,X,Plus} from 'lucide-react';
+import {GripVertical,X,Plus} from '@/components/ui/library-glyphs';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';

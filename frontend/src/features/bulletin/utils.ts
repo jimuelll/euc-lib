@@ -18,7 +18,7 @@ export function getInitials(name: string): string {
 }
 
 export function toPost(raw: ApiPost): BulletinPost {
-  let gallery:{url:string;alt:string}[]=[];try{gallery=typeof raw.gallery==="string"?JSON.parse(raw.gallery):raw.gallery||[];}catch{}
+  let gallery:{url:string;alt:string}[]=[];try{gallery=typeof raw.gallery==="string"?JSON.parse(raw.gallery):raw.gallery||[];}catch{/* Keep the empty gallery when saved data is malformed. */}
   return {
     id:            raw.id,
     title:         raw.title,

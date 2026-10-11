@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Barcode, Check, Loader2, Save, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Barcode, Check, Loader2, Lock, Save, ShieldAlert } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,9 +48,16 @@ type Props = {
   guardRef: React.MutableRefObject<(() => Promise<boolean>) | null>;
   onManageCopies: () => void;
   isSuperAdmin?: boolean;
+  inline?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+  /** Controlled selection; a missing ID must never silently open a different copy. */
+  copyId?: number;
+  navigation?: { position: number; total: number; label: string; onPrevious: () => void; onNext: () => void };
+  onSavedNext?: () => void;
+  actionsHost?: HTMLElement | null;
 };
 
-export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = null, guardRef, onManageCopies, isSuperAdmin = false }: Props) {
+export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = null, guardRef, onManageCopies, isSuperAdmin = false, inline = false, onBusyChange, copyId, navigation, onSavedNext, actionsHost }: Props) {
   const queryClient = useQueryClient();
   const holdingsQuery = useQuery({ queryKey: catalogKeys.bookHoldings(bookId), queryFn: ({ signal }) => fetchBookHoldings(bookId, signal) });
   const programsQuery = useQuery({ queryKey: librarySettingsKeys.programs("active"), queryFn: ({ signal }) => fetchAcademicPrograms("active", signal) });
@@ -61,15 +69,16 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
   const [voidReason, setVoidReason] = useState("");
   const [markSavedAfterUpdate, setMarkSavedAfterUpdate] = useState(false);
   const [initializedSelection, setInitializedSelection] = useState<string | null>(null);
-  const current = copies[copyIndex] ?? null;
-  const selectionIdentity = `${bookId}:${initialCopyId ?? "first"}`;
+  const requestedCopyId = copyId ?? initialCopyId;
+  const current = copies[copyId === undefined ? copyIndex : copies.findIndex(copy => copy.copy_id === copyId)] ?? null;
+  const selectionIdentity = `${bookId}:${requestedCopyId ?? "first"}`;
   const selectionInitialized = initializedSelection === selectionIdentity;
   const loading = holdingsQuery.isPending || (holdingsQuery.data !== undefined && !selectionInitialized);
   const canEditHolding = Boolean(current && (current.is_active || current.accession_number));
   const guardIdentity = current?.copy_id ?? `${bookId}-none`;
   const savedDraft = current ? asDraft(current) : null;
   const isDraftDirty = Boolean(current && selectionInitialized && savedDraft && JSON.stringify(draft) !== JSON.stringify(savedDraft));
-  const { dirty, confirmDiscard, discardDialog, markSaved } = useUnsavedChanges(draft, Boolean(current && selectionInitialized), guardIdentity, isDraftDirty);
+  const { dirty, confirmDiscard, discardDialog, markSaved } = useUnsavedChanges(draft, Boolean(current && selectionInitialized), guardIdentity, isDraftDirty, {guardLinks:!navigation});
   const completeCount = useMemo(() => copies.filter((copy) => Boolean(copy.accession_number) && !copy.accession_voided).length, [copies]);
 
   const saveMutation = useMutation({
@@ -84,25 +93,34 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
   const voiding = voidMutation.isPending;
 
   useEffect(() => {
+    onBusyChange?.(saving || voiding);
+    return () => onBusyChange?.(false);
+  }, [onBusyChange, saving, voiding]);
+
+  useEffect(() => {
     if (!holdingsQuery.data || initializedSelection === selectionIdentity) return;
     const data = holdingsQuery.data;
-    const preferred = initialCopyId === null ? data.findIndex((copy) => !copy.accession_number) : data.findIndex((copy) => copy.copy_id === initialCopyId);
-    const selectedIndex = preferred >= 0 ? preferred : 0;
+    const preferred = requestedCopyId === null ? data.findIndex((copy) => Boolean(copy.is_active) && !copy.accession_voided && !copy.accession_number?.trim()) : data.findIndex((copy) => copy.copy_id === requestedCopyId);
+    const selectedIndex = preferred >= 0 ? preferred : requestedCopyId === null ? 0 : -1;
     setCopyIndex(selectedIndex);
     setDraft(data[selectedIndex] ? asDraft(data[selectedIndex]) : emptyDraft());
     setInitializedSelection(selectionIdentity);
-  }, [holdingsQuery.data, initialCopyId, initializedSelection, selectionIdentity]);
+  }, [holdingsQuery.data, requestedCopyId, initializedSelection, selectionIdentity]);
 
   useEffect(() => {
-    guardRef.current = confirmDiscard;
+    guardRef.current = async () => !saving && !voiding && await confirmDiscard();
     return () => { guardRef.current = null; };
-  }, [confirmDiscard, guardRef]);
+  }, [confirmDiscard, guardRef, saving, voiding]);
 
   useEffect(() => {
     if (!markSavedAfterUpdate) return;
     markSaved();
     setMarkSavedAfterUpdate(false);
   }, [draft, markSavedAfterUpdate, markSaved]);
+
+  useEffect(() => {
+    if (copyId !== undefined && selectionInitialized && !inline) document.getElementById("holding-accession")?.focus({preventScroll:true});
+  }, [copyId, selectionInitialized, inline]);
 
   const switchCopy = useCallback(async (nextIndex: number) => {
     if (nextIndex < 0 || nextIndex >= copies.length || nextIndex === copyIndex) return;
@@ -113,8 +131,8 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
 
   const setField = (key: keyof Draft, value: string) => setDraft((previous) => ({ ...previous, [key]: value }));
 
-  const save = async () => {
-    if (!current || !canEditHolding) return;
+  const save = async (advance = false) => {
+    if (!current || !canEditHolding || saving || voiding) return;
     if (!draft.accession_number.trim()) return toast.error("Accession number is required");
     try {
       await saveMutation.mutateAsync({ copyId: current.copy_id, payload: { ...draft, accession_number: draft.accession_number.trim() } });
@@ -124,42 +142,57 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
       if (refreshed[nextIndex]) setDraft(asDraft(refreshed[nextIndex]));
       setMarkSavedAfterUpdate(true);
       toast.success("Holding saved");
+      if (advance) {
+        if (onSavedNext) onSavedNext();
+        else if (copyIndex < copies.length - 1) {
+          setCopyIndex(copyIndex + 1);
+          setDraft(asDraft(copies[copyIndex + 1]));
+        }
+      }
     } catch (error: unknown) { toast.error(getApiErrorMessage(error, "Failed to save holding")); }
   };
 
+  const saveActions = current ? (
+      <div className="catalog-holding-save-actions">
+        {!navigation && !inline && <div className="flex gap-2"><Button variant="outline" disabled={copyIndex === 0 || saving || voiding} onClick={() => void switchCopy(copyIndex - 1)}><ArrowLeft className="mr-2 h-4 w-4" />Previous</Button><Button variant="outline" disabled={copyIndex >= copies.length - 1 || saving || voiding} onClick={() => void switchCopy(copyIndex + 1)}>Next<ArrowRight className="ml-2 h-4 w-4" /></Button></div>}
+        {canEditHolding && <div className="catalog-holding-save-buttons"><Button onClick={() => void save()} disabled={saving || voiding || !draft.accession_number.trim()}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : current.accession_number ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}{saving ? "Saving…" : "Save holding"}</Button>{(navigation || !inline) && <Button variant="outline" onClick={() => void save(true)} disabled={saving || voiding || !draft.accession_number.trim() || (navigation ? navigation.position >= navigation.total - 1 : copyIndex >= copies.length - 1)}>Save and next<ArrowRight className="ml-2 h-4 w-4" /></Button>}</div>}
+      </div>
+  ) : null;
+
   return <>
     {discardDialog}
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 sm:px-6">
-    <div className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className={inline ? "catalog-copy-editor" : copyId !== undefined ? "catalog-focused-editor" : "flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-5 sm:px-6"}>
+    {!inline && copyId === undefined && <div className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <h2 className="text-base font-semibold text-foreground">Copy holdings</h2>
         <p className="mt-1 truncate text-sm text-muted-foreground">{bookTitle}</p>
       </div>
       {!loading && copies.length > 0 && <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{completeCount} of {copies.length} accessioned</span>}
-    </div>
+    </div>}
 
+    {navigation && <nav className="catalog-copy-navigation" aria-label={navigation.label}><p aria-live="polite">{navigation.label} · {navigation.position + 1} of {navigation.total}</p><div><Button variant="outline" disabled={saving || voiding || navigation.position <= 0} onClick={navigation.onPrevious}><ArrowLeft className="mr-2 h-4 w-4" />Previous</Button><Button variant="outline" disabled={saving || voiding || navigation.position >= navigation.total - 1} onClick={navigation.onNext}>Next<ArrowRight className="ml-2 h-4 w-4" /></Button></div></nav>}
     {loading ? <div className="flex flex-1 items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading copy holdings…</div> : holdingsQuery.isError ? <div role="alert" className="flex flex-1 flex-col items-center justify-center py-12 text-center"><p className="text-sm text-destructive">{getApiErrorMessage(holdingsQuery.error, "Failed to load holdings")}</p><Button className="mt-3" variant="outline" onClick={() => void holdingsQuery.refetch()}>Try again</Button></div> : copies.length === 0 ? <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
       <p className="text-sm font-medium text-foreground">This book has no copies yet</p>
       <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">Add a copy in Copies before recording its accession details.</p>
       <Button className="mt-4" variant="outline" onClick={onManageCopies}>Manage copies</Button>
-    </div> : current ? <div className="flex-1 py-5">
-      <div className="flex flex-wrap items-center gap-2">
+    </div> : current ? <div className={inline ? "catalog-copy-fields" : "flex-1 py-5"}>
+      {!inline && <>{copyId === undefined && <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="holding-copy" className={labelClass}>Physical copy</label>
         <select id="holding-copy" value={String(current.copy_id)} disabled={saving || voiding} onChange={(event) => { const next = copies.findIndex((copy) => copy.copy_id === Number(event.target.value)); void switchCopy(next); }} className="h-10 min-w-0 flex-1 border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {copies.map((copy) => <option key={copy.copy_id} value={copy.copy_id}>{copyLabel(copy)} · {copy.barcode} · {copy.accession_number || "Needs accession"}{!copy.is_active ? " · Inactive" : ""}</option>)}
         </select>
-      </div>
+      </div>}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-border bg-muted/20 px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2"><Barcode className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="shrink-0 text-xs font-medium text-foreground">{copyLabel(current)}</span><span className="truncate font-mono text-xs text-muted-foreground">{current.barcode}</span><span className="text-xs text-muted-foreground">{current.accession_number ? `Accession ${current.accession_number}` : "No accession number"}</span></div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2"><Barcode className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="shrink-0 text-xs font-medium text-foreground">{copyLabel(current)}</span><span className="break-all font-mono text-xs text-muted-foreground">{current.barcode}</span><span className="text-xs text-muted-foreground">{current.accession_number ? `Accession ${current.accession_number}` : "No accession number"}</span></div>
         <span className={`text-xs font-medium ${current.borrow_eligible ? "text-success" : "text-muted-foreground"}`}>{lendingStatus(current)} · {current.condition}</span>
       </div>
-      <div className="mt-3 border border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">Loan policy: <span className="font-medium text-foreground">{current.book_type || "Not assigned"}</span>{current.borrower_name ? ` · Borrowed by ${current.borrower_name}` : ""}{current.due_date ? ` · Due ${new Date(current.due_date).toLocaleDateString()}` : ""}</div>
+      <div className="mt-3 border border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">Loan policy: <span className="font-medium text-foreground">{current.book_type || "Not assigned"}</span>{current.borrower_name ? ` · Borrowed by ${current.borrower_name}` : ""}{current.due_date ? ` · Due ${new Date(current.due_date).toLocaleDateString()}` : ""}</div></>}
 
       {!current.is_active && !current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired and has no accession yet. Restore it from Copies before assigning one.</p>}
       {!current.is_active && current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired. Its accession is permanent; you can update its other holding details here.</p>}
-      {current.accession_voided && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This accession is permanently voided. The number stays attached to this copy and cannot be reused. This copy cannot be borrowed; add a new physical copy to register the correct accession.</p>}
+      {Boolean(current.accession_voided) && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This accession is permanently voided. The number stays attached to this copy and cannot be reused. This copy cannot be borrowed; add a new physical copy to register the correct accession.</p>}
       <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
-        <div><label className={labelClass} htmlFor="holding-accession">Accession number <span className="text-destructive">*</span></label><Input id="holding-accession" autoComplete="off" value={draft.accession_number} readOnly={Boolean(current.accession_number)} disabled={!current.is_active && !current.accession_number || saving || voiding} onChange={(event) => setField("accession_number", event.target.value)} placeholder="Enter the accession number" /><p className="mt-1 text-xs text-muted-foreground">{current.accession_number ? "Permanent after first save" : "Assigned numbers cannot be changed or reused"}</p>{isSuperAdmin && current.accession_number && !current.accession_voided && <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => { if (dirty) return; setVoidReason(""); setVoidDialogOpen(true); }} disabled={dirty || saving || voiding}><ShieldAlert className="mr-2 h-3.5 w-3.5" />Void mistaken accession</Button>}{isSuperAdmin && current.accession_number && dirty && <p className="mt-1 text-xs text-muted-foreground">Save or discard other holding edits before voiding the accession.</p>}</div>
+        <div><label className={labelClass} htmlFor="holding-accession">Accession number <span className="text-destructive">*</span></label><Input id="holding-accession" autoComplete="off" value={draft.accession_number} readOnly={Boolean(current.accession_number)} disabled={!current.is_active && !current.accession_number || saving || voiding} onChange={(event) => setField("accession_number", event.target.value)} placeholder="Enter the accession number" /><p className="catalog-accession-help mt-1 text-xs text-muted-foreground">{current.accession_number && <Lock aria-hidden="true" className="h-3.5 w-3.5" />}{current.accession_number ? "Permanent after first save" : "Assigned numbers cannot be changed or reused"}</p>{isSuperAdmin && current.accession_number && !current.accession_voided && <Button type="button" size="sm" variant="outline" className="catalog-void-accession mt-2" onClick={() => { if (dirty) return; setVoidReason(""); setVoidDialogOpen(true); }} disabled={dirty || saving || voiding}><ShieldAlert className="mr-2 h-3.5 w-3.5" />Void mistaken accession</Button>}{isSuperAdmin && current.accession_number && dirty && <p className="mt-1 text-xs text-muted-foreground">Save or discard other holding edits before voiding the accession.</p>}</div>
         <div><label className={labelClass} htmlFor="holding-price">Price</label><Input id="holding-price" type="number" min="0" step="0.01" value={draft.price} disabled={!canEditHolding || saving || voiding} onChange={(event) => setField("price", event.target.value)} placeholder="0.00" /></div>
         <div><label className={labelClass} htmlFor="holding-course">Course / program</label><Select value={draft.program_id || "none"} disabled={!canEditHolding || saving || voiding} onValueChange={(value) => setField("program_id", value === "none" ? "" : value)}><SelectTrigger id="holding-course"><SelectValue placeholder="Select a program / course" /></SelectTrigger><SelectContent><SelectItem value="none">No course</SelectItem>{current.program_id && !programs.some((program) => String(program.id) === String(current.program_id)) && <SelectItem value={String(current.program_id)} disabled>{current.course || "Inactive program / course"} (inactive)</SelectItem>}{programs.map((program) => <SelectItem key={program.id} value={String(program.id)}>{program.name}</SelectItem>)}</SelectContent></Select><Link to="/admin/holidays?tab=programs" className="mt-1.5 inline-block text-xs text-muted-foreground underline">Manage programs / courses</Link></div>
         <div><label className={labelClass} htmlFor="holding-course-code">Course code</label><Input id="holding-course-code" value={draft.course_code} disabled={!canEditHolding || saving || voiding} onChange={(event) => setField("course_code", event.target.value)} placeholder="Optional code" /></div>
@@ -168,11 +201,8 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
         <div><label className={labelClass} htmlFor="holding-distributor">Distributor</label><Input id="holding-distributor" value={draft.distributor} disabled={!canEditHolding || saving || voiding} onChange={(event) => setField("distributor", event.target.value)} placeholder="Optional" /></div>
         <div><label className={labelClass} htmlFor="holding-invoice">Invoice / O.R.</label><Input id="holding-invoice" value={draft.invoice_reference} disabled={!canEditHolding || saving || voiding} onChange={(event) => setField("invoice_reference", event.target.value)} placeholder="Optional reference" /></div>
       </div>
-      <div className="mt-6 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-between">
-        <div className="flex gap-2"><Button variant="outline" disabled={copyIndex === 0 || saving || voiding} onClick={() => void switchCopy(copyIndex - 1)}><ArrowLeft className="mr-2 h-4 w-4" />Previous</Button><Button variant="outline" disabled={copyIndex >= copies.length - 1 || saving || voiding} onClick={() => void switchCopy(copyIndex + 1)}>Next<ArrowRight className="ml-2 h-4 w-4" /></Button></div>
-        {canEditHolding && <Button onClick={() => void save()} disabled={saving || voiding || !draft.accession_number.trim()}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : current.accession_number ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}{saving ? "Saving…" : "Save holding"}</Button>}
-      </div>
-    </div> : null}
+      {actionsHost ? createPortal(saveActions,actionsHost) : saveActions}
+    </div> : <div role="alert" className="catalog-error">This copy is no longer available. Close the drawer or choose another copy.</div>}
     </div>
     <Dialog open={voidDialogOpen} onOpenChange={(open) => { if (!voiding) setVoidDialogOpen(open); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminConfirmDialog } from "../components/useAdminConfirmDialog";
 
-export function useUnsavedChanges(value: unknown, open: boolean, identity: string | number = "draft", dirtyOverride?: boolean) {
+export function useUnsavedChanges(value: unknown, open: boolean, identity: string | number = "draft", dirtyOverride?: boolean, options?: { guardLinks?: boolean }) {
   const serialized = JSON.stringify(value);
   const current = useRef(serialized);
   current.current = serialized;
@@ -20,6 +20,7 @@ export function useUnsavedChanges(value: unknown, open: boolean, identity: strin
     if (!dirty) return;
     const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     const link = (event: MouseEvent) => {
+      if (options?.guardLinks === false) return;
       const anchor = (event.target as Element)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download") || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
       const url = new URL(anchor.href);
@@ -30,6 +31,6 @@ export function useUnsavedChanges(value: unknown, open: boolean, identity: strin
     window.addEventListener("beforeunload", unload);
     document.addEventListener("click", link, true);
     return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", link, true); };
-  }, [dirty, confirmDiscard, navigate]);
+  }, [dirty, confirmDiscard, navigate, options?.guardLinks]);
   return { dirty, confirmDiscard, discardDialog: confirmDialog, markSaved };
 }

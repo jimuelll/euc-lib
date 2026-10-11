@@ -1,66 +1,18 @@
-import type { AboutSettings } from "@/features/about/api/about.service";
-import SectionLabel from "./ui/SectionLabel";
-import SectionHeading from "./ui/SectionHeading";
+import type { AboutSettings } from "../api/about.service";
 
-interface StaffGridProps {
-  staff: AboutSettings["staff"];
+const initials = (name: string) => name.trim().split(/\s+/).map((word) => word[0]).slice(0, 2).join("");
+
+export default function StaffGrid({ staff }: { staff: AboutSettings["staff"] }) {
+  if (!staff.length) return null;
+  const groupFor = (role: string) => /student\s+assistant/i.test(role) ? "Student assistants" : "Library staff";
+  const groups = [...new Set(staff.map((member) => groupFor(member.role)))];
+  return <section className="library-about-chapter" id="about-staff" aria-labelledby="about-staff-title">
+    <div className="library-information-kicker">Library staff</div><h2 className="library-information-section-title" id="about-staff-title">Meet the team</h2>
+    {groups.map((group) => <div key={group}><h3 className="library-about-staff-group">{group}</h3>
+      <div className="library-about-team">{staff.filter((member) => groupFor(member.role) === group).map((member, index) => <div className="library-about-person" key={member.name + index}>
+        {member.image_url ? <img className="library-about-portrait" src={member.image_url} alt={member.image_alt ?? member.name} loading="lazy" /> : <div className="library-about-portrait" aria-hidden="true">{initials(member.name)}</div>}
+        <b>{member.name}</b><span>{member.role}</span>
+      </div>)}</div>
+    </div>)}
+  </section>;
 }
-
-const getInitials = (name: string): string =>
-  name
-    .split(" ")
-    .filter((_, i, a) => i === 0 || i === a.length - 1)
-    .map((n) => n[0])
-    .join("");
-
-const StaffGrid = ({ staff }: StaffGridProps) => (
-  <div className="border-b border-border bg-background">
-    <div className="container px-4 sm:px-6 py-10 md:py-14">
-      <SectionLabel>Library Staff</SectionLabel>
-      <SectionHeading>Meet the Team</SectionHeading>
-      <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4 border-l border-t border-border">
-        {staff.map((member) => (
-          <div
-            key={member.name}
-            className="border-r border-b border-border bg-background p-6 flex flex-col items-center gap-4 text-center"
-          >
-            {/* Avatar — photo if available, initials fallback */}
-            {member.image_url ? (
-              <img
-                src={member.image_url}
-                alt={member.image_alt??member.name}
-                className="h-24 w-24 object-cover border border-border"
-              />
-            ) : (
-              <div className="flex h-24 w-24 items-center justify-center bg-primary border border-primary/20">
-                <span
-                  className="text-lg font-bold tracking-widest text-primary-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  {getInitials(member.name)}
-                </span>
-              </div>
-            )}
-
-            <div>
-              <p
-                className="text-[13px] font-bold text-foreground tracking-tight"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {member.name}
-              </p>
-              <p
-                className="text-xs uppercase tracking-[0.18em] text-muted-foreground/60 mt-1"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {member.role}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-export default StaffGrid;

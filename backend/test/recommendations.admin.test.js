@@ -1,6 +1,21 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const db=require('../db'),repository=require('../modules/recommendations/recommendations.repository'),service=require('../modules/recommendations/recommendations.service'),runLog=require('../modules/recommendations/recommendations.run-log');
 const {validateBackfillOptions}=require('../modules/recommendations/recommendations.admin');
+test('progress returns idle when no run has ever been recorded',async()=>{
+ const controller=require('../modules/recommendations/recommendations.controller');
+ const original=runLog.latestRun,originalProgress=service.restoredBackfillProgress;
+ let response,statusCode=200;
+ const res={status(code){statusCode=code;return this;},json(body){response=body;return this;}};
+ runLog.latestRun=async()=>null;
+ service.restoredBackfillProgress=async()=>({status:'idle',total:0,completed:0});
+ try{
+  await controller.backfillProgress({},res);
+  assert.equal(statusCode,200);
+  assert.equal(response.status,'idle');
+  assert.equal(response.total,0);
+  assert.equal(response.runId,undefined);
+ }finally{runLog.latestRun=original;service.restoredBackfillProgress=originalProgress;}
+});
 test('backfill options reject unsupported scopes, excessive limits and empty selections',()=>{for(const options of [{scope:'unknown'},{limit:-1},{limit:1001},{scope:'selected',bookIds:[]},{bookIds:[-1]},{retryFailures:'true'}])assert.throws(()=>validateBackfillOptions(options),{status:400});assert.deepEqual(validateBackfillOptions({scope:'selected',bookIds:[2,2,3],limit:10}).bookIds,[2,3]);});
 test('coverage total counts active books, including books without embeddings',async()=>{const original=db.query,queries=[];db.query=async(sql)=>{queries.push(sql);return sql.includes('AS total')?[[{total:60,ready:40,missing:20}]]:[[]];};try{const result=await repository.getEmbeddingStatus();assert.equal(result.row.total,60);assert.match(queries[0],/COUNT\(bk.id\) AS total/);}finally{db.query=original;}});
 test('readiness filters are applied before both count and pagination',async()=>{const original=db.query,queries=[];db.query=async(sql,params)=>{queries.push({sql,params});return sql.includes('COUNT(*)')?[[{total:3}]]:[[]];};try{await repository.listBooksForMetadata({synopsis:'no_description',embedding:'ready',details:'found',query:'Atlas',page:2,limit:10});for(const query of queries){assert.match(query.sql,/synopsisProviderCheckVersion/);assert.deepEqual(query.params.slice(0,5),['%Atlas%','%Atlas%','%Atlas%','no_description','ready']);}assert.deepEqual(queries[1].params.slice(-2),[10,10]);}finally{db.query=original;}});
