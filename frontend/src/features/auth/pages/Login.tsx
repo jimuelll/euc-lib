@@ -1,17 +1,39 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Bell, BookOpen, CalendarDays, Eye, EyeOff, HelpCircle } from "@/components/ui/library-glyphs";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
+import "./login.css";
+
+const benefits = [
+  {
+    code: "A·01",
+    title: "Track your borrowing",
+    detail: "See current loans and due dates at a glance.",
+    rotation: "-.8deg",
+    offset: "0px",
+  },
+  {
+    code: "A·02",
+    title: "Manage reservations",
+    detail: "Keep up with requests that are ready for pickup.",
+    rotation: ".6deg",
+    offset: "14px",
+  },
+  {
+    code: "A·03",
+    title: "Stay informed",
+    detail: "Library updates and account notifications.",
+    rotation: "-.4deg",
+    offset: "4px",
+  },
+];
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,273 +42,216 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [capsLock, setCapsLock] = useState(false);
+  const accountInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const reserving = searchParams.get("for") === "reserve";
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError("");
-    if (!id || !password) {
-      setError("Please fill in all fields.");
+
+    const accountId = id.trim();
+    if (!accountId || !password) {
+      setError(
+        "Enter your library card, employee number or username, and your password.",
+      );
+      if (!accountId) accountInput.current?.focus();
+      else passwordInput.current?.focus();
       return;
     }
+
     setLoading(true);
     try {
-      await login(id, password, rememberMe);
-    } catch (err: any) {
-      setError(err.message || "Login failed.");
+      await login(accountId, password, rememberMe);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Login failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const readCapsLock = (event: KeyboardEvent<HTMLInputElement>) => {
+    setCapsLock(event.getModifierState("CapsLock"));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
-      <main data-library-design className="bg-background">
-        <div className="container grid min-h-[calc(100svh-3.75rem)] items-center gap-12 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16 lg:py-20 xl:gap-28">
-          <section className="hidden max-w-xl lg:block" aria-labelledby="login-support-heading">
-            <div className="h-px w-8 bg-warning" />
-            <h1
-              id="login-support-heading"
-              className="mt-6 text-4xl font-bold leading-[1.08] tracking-[-0.03em] text-foreground xl:text-5xl"
-              style={{ fontFamily: "var(--font-heading)" }}
+      <div className="login-shell">
+        <a className="login-skip-link" href="#login-id">
+          Skip to sign in
+        </a>
+        <main className="login-page">
+          <div className="login-grid">
+            <section
+              className="login-story"
+              aria-labelledby="login-story-heading"
             >
-              Your library, ready when you are.
-            </h1>
-            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground">
-              Access your borrowing activity, reservations, notices, and academic resources from one place.
-            </p>
+              <div className="login-kicker">Library access</div>
+              <h1 id="login-story-heading">
+                Your library, <em>ready</em> when you are.
+              </h1>
+              <p className="login-lead">
+                Your loans, reservations and notices, in one place.
+              </p>
 
-            <div className="mt-10 divide-y divide-border border-y border-border">
-              {[
-                { icon: BookOpen, title: "Track your borrowing", detail: "See current loans and due dates at a glance." },
-                { icon: CalendarDays, title: "Manage reservations", detail: "Keep up with requests that are ready for pickup." },
-                { icon: Bell, title: "Stay informed", detail: "Review library updates and account notifications." },
-              ].map(({ icon: Icon, title, detail }) => (
-                <div key={title} className="flex gap-4 py-4">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                  <div>
-                    <h2
-                      className="text-sm font-bold tracking-[-0.01em] text-foreground"
-                      style={{ fontFamily: "var(--font-heading)" }}
+              <div className="login-benefits">
+                {benefits.map(({ code, title, detail, rotation, offset }) => (
+                  <div
+                    className="login-benefit"
+                    key={code}
+                    style={
+                      {
+                        "--benefit-rotation": rotation,
+                        "--benefit-offset": offset,
+                      } as CSSProperties
+                    }
+                  >
+                    <span className="login-benefit-code" aria-hidden="true">
+                      {code}
+                    </span>
+                    <b>{title}</b>
+                    <p>{detail}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section
+              className={`login-card${error ? " login-shake" : ""}`}
+              aria-label="Sign in"
+            >
+              <div className="login-card-header">
+                <p className="login-card-title">Sign In</p>
+                <small>Enverga-Candelaria Library</small>
+                <div className="login-stamp">
+                  Member
+                  <br />
+                  access
+                </div>
+              </div>
+
+              <form className="login-form" onSubmit={handleLogin} noValidate>
+                {reserving && (
+                  <p className="login-context">
+                    Sign in to reserve books<span>.</span>
+                  </p>
+                )}
+                {error && (
+                  <div className="login-error" role="alert">
+                    <svg
+                      className="login-icon"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
                     >
-                      {title}
-                    </h2>
-                    <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
+                      <path d="M12 3l10 18H2zM12 10v5M12 18h.01" />
+                    </svg>
+                    <span>{error}</span>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                )}
 
-          <div className="w-full max-w-sm">
-            <div className="bg-primary relative overflow-hidden">
-              <div className="h-[3px] w-full bg-warning" />
-              <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
-              <div
-                className="absolute inset-0 opacity-[0.04] pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-                }}
-              />
-              <div className="absolute inset-x-0 bottom-0 h-px bg-black/30" />
-              <div className="relative z-10 px-6 py-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-px w-4 bg-warning shrink-0" />
-                  <span
-                    className="text-xs font-bold uppercase tracking-[0.3em] text-warning"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Enverga-Candelaria Library
-                  </span>
-                </div>
-                <h1
-                  className="text-xl font-bold text-primary-foreground leading-tight"
-                  style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em" }}
-                >
-                  Library Access
-                </h1>
-                <p className="mt-1.5 text-xs text-primary-foreground/85 leading-relaxed">
-                  Sign in with your library card, employee number, or username.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleLogin} className="border border-border border-t-0 divide-y divide-border bg-card">
-              <div className="px-6 pt-5 pb-4">
-                <label
-                  className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                  htmlFor="login-id"
-                >
-                  Account ID <span className="text-destructive">*</span>
-                </label>
-                <input
-                  id="login-id"
-                  type="text"
-                  value={id}
-                  onChange={(e) => setId(e.target.value)}
-                  placeholder="Library card, employee no., or username"
-                  autoComplete="username"
-                  className="h-10 w-full border border-border bg-background px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition-colors"
-                />
-              </div>
-
-              <div className="px-6 pt-4 pb-5">
-                <div className="flex items-center justify-between mb-2">
-                  <label
-                    className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                    htmlFor="login-password"
-                  >
-                    Password <span className="text-destructive">*</span>
-                  </label>
-
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button
-                        type="button"
-                        className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-primary hover:text-primary transition-colors"
-                        style={{ fontFamily: "var(--font-heading)" }}
-                      >
-                        Forgot?
-                        <HelpCircle className="h-3 w-3" />
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-sm rounded-md border-border bg-card p-0 shadow-2xl">
-                      <div className="bg-primary relative overflow-hidden px-6 py-5">
-                        <div className="absolute inset-x-0 top-0 h-[3px] bg-warning" />
-                        <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
-                        <div
-                          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-                          style={{
-                            backgroundImage:
-                              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-                          }}
-                        />
-                        <DialogHeader className="relative z-10 space-y-3 text-left">
-                          <span
-                            className="text-xs font-bold uppercase tracking-[0.28em] text-primary-foreground/90"
-                            style={{ fontFamily: "var(--font-heading)" }}
-                          >
-                            Account Help
-                          </span>
-                          <DialogTitle
-                            className="text-xl font-bold tracking-tight text-primary-foreground"
-                            style={{ fontFamily: "var(--font-heading)" }}
-                          >
-                            Password Reset
-                          </DialogTitle>
-                          <DialogDescription className="text-sm leading-6 text-primary-foreground/70">
-                            Visit the library front desk with a valid school ID to reset your password.
-                          </DialogDescription>
-                        </DialogHeader>
-                      </div>
-
-                      <div className="px-6 py-5 border-t border-border bg-background">
-                        <p className="text-sm leading-relaxed text-muted-foreground">
-                          Staff will verify your identity and issue a new temporary password for your account.
-                        </p>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                <div className="relative">
-                  <input
-                    id="login-password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    className="h-10 w-full border border-border bg-background px-3.5 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="px-6 py-3 flex items-center justify-between bg-muted/30">
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <div className="relative flex items-center">
+                <div className="login-field">
+                  <label htmlFor="login-id">Account ID</label>
+                  <div className="login-input">
                     <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="peer sr-only"
-                      id="remember-me"
+                      ref={accountInput}
+                      id="login-id"
+                      name="username"
+                      type="text"
+                      value={id}
+                      onChange={(event) => setId(event.target.value)}
+                      autoFocus
+                      autoComplete="username"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      required
                     />
-                    <div className="h-4 w-4 border border-border bg-background peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
-                      {rememberMe && (
-                        <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 10 10" fill="none">
-                          <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                        </svg>
-                      )}
-                    </div>
                   </div>
-                  <span
-                    className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground group-hover:text-foreground transition-colors"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    Remember me
-                  </span>
-                </label>
-              </div>
+                </div>
 
-              {error && (
-                <div className="flex gap-0">
-                  <div className="w-[3px] bg-destructive shrink-0" />
+                <div className="login-field login-password-field">
+                  <label htmlFor="login-password">Password</label>
+                  <div className="login-input">
+                    <input
+                      ref={passwordInput}
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      onKeyDown={readCapsLock}
+                      onKeyUp={readCapsLock}
+                      onBlur={() => setCapsLock(false)}
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      className="login-password-toggle"
+                      type="button"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
                   <p
-                    className="flex-1 px-4 py-3 text-xs text-destructive bg-destructive/[0.04] leading-relaxed"
-                    style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.02em" }}
+                    className="login-caps-lock"
+                    role="status"
+                    hidden={!capsLock}
                   >
-                    {error}
+                    Caps Lock is on.
                   </p>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {loading ? (
-                  <>
-                    <span className="inline-block h-3.5 w-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </button>
-            </form>
+                <label className="login-remember">
+                  <input
+                    id="remember-me"
+                    name="remember"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                  />
+                  <span>
+                    Keep me signed in
+                    <small>Leave this off on shared computers.</small>
+                  </span>
+                </label>
 
-            <div className="mt-5 flex items-center gap-3">
-              <div className="flex-1 h-px bg-border" />
-              <Link
-                to="/"
-                className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Back to Home
-              </Link>
-              <div className="flex-1 h-px bg-border" />
-            </div>
+                <button
+                  className="login-submit"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? "Signing in…" : "Sign in"}
+                </button>
+
+                <details className="login-help">
+                  <summary>Forgot password?</summary>
+                  <p>
+                    Visit the front desk with your student or employee ID, or
+                    email library@college.edu.
+                  </p>
+                </details>
+
+                <div className="login-form-foot">
+                  <span>No account? Ask at the front desk.</span>
+                  <Link to="/">Back to home</Link>
+                </div>
+              </form>
+            </section>
           </div>
-        </div>
-      </main>
-
+        </main>
+      </div>
       <Footer />
     </div>
   );
