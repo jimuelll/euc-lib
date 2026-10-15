@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 
 const ribbon = (d: string) => <path data-library-accent="" d={d} />;
 const glyphs: Record<string, ReactNode> = {
+  ai: <><path d="m10 3 2.5 6.5L19 12l-6.5 2.5L10 21l-2.5-6.5L1 12l6.5-2.5zM19 2v6M16 5h6"/></>,
   barcode: <><path d="M3 4v16M6 4v16M10 4v16M17 4v16M21 4v16"/><path data-library-accent="" d="M13 4h2v16h-2z"/></>,
   lock: <><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"/><path data-library-accent="" d="M11 14.5h2v3h-2z"/></>,
   edit: <><path d="M4 20l1-5L16 4l4 4L9 19z"/><path data-library-accent="" d="M14 6l4 4-1.5 1.5-4-4z"/></>,

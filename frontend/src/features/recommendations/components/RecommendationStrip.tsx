@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, Sparkles, X } from "@/components/ui/library-glyphs";
+import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, X } from "@/components/ui/library-glyphs";
+import { LibraryIcon } from "@/components/ui/library-icon";
 import { toast } from "@/components/ui/sonner";
 import { dismissRecommendation, fetchRecommendations, type RecommendationsResponse } from "../api";
 import { recommendationsKeys } from "../recommendations.keys";
@@ -94,7 +95,7 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
         <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="flex min-w-0 flex-1 items-start gap-3 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           <RecommendationCover book={book} />
           <div className="flex min-w-0 flex-1 flex-col py-0.5">
-            {book.source === "ai" ? <span className="library-recommendation-marker mb-1.5 inline-grid size-6 place-items-center rounded-full border border-warning/50 bg-primary text-primary-foreground" role="img" aria-label="AI recommendation" title="AI recommendation"><Sparkles className="h-3 w-3 text-warning" aria-hidden="true" /></span> : null}
+            {book.source === "ai" ? <span className="library-recommendation-marker mb-1.5 inline-flex h-6 w-fit items-center gap-1 border border-warning/50 bg-primary px-1.5 text-warning" role="img" aria-label="AI recommendation" title="AI recommendation"><LibraryIcon name="ai" className="size-4" aria-hidden="true" /><span className="text-xs font-bold leading-none" aria-hidden="true">AI</span></span> : null}
             <p className="library-recommendation-title break-words text-base font-bold leading-5 text-foreground group-hover:text-primary">{book.title}</p>
             <p className="mt-1 break-words text-[13px] leading-5 text-muted-foreground">{book.author || "Unknown author"}</p>
             <p className="mt-2 break-words text-[13px] leading-5 text-muted-foreground">{book.reason}</p>
