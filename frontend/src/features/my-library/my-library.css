@@ -7,6 +7,10 @@
   --warning: 39 85% 67%;
 }
 
+[data-library-design][data-library-design].my-library-workspace .library-section-tabs > a[aria-current="page"] {
+  border-bottom-color: transparent;
+}
+
 .my-library-discover button[aria-label^="Not interested in"] {
   display: grid;
   min-width: 44px;
