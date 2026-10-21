@@ -7,9 +7,7 @@ export { PostModal }            from "./components/PostModal";
 export { CreatePostModal }      from "./components/CreatePostModal";
 export { PostCard }             from "./components/PostCard";
 export { BulletinSidebar }      from "./components/BulletinSidebar";
-export { default as AdminBulletin } from "./admin/AdminBulletin";
 export { useBulletinPosts }     from "./hooks/useBulletinPosts";
-export { useLikeToggle }        from "./hooks/useLikeToggle";
 export type { BulletinPost, BulletinComment, ApiPost, ApiComment } from "./types";
 
 // ── Default export keeps the /bulletin route working without touching App.tsx routing ──

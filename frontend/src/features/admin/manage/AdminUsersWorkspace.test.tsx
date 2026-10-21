@@ -7,13 +7,14 @@ import AdminManage from "./Index";
 import { useAdminManage } from "./useAdminManage";
 import * as api from "./api";
 configure({asyncUtilTimeout:5000});
-vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{role:"super_admin"}})}));
+const signedIn=vi.hoisted(()=>({role:"super_admin"}));
+vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{role:signedIn.role}})}));
 vi.mock("./api",()=>({searchUsers:vi.fn(),fetchAcademicPrograms:vi.fn(),fetchAcademicTerms:vi.fn(),fetchDepartments:vi.fn(),createUser:vi.fn(),updateUser:vi.fn(),archiveUser:vi.fn(),restoreUser:vi.fn(),requestAccountEmail:vi.fn()}));
 const patron = {name:"Alex Rivera",student_employee_id:"CARD-1",library_card_number:"CARD-1",student_number:"ST-1",role:"student",program_id:1,academic_term_id:1,year_level:"2nd Year",is_active:1,active_loans:2,overdue_loans:1,unpaid_fines:1260,active_reservations:1};
 const admin = {name:"Desk Admin",student_employee_id:"admin-one",username:"admin-one",role:"admin",email:"desk@example.edu",email_verified_at:"2026-10-01",is_active:1,active_loans:0,overdue_loans:0,unpaid_fines:0,active_reservations:0};
 function Location(){return <output data-testid="route">{useLocation().search}</output>;}
 function mount(url="/admin/manage"){const Wrapper=createTestQueryClientWrapper(createTestQueryClient());render(<Wrapper><MemoryRouter initialEntries={[url]}><AdminManage/><Location/></MemoryRouter></Wrapper>);}
-beforeEach(()=>{vi.resetAllMocks();vi.mocked(api.searchUsers).mockResolvedValue({rows:[patron,admin],summary:{total:3,active:2,needsAttention:1,statuses:{active:2,inactive:0,archived:1,all:3},roles:{student:2,admin:1}},pagination:{page:1,limit:25,total:2,totalPages:1}});vi.mocked(api.fetchAcademicPrograms).mockResolvedValue([{id:1,name:"Information Systems"}]);vi.mocked(api.fetchAcademicTerms).mockResolvedValue([{id:1,name:"2026-2027",starts_on:"2026-08-01",ends_on:"2027-06-01",is_current:1}]);vi.mocked(api.fetchDepartments).mockResolvedValue([]);vi.mocked(api.updateUser).mockResolvedValue({message:"Saved"});});
+beforeEach(()=>{signedIn.role="super_admin";vi.resetAllMocks();vi.mocked(api.searchUsers).mockResolvedValue({rows:[patron,admin],summary:{total:3,active:2,needsAttention:1,statuses:{active:2,inactive:0,archived:1,all:3},roles:{student:2,admin:1}},pagination:{page:1,limit:25,total:2,totalPages:1}});vi.mocked(api.fetchAcademicPrograms).mockResolvedValue([{id:1,name:"Information Systems"}]);vi.mocked(api.fetchAcademicTerms).mockResolvedValue([{id:1,name:"2026-2027",starts_on:"2026-08-01",ends_on:"2027-06-01",is_current:1}]);vi.mocked(api.fetchDepartments).mockResolvedValue([]);vi.mocked(api.updateUser).mockResolvedValue({message:"Saved"});});
 afterEach(cleanup);
 it("uses counted filters, live search and a clearance deep link",async()=>{mount();await screen.findByRole("button",{name:"All 3"});expect(screen.getByRole("link",{name:/Needs attention/}).getAttribute("href")).toContain("/admin/clearance?tab=queue");expect(screen.queryByRole("button",{name:"Total patrons"})).toBeNull();expect(screen.getByText("3 patrons")).toBeTruthy();expect(screen.queryByRole("button",{name:"Search"})).toBeNull();fireEvent.click(screen.getByRole("button",{name:"Archived 1"}));await waitFor(()=>expect(screen.getByTestId("route").textContent).toContain("filter=archived"));fireEvent.change(screen.getByRole("textbox",{name:"Search users"}),{target:{value:"Alex"}});await waitFor(()=>expect(api.searchUsers).toHaveBeenLastCalledWith(expect.objectContaining({query:"Alex",status:"archived"}),expect.any(AbortSignal)));},15000);
 it("sections the patron form, hides passwords and blocks unsafe archival",async()=>{mount();fireEvent.click(await screen.findByRole("button",{name:"Alex Rivera"}));const drawer=within(screen.getByRole("dialog"));expect(drawer.getByRole("region",{name:"Academic"})).toBeTruthy();expect(drawer.queryByLabelText("New password")).toBeNull();expect(drawer.getByRole("button",{name:"Archive user"}).hasAttribute("disabled")).toBe(true);expect(drawer.getByRole("region",{name:"Borrowing summary"}).textContent).toContain("1,260.00");expect(drawer.getByRole("button",{name:"Save changes"}).hasAttribute("disabled")).toBe(true);});
@@ -28,3 +29,11 @@ it("requires explicit confirmation before a permitted role change reaches the AP
 it("opens a patron drawer from an attendance handoff",async()=>{mount("/admin/manage?q=CARD-1&status=all&patron=CARD-1");await screen.findByRole("dialog");expect(screen.getByRole("dialog").textContent).toContain("Alex Rivera");});
 
 it.each(['programId','departmentId','termId'])('keeps the %s academic reference filter in the Users request',async key=>{mount('/admin/manage?'+key+'=7&status=all&academicLabel=Academic%20entry');await screen.findByText('Users linked to Academic entry');await waitFor(()=>expect(api.searchUsers).toHaveBeenCalledWith(expect.objectContaining({[key]:'7',status:'all'}),expect.any(AbortSignal)));});
+
+it.each(["admin","staff","scanner","student","employee","alumni"])("hides email delivery and allowance from %s",async role=>{
+ signedIn.role=role;mount();await screen.findByRole("textbox",{name:"Search users"});
+ expect(screen.queryByRole("link",{name:"Email delivery and allowance"})).toBeNull();
+});
+it("shows email delivery and allowance for super admins",async()=>{
+ mount();expect(await screen.findByRole("link",{name:"Email delivery and allowance"})).toBeTruthy();
+});

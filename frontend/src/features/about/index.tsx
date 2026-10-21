@@ -10,7 +10,6 @@ import { ContentCardsSkeleton } from "@/components/ui/content-skeletons";
 import "@/components/layout/library-pages.css";
 
 export * from "./api/about.service";
-export { default as AdminAbout } from "./admin/Index";
 export { default as AboutPreviewSection } from "./components/AboutPreviewSection";
 
 const LoadingIndicator = () => (
