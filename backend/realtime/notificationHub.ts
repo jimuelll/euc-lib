@@ -82,7 +82,14 @@ const closeAllConnections = (payload: unknown): void => {
   userSockets.clear();
 };
 
+const closeUserConnections = (userId: number): void => {
+  const connections = userSockets.get(String(userId));
+  for (const entry of connections || []) { try { entry.socket.close(4002,"Account session ended; sign in again"); } catch { /* already closed */ } }
+  userSockets.delete(String(userId));
+};
+
 export = {
+  closeUserConnections,
   registerConnection,
   unregisterConnection,
   pushUnreadCount,

@@ -1,4 +1,7 @@
 import bcrypt = require("bcryptjs");
+import { randomBytes } from "node:crypto";
+import * as accountEmail from "../auth/account-email.service";
+import { normalizeEmail } from "../email/email.config";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import repository = require("./admin.repository");
 import type { AdminRole, UserProfile, UserSearchQuery } from "./admin.types";
@@ -80,13 +83,15 @@ const roleProfile = (input: UserInput, role: string): UserProfile => {
 };
 
 const createUser = async (input: UserInput, creatorRole: string, creatorId: number | null = null) => {
-  const { name, role: requestedRole, password, address, contact, program_id, academic_term_id, department_id, year_level, email } = input;
+  const { name, role: requestedRole, address, contact, program_id, academic_term_id, department_id, year_level, email } = input;
   const role = String(requestedRole || "");
   if (!roleHierarchy[creatorRole]?.includes(role)) throw new Error("You are not allowed to create a user with this role");
   if (role === creatorRole && creatorRole !== "super_admin") throw new Error("You cannot create a user with your own role");
-  if (!String(name || "").trim() || !password) throw new Error("Name and password are required");
+  if (Object.prototype.hasOwnProperty.call(input,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
+  if (!String(name || "").trim()) throw new Error("Name is required");
+  const accountAddress = normalizeEmail(email);
   const identity = roleProfile(input, role);
-  const passwordHash = await bcrypt.hash(password as string, 12);
+  const passwordHash = await bcrypt.hash(randomBytes(48).toString("base64url"), 12);
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
@@ -105,7 +110,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
     }
     const barcode = await repository.createUser({
       ...identity,
-      email,
+      email: accountAddress,
       name: String(name).trim(),
       passwordHash,
       role,
@@ -123,6 +128,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
          FROM users WHERE barcode = ? LIMIT 1`,
       [barcode],
     );
+    await accountEmail.invite(conn, createdRows[0]);
     await enqueueTransactionalAudit(conn, {
       actorId: creatorId,
       category: "users",
@@ -134,7 +140,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
       isCreation: true,
     });
     await conn.commit();
-    return { message: "User created successfully", barcode };
+    return { message: "Account created; invitation queued", barcode };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -157,6 +163,8 @@ const deleteUser = async (student_employee_id: string, requesterRole: string, re
     if (activeReservations.length) throw conflict(`User has ${activeReservations.length} active reservation${activeReservations.length > 1 ? "s" : ""} — resolve before archiving`);
     archivedUserId = user.id;
     await repository.deactivateUser(user.id, requesterId, conn);
+    await accountEmail.invalidateChallenges(conn,user.id);
+    await conn.query("DELETE FROM email_address_claims WHERE user_id=?",[user.id]);
     const after = await repository.findUserByIdForAudit(user.id, conn);
     await enqueueTransactionalAudit(conn, {
       actorId: requesterId,
@@ -186,6 +194,8 @@ const restoreUser = async (student_employee_id: string, requesterRole: string, r
     const user = await repository.findArchivedUser(student_employee_id, conn);
     if (!user) throw Object.assign(new Error("Archived user not found"), { status: 404 });
     if (!roleHierarchy[requesterRole]?.includes(user.role)) throw forbidden("You are not allowed to restore this user");
+    if (user.email) await accountEmail.claimAddress(conn,user.id,String(user.email));
+    if (user.pending_email) await accountEmail.claimAddress(conn,user.id,String(user.pending_email));
     const changed = await repository.restoreUser(student_employee_id, conn);
     if (changed !== 1) throw conflict("This account changed while it was being restored. Reload and try again.");
     const after = await repository.findUserByIdForAudit(user.id, conn);
@@ -209,7 +219,7 @@ const restoreUser = async (student_employee_id: string, requesterRole: string, r
 };
 
 const updateUser = async (student_employee_id: string, updates: UserInput, requesterRole: string, requesterId: number | null = null) => {
-  const passwordHash = updates.password ? await bcrypt.hash(updates.password as string, 12) : null;
+  if (Object.prototype.hasOwnProperty.call(updates,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
   const conn = await repository.getConnection();
   let deactivatedUserId: number | null = null;
   try {
@@ -226,7 +236,6 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       if (role === requesterRole) throw forbidden("You cannot assign a user with your own role");
       normalized.role = updates.role;
     }
-    if (passwordHash) { normalized.password_hash = passwordHash; normalized.must_change_password = 1; }
     const identityKeys = ["library_card_number", "student_number", "employee_number", "username", "program_id", "department_id", "year_level"];
     if (identityKeys.some((key) => updates[key] !== undefined) || updates.role) {
       const profile = roleProfile({ ...existing, ...updates }, nextRole);
@@ -235,7 +244,9 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       normalized.department_id = nextRole === "employee" ? await ensureDepartmentExists(updates.department_id ?? existing.department_id, conn) : null;
       normalized.year_level = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? (updates.year_level ?? existing.year_level) : null;
     }
-    if (updates.email !== undefined) normalized.email = updates.email || null;
+    if (updates.email !== undefined && String(updates.email || "").trim().toLowerCase() !== String(existing.email || "").trim().toLowerCase()) {
+      await accountEmail.stageAddress(conn, existing, updates.email);
+    }
     if (updates.address !== undefined) normalized.address = updates.address;
     if (updates.contact !== undefined) normalized.contact = updates.contact;
     if (updates.remarks !== undefined) normalized.remarks = updates.remarks || null;
@@ -245,7 +256,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       normalized.academic_term_id = term?.id ?? null;
     }
     if (updates.is_active !== undefined) normalized.is_active = updates.is_active ? 1 : 0;
-    if (!Object.keys(normalized).length) throw new Error("No valid fields to update");
+    if (!Object.keys(normalized).length && updates.email === undefined) throw new Error("No valid fields to update");
 
     if (normalized.is_active === 0) {
       await assertUserHasNoOutstandingFines(existing.id, conn);
@@ -264,7 +275,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       description: normalized.is_active === 0 ? "Deactivated user account" : "Updated user account",
       before: existing,
       after,
-      extraMetadata: updates.password ? { security_change: "Password value withheld; password changed" } : {},
+      extraMetadata: {},
     });
     await conn.commit();
   } catch (error) {

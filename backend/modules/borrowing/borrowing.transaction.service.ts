@@ -191,7 +191,7 @@ const borrowBook = async (
       });
     }
     await notifications.enqueueNotification(conn, {
-      type: "borrowing_created",
+      type: "borrowing_created", sourceType: "borrowing", sourceId: borrowingId, emailDueDate: new Date(dueDate).toISOString(),
       title: "Book borrowed successfully",
       body: `You borrowed "${copy.title}". Please return it on or before ${new Date(dueDate).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}.`,
       href: "/my-library",
@@ -251,7 +251,7 @@ const returnBook = async (borrowingId: number, userId: number, { auditRoute = nu
     if (auditRoute === "/api/borrowing/scan/return" && row.status === "borrowed" && fineAssessment.fineAmount === 0 && actorId) undo = undoTokens.issueDeskUndo(actorId, borrowingId, "return", returnedAt);
     const target = await repository.getBorrowingNotificationTarget(borrowingId, conn);
     if (target) await notifications.enqueueNotification(conn, {
-      type: "borrowing_returned",
+      type: "borrowing_returned", sourceType: "borrowing", sourceId: borrowingId,
       title: "Book return recorded",
       body: `Your return for "${target.title}" has been recorded successfully.`,
       href: "/my-library",

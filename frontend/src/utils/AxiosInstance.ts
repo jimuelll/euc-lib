@@ -21,6 +21,11 @@ export function setAuthRefreshHandler(handler: ((token: string) => void) | null)
   authRefreshHandler = handler;
 }
 
+export function clearLocalAuthSession() {
+  inMemoryToken = null;
+  authFailureHandler?.();
+}
+
 export function setAuthFailureHandler(handler: (() => void) | null) {
   authFailureHandler = handler;
 }

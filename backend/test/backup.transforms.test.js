@@ -20,7 +20,7 @@ test("version 15 snapshots upgrade with empty private drafts and a verified chec
   const backup = {format:"euc-library-backup",version:15,tables:{books:[]}};
   backup.integrity={algorithm:"sha256",checksum:payloadChecksum(backup)};
   const upgraded=upgradeBackup(backup);
-  assert.equal(upgraded.version,17);
+  assert.equal(upgraded.version,18);
   assert.deepEqual(upgraded.tables.website_content_drafts,[]);
   assert.ok(upgraded.tableManifest.includes("website_content_drafts"));
   assert.equal(upgraded.integrity.checksum,payloadChecksum(upgraded));

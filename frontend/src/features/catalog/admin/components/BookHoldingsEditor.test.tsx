@@ -6,11 +6,13 @@ import { MemoryRouter } from "react-router-dom";
 import BookHoldingsEditor from "./BookHoldingsEditor";
 import type { CatalogHolding } from "../catalog.api";
 import type { AcademicProgram } from "@/features/library-settings";
-import { fetchBookHoldings, voidCopyAccession } from "../catalog.api";
+import { fetchBookHoldings, voidCopyAccession, updateCatalogCopyCondition } from "../catalog.api";
 import { fetchAcademicPrograms } from "@/features/library-settings";
+import { printHolding } from "../catalog.holdings-print";
 import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
-vi.mock("../catalog.api", () => ({ fetchBookHoldings: vi.fn(), saveCopyHolding: vi.fn(), voidCopyAccession: vi.fn() }));
+vi.mock("../catalog.holdings-print",()=>({printHolding:vi.fn().mockResolvedValue(undefined)}));
+vi.mock("../catalog.api", () => ({ fetchBookHoldings: vi.fn(), saveCopyHolding: vi.fn(), voidCopyAccession: vi.fn(), updateCatalogCopyCondition: vi.fn() }));
 vi.mock("@/features/library-settings", () => ({ fetchAcademicPrograms: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -96,4 +98,36 @@ describe("copy holdings editor", () => {
     expect(screen.getByLabelText(/Accession number/)).toHaveAttribute("readonly");
     expect(screen.getByLabelText("Price")).toBeEnabled();
   });
+});
+
+it("updates the selected holdings copy condition without discarding unsaved accession details",async()=>{
+ vi.mocked(updateCatalogCopyCondition).mockImplementation(async(id,condition)=>{
+   vi.mocked(fetchBookHoldings).mockResolvedValue(copies.map(copy=>copy.copy_id===id?{...copy,condition}:copy));
+ });
+ renderEditor();
+ const condition=await screen.findByLabelText("Copy condition");
+ fireEvent.change(screen.getByLabelText("Location"),{target:{value:"Edited shelf"}});
+ fireEvent.change(condition,{target:{value:"weeded"}});
+ await waitFor(()=>expect(updateCatalogCopyCondition).toHaveBeenCalledWith(11,"weeded"));
+ await waitFor(()=>expect(screen.getByLabelText("Copy condition")).toHaveValue("weeded"));
+ expect(screen.getByLabelText("Location")).toHaveValue("Edited shelf");
+ expect(screen.getByRole("option",{name:"Discarded"})).toBeInTheDocument();
+});
+it("shows failed condition changes and retains the saved condition",async()=>{
+ vi.mocked(updateCatalogCopyCondition).mockRejectedValue({isAxiosError:true,response:{data:{message:"Return this copy before marking it discarded"}}});
+ renderEditor();
+ fireEvent.change(await screen.findByLabelText("Copy condition"),{target:{value:"discarded"}});
+ expect(await screen.findByRole("alert")).toHaveTextContent("Return this copy before marking it discarded");
+ expect(screen.getByLabelText("Copy condition")).toHaveValue("good");
+});
+
+it("prints the selected holdings data directly from the holdings drawer",async()=>{
+ vi.mocked(printHolding).mockResolvedValue(undefined);
+ renderEditor();
+ fireEvent.click(await screen.findByRole("button",{name:"Print holdings"}));
+ await waitFor(()=>expect(printHolding).toHaveBeenCalledWith(expect.objectContaining({copy_id:11,accession_number:"ACC-1",location:"Shelf A"})));
+ fireEvent.click(screen.getByRole("button",{name:"Next"}));
+ await waitFor(()=>expect(screen.getByText("Accession ACC-2")).toBeInTheDocument());
+ fireEvent.click(screen.getByRole("button",{name:"Print holdings"}));
+ await waitFor(()=>expect(printHolding).toHaveBeenLastCalledWith(expect.objectContaining({copy_id:12,accession_number:"ACC-2",location:"Shelf B"})));
 });

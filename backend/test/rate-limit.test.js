@@ -36,6 +36,7 @@ test("central rate-limit policy values and account scopes match the documented p
     Object.fromEntries(Object.entries(policies).map(([name, { windowMs, limit }]) => [name, { windowMs, limit }])),
     {
       api: { windowMs: 60_000, limit: 1_500 },
+      emailPublic: { windowMs: 900_000, limit: 30 },
       login: { windowMs: 900_000, limit: 5 },
       passwordChange: { windowMs: 900_000, limit: 5 },
       refreshIp: { windowMs: 60_000, limit: 300 },

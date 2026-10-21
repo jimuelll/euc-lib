@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
+import { BrowserMultiFormatReader, NotFoundException, ChecksumException, FormatException } from "@zxing/library";
 import type { Exception, Result } from "@zxing/library";
 
 interface Options {
@@ -10,6 +10,8 @@ interface Options {
 
 export const useZxingScanner = ({ onResult, active, facingMode }: Options) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,30 +21,35 @@ export const useZxingScanner = ({ onResult, active, facingMode }: Options) => {
       return;
     }
 
+    let cancelled = false, handled = false;
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
     setError(null);
 
     const handleDecode = (result: Result, err?: Exception) => {
+      if (cancelled || handled) return;
       if (result) {
-        onResult(result.getText());
-        reader.reset(); // stop after first scan
+        handled = true;
+        reader.reset();
+        onResultRef.current(result.getText());
+        return;
       }
-      if (err && !(err instanceof NotFoundException)) {
+      if (err && !(err instanceof NotFoundException) && !(err instanceof ChecksumException) && !(err instanceof FormatException)) {
         setError("Camera error — check permissions");
       }
     };
 
     const startCamera = facingMode
-      ? reader.decodeFromConstraints({ video: { facingMode: { exact: facingMode } } }, videoRef.current!, handleDecode)
+      ? reader.decodeFromConstraints({ video: { facingMode: { ideal: facingMode } } }, videoRef.current!, handleDecode)
       : reader.decodeFromVideoDevice(undefined, videoRef.current!, handleDecode);
 
-    startCamera.catch(() => setError("Could not start camera"));
+    startCamera.then(() => { if (cancelled) reader.reset(); }).catch(() => { if (!cancelled) setError("Could not start camera"); });
 
     return () => {
+      cancelled = true;
       reader.reset();
     };
-  }, [active, facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, facingMode]);
 
   return { videoRef, error };
 };

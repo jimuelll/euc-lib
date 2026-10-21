@@ -6,7 +6,7 @@ const PasswordChangeGate = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
 
-  if (loading || !user?.must_change_password || location.pathname === "/change-password") {
+  if (loading || !user?.must_change_password || ["/change-password", "/forgot-password", "/set-password", "/verify-email"].includes(location.pathname)) {
     return null;
   }
 

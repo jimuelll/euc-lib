@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ function Status({ item, group = false }: {
     group?: boolean;
 }) { return <div className="notification-delivery"><AdminStatusBadge status={item.delivery_status === 'failed' ? 'blocked' : item.delivery_status === 'available' ? 'ready' : item.delivery_status === 'expired' ? 'expired' : 'pending'}>{label(item.delivery_status)}</AdminStatusBadge><span>{item.delivery_status === 'available' || item.delivery_status === 'expired' ? `${Number(group ? item.group_reads : item.read_count) || 0} read` : 'Not sent yet'}</span></div>; }
 export default function AdminNotifications() {
+    const { user } = useAuth();
     const client = useQueryClient(), [params, setParams] = useSearchParams();
     const tab = params.get('tab') === 'system' ? 'system' : 'announcements';
     const [filter, setFilter] = useState('all'), [search, setSearch] = useState(''), [page, setPage] = useState(1), [compose, setCompose] = useState(false), [form, setForm] = useState(defaultForm), [recipient, setRecipient] = useState<NotificationRecipient | null>(null), [recipientSearch, setRecipientSearch] = useState(''), [detail, setDetail] = useState<AdminNotification | null>(null), [busy, setBusy] = useState(false), [exporting, setExporting] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
@@ -150,7 +152,7 @@ export default function AdminNotifications() {
     };
     const previewDestination = destinations.find(item => item[0] === form.href)?.[1];
     return <div className="notifications-workspace">
- <AdminPageHeader title="Notifications" updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={() => void refresh()} actions={<><Button variant="outline" disabled={exporting || !query.data} onClick={() => void exportFeed()}><AdminIcon name="reports"/>{exporting ? 'Exporting…' : 'Export'}</Button><Button onClick={() => open()}><AdminIcon name="plus"/>New notification</Button></>}/>
+ <AdminPageHeader title="Notifications" updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={() => void refresh()} actions={<>{user?.role === 'super_admin' && <Button asChild variant="outline"><Link to="/admin/email-deliveries">Email delivery</Link></Button>}<Button variant="outline" disabled={exporting || !query.data} onClick={() => void exportFeed()}><AdminIcon name="reports"/>{exporting ? 'Exporting…' : 'Export'}</Button><Button onClick={() => open()}><AdminIcon name="plus"/>New notification</Button></>}/>
  <AdminPageTabs value={tab} onChange={value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next); setPage(1); setFilter('all'); }} label="Notification pages" items={[{ value: 'announcements', label: 'Announcements', icon: 'content' }, { value: 'system', label: 'System alerts', icon: 'notifications' }]}>
  <TabsContent value={tab} className="notifications-feed">
  <AdminFilterChips label="Notification source" value={filter} onChange={value => { setFilter(value); setPage(1); }} items={[{ value: 'manual', label: 'Manual', count: counts?.manual }, { value: 'automatic', label: 'Automatic', count: counts?.automatic }, { value: 'failed', label: 'Failed', count: counts?.failed, tone: 'red' }, { value: 'all', label: 'All', count: counts?.all }]}/>

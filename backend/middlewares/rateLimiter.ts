@@ -14,6 +14,7 @@ type RateLimitUserRequest = Request & {
 };
 
 type PolicyName =
+  | "emailPublic"
   | "api"
   | "login"
   | "passwordChange"
@@ -41,6 +42,7 @@ type Policy = { windowMs: number; limit: number; key: "ip" | "account" | "refres
 // Every policy receives its own express-rate-limit memory store. Keep these
 // values in sync with the API protection table in the README.
 const policies: Record<PolicyName, Policy> = {
+  emailPublic: { windowMs: 15 * 60_000, limit: 30, key: "ip" },
   api: { windowMs: 60_000, limit: 1_500, key: "ip" },
   login: { windowMs: 15 * 60_000, limit: 5, key: "ip" },
   passwordChange: { windowMs: 15 * 60_000, limit: 5, key: "account" },

@@ -7,6 +7,8 @@ const auth = require("../modules/auth/jwt.util");
 
 test("concurrent refresh attempts use one atomic rotation and only one can succeed", async () => {
   const originalRotate = repository.rotateRefreshSession;
+  const originalVersion = repository.getSessionVersion;
+  repository.getSessionVersion = async () => 0;
   let claimed = false;
   const observed = [];
   repository.rotateRefreshSession = async (...args) => {
@@ -31,6 +33,7 @@ test("concurrent refresh attempts use one atomic rotation and only one can succe
     assert.equal(payload.remember_me, true);
   } finally {
     repository.rotateRefreshSession = originalRotate;
+    repository.getSessionVersion = originalVersion;
   }
 });
 

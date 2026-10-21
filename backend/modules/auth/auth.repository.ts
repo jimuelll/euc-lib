@@ -24,7 +24,7 @@ const recordAuthAuditEvent = async (userId: number, eventType: string, deviceTyp
 
 const updatePassword = async (userId: number, passwordHash: string): Promise<void> => {
   await db.query(
-    "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
+    "UPDATE users SET password_hash = ?, must_change_password = 0, session_version = session_version + 1 WHERE id = ?",
     [passwordHash, userId],
   );
 };

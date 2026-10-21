@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, QrCode, Download, Printer, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "@/components/ui/library-glyphs";
+import { QrCode, Download, Printer, Archive, ArchiveRestore, MoreHorizontal, Search, UserPlus } from "@/components/ui/library-glyphs";
 import { toast } from "@/components/ui/sonner";
 import {
   Input,
@@ -95,43 +95,6 @@ export const QrModal = ({ target, onClose }: QrModalProps) => {
  return <Dialog open onOpenChange={open=>{if(!open)onClose();}}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>{target.name}</DialogTitle><DialogDescription>{target.studentId} / Library QR identity</DialogDescription></DialogHeader><div className="grid justify-items-center gap-4">{loading ? <p>Loading library QR...</p> : qrUrl ? <img src={qrUrl} alt={`QR code for ${target.studentId}`} className="h-48 w-48" /> : <p role="alert">Could not load this QR code.</p>}<Button onClick={handleDownload} disabled={!qrUrl}><Download className="mr-2 h-4 w-4" />Download PNG</Button><Button variant="outline" onClick={handlePrint} disabled={!qrUrl}><Printer className="mr-2 h-4 w-4" />Print label</Button></div></DialogContent></Dialog>;
 };
 
-// ─── Password Field ───────────────────────────────────────────────────────────
-
-interface PasswordFieldProps {
-  label:        string;
-  value:        string;
-  showPassword: boolean;
-  placeholder?: string;
-  onChange:     (v: string) => void;
-  onToggle?:    () => void;
-}
-
-export const PasswordField = ({
-  label, value, showPassword, placeholder, onChange, onToggle,
-}: PasswordFieldProps) => (
-  <div>
-    <FieldLabel>{label}</FieldLabel>
-    <div className="relative">
-      <Input
-        type={showPassword ? "text" : "password"}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="rounded-md"
-      />
-      {onToggle && (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      )}
-    </div>
-  </div>
-);
-
 // ─── Role Select ──────────────────────────────────────────────────────────────
 
 interface RoleSelectProps {
@@ -213,8 +176,8 @@ interface CreateFormProps {
 }
 
 export const CreateForm = ({
-  form, showPassword, allowedRoles, programs, terms, departments, loading,
-  onField, onTogglePassword, onSubmit, onReset, embedded = false,
+  form, allowedRoles, programs, terms, departments, loading,
+  onField, onSubmit, onReset, embedded = false,
 }: CreateFormProps) => (
   <form
     className={embedded ? "py-5" : "admin-panel-surface admin-etched-border mt-6 border border-border bg-background"}
@@ -228,21 +191,7 @@ export const CreateForm = ({
       <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
       {form.role ? <RoleProfileFields form={form} programs={programs} departments={departments} onField={onField} /> : null}
       {form.role === "student" ? <TermSelect value={form.academicTermId} terms={terms} onChange={(value) => onField("academicTermId", value)} /> : null}
-      <div className="grid gap-5 sm:grid-cols-2">
-        <PasswordField
-          label="Password"
-          value={form.password}
-          showPassword={showPassword}
-          onChange={(v) => onField("password", v)}
-          onToggle={onTogglePassword}
-        />
-        <PasswordField
-          label="Re-Type Password"
-          value={form.rePassword}
-          showPassword={showPassword}
-          onChange={(v) => onField("rePassword", v)}
-        />
-      </div>
+      <p>Users choose their own passwords through an emailed invitation or recovery code.</p>
     </div>
 
     <div className={embedded ? "mt-6 flex gap-2 border-t border-border py-4" : "flex gap-2 border-t border-border px-6 py-4"}>
@@ -386,8 +335,8 @@ interface EditFormProps {
 }
 
 export const EditForm = ({
-  selectedUser, form, showPassword, allowedRoles, programs, terms, departments, loading, showArchived,
-  onField, onTogglePassword, onSubmit, onViewQr, onArchive, onRestore, embedded = false,
+  selectedUser, form, allowedRoles, programs, terms, departments, loading, showArchived,
+  onField, onSubmit, onViewQr, onArchive, onRestore, embedded = false,
 }: EditFormProps) => (
   <form
     className={embedded ? "py-5" : "mt-6 border border-border bg-background"}
@@ -422,23 +371,7 @@ export const EditForm = ({
       {/* Password + role only editable in active mode */}
       {!showArchived && (
         <>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <PasswordField
-              label="New Password"
-              value={form.password}
-              showPassword={showPassword}
-              placeholder="Leave empty to keep current"
-              onChange={(v) => onField("password", v)}
-              onToggle={onTogglePassword}
-            />
-            <PasswordField
-              label="Re-Type Password"
-              value={form.rePassword}
-              showPassword={showPassword}
-              placeholder="Leave empty to keep current"
-              onChange={(v) => onField("rePassword", v)}
-            />
-          </div>
+          <p>Users choose their own passwords through an emailed invitation or recovery code.</p>
           <RoleSelect value={form.role} allowedRoles={allowedRoles} onChange={(v) => onField("role", v)} />
         </>
       )}

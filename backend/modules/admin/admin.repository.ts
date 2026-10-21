@@ -89,7 +89,7 @@ const restoreUser = async (studentEmployeeId: string, conn: QueryConnection = db
 
 const findUserByIdForAudit = async (userId: number, conn: QueryConnection = db): Promise<AdminUserRow | null> => {
   const [rows] = await conn.query<AdminUserRow[]>(
-    `SELECT id, name, student_employee_id, email, role, is_active, program_id, academic_term_id,
+    `SELECT id, name, student_employee_id, email, pending_email, email_verified_at, setup_pending, role, is_active, program_id, academic_term_id,
             department_id, address, contact, year_level, remarks, deleted_at
        FROM users WHERE id = ? LIMIT 1`,
     [userId],
@@ -122,7 +122,7 @@ const updateUser = async (studentEmployeeId: string, updates: UserUpdateRecord, 
 
 const searchUsers = async ({ allowedRoles, showArchived, studentEmployeeId, name, role, status, page, limit = 25 }: SearchUsersOptions): Promise<SearchUserRow[] | SearchUsersPage> => {
   const expiredStudentTerm = "(u.role = 'student' AND (assigned_term.ends_on IS NULL OR assigned_term.ends_on < CURRENT_DATE()))";
-  let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.name, u.role,
+  let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.pending_email, u.email_verified_at, u.setup_pending, u.name, u.role,
                     CASE WHEN ${expiredStudentTerm} THEN 0 ELSE u.is_active END AS is_active,
                     u.address, u.contact, u.program_id, u.academic_term_id, u.year_level, u.department_id, u.remarks,
                     p.name AS program_course, d.name AS department_name, u.deleted_at,

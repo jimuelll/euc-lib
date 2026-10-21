@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Eye, EyeOff, Lock } from "@/components/ui/library-glyphs";
 import { useAuth } from "@/context/AuthContext";
 
@@ -200,6 +201,7 @@ const PasswordChangeModal = ({
             "Update Password"
           )}
         </button>
+        <Link to="/forgot-password" className="block text-sm text-action underline">Forgot your current password? Recover by email</Link>
       </form>
     </div>
   );

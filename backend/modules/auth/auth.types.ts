@@ -20,6 +20,10 @@ export interface AuthUser {
   is_active: number | boolean;
   must_change_password: number | boolean;
   academic_term_id?: number | null;
+  session_version?: number;
+  setup_pending?: number | boolean;
+  email?: string | null;
+  email_verified_at?: Date | string | null;
 }
 
 export interface AuthAuditContext {

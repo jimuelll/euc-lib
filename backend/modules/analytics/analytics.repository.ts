@@ -278,7 +278,7 @@ async function getDashboardOverviewData(daysAgo: number) {
        GROUP BY COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))), ''), 'Uncategorized')
        ORDER BY titles DESC, name ASC LIMIT 8`
     ),
-    db.query("SELECT \`condition\` AS name, COUNT(*) AS value FROM book_copies WHERE deleted_at IS NULL AND is_active = 1 GROUP BY \`condition\` ORDER BY FIELD(\`condition\`, 'good', 'damaged', 'lost')"),
+    db.query("SELECT \`condition\` AS name, COUNT(*) AS value FROM book_copies WHERE deleted_at IS NULL AND is_active = 1 GROUP BY \`condition\` ORDER BY FIELD(\`condition\`, 'good', 'damaged', 'lost', 'weeded', 'discarded')"),
     db.query(
       `SELECT u.role AS name, COUNT(*) AS value FROM borrowings b JOIN users u ON u.id = b.user_id
        WHERE b.created_at >= CURDATE() - INTERVAL ? DAY

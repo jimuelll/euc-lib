@@ -43,7 +43,7 @@ export function options(key: string, type: string, meta?: QueryMeta) { const str
     case 'ranking': return [{ value: 'borrowings', label: 'Most borrowings' }, { value: 'checkins', label: 'Most library check-ins' }];
     case 'completion': return [{ value: 'complete', label: 'Accessioned' }, { value: 'missing', label: 'Needs accession' }];
     case 'availability': return strings(['available', 'unavailable']);
-    case 'condition': return strings(['good', 'damaged', 'lost']);
+    case 'condition': return strings(['good', 'damaged', 'lost', 'weeded', 'discarded']);
     default: return [];
 } }
 

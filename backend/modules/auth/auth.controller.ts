@@ -66,12 +66,14 @@ const handleRefresh: RequestHandler = async (req, res) => {
     if (!(await sessions.isAccessTokenCurrent(payload))) throw new Error("Refresh token predates the most recent system restore");
     const user = await users.getUserByID(payload.id);
     if (!user) throw new Error("User not found");
-    if (!user.is_active) throw new Error("User inactive");
+    if (!user.is_active || user.setup_pending) throw new Error("User inactive or setup pending");
+    if (Number(user.session_version ?? 0) !== Number(payload.session_version ?? 0)) throw new Error("Account credentials changed");
     const nextRefreshToken = await sessions.rotateRefreshSession(
       user.id,
       payload.jti,
       new Date((payload.exp || 0) * 1000),
       Boolean(payload.remember_me),
+      Number(payload.session_version ?? 0),
     );
     cookies.setRefreshAuthCookies(res, nextRefreshToken, Boolean(payload.remember_me));
     const termStatus = await service.getTermStatus(user);
@@ -80,6 +82,8 @@ const handleRefresh: RequestHandler = async (req, res) => {
       role: user.role,
       name: user.name,
       must_change_password: user.must_change_password,
+      session_version: user.session_version ?? 0,
+      email_verified: Boolean(user.email_verified_at),
       ...termStatus,
     }) });
   } catch {

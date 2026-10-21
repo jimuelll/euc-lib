@@ -11,7 +11,8 @@ import { fetchAcademicPrograms } from "@/features/library-settings";
 import { useUnsavedChanges } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { fetchBookHoldings, saveCopyHolding, voidCopyAccession, type CatalogHolding } from "../catalog.api";
+import { fetchBookHoldings, saveCopyHolding, voidCopyAccession, updateCatalogCopyCondition, type CatalogHolding } from "../catalog.api";
+import { printHolding } from "../catalog.holdings-print";
 import { catalogKeys } from "../../catalog.keys";
 import { librarySettingsKeys } from "@/features/library-settings/library-settings.keys";
 
@@ -33,7 +34,7 @@ const EMPTY_HOLDINGS: CatalogHolding[] = [];
 const lendingStatus = (copy: CatalogHolding) => {
   if (!copy.is_active) return "Inactive";
   if (copy.accession_voided) return "Accession voided";
-  if (copy.condition === "lost") return "Lost";
+  if (["lost", "weeded", "discarded"].includes(copy.condition)) return copy.condition.charAt(0).toUpperCase() + copy.condition.slice(1);
   if (copy.needs_policy) return "Needs loan policy";
   if (!copy.accession_number?.trim()) return "Needs accession";
   if (copy.circulation_status === "borrowed") return "Borrowed";
@@ -65,6 +66,7 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
   const [copyIndex, setCopyIndex] = useState(0);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const programs = programsQuery.data ?? [];
+  const [printing, setPrinting] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const [markSavedAfterUpdate, setMarkSavedAfterUpdate] = useState(false);
@@ -89,7 +91,11 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
     mutationFn: ({ copyId, reason }: { copyId: number; reason: string }) => voidCopyAccession(copyId, { reason }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
   });
-  const saving = saveMutation.isPending;
+  const conditionMutation = useMutation({
+    mutationFn: ({copyId,condition}:{copyId:number;condition:CatalogHolding["condition"]}) => updateCatalogCopyCondition(copyId,condition),
+    onSuccess: () => queryClient.invalidateQueries({queryKey:catalogKeys.all}),
+  });
+  const saving = saveMutation.isPending || conditionMutation.isPending;
   const voiding = voidMutation.isPending;
 
   useEffect(() => {
@@ -154,6 +160,10 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
 
   const saveActions = current ? (
       <div className="catalog-holding-save-actions">
+        {!inline && <Button type="button" variant="outline" disabled={printing || saving || voiding || dirty} title={dirty ? "Save holding edits before printing" : undefined} onClick={()=>{
+          setPrinting(true);
+          void printHolding(current).finally(()=>setPrinting(false));
+        }}>{printing ? "Preparing holdings…" : "Print holdings"}</Button>}
         {!navigation && !inline && <div className="flex gap-2"><Button variant="outline" disabled={copyIndex === 0 || saving || voiding} onClick={() => void switchCopy(copyIndex - 1)}><ArrowLeft className="mr-2 h-4 w-4" />Previous</Button><Button variant="outline" disabled={copyIndex >= copies.length - 1 || saving || voiding} onClick={() => void switchCopy(copyIndex + 1)}>Next<ArrowRight className="ml-2 h-4 w-4" /></Button></div>}
         {canEditHolding && <div className="catalog-holding-save-buttons"><Button onClick={() => void save()} disabled={saving || voiding || !draft.accession_number.trim()}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : current.accession_number ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}{saving ? "Saving…" : "Save holding"}</Button>{(navigation || !inline) && <Button variant="outline" onClick={() => void save(true)} disabled={saving || voiding || !draft.accession_number.trim() || (navigation ? navigation.position >= navigation.total - 1 : copyIndex >= copies.length - 1)}>Save and next<ArrowRight className="ml-2 h-4 w-4" /></Button>}</div>}
       </div>
@@ -191,6 +201,16 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
       {!current.is_active && !current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired and has no accession yet. Restore it from Copies before assigning one.</p>}
       {!current.is_active && current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired. Its accession is permanent; you can update its other holding details here.</p>}
       {Boolean(current.accession_voided) && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This accession is permanently voided. The number stays attached to this copy and cannot be reused. This copy cannot be borrowed; add a new physical copy to register the correct accession.</p>}
+      <div className="mt-5 max-w-sm"><label className={labelClass} htmlFor="holding-condition">Copy condition</label>
+        <select id="holding-condition" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" value={current.condition} disabled={saving || voiding} onChange={async(event)=>{
+          const condition=event.target.value as CatalogHolding["condition"];
+          try {await conditionMutation.mutateAsync({copyId:current.copy_id,condition});toast.success("Copy condition updated");}
+          catch(error){toast.error(getApiErrorMessage(error,"Failed to update copy condition"));}
+        }}>{["good","damaged","lost","weeded","discarded"].map(condition=><option key={condition} value={condition}>{condition.charAt(0).toUpperCase()+condition.slice(1)}</option>)}</select>
+        <p className="mt-1 text-xs text-muted-foreground">Changes save immediately. Lost, weeded, and discarded copies cannot be borrowed.</p>
+        {conditionMutation.isPending && <p role="status" className="mt-1 text-sm">Saving condition…</p>}
+        {conditionMutation.isError && <p role="alert" className="mt-1 text-sm text-destructive">{getApiErrorMessage(conditionMutation.error,"Failed to update copy condition")}</p>}
+      </div>
       <div className="mt-5 grid gap-x-4 gap-y-4 sm:grid-cols-2">
         <div><label className={labelClass} htmlFor="holding-accession">Accession number <span className="text-destructive">*</span></label><Input id="holding-accession" autoComplete="off" value={draft.accession_number} readOnly={Boolean(current.accession_number)} disabled={!current.is_active && !current.accession_number || saving || voiding} onChange={(event) => setField("accession_number", event.target.value)} placeholder="Enter the accession number" /><p className="catalog-accession-help mt-1 text-xs text-muted-foreground">{current.accession_number && <Lock aria-hidden="true" className="h-3.5 w-3.5" />}{current.accession_number ? "Permanent after first save" : "Assigned numbers cannot be changed or reused"}</p>{isSuperAdmin && current.accession_number && !current.accession_voided && <Button type="button" size="sm" variant="outline" className="catalog-void-accession mt-2" onClick={() => { if (dirty) return; setVoidReason(""); setVoidDialogOpen(true); }} disabled={dirty || saving || voiding}><ShieldAlert className="mr-2 h-3.5 w-3.5" />Void mistaken accession</Button>}{isSuperAdmin && current.accession_number && dirty && <p className="mt-1 text-xs text-muted-foreground">Save or discard other holding edits before voiding the accession.</p>}</div>
         <div><label className={labelClass} htmlFor="holding-price">Price</label><Input id="holding-price" type="number" min="0" step="0.01" value={draft.price} disabled={!canEditHolding || saving || voiding} onChange={(event) => setField("price", event.target.value)} placeholder="0.00" /></div>

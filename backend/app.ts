@@ -98,6 +98,7 @@ app.use("/api/admin/users", require("./modules/admin/barcode.routes"));
 app.use(authMiddleware());
 app.use(forcePasswordChange);
 // --- Protected Routes ---
+app.use("/api/admin", require("./modules/auth/account-email.routes").adminRouter);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin", analyticsAdminRoutes);
 app.use("/api/admin", queryRoutes);

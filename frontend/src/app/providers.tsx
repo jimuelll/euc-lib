@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
@@ -33,6 +33,14 @@ function RoutePrefetcher() {
   return null;
 }
 
+function EmailVerificationNotice() {
+ const {user}=useAuth();
+ const {pathname}=useLocation();
+ if(pathname === "/admin" || pathname.startsWith("/admin/"))return null;
+ if(!user || user.email_verified !== false || user.must_change_password)return null;
+ return <div data-library-design className="border-b bg-background px-4 py-2 text-foreground text-sm" role="status">Verify your email to receive library notices and recover your password. <a className="text-action underline" href="/edit-profile">Manage account email</a></div>;
+}
+
 export default function AppProviders() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -45,6 +53,7 @@ export default function AppProviders() {
               <NotificationsProvider>
                 <RoutePrefetcher />
                 <LibraryDesignProvider><PasswordChangeGate /><TermRevalidationNotice /></LibraryDesignProvider>
+                <EmailVerificationNotice />
                 <SiteVisitTracker />
                 <AppRoutes />
               </NotificationsProvider>

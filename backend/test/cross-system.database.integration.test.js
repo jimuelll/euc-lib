@@ -443,7 +443,7 @@ test("database: program, department, and holiday lifecycle preserves references 
   assert.equal(editedHolding.location, "Updated shelf");
   await assert.rejects(
     adminService.createUser({
-      name: "Archived program test", password: "test-password", role: "student",
+      name: "Archived program test", email: `archived-${fixture.runId}@example.edu`, role: "student",
       library_card_number: `NEW-${fixture.runId}`, student_number: `ST-${fixture.runId}`,
       year_level: "1st Year", program_id: program.id,
     }, "super_admin", 1),

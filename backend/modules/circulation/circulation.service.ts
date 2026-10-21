@@ -65,7 +65,7 @@ const processReturn = async (borrowingId: number, returnedBy: number | null = nu
     await fineLedger.assessBorrowing({ ...row, returned_at: returned.returned_at }, conn);
     const target = await repository.getBorrowingNotificationTarget(borrowingId, conn);
     if (target) await notificationsService.enqueueNotification(conn, {
-      type: "borrowing_returned", title: "Book return recorded",
+      type: "borrowing_returned", sourceType: "borrowing", sourceId: borrowingId, title: "Book return recorded",
       body: `Your return for "${target.title}" has been recorded successfully.`,
       href: "/my-library", audienceType: "user", audienceUserId: target.user_id,
     });
@@ -111,7 +111,7 @@ const processRenew = async ({ borrowingId, renewedBy = null }: ProcessRenewInput
     const changed = await repository.renewBorrowing(borrowingId, dueDate, connection);
     if (changed !== 1) throw createServiceError("This loan changed while renewal was being processed. Reload and try again.", 409);
     await notificationsService.enqueueNotification(connection, {
-      type: "borrowing_renewed", title: "Book renewal recorded",
+      type: "borrowing_renewed", sourceType: "borrowing", sourceId: borrowingId, emailDueDate: new Date(dueDate).toISOString(), title: "Book renewal recorded",
       body: `Your borrowing for "${row.title}" has been renewed. New due date: ${new Date(dueDate).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}.`,
       href: "/my-library", audienceType: "user", audienceUserId: row.user_id, createdBy: renewedBy,
     });

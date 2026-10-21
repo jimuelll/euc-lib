@@ -1,0 +1,8 @@
+<!-- EmailJS dashboard: To = {{to_email}}, To name = {{to_name}}, Subject = {{subject}}.
+     Do not configure CC/BCC or auto-replies. Use escaped double-brace variables. -->
+<h1>{{subject}}</h1>
+<p>Hello {{to_name}},</p>
+<p>{{message}}</p>
+{{#as_of}}<p>Balances as of {{as_of}}. Amounts are in PHP.</p>{{/as_of}}
+{{#loans}}<p><strong>{{title}}</strong><br>Due: {{due}}<br>Unsettled balance: PHP {{balance}}</p>{{/loans}}
+{{#action_url}}<p><a href="{{action_url}}">{{action_label}}</a></p>{{/action_url}}

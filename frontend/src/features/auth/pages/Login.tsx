@@ -235,13 +235,7 @@ const Login = () => {
                   {loading ? "Signing in…" : "Sign in"}
                 </button>
 
-                <details className="login-help">
-                  <summary>Forgot password?</summary>
-                  <p>
-                    Visit the front desk with your student or employee ID, or
-                    email library@college.edu.
-                  </p>
-                </details>
+                <div className="login-help"><Link to="/forgot-password">Forgot password?</Link></div>
 
                 <div className="login-form-foot">
                   <span>No account? Ask at the front desk.</span>

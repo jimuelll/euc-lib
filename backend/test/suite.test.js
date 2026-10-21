@@ -52,3 +52,9 @@ require('./catalog.configuration.test');
 require('./recommendations.admin.test');
 require('./audit.feed.test');
 require('./backup.safety.test.js');
+
+require("./email.workflows.test");
+
+require("./email.database.integration.test");
+
+require("./profile.test");

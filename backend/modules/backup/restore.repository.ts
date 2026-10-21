@@ -151,11 +151,15 @@ async function replaceApplicationData(backup: SnapshotPayload, {
   snapshot.validateSnapshotUniqueStudentIds(backup);
   const schemaTables = await snapshot.getSchemaManifest();
   let connection: PoolConnection | undefined;
+  let emailLock = false;
   let orphanedAccessionClaimCount = 0;
   let retainedAccessionAudit: AuditEventRow[] = [];
   let preservedPendingAuditEventCount = 0;
   try {
     connection = await db.getConnection();
+    const [[dispatchLock]] = await connection.query<RowDataPacket[]>("SELECT GET_LOCK('euc-library-email-dispatch',30) AS acquired");
+    if (!dispatchLock.acquired) throw Object.assign(new Error("Email dispatch is busy; retry restore."),{status:409});
+    emailLock=true;
     await connection.beginTransaction();
     await connection.query("SET @allow_accession_restore = 1");
     const liveAccessionState = await getLiveAccessionState(connection);
@@ -226,6 +230,16 @@ async function replaceApplicationData(backup: SnapshotPayload, {
           metadata, row.event_key, row.restore_status, row.reversed_at, row.reversed_by_restore_id, row.occurred_at],
       );
     }
+    await connection.query("UPDATE account_challenges SET consumed_at=UTC_TIMESTAMP() WHERE consumed_at IS NULL");
+    await connection.query("UPDATE email_deliveries SET status='cancelled',content_encrypted=NULL,last_error='Cancelled by restore' WHERE status IN ('queued','processing')");
+    await connection.query("UPDATE delivery_outbox SET status='delivered',locked_at=NULL WHERE event_type='email' AND status='pending'");
+    await connection.query("UPDATE delivery_outbox SET payload=JSON_SET(payload,'$.suppressEmail',true) WHERE event_type='notification' AND status='pending'");
+    await connection.query("DELETE FROM email_address_claims");
+    const [restoredUsers] = await connection.query<RowDataPacket[]>("SELECT id,email,pending_email FROM users WHERE deleted_at IS NULL");
+    for (const user of restoredUsers) for (const value of [user.email,user.pending_email]) {
+      if (!value) continue;
+      await require("../auth/account-email.service").claimAddress(connection,Number(user.id),String(value));
+    }
     await assertForeignKeys(connection);
     await invalidateSessions!(connection);
     const [restoreAudit] = await connection.query<ResultSetHeader>(
@@ -265,6 +279,7 @@ async function replaceApplicationData(backup: SnapshotPayload, {
     throw error;
   } finally {
     if (connection) {
+      if (emailLock) await connection.query("SELECT RELEASE_LOCK('euc-library-email-dispatch')");
       await connection.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
       await connection.query("SET @allow_accession_restore = 0").catch(() => {});
       connection.release();

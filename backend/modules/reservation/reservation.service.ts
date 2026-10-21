@@ -74,7 +74,7 @@ const reserveBook = async (userId: number, bookId: number, hoursUntilExpiry = 48
     const result = await repository.createReservation(userId, bookId, expiryHours, conn);
     const savedReservation = await repository.findReservationForAudit(result.insertId, conn);
     await notificationsService.enqueueNotification(conn, {
-      type: "reservation_created",
+      type: "reservation_created", sourceType: "reservation", sourceId: result.insertId,
       title: "Reservation placed",
       body: `Your reservation for ${book.title} has been placed and is pending library processing.`,
       href: "/services/borrowing",
@@ -182,7 +182,7 @@ const markReservationReady = async (reservationId: number, markedBy: number | nu
     const changed = await repository.markReady(reservationId, copy.id, 48, conn);
     if (changed !== 1) throw serviceError("This reservation changed while it was being prepared. Reload and try again.", 409);
     await notificationsService.enqueueNotification(conn, {
-      type: "reservation_ready",
+      type: "reservation_ready", sourceType: "reservation", sourceId: reservationId,
       title: "Reservation ready for pickup",
       body: `${row.title} is now ready for pickup at the library front desk.`,
       href: "/services/borrowing",
@@ -230,7 +230,7 @@ const cancelReservationAdmin = async (reservationId: number, cancelledBy: number
     const changed = await repository.cancelReservationAdmin(reservationId, conn, reason);
     if (changed !== 1) throw serviceError("This reservation changed while it was being cancelled. Reload and try again.", 409);
     await notificationsService.enqueueNotification(conn, {
-      type: "reservation_cancelled",
+      type: "reservation_cancelled", sourceType: "reservation", sourceId: reservationId,
       title: "Reservation rejected",
       body: `Your reservation for ${row.title} was rejected by the library staff.`,
       href: "/services/borrowing",

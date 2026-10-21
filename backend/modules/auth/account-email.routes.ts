@@ -1,0 +1,17 @@
+import express = require('express');
+import * as controller from './account-email.controller';
+const { authMiddleware } = require('./auth.middleware');
+const { limiters } = require('../../middlewares/rateLimiter');
+export const router = express.Router();
+router.post('/setup-password',limiters.emailPublic,controller.setup);
+router.post('/verify-email',limiters.emailPublic,controller.verify);
+router.post('/recovery/request',limiters.emailPublic,controller.request);
+router.post('/recovery/verify',limiters.emailPublic,controller.code);
+router.post('/recovery/reset',limiters.emailPublic,controller.reset);
+router.get('/email-status',authMiddleware(),controller.status);
+router.post('/email-verification',authMiddleware(),limiters.passwordChange,controller.verification);
+router.post('/email-change',authMiddleware(),limiters.passwordChange,controller.change);
+export const adminRouter = express.Router();
+adminRouter.post('/users/:identifier/account-email',authMiddleware(['staff','admin','super_admin']),limiters.passwordChange,controller.adminAction);
+adminRouter.get('/email-deliveries',authMiddleware(['super_admin']),controller.listDeliveries);
+adminRouter.post('/email-deliveries/:id/retry',authMiddleware(['super_admin']),limiters.passwordChange,controller.retry);

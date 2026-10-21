@@ -14,6 +14,8 @@ import ChangePassword from "@/features/auth/pages/ChangePassword";
 import NotFound from "@/pages/NotFound";
 import { loadAcademicSubscriptions, loadAdminCatalog, loadAdminContentManagement, loadAdminHome, loadAdminLayout, loadAdminManage, loadLibraryServices, loadStudentDashboard } from "./route-loaders";
 
+const EmailAccess = lazy(() => import("@/features/auth/pages/EmailAccess"));
+const AdminEmailDeliveries = lazy(() => import("@/features/notifications/admin/AdminEmailDeliveries"));
 const LibraryServices = lazy(loadLibraryServices);
 const AcademicSubscriptions = lazy(loadAcademicSubscriptions);
 const StudentDashboard = lazy(loadStudentDashboard);
@@ -60,6 +62,9 @@ export const AppRoutes = () => {
       <Route path="/catalogue" element={<Catalogue />} />
       <Route path="/bulletin" element={<Bulletin />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<EmailAccess key="recovery" />} />
+      <Route path="/set-password" element={<EmailAccess key="setup" />} />
+      <Route path="/verify-email" element={<EmailAccess key="verify" />} />
       <Route path="/scan-qr" element={<ScanQR />} />
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/my-library" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
@@ -88,6 +93,7 @@ export const AppRoutes = () => {
         <Route path="user-guide" element={<AdminUserGuide />} />
         <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />
         <Route path="subscriptions" element={<Navigate to="/admin/content?tab=subscriptions" replace />} />
+        <Route path="email-deliveries" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries /></ProtectedRoute>} />
         <Route path="notifications" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminNotifications /></ProtectedRoute>} />
         <Route path="attendance-logs" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAttendanceLogs /></ProtectedRoute>} />
         <Route path="edit-about" element={<Navigate to="/admin/content?tab=about" replace />} />

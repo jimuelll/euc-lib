@@ -278,7 +278,7 @@ const deleteBookType = async (id: number, actorId: number | null = null) => {
 };
 
 const updateCopyCondition = async (copyId: number, condition: string, notes: string | null = null, userId: number | null = null): Promise<{ auditEnqueued: boolean }> => {
-  if (!["good", "damaged", "lost"].includes(condition)) throw Object.assign(new Error("Invalid copy condition"), { status: 400 });
+  if (!["good", "damaged", "lost", "weeded", "discarded"].includes(condition)) throw Object.assign(new Error("Invalid copy condition"), { status: 400 });
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
@@ -287,14 +287,14 @@ const updateCopyCondition = async (copyId: number, condition: string, notes: str
     await conn.query("SELECT id FROM books WHERE id = ? FOR UPDATE", [identity.book_id]);
     const copy = await repository.findCopyStateForUpdate(copyId, conn);
     if (!copy) throw Object.assign(new Error("Copy not found"), { status: 404 });
-    if (condition === "lost" && copy.has_active_loan) throw Object.assign(new Error("Return this copy before marking it lost"), { status: 409 });
-    if (condition === "lost" && copy.has_prepared_reservation) {
-      throw Object.assign(new Error("Reassign or cancel the prepared reservation before marking this copy lost"), { status: 409 });
+    if (["lost", "weeded", "discarded"].includes(condition) && copy.has_active_loan) throw Object.assign(new Error(`Return this copy before marking it ${condition}`), { status: 409 });
+    if (["lost", "weeded", "discarded"].includes(condition) && copy.has_prepared_reservation) {
+      throw Object.assign(new Error(`Reassign or cancel the prepared reservation before marking this copy ${condition}`), { status: 409 });
     }
-    if (condition === "lost") {
+    if (["lost", "weeded", "discarded"].includes(condition)) {
       const pending = await repository.getPendingReservationCount(copy.book_id, conn);
       const eligibleRemaining = await repository.getAvailableEligibleCopyCount(copy.book_id, conn, copy.id);
-      if (eligibleRemaining < pending) throw Object.assign(new Error(`Cannot mark this copy lost: ${pending} pending reservation${pending === 1 ? " needs" : "s need"} an available accessioned copy to prepare, but only ${eligibleRemaining} would remain. Resolve or cancel pending reservations first.`), { status: 409 });
+      if (eligibleRemaining < pending) throw Object.assign(new Error(`Cannot mark this copy ${condition}: ${pending} pending reservation${pending === 1 ? " needs" : "s need"} an available accessioned copy to prepare, but only ${eligibleRemaining} would remain. Resolve or cancel pending reservations first.`), { status: 409 });
     }
     const before = { ...copy };
     await repository.updateCopyCondition(copyId, condition, notes, conn);

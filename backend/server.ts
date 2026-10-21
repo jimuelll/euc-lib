@@ -8,6 +8,7 @@ const { startRefreshSessionPurgeJob } = require("./jobs/refresh-session-purge.jo
 const { startDeliveryOutboxJob } = require("./modules/delivery-outbox/outbox.service");
 const { startReservationExpiryJob } = require("./jobs/reservation-expiry.job");
 
+require("./modules/email/email.config").validateConfig();
 const PORT = process.env.PORT || 4000;
 
 const server = http.createServer(app);
@@ -18,6 +19,7 @@ server.listen(PORT, () => {
   startOverdueSyncJob();
   startRefreshSessionPurgeJob();
   startDeliveryOutboxJob();
+  require("./modules/email/email.service").startEmailJob();
   startReservationExpiryJob();
   require('./modules/backup/backup.schedule').start();
 });

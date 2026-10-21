@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 
-export type DeliveryEventType = "notification" | "audit";
+export type DeliveryEventType = "notification" | "audit" | "email";
 
 export interface DeliveryOutboxRow extends RowDataPacket {
   id: string;

@@ -4,6 +4,7 @@ import { AdminIcon } from "@/features/admin";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getApiErrorMessage } from "@/utils/apiError";
+import CirculationScannerButton from "./CirculationScannerButton";
 import BarcodeInput from "./BarcodeInput";
 import { fetchCirculationBookCopies, searchCirculationBooks } from "../circulation.api";
 import { circulationKeys } from "../circulation.keys";
@@ -23,6 +24,7 @@ export default function BookLookup({ copyBarcode, onCopyBarcodeChange, onLookup,
   return <div className="circulation-lookup">
     <label htmlFor="circulation-copy-input" className="sr-only">Accession number or copy QR code</label>
     <BarcodeInput inputId="circulation-copy-input" value={copyBarcode} onChange={onCopyBarcodeChange} onSubmit={onLookup} loading={lookingUp} disabled={disabled} placeholder="Scan or type an accession number" />
+    <CirculationScannerButton label="Scan copy" disabled={disabled||lookingUp} onScan={value=>{onCopyBarcodeChange(value);onLookup(value);}}/>
     <button type="button" id="circulation-catalog-open" className="circulation-secondary-button" disabled={disabled} onClick={() => setOpen(true)}><AdminIcon name="search" />Search catalog</button>
     {foundCopy && <div className="circulation-selection"><AdminIcon name="catalog" /><div><strong>{foundCopy.title}</strong><span className="circulation-secondary">{foundCopy.accession_number ? `Accession ${foundCopy.accession_number}` : "No accession number"} · {foundCopy.condition}</span></div></div>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="circulation-dialog sm:max-w-xl" onCloseAutoFocus={event => { event.preventDefault(); document.getElementById("circulation-catalog-open")?.focus(); }}><DialogHeader><DialogTitle>Search catalog</DialogTitle><DialogDescription>Choose a book, then select its copy for checkout.</DialogDescription></DialogHeader>

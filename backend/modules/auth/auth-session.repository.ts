@@ -116,7 +116,13 @@ const isUserAccessActive = async (userId: number): Promise<boolean> => {
   return Boolean(user?.is_active);
 };
 
+const getSessionVersion = async (userId: number): Promise<number> => {
+  const [[user]] = await db.query<RowDataPacket[]>("SELECT session_version FROM users WHERE id=? AND deleted_at IS NULL",[userId]);
+  return user ? Number(user.session_version || 0) : -1;
+};
+
 export = {
+  getSessionVersion,
   createRefreshSession,
   getActiveRefreshSession,
   revokeRefreshSession,

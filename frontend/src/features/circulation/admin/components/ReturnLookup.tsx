@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AdminIcon } from "@/features/admin";
+import CirculationScannerButton from "./CirculationScannerButton";
 import BarcodeInput from "./BarcodeInput";
 import ReturnFineActions from "./ReturnFineActions";
 import type { ReturnPreview, ReturnReceipt } from "../circulation.types";
@@ -12,6 +13,7 @@ export default function ReturnLookup({ identifier, onIdentifierChange, onLookup,
   useEffect(() => { if (receipt) document.getElementById("circulation-accession-input")?.focus(); }, [receipt]);
   return <div className="circulation-lookup"><label htmlFor="circulation-accession-input">Accession number or copy QR code</label>
     <BarcodeInput inputId="circulation-accession-input" autoFocus value={identifier} onChange={onIdentifierChange} onSubmit={value => { if (preview && value.trim() === identifier.trim()) onConfirm(); else onLookup(value); }} loading={lookingUp} disabled={submitting} placeholder="Scan or type a copy identifier" />
+    <CirculationScannerButton label="Scan return copy" disabled={submitting||lookingUp} onScan={value=>{onIdentifierChange(value);onLookup(value);}}/>
     <p className="circulation-secondary">Scan to identify the loan. Press Enter again to confirm its return.</p>
     {lookingUp && <p role="status">Finding the active loan…</p>}
     {error && <p role="alert" className="circulation-error"><AdminIcon name="warning" />{error}</p>}

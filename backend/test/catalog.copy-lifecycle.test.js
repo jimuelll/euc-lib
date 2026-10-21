@@ -154,3 +154,27 @@ test("explicit copy retirement protects pending reservations and restoration is 
     restoreMethods(repository, saved);
   }
 });
+const queryService = require('../modules/catalog/catalog.query.service');
+test('weeded and discarded conditions preserve loan and reservation commitments', async () => {
+ const names=['getConnection','findCopyStateForUpdate','getPendingReservationCount','getAvailableEligibleCopyCount','updateCopyCondition'];
+ const saved=saveMethods(repository,names),oldAudit=audit.enqueueTransactionalAudit;
+ let copy={id:1,book_id:9,title:'Atlas',barcode:'COPY-1',condition:'good',has_active_loan:0,has_prepared_reservation:0};
+ let pending=0,remaining=0,writes=0;
+ const conn=fakeConnection(sql=>sql.includes('SELECT book_id')?[[{book_id:9}],[]]:[[],[]]);
+ repository.getConnection=async()=>conn;
+ repository.findCopyStateForUpdate=async()=>({...copy});
+ repository.getPendingReservationCount=async()=>pending;
+ repository.getAvailableEligibleCopyCount=async()=>remaining;
+ repository.updateCopyCondition=async(id,condition)=>{assert.equal(id,1);writes++;copy.condition=condition;};
+ audit.enqueueTransactionalAudit=async()=>{};
+ try {
+  for(const condition of ['weeded','discarded']) {
+   copy.has_active_loan=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/Return/.test(e.message));
+   copy.has_active_loan=0;copy.has_prepared_reservation=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/prepared/.test(e.message));
+   copy.has_prepared_reservation=0;pending=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/pending reservation/.test(e.message));
+   pending=0;await queryService.updateCopyCondition(1,condition,null,7);assert.equal(copy.condition,condition);
+  }
+  assert.equal(writes,2);assert.equal(conn.state.commits,2);assert.equal(conn.state.rollbacks,6);
+  await assert.rejects(queryService.updateCopyCondition(1,'invalid'),{status:400});
+ }finally{restoreMethods(repository,saved);audit.enqueueTransactionalAudit=oldAudit;}
+});

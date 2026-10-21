@@ -10,7 +10,7 @@ const enqueue = async (
   conn: Pool | PoolConnection = db,
   eventId = randomUUID(),
 ): Promise<string> => {
-  if (!["notification", "audit"].includes(eventType)) throw new TypeError("Unsupported outbox event type");
+  if (!["notification", "audit", "email"].includes(eventType)) throw new TypeError("Unsupported outbox event type");
   await conn.query(
     "INSERT INTO delivery_outbox (id, event_type, payload) VALUES (?, ?, ?)",
     [eventId, eventType, JSON.stringify(payload)],
@@ -23,7 +23,7 @@ const claimBatch = async (limit = 25): Promise<DeliveryOutboxRow[]> => {
   try {
     await conn.beginTransaction();
     const [rows] = await conn.query<DeliveryOutboxStoredRow[]>(
-      `SELECT id, event_type, payload, attempts
+      `SELECT id, event_type, payload, attempts, created_at
          FROM delivery_outbox
         WHERE status = 'pending' AND available_at <= NOW()
           AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))

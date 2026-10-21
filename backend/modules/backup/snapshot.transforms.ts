@@ -4,7 +4,7 @@ import type { SnapshotPayload, SnapshotRow } from "./snapshot.types";
 
 const { APPLICATION_TABLES } = registry;
 
-const SNAPSHOT_VERSION = 17;
+const SNAPSHOT_VERSION = 18;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -369,6 +369,12 @@ function upgradeV16ToV17(backup:SnapshotPayload):SnapshotPayload {
  for(const row of backup.tables.bulletin_posts||[]){row.image_alt??=null;row.gallery??="[]";}
  backup.version=17;backup.integrity={algorithm:"sha256",checksum:payloadChecksum(backup)};return backup;
 }
+function upgradeV17ToV18(backup: SnapshotPayload): SnapshotPayload {
+  assertSnapshotIntegrity(backup);
+  for (const user of backup.tables.users ?? []) { user.setup_pending ??= 0; user.email_verified_at ??= null; user.pending_email ??= null; user.session_version ??= 0; }
+  backup.version=18; backup.integrity={algorithm:"sha256",checksum:payloadChecksum(backup)}; return backup;
+}
+
 // Each supported snapshot version advances through one reviewed transformer.
 const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => SnapshotPayload>([
   [3, upgradeV3ToV4],
@@ -385,6 +391,7 @@ const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => Snaps
   [14, upgradeV14ToV15],
   [15, upgradeV15ToV16],
   [16, upgradeV16ToV17],
+  [17, upgradeV17ToV18],
 ]);
 
 function upgradeBackup(backup: SnapshotPayload): SnapshotPayload {

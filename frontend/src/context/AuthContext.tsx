@@ -14,6 +14,7 @@ export interface User {
   role: string;
   name: string;
   must_change_password: boolean;
+  email_verified?: boolean;
   term_status?: "current" | "expired" | "not_applicable";
   academic_term_name?: string | null;
 }
@@ -47,6 +48,7 @@ const decodeAccessToken = (token: string): User | null => {
       role: payload.role,
       name: payload.name,
       must_change_password: Boolean(payload.must_change_password),
+      email_verified: Boolean(payload.email_verified),
       term_status: payload.term_status,
       academic_term_name: payload.academic_term_name ?? null,
     };

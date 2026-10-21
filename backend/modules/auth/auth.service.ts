@@ -52,7 +52,7 @@ async function loginUser(
   academic_term_name?: string | null;
 }> {
   const user = await users.getUserByEmployeeID(student_employee_id);
-  if (!user || !user.is_active) {
+  if (!user || !user.is_active || user.setup_pending) {
     throw Object.assign(new Error("Invalid credentials"), { status: 401 });
   }
 
@@ -67,6 +67,8 @@ async function loginUser(
     role: user.role,
     name: user.name,
     must_change_password: user.must_change_password,
+    session_version: user.session_version ?? 0,
+    email_verified: Boolean(user.email_verified_at),
     ...termStatus,
   };
 
@@ -75,6 +77,7 @@ async function loginUser(
     user.id,
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     rememberMe,
+    Number(user.session_version ?? 0),
   );
 
   await users.updateLastLogin(user.id);
@@ -98,7 +101,7 @@ async function changePassword(
   if (!user) throw new Error("User not found");
 
   // Validate new password before doing anything
-  if (!newPassword || newPassword.length < 8) {
+  if (!newPassword || newPassword.length < 8 || Buffer.byteLength(newPassword)>72) {
     throw new Error("New password must be at least 8 characters");
   }
   if (oldPassword === newPassword) {
@@ -111,7 +114,14 @@ async function changePassword(
 
   // Hash and update
   const newHash = await bcrypt.hash(newPassword, 12);
-  await repository.updatePassword(userId, newHash);
+  await require("./account-email.service").transaction(async (conn: import("mysql2/promise").PoolConnection) => {
+    const [[current]] = await conn.query<import("mysql2/promise").RowDataPacket[]>("SELECT password_hash FROM users WHERE id=? FOR UPDATE",[userId]);
+    if (!current || current.password_hash !== user.password_hash) throw new Error("Account changed; sign in again");
+    await conn.query("UPDATE users SET password_hash=?,must_change_password=0,session_version=session_version+1 WHERE id=?",[newHash,userId]);
+    await require("./account-email.service").invalidateChallenges(conn,userId);
+    await require("./account-email.service").securityNotice(conn,user,"password_changed","Your library password was changed. Contact the library if you did not request this.");
+  });
+  require("../../realtime/notificationHub").closeUserConnections(userId);
 
   await authSessions.revokeAllRefreshSessionsForUser(userId);
   await recordAuthAuditEvent(user.id, "password_changed", auditContext);
@@ -123,6 +133,8 @@ async function changePassword(
     role: user.role,
     name: user.name,
     must_change_password: false,
+    session_version: Number(user.session_version ?? 0)+1,
+    email_verified: Boolean(user.email_verified_at),
     ...(await getTermStatus(user)),
   });
 
@@ -130,6 +142,7 @@ async function changePassword(
     user.id,
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     rememberMe,
+    Number(user.session_version ?? 0)+1,
   );
 
   return {

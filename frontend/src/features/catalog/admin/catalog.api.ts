@@ -56,7 +56,7 @@ export async function searchCatalogBooks(params: { query: string; materialType: 
   const rows = Array.isArray(payload) ? payload : payload.rows;
   return { rows, summary: Array.isArray(payload) ? undefined : payload.summary, pagination: Array.isArray(payload) ? { page: 1, limit: rows.length, total: rows.length, totalPages: 1 } : payload.pagination };
 }
-export type CatalogCopy = { id: number; barcode: string; accession_number?: string | null; accession_voided?: number | boolean; borrow_eligible?: number | boolean; needs_policy?: number | boolean; condition: "good" | "damaged" | "lost"; is_active: number; status: "available" | "borrowed" | "reserved" };
+export type CatalogCopy = { id: number; barcode: string; accession_number?: string | null; accession_voided?: number | boolean; borrow_eligible?: number | boolean; needs_policy?: number | boolean; condition: "good" | "damaged" | "lost" | "weeded" | "discarded"; is_active: number; status: "available" | "borrowed" | "reserved" };
 export async function addCatalogCopies(bookId:number,count:number):Promise<{message:string;copies:number}>{return (await axiosInstance.post(`api/admin/books/${bookId}/copies`,{count})).data;}
 export async function fetchCatalogBookCopies(bookId: number, signal?: AbortSignal): Promise<CatalogCopy[]> { return (await axiosInstance.get<CatalogCopy[]>(`api/admin/books/${bookId}/copies`, { signal })).data; }
 export async function fetchCatalogBarcode(barcode: string): Promise<string> { const response = await axiosInstance.get(`api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`, { responseType: "blob" }); return URL.createObjectURL(response.data); }
@@ -69,7 +69,7 @@ export type CatalogSettings = { show_unheld_in_opac: boolean; updated_at?: strin
 export async function fetchCatalogSettings(signal?: AbortSignal): Promise<CatalogSettings> { return (await axiosInstance.get<CatalogSettings>("api/admin/catalog-settings", { signal })).data; }
 export async function saveCatalogSettings(showUnheldInOpac: boolean): Promise<CatalogSettings> { return (await axiosInstance.put<{ settings: CatalogSettings }>("api/admin/catalog-settings", { show_unheld_in_opac: showUnheldInOpac })).data.settings; }
 export type CatalogHolding = {
-  copy_id: number; book_id: number; barcode: string; condition: "good" | "damaged" | "lost"; is_active: number;
+  copy_id: number; book_id: number; barcode: string; condition: "good" | "damaged" | "lost" | "weeded" | "discarded"; is_active: number;
   title: string; author?: string | null; isbn?: string | null; book_type?: string | null; needs_policy?: number | boolean; program_is_active?: number | boolean;
   accession_number: string | null; accession_voided?: number | boolean; price: number | string | null; program_id: number | null; course: string | null;
   course_code: string | null; location: string | null; date_acquired: string | null; distributor: string | null;

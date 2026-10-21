@@ -22,6 +22,13 @@ const attachWebSocketServer = (server: Server) => {
       }
 
       const user = verifyAccessToken(token) as AuthenticatedUser;
+      const sessions = require("../modules/auth/authSession.service");
+      if (!await sessions.isAccessTokenCurrent(user) || !await sessions.isUserAccessActive(user.id) || user.must_change_password) { socket.close(4002,"Session ended"); return; }
+      const sessionCheck = setInterval(async () => {
+        try { if (!await sessions.isAccessTokenCurrent(user) || !await sessions.isUserAccessActive(user.id) || (user.exp && Number(user.exp)*1000<=Date.now())) socket.close(4002,"Session ended"); } catch { socket.close(4002,"Unable to validate session"); }
+      },15_000);
+      sessionCheck.unref();
+      socket.on("close",()=>clearInterval(sessionCheck));
       socket.user = user;
       hub.registerConnection(user.id, socket, user.role);
 

@@ -1,7 +1,7 @@
 const SNAPSHOT_TABLE = "backup_snapshots";
 // Audit history is an append-only operational ledger. It must survive a data
 // restore so post-snapshot actions can be shown as reversed rather than erased.
-const SYSTEM_TABLES: string[] = [SNAPSHOT_TABLE, "backup_schedule", "audit_events", "auth_restore_state", "restore_audit_events", "system_maintenance_state"];
+const SYSTEM_TABLES: string[] = [SNAPSHOT_TABLE, "backup_schedule", "audit_events", "auth_restore_state", "restore_audit_events", "system_maintenance_state", "account_challenges", "email_address_claims", "email_request_limits", "email_deliveries", "email_dispatch_state", "email_quota_usage"];
 
 // Add every application data table here with its migration. Control tables are
 // deliberately excluded: restoring them would overwrite the recovery record,

@@ -121,14 +121,11 @@ export const useAdminManage = (): UseAdminManageReturn => {
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
     const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks } = form;
-    if (!fullName || !role || !password || !rePassword) {
+    if (!fullName || !role || !email.trim()) {
       toast.error("All required fields must be filled");
       return false;
     }
-    if (password !== rePassword) {
-      toast.error("Passwords do not match");
-      return false;
-    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Enter a valid email address"); return false; }
     setLoading(true);
     try {
       const response = await createMutation.mutateAsync({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
@@ -178,17 +175,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!selectedUser || updateLock.current) return false;
     updateLock.current = true;
     try {
-    const { password, rePassword } = form;
-    const updates = { ...form };
-    if (password) {
-      if (password !== rePassword) {
-        toast.error("Passwords do not match");
-        return false;
-      }
-      updates.password = password;
-    }
     if (form.role !== selectedUser.role && !await confirm({ title: "Confirm role change?", description: `${selectedUser.name} will change from ${selectedUser.role.replace(/_/g, " ")} to ${form.role.replace(/_/g, " ")}. This changes their access and available permissions.`, actionLabel: "Confirm role change", tone: "danger" })) return false;
-    if (password && !await confirm({ title: "Reset this password?", description: `${selectedUser.name} will use the new password and must change it at their next sign-in.`, actionLabel: "Reset password" })) return false;
     setLoading(true);
     try {
       const response = await updateMutation.mutateAsync({ id: selectedUser.student_employee_id, form: { ...form } });

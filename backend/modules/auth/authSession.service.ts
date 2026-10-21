@@ -8,20 +8,20 @@ function toMySqlDateTime(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ");
 }
 
-async function issueRefreshSession(userId: number, expiresAt: Date, rememberMe = false): Promise<string> {
+async function issueRefreshSession(userId: number, expiresAt: Date, rememberMe = false, sessionVersion = 0): Promise<string> {
   const jti = randomUUID();
   await repository.createRefreshSession(userId, jti, toMySqlDateTime(expiresAt));
-  return auth.signRefreshToken({ id: userId, jti, remember_me: Boolean(rememberMe) });
+  return auth.signRefreshToken({ id: userId, jti, session_version: sessionVersion, remember_me: Boolean(rememberMe) });
 }
 
 const getActiveRefreshSession = (userId: number, jti: string) => repository.getActiveRefreshSession(userId, jti);
 const revokeRefreshSession = (userId: number, jti: string) => repository.revokeRefreshSession(userId, jti);
 
-async function rotateRefreshSession(userId: number, oldJti: string, nextExpiresAt: Date, rememberMe = false): Promise<string> {
+async function rotateRefreshSession(userId: number, oldJti: string, nextExpiresAt: Date, rememberMe = false, sessionVersion = 0): Promise<string> {
   const jti = randomUUID();
   const rotated = await repository.rotateRefreshSession(userId, oldJti, jti, toMySqlDateTime(nextExpiresAt));
   if (!rotated) throw Object.assign(new Error("Invalid refresh token"), { status: 401 });
-  return auth.signRefreshToken({ id: userId, jti, remember_me: Boolean(rememberMe) });
+  return auth.signRefreshToken({ id: userId, jti, session_version: sessionVersion, remember_me: Boolean(rememberMe) });
 }
 
 const revokeAllRefreshSessionsForUser = (userId: number) => repository.revokeAllRefreshSessionsForUser(userId);
@@ -30,6 +30,8 @@ const invalidateAllSessionsAfterRestore = (conn?: PoolConnection) => repository.
 
 async function isAccessTokenCurrent(payload: unknown): Promise<boolean> {
   const invalidBeforeSeconds = await repository.getInvalidBefore();
+  const record = payload as { id?: number; session_version?: number };
+  if (record?.id && Number(record.session_version ?? 0) !== await repository.getSessionVersion(record.id)) return false;
   if (!invalidBeforeSeconds) return true;
   const issuedAt = payload !== null && (typeof payload === "object" || typeof payload === "function")
     ? (payload as { iat?: unknown }).iat

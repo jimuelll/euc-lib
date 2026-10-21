@@ -328,3 +328,10 @@ under the wrong IP address. Use a shared store before adding backend instances.
 ## License
 
 No license file is currently included in this repository. Unless the project owners state otherwise, the source should be treated as proprietary.
+
+
+### EmailJS account invitations and recovery
+
+Apply the email-account migration before running this version. Live sending is disabled by default. Setup, templates, quota configuration, bootstrap invitations, and staged rollout are documented in [backend/modules/email/README.md](backend/modules/email/README.md).
+
+Existing installations: apply `db/migrations/2026-10-22-copy-withdrawal-conditions.sql` before using the Weeded and Discarded copy conditions. These conditions prevent lending while retaining copy identity, accession details, and transaction history. The Holdings and Copies condition dropdowns update the same record.

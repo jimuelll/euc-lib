@@ -7,8 +7,10 @@ async function dispatch(row: DeliveryOutboxRow): Promise<void> {
   if (row.event_type === "notification") {
     const notifications = require("../notifications/notifications.service");
     await notifications.createNotification({ ...row.payload, deliveryKey: row.id });
+    await require("../email/email.service").queueNotification(row.payload, row.id, row.created_at);
     return;
   }
+  if (row.event_type === "email") return; // Durable handoff; the email worker sends independently.
   if (row.event_type === "audit") {
     const audit = require("../analytics/analytics.audit.service");
     await audit.recordAuditEvent({ ...row.payload, eventKey: row.id });
