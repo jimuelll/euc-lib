@@ -1,115 +1,84 @@
-# Enverga-Candelaria Library Management System
+# EUC Library
 
-A full-stack library services platform built for Manuel S. Enverga University Foundation – Candelaria. The system combines a public catalogue and library website with authenticated patron services, circulation workflows, content management, reporting, and administrative controls.
+A web-based library management system for Manuel S. Enverga University Foundation — Candelaria Inc. It combines a public library website and catalogue, patron self-service, and a role-based workspace for library operations.
 
-## What the system covers
+## Features
 
-### Public and patron services
+- **Public website:** searchable book and thesis catalogue, library information, opening hours, bulletin posts, events, and academic subscriptions.
+- **Patron accounts:** borrowing and reservation records, attendance history, fines, notifications, and profile management through My Library.
+- **Circulation:** barcode-based checkout and returns, reservation queues, overdue tracking, fine payments, clearance, and receipts.
+- **Catalogue management:** configurable metadata fields, loan policies, physical copies, holdings, permanent accession records, cover images, and ISBN metadata lookup.
+- **Administration:** role-based account management, academic programmes and terms, departments, holidays, and library settings.
+- **Content and reporting:** draft-and-publish website editing, user guides, analytics, record queries, exports, and audit logs.
+- **Integrations:** real-time notifications, email invitations and recovery, AI-assisted recommendations and analytics reports, and manual or scheduled backup snapshots.
 
-- Public catalogue search, availability, categories, book covers, and recommendations
-- Library announcements, events, information, hours, and academic-resource links
-- Student and patron sign-in with refresh-session support
-- Personal library view for current loans, history, reservations, notifications, and barcode access
-- Book reservations and reservation-queue tracking
-- QR/barcode-based attendance scanning
+### Access roles
 
-### Staff and administration
-
-- Catalogue records, configurable metadata, book types, physical copies, holdings, accession numbers, and cover images
-- Barcode-assisted checkout, return, renewal, and circulation history
-- Patron accounts for students, employees, alumni, scanners, staff, administrators, and super administrators
-- Reservation preparation, fulfilment, expiry, and notifications
-- Fine ledgers, clearance payments, and printable receipts
-- Departments, academic programs, terms, holidays, and circulation settings
-- Bulletin, subscription, About page, homepage, and role-aware user-guide management
-- Analytics dashboards, audit logs, reports, and an administrative query workspace
-- Cloud-backed application snapshots with restore maintenance mode
-- Real-time notifications over WebSockets
+| Role | Purpose |
+| --- | --- |
+| Visitor | Browse the public website and catalogue without signing in. |
+| `student`, `employee`, `alumni` | Access patron self-service and personal library records. |
+| `scanner` | Operate the attendance scanner. |
+| `staff` | Perform library desk operations with scoped permissions. |
+| `admin` | Manage library operations, website content, analytics, and reports. |
+| `super_admin` | Access additional controls for loan policies, backups and restore, audit logs, and email deliveries. |
 
 ## Technology
 
-| Layer | Main technologies |
+| Layer | Stack |
 | --- | --- |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Radix UI, TanStack Query, React Router, Axios, Recharts |
-| Backend | Node.js, Express 5, TypeScript, MySQL2, WebSocket, JWT, bcrypt, Helmet |
-| Database | MySQL or MariaDB |
-| Media and backups | Cloudinary (optional for basic local use) |
-| Optional AI features | Gemini embeddings and Gemini or Groq analytics reports |
-| Testing | Node test runner, Vitest, Testing Library, architecture checks |
+| Frontend | React 18, TypeScript, Vite 5, React Router, TanStack Query, Tailwind CSS, Radix UI |
+| Backend | Node.js, TypeScript, Express 5, `mysql2`, JWT authentication, WebSockets |
+| Database | MariaDB; schema, seed data, and incremental SQL migrations are in `db/` |
+| Tests | Node.js test runner for the backend; Vitest and React Testing Library for the frontend |
 
-## Architecture
+## Local development
 
-The repository contains two independently managed Node.js applications:
+### Requirements
 
-```text
-Browser
-  -> React/Vite frontend (port 8080)
-      -> REST API and WebSocket connection
-          -> Express API (port 4000)
-              -> services and repositories
-                  -> MySQL/MariaDB
-```
+- Node.js 24 and npm.
+- MariaDB and a SQL client such as the MariaDB CLI or phpMyAdmin.
 
-The intended dependency flow is:
+The supplied SQL baseline uses MariaDB-specific syntax, including `ADD COLUMN IF NOT EXISTS`. A MySQL installation may require changes to the SQL before importing.
 
-```text
-Backend:  routes -> controllers -> services -> repositories -> database
-Frontend: route/page -> components -> hooks -> feature API -> backend API
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the enforced module-boundary rules.
-
-## Prerequisites
-
-- A current Node.js LTS release and npm
-- MySQL 8+ or a compatible MariaDB installation
-- A MySQL client, phpMyAdmin, or another tool capable of importing SQL files
-- Optional: a Cloudinary account for image uploads and snapshot backup/restore
-- Optional: Gemini and/or Groq credentials for AI-assisted features
-
-## Local setup
+Run the following commands from the repository root unless a different directory is specified.
 
 ### 1. Install dependencies
 
-The frontend and backend have separate lockfiles and must be installed separately.
+The frontend and backend have separate packages and lockfiles.
 
-```bash
-cd backend
-npm ci
-
-cd ../frontend
-npm ci
+```sh
+npm --prefix backend ci
+npm --prefix frontend ci
 ```
 
-### 2. Create the database
+### 2. Initialize the database
 
-Create an empty UTF-8 database, then import the current baseline:
+Open a MariaDB client from the repository root:
+
+```sh
+mariadb -u root -p
+```
+
+Some installations name the client `mysql`. In that client, run:
 
 ```sql
-CREATE DATABASE library
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE library CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE library;
+SOURCE db/fresh-start.sql;
 ```
 
-From the repository root, the MySQL CLI can import it with:
+**Use `fresh-start.sql` only for a new or disposable database. It drops and recreates application tables in the selected database.** The backend does not create the schema automatically.
 
-```bash
-mysql -u root -p library -e "source db/fresh-start.sql"
+The baseline includes current schema changes and initial library settings, a general collection loan policy, and a development super administrator (`SA0001`). Do not replay every migration after importing it. For an existing installation, review and apply only the missing files in [db/migrations](db/migrations) in chronological order.
+
+Optionally import [db/realistic-demo-data.sql](db/realistic-demo-data.sql) into a fresh development database for sample patrons, catalogue records, and circulation activity:
+
+```sql
+SOURCE db/realistic-demo-data.sql;
 ```
 
-`db/fresh-start.sql` is destructive when run against an existing database: it drops and recreates the application's tables. Use it only for a new installation or a database whose data can be discarded.
-
-The baseline already incorporates the schema represented by the dated files in `db/migrations/`. Those migrations are for upgrading older installations; do not replay them after importing `fresh-start.sql`.
-
-To add the optional realistic development dataset after the baseline import:
-
-```bash
-mysql -u root -p library -e "source db/realistic-demo-data.sql"
-```
-
-The demo seed adds five student accounts with IDs `DEMO-REAL-001` through `DEMO-REAL-005`. Their shared development-only password is `Test1234!`.
-
-### 3. Configure the backend
+### 3. Configure the environment
 
 Create `backend/.env`:
 
@@ -117,230 +86,160 @@ Create `backend/.env`:
 NODE_ENV=development
 PORT=4000
 
-DB_HOST=127.0.0.1
+DB_HOST=localhost
 DB_PORT=3306
-DB_USER=root
+DB_USER=your_database_user
 DB_PASS=your_database_password
 DB_NAME=library
 
-JWT_SECRET=replace_with_a_long_random_secret
-JWT_REFRESH_SECRET=replace_with_a_different_long_random_secret
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
+JWT_SECRET=replace_with_a_random_secret
+JWT_REFRESH_SECRET=replace_with_a_different_random_secret
+
+EMAIL_ENABLED=false
+EMAIL_ROUTINE_ENABLED=false
+PUBLIC_APP_URL=http://localhost:8080
 ```
 
-`JWT_SECRET` and `JWT_REFRESH_SECRET` are required for authentication. Use independent, high-entropy values and never commit the `.env` file.
+Generate each JWT secret separately:
 
-### 4. Configure the frontend
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
 
-No frontend environment file is required for ordinary local development. Vite proxies `/api` requests to `http://localhost:4000`.
+The database user must have access to the database created above. For a remote database requiring TLS, the backend also accepts `DB_SSL`, `DB_SSL_CA`, and `DB_SSL_REJECT_UNAUTHORIZED`; certificate verification defaults to enabled.
 
-If the API is hosted separately, create `frontend/.env`:
+Create or update `frontend/.env`:
 
 ```dotenv
-VITE_BASE_URL=https://your-api.example.com
+VITE_BASE_URL=http://localhost:4000/api
 ```
+
+Use this absolute API URL for local development. The current Vite `/api` proxy points to port 8080, which is also the frontend port. The notifications client also derives its WebSocket connection from `VITE_BASE_URL`.
+
+### 4. Set a local administrator password
+
+The baseline stores a bcrypt hash for `SA0001`. To use your own password for this development account, generate a replacement hash from `backend/`:
+
+```sh
+cd backend
+node -e "require('bcryptjs').hash(process.argv[1], 12).then(console.log)" "replace-with-your-local-password"
+```
+
+In your SQL client, select the development database and paste the generated hash:
+
+```sql
+USE library;
+UPDATE users
+SET password_hash = 'PASTE_GENERATED_BCRYPT_HASH_HERE'
+WHERE student_employee_id = 'SA0001' AND role = 'super_admin';
+```
+
+Sign in with `SA0001` and the password you chose. This step is for the freshly seeded local account; deployed accounts use the invitation and recovery workflows described below.
 
 ### 5. Start both applications
 
-In one terminal:
+Run each command in a separate terminal, from the repository root:
 
-```bash
-cd backend
-npm run dev
+```sh
+npm --prefix backend run dev
 ```
 
-In another terminal:
-
-```bash
-cd frontend
-npm run dev
+```sh
+npm --prefix frontend run dev
 ```
 
-Open <http://localhost:8080>. The API listens on <http://localhost:4000>.
+Open [http://localhost:8080](http://localhost:8080). The backend listens on port 4000 by default, serves HTTP endpoints under `/api`, and accepts WebSocket connections at `/ws`.
 
-## Environment variables
+The backend checks database restore state before accepting requests. A database connection or schema failure can therefore prevent it from starting.
 
-### Backend
+## Integration configuration
 
-| Variable | Required | Purpose / default |
-| --- | --- | --- |
-| `DB_HOST` | Yes | Database host |
-| `DB_PORT` | No | Database port; defaults to `3306` |
-| `DB_USER` | Yes | Database user |
-| `DB_PASS` | Depends | Database password |
-| `DB_NAME` | Yes | Database name |
-| `JWT_SECRET` | Yes | Access-token signing secret |
-| `JWT_REFRESH_SECRET` | Yes | Refresh-token signing secret |
-| `JWT_EXPIRES_IN` | No | Access-token lifetime; defaults to `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | No | Refresh-token lifetime; defaults to `7d` |
-| `PORT` | No | HTTP/WebSocket port; defaults to `4000` |
-| `NODE_ENV` | No | Enables production logging and secure cross-site cookies when set to `production` |
-| `DB_SSL` | No | Enables database TLS |
-| `DB_SSL_CA` | No | Database CA certificate; escaped `\\n` sequences are supported |
-| `DB_SSL_REJECT_UNAUTHORIZED` | No | TLS certificate verification; defaults to `true` |
-| `DB_CONNECT_TIMEOUT_MS` | No | Connection timeout; defaults to `30000` |
-| `DB_CONNECTION_LIMIT` | No | Pool size; defaults to `10` |
-| `CLOUDINARY_CLOUD_NAME` | Feature-specific | Server-side catalogue images and snapshot storage |
-| `CLOUDINARY_API_KEY` | Feature-specific | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Feature-specific | Cloudinary API secret |
-| `BACKUP_MAX_BYTES` | No | Maximum restore request body; defaults to 50 MiB |
-| `SNAPSHOT_MAX_BYTES` | No | Maximum uncompressed snapshot size; defaults to 50 MiB |
-| `SNAPSHOT_UPLOAD_TIMEOUT_MS` | No | Snapshot upload timeout; defaults to 120000 ms |
-| `OPEN_LIBRARY_CONTACT_EMAIL` | No | Contact identity used for Open Library ISBN lookups |
-| `GOOGLE_BOOKS_API_KEY` | No | Enables authenticated Google Books metadata lookups |
-| `HARDCOVER_API_TOKEN` | No | Enables Hardcover synopsis fallback lookups |
-| `AI_EMBEDDING_PROVIDER` | No | Set to `gemini` to enable semantic recommendation embeddings |
-| `GEMINI_API_KEY` | Feature-specific | Gemini embeddings and/or report generation |
-| `GEMINI_EMBEDDING_MODEL` | No | Defaults to `gemini-embedding-001` |
-| `AI_REPORT_PROVIDER` | No | `gemini` (default) or `groq` |
-| `GEMINI_REPORT_MODEL` | No | Defaults to `gemini-2.5-flash` |
-| `GROQ_API_KEY` | Feature-specific | Required when the report provider is `groq` |
-| `GROQ_REPORT_MODEL` | No | Defaults to `openai/gpt-oss-20b` |
-| `REFRESH_SESSION_PURGE_INTERVAL_MS` | No | Refresh-session cleanup interval |
+The basic setup above supports browsing and the seeded administrator account. Additional workflows require the following settings.
 
-### Frontend
-
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `VITE_BASE_URL` | No locally | Absolute API origin for a separately hosted backend |
-| `VITE_CLOUDINARY_CLOUD_NAME` | Feature-specific | Browser-side image upload cloud name |
-| `VITE_CLOUDINARY_UPLOAD_PRESET` | Feature-specific | Unsigned Cloudinary upload preset |
-
-Keep Cloudinary's API secret on the backend only. Every variable prefixed with `VITE_` is exposed to the browser bundle.
-
-## Available commands
-
-Run commands from the application directory shown.
-
-### Backend (`backend/`)
-
-| Command | Description |
+| Capability | Configuration |
 | --- | --- |
-| `npm run dev` | Run the API with nodemon and ts-node |
-| `npm run build` | Compile TypeScript into `backend/dist/` |
-| `npm start` | Run the compiled server |
-| `npm test` | Run the backend test suite |
-| `npm run architecture:test` | Run backend regression and architecture checks |
+| Catalogue cover uploads and backup storage | Backend: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. Backups use authenticated Cloudinary storage. |
+| Website content image uploads | Frontend: `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET` for an unsigned upload preset. |
+| Gemini recommendation embeddings | Backend: `AI_EMBEDDING_PROVIDER=gemini` and `GEMINI_API_KEY`; optionally `GEMINI_EMBEDDING_MODEL`. |
+| AI analytics reports | Backend: `AI_REPORT_PROVIDER=gemini` with `GEMINI_API_KEY`, or `AI_REPORT_PROVIDER=groq` with `GROQ_API_KEY`. Optional model overrides: `GEMINI_REPORT_MODEL` and `GROQ_REPORT_MODEL`. |
+| ISBN metadata enrichment | Open Library and Google Books are queried by the backend. Optional settings: `OPEN_LIBRARY_CONTACT_EMAIL`, `GOOGLE_BOOKS_API_KEY`, and `HARDCOVER_API_TOKEN`. |
 
-### Frontend (`frontend/`)
+Keep private keys and credentials in `backend/.env`. Values prefixed with `VITE_` are included in the browser build. Restart the development server after changing environment files.
 
-| Command | Description |
+### Account invitations and email recovery
+
+New account creation, password setup, email verification, and password recovery depend on the email service. There is no public self-registration flow.
+
+Use the field names in [backend/email.env.example](backend/email.env.example) with your own values. To deliver email, configure:
+
+- `EMAIL_ENABLED=true` and `EMAIL_MODE=emailjs`.
+- `PUBLIC_APP_URL` as the frontend's absolute URL.
+- `EMAIL_ENCRYPTION_KEY` as 32 random bytes encoded as 64 hexadecimal characters; the secret-generation command above produces this format.
+- `EMAILJS_SERVICE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY`, `EMAILJS_ACCOUNT_TEMPLATE_ID`, and `EMAILJS_LIBRARY_TEMPLATE_ID`.
+- `EMAIL_QUOTA_PERIOD_START` and `EMAIL_QUOTA_PERIOD_END` as the actual quota period dates in `YYYY-MM-DD` format; the end date is exclusive.
+
+Account templates receive `to_email`, `to_name`, `subject`, `message`, `action_url`, `action_label`, `code`, and `login_identifier`. Library templates can also receive `loans` and `as_of`. Set up the templates to display the fields needed by each workflow.
+
+`EMAIL_ROUTINE_ENABLED=true` enables routine library emails. Non-production `EMAIL_MODE=capture` stores outgoing messages in process memory for development and tests; it does not deliver them to an inbox or expose them through a public route.
+
+With email configured, invite an existing active super administrator from the repository root:
+
+```sh
+npm --prefix backend run invite-super-admin -- SA0001 admin@example.com
+```
+
+This queues a password-setup invitation and invalidates the account's previous password and sessions. The backend must be running to process queued mail; the command does not create a super administrator.
+
+## Development commands
+
+Run these from the repository root:
+
+| Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the Vite development server on port 8080 |
-| `npm run build` | Create a production bundle |
-| `npm run preview` | Preview the production bundle locally |
-| `npm run lint` | Run ESLint |
-| `npm run test` | Run architecture checks and unit tests |
-| `npm run test:architecture` | Validate frontend feature boundaries and route coverage |
-| `npm run test:unit` | Run Vitest tests |
+| `npm --prefix backend run dev` | Run the API with automatic restarts. |
+| `npm --prefix backend run build` | Compile backend TypeScript into `backend/dist/`. |
+| `npm --prefix backend start` | Run the compiled backend. |
+| `npm --prefix backend test` | Run backend regression and architecture checks. |
+| `npm --prefix frontend run dev` | Run the Vite development server. |
+| `npm --prefix frontend run build` | Build the frontend into `frontend/dist/`. |
+| `npm --prefix frontend run preview` | Preview the built frontend locally. |
+| `npm --prefix frontend run lint` | Run ESLint. |
+| `npm --prefix frontend test` | Run frontend architecture checks and unit tests. |
 
-Database integration tests are guarded to prevent accidental use against a normal database. To enable them, set `RUN_DB_INTEGRATION=1` and use a database name ending in `_test`.
+Database integration tests are skipped by default. To enable them, initialize a separate disposable database from the baseline, point the backend's database settings at it, and set `RUN_DB_INTEGRATION=1`. Its name must end in `_test`. These tests write fixtures, including permanent accession records.
 
-## Repository layout
+## Project structure
 
 ```text
-.
-├── backend/
-│   ├── jobs/             # Scheduled cleanup and synchronization work
-│   ├── middlewares/      # Authentication, audit, maintenance, validation
-│   ├── modules/          # Feature routes, controllers, services, repositories
-│   ├── realtime/         # WebSocket notification transport
-│   ├── test/             # Backend regression and integration tests
-│   ├── app.ts            # Express composition and route mounting
-│   ├── db.ts             # MySQL connection pool
-│   └── server.ts         # HTTP/WebSocket startup and background jobs
-├── db/
-│   ├── migrations/       # Incremental upgrades for older databases
-│   ├── fresh-start.sql   # Destructive, current database baseline
-│   └── realistic-demo-data.sql
-├── docs/                 # Audit notes and generated UML documentation
-├── frontend/
-│   ├── scripts/          # Architecture tooling
-│   └── src/
-│       ├── app/          # Providers, routing, and shared server-state setup
-│       ├── components/   # Shared UI and layout primitives
-│       ├── context/      # Application-wide contexts
-│       ├── features/     # Domain-oriented frontend modules
-│       ├── hooks/        # Cross-feature hooks
-│       └── utils/        # HTTP and utility helpers
-├── ARCHITECTURE.md
-└── README.md
+backend/
+  app.ts              Express middleware and API routes
+  server.ts           HTTP/WebSocket server and background workers
+  db.ts               Database connection pool
+  modules/            Domain routes, controllers, services, and repositories
+  jobs/               Scheduled circulation and session maintenance
+  realtime/           WebSocket notifications
+  scripts/            Administrative command-line tools
+  test/               Backend tests
+frontend/
+  src/app/            Routes, providers, and query configuration
+  src/features/       Feature pages, components, hooks, and API clients
+  src/components/     Shared UI and layout
+  src/context/        Authentication and notifications
+  public/             Static assets
+db/
+  fresh-start.sql     Destructive development baseline
+  migrations/         Incremental schema updates
+  realistic-demo-data.sql
 ```
 
-## Production notes
+See [ARCHITECTURE.md](ARCHITECTURE.md) for dependency boundaries and contribution rules.
 
-- Build the backend with `npm run build`, then run it with `npm start`.
-- Build the frontend with `npm run build`; the static output is written to `frontend/dist/`.
-- The checked-in `frontend/vercel.json` rewrites `/api/*` to the deployed API and sends other routes to the single-page application entry point.
-- The API's allowed browser origins are currently declared in `backend/app.ts`. Add the production frontend origin there before deploying to a different domain.
-- Production authentication uses `Secure`, `SameSite=None` refresh cookies. Serve the frontend and API over HTTPS and keep credentialed CORS correctly configured.
-- WebSockets share the backend HTTP server and therefore use the same deployed origin and port.
-- Snapshot backup/restore and server-managed catalogue images require all three server-side Cloudinary variables.
-- Run both backend and frontend test suites before deployment.
+## Deployment
 
-### API rate limits
+Build each application separately. Serve `frontend/dist/` with a fallback to `index.html` for client-side routes, and run `npm start` from `backend/` after building it. The API needs a persistent Node.js process for WebSockets, queued deliveries, and scheduled jobs.
 
-The API uses independent fixed-window counters for the following policies. The
-first admitted request starts the window. Account budgets are shared across
-resource IDs and aliases listed together. The current memory store is for the
-single backend instance; counts reset when that process restarts.
+Set `VITE_BASE_URL` to the backend's absolute HTTPS API URL before building the frontend. The notification client connects to `/ws` on that host, so the backend host or reverse proxy must support secure WebSocket upgrades.
 
-| Policy | Covered requests | Budget | Key |
-| --- | --- | ---: | --- |
-| API baseline | All `/api` requests except CORS preflight | 1,500/minute | IP |
-| Login total | `POST /api/auth/login` | 300/15 minutes | IP |
-| Login failures | `POST /api/auth/login` | 5 failed attempts/15 minutes | Normalized identifier + IP (hashed); successes do not consume this budget |
-| Password change | `POST /api/auth/change-password` | 5/15 minutes | Account |
-| Refresh flood | Every `POST /api/auth/refresh` | 300/minute | IP |
-| Refresh sessions | Refresh with a valid signed cookie | 30/minute | Verified account |
-| Bulletin posts | `POST /api/bulletin` | 10/10 minutes | Account |
-| Bulletin comments | `POST /api/bulletin/:postId/comments` | 20/5 minutes | Account |
-| Bulletin likes | `POST /api/bulletin/:postId/like` | 60/minute | Account |
-| Visit tracking | `POST /api/analytics/visit` | 120/minute | IP |
-| Notifications | `POST /api/admin/notifications` | 20/10 minutes | Account |
-| Public catalogue | Public catalogue schema/search and seed-book recommendations | 300/minute | IP |
-| Authenticated catalogue | Borrowing/reservation searches and personal recommendations | 120/minute | Account |
-| Student transactions | Self-service borrowing and reservation/cancellation | 30/minute | Account |
-| Desk transactions | Scanner and circulation borrow/return/renew; reservation ready/fulfill/cancel | 120/minute | Operator account |
-| Attendance scans | `POST /api/attendance/scan` | 120/minute | Operator account |
-| AI reports | `POST /api/analytics/dashboard/ai-report` | 10/10 minutes | Account |
-| ISBN lookup | `GET /api/admin/books/isbn/:isbn` | 60/minute | Account |
-| Catalogue image upload | `POST /api/admin/books/:id/image` | 30/10 minutes | Account |
-| Embedding backfill | `POST /api/admin/recommendations/embeddings/backfill` | 10/15 minutes | Account |
-| Report exports | Query and report CSV exports | 30/10 minutes | Account |
-| Backup work | Export, compatibility checks, snapshot save/download, and restore | 20/15 minutes | Account |
+Update the origin allowlist in [backend/app.ts](backend/app.ts) for your frontend domain. [frontend/vercel.json](frontend/vercel.json) includes an API rewrite to the project's Render hostname; update it for your own backend when using Vercel.
 
-Rate-limited responses use HTTP 429 with `code: "RATE_LIMITED"`, a
-`retryAfterSeconds` value, and standard rate-limit headers. The browser client
-shares concurrent refresh requests and observes the refresh cooldown without
-clearing the current session. Verify `trust proxy` against the deployed
-forwarding chain before release; incorrect proxy settings can group visitors
-under the wrong IP address. Use a shared store before adding backend instances.
-
-### Production recovery and content retention
-
-- Startup verifies restore maintenance before listening or starting workers. Recovery checks repeat every 60 seconds and use the same database lock as restores; an active restore is never cleared. Stale maintenance recovery invalidates sessions and records a system audit event atomically. Review restore history and safety snapshots after recovery: recovery does not infer whether the interrupted restore committed.
-- A role change increments the account session version and revokes refresh sessions in the account-update transaction. The account must sign in again; ordinary profile edits and unchanged roles preserve sessions.
-- Physical book returns must be processed at the library desk through the staff/scanner circulation workflow. The legacy patron self-return endpoint responds with HTTP 410 and makes no circulation changes.
-- Archived bulletin posts retain their images and individual comment moderation state. Previously deleted comments remain hidden, including legacy comments whose original deletion reason cannot be reconstructed. Missing and archived posts reject new comments.
-- Bulletin and academic-resource images are preserved on archive, removal, and replacement so retained records and snapshots do not lose media. Permanent content-media cleanup is a separate task; preserved media may accumulate. These changes cannot recover assets already deleted from Cloudinary.
-
-## Security notes
-
-- Do not commit `.env` files, database dumps containing private data, JWT secrets, or Cloudinary/API credentials.
-- Replace all development credentials before using the system with real users.
-- Treat `db/fresh-start.sql` as a destructive reset operation.
-- Use a dedicated `_test` database for integration tests.
-- Review role permissions, CORS origins, cookie behavior, database TLS, backup access, and external upload presets before production use.
-
-## License
-
-No license file is currently included in this repository. Unless the project owners state otherwise, the source should be treated as proprietary.
-
-
-### EmailJS account invitations and recovery
-
-Apply the email-account migration before running this version. Live sending is disabled by default. Setup, templates, quota configuration, bootstrap invitations, and staged rollout are documented in [backend/modules/email/README.md](backend/modules/email/README.md).
-
-Existing installations: apply `db/migrations/2026-10-22-copy-withdrawal-conditions.sql` before using the Weeded and Discarded copy conditions. These conditions prevent lending while retaining copy identity, accession details, and transaction history. The Holdings and Copies condition dropdowns update the same record.
+Use `NODE_ENV=production`, private database and JWT credentials, and HTTPS. Production email additionally requires `EMAIL_MODE=emailjs` and an HTTPS `PUBLIC_APP_URL`. Replace the seeded development account's credentials before making an installation accessible.
