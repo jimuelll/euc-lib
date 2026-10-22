@@ -4,13 +4,115 @@ A web-based library management system for Manuel S. Enverga University Foundatio
 
 ## Features
 
-- **Public website:** searchable book and thesis catalogue, library information, opening hours, bulletin posts, events, and academic subscriptions.
-- **Patron accounts:** borrowing and reservation records, attendance history, fines, notifications, and profile management through My Library.
-- **Circulation:** barcode-based checkout and returns, reservation queues, overdue tracking, fine payments, clearance, and receipts.
-- **Catalogue management:** configurable metadata fields, loan policies, physical copies, holdings, permanent accession records, cover images, and ISBN metadata lookup.
-- **Administration:** role-based account management, academic programmes and terms, departments, holidays, and library settings.
-- **Content and reporting:** draft-and-publish website editing, user guides, analytics, record queries, exports, and audit logs.
-- **Integrations:** real-time notifications, email invitations and recovery, AI-assisted recommendations and analytics reports, and manual or scheduled backup snapshots.
+Features span public discovery, patron services, daily desk work, and library administration. Available actions depend on the account's role; email, cloud storage, and AI capabilities also require the integrations described below.
+
+### Public website and catalogue discovery
+
+- Browse library information, services, opening hours, contact details, policies, facilities, staff, and library spaces without an account.
+- Search books and theses by title, author, or ISBN, with advanced search fields for specific titles, authors, ISBNs, and publication year.
+- Narrow results by material format, category, and availability; switch between list and grid views and browse paginated results.
+- Open catalogue details with cover images, publicly visible metadata, copy availability, and related titles. Thesis records include research-specific fields such as programme, adviser, academic year, and keywords.
+- Read bulletin posts and upcoming library events. Signed-in users can like posts and add comments.
+
+### My Library and patron self-service
+
+- View a personal dashboard showing active loans, overdue and due-soon items, outstanding fines, and pending or ready reservations.
+- Check loan due dates, copy barcodes, shelf locations, and current fine amounts; review completed borrowing and reservation history.
+- Place and cancel eligible book reservations, track their status and expiry, and receive notices when materials are ready for collection.
+- View attendance sessions, display a personal library barcode, access academic subscription links, and read account notifications.
+- Manage email verification, email changes, and passwords from the account page. Other patron identity changes are handled by authorized library staff.
+
+### Book and thesis cataloguing
+
+- Create, edit, archive, and restore catalogue records, with separate metadata fields for books and theses.
+- Record book details such as ISBN, publisher, edition, physical description, category, call number, subjects, and additional contributors. Thesis fields cover programme, adviser, academic year, accession number, keywords, and abstract.
+- Look up ISBN metadata to assist data entry, enter missing details manually, and upload or remove catalogue cover images.
+- Import catalogue records from CSV with a validation preview, and export records or holdings to CSV.
+- Super administrators can configure field types, required fields, display order, public visibility, material-specific scopes, and selectable options, including archiving fields and options that should no longer be offered.
+
+### Physical copies, holdings, and accessions
+
+- Manage individual physical copies separately from title records, with unique copy barcodes and printable labels.
+- Maintain copy-level holdings such as accession number, programme, location, price, acquisition date, distributor, and invoice reference; print individual holdings records.
+- Track good, damaged, lost, weeded, and discarded conditions, and retire or restore physical copies while retaining their history.
+- Distinguish copies that are available, on loan, reserved, inactive, or awaiting accession. Lending eligibility considers accession status, condition, loan policy, and existing commitments.
+- Preserve permanent accession claims and prevent their reuse. Super administrators can void an accession with a recorded reason; copy retirement and catalogue changes are checked against active loans and reservations.
+
+### Circulation and lending policies
+
+- Find patrons and physical copies by identifier or barcode, preview account eligibility and item status, and process checkout, return, and renewal transactions at the desk.
+- Review circulation activity and active, overdue, and returned loans, with the exact copy associated with each transaction.
+- Configure loan durations, fine rates, charging intervals, and initial charges through super administrator loan policies. Loans retain their saved policy terms when settings change later.
+- Calculate due dates with library holiday handling, synchronize overdue loans in the background, and offer a guarded undo workflow for eligible desk transactions.
+
+### Reservation processing
+
+- Let eligible patrons reserve books against available accessioned, lendable capacity, with checks against duplicate active reservations and overcommitting copies.
+- Give desk staff a reservation workspace for reviewing pending requests, preparing a specific copy, marking it ready, and fulfilling collection as a loan.
+- Support patron and staff cancellation, reservation history, and archiving or restoring records where allowed.
+- Automatically expire elapsed reservations and release their commitments; notify patrons about reservation creation, readiness, and cancellation.
+
+### Fines, payments, and clearance
+
+- Review a patron's overdue items, assessed charges, payments, adjustments, and outstanding balance together in a clearance profile.
+- Use a clearance queue to find patrons with overdue returns, unpaid fines, or both, and distinguish return-related blocks from payment-only cases.
+- Record full fine payments at the desk. Administrators can also record partial payments, adjust fines, and reverse payment transactions with a recorded reason.
+- Generate numbered receipts with itemized payment allocations and printable receipt views. A fine ledger preserves the relationship between charges, payments, adjustments, and reversals.
+
+### Attendance and scanning
+
+- Scan patron identifiers for library check-in and check-out, with dedicated scanner accounts and validation against duplicate consecutive scans.
+- Review open visits, patrons currently inside, and completed attendance sessions; administrators can close individual visits or time out all open visits.
+- Search attendance history by date, patron, scan type, and purpose, distinguishing physical entry and exit from borrowing activity.
+- Show patrons their own attendance history and summarize physical visits separately from website traffic in analytics.
+
+### Accounts and academic configuration
+
+- Create and maintain student, employee, alumni, scanner, staff, and administrator accounts within the acting user's role permissions; archive and restore accounts while preserving historical records.
+- Use role-specific identities and information, including library card numbers, student or employee numbers, staff usernames, programmes, departments, and year levels.
+- Manage academic programmes, departments, and academic terms; choose the current term and identify student accounts requiring term revalidation.
+- Maintain library holidays, including imports and restoration of archived dates, alongside circulation settings and loan policies.
+- Issue account setup invitations rather than assigning patron passwords. Super administrators can also edit their own account identity through the profile editor.
+
+### Website publishing, community content, and staff guides
+
+- Edit homepage content, library information, hours, contact details, images, and About sections through a website content workspace.
+- Save private drafts, preview changes, publish individual content or whole sections, publish multiple sections together, and discard unpublished changes.
+- Manage bulletin announcements, images and galleries, pinned posts, archived posts, and comment moderation; maintain library events.
+- Organize academic subscription resources by category, description, image, active status, and display order for signed-in patrons.
+- Provide role-targeted staff guides with steps, prerequisites, warnings, and troubleshooting. Administrators can draft, reorder, publish, unpublish, and archive guide modules.
+
+### Notifications and email access
+
+- Deliver in-app notifications over WebSockets, maintain unread counts, and let users mark individual messages or all messages as read.
+- Send administrative notices to all users, a selected role, or an individual recipient, with audience counts, expiry, and notification management controls.
+- Support invitation-based password setup, email ownership verification, verified email changes, and password recovery using expiring links or codes.
+- Process email through a persistent delivery queue with retry handling and quota controls. Super administrators can inspect delivery outcomes and retry eligible failed deliveries.
+- Optionally send routine library emails alongside account security messages. Refresh sessions, forced password changes, and session invalidation enforce changes to account access.
+
+### Recommendations and metadata enrichment
+
+- Suggest related catalogue titles using category, author, and title relationships; thesis suggestions also use programme, adviser, academic year, and keyword relationships.
+- Personalize suggestions using recent library activity and let patrons dismiss unwanted recommendations.
+- Add semantic recommendations for books using configured Gemini embeddings while retaining rule-based suggestions.
+- Give super administrators tools to review missing synopsis or enrichment data, enter summaries and subjects manually, preview recommendations, and run, monitor, or cancel embedding backfills.
+
+### Dashboards, analytics, and reports
+
+- Summarize collection size, accession readiness, available copies, active patrons, circulation, reservations, overdue items, fines, and activity needing attention.
+- Explore trends for checkouts and returns, reservation outcomes, physical library visits, website activity, and fine collections, with reporting periods and comparisons where prior data is available.
+- Review popular titles, borrowing by patron role, collection categories, copy conditions, and the distinction between current collection snapshots and activity during a selected period.
+- Generate AI-assisted performance briefs or ask questions about aggregate library analytics using Gemini or Groq; reports show supporting figures and links back to relevant records.
+- Query catalogue, user, borrowing, reservation, attendance, notification, subscription, and clearance datasets with filters, sorting, pagination, and selectable columns.
+- Produce due-date, fine, daily attendance, holdings inventory, resource usage, and top-user reports. Export matching records to CSV or Excel-compatible files, or use print/PDF views identifying the library, reporting period, applied filters, and generating staff member.
+
+### Audit history, backups, and recovery
+
+- Let super administrators search, filter, inspect, and export audit events for account activity, library operations, administrative changes, and report exports.
+- Export application backups, save manual snapshots to authenticated Cloudinary storage, or schedule daily and weekly snapshots.
+- Label, annotate, pin, verify, download, and manage saved snapshots; check compatibility and preview record changes before restoring a saved snapshot or uploaded backup.
+- Require administrator password confirmation and an explicit acknowledgement before restore, and create a safety snapshot before replacing live data.
+- Place the application in maintenance mode during restore, invalidate affected sessions, and recover interrupted restore maintenance on startup.
 
 ### Access roles
 
@@ -21,7 +123,7 @@ A web-based library management system for Manuel S. Enverga University Foundatio
 | `scanner` | Operate the attendance scanner. |
 | `staff` | Perform library desk operations with scoped permissions. |
 | `admin` | Manage library operations, website content, analytics, and reports. |
-| `super_admin` | Access additional controls for loan policies, backups and restore, audit logs, and email deliveries. |
+| `super_admin` | Access additional controls for catalogue configuration, loan policies, recommendation maintenance, backups and restore, audit logs, and email deliveries. |
 
 ## Technology
 
