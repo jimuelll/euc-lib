@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from "express";
+import { createHash } from "node:crypto";
 
 const { ipKeyGenerator, rateLimit } = require("express-rate-limit") as {
   ipKeyGenerator: (ip: string, ipv6Subnet?: number | false) => string;
@@ -17,6 +18,7 @@ type PolicyName =
   | "emailPublic"
   | "api"
   | "login"
+  | "loginIdentity"
   | "passwordChange"
   | "refreshIp"
   | "refreshAccount"
@@ -37,14 +39,15 @@ type PolicyName =
   | "reportExport"
   | "backup";
 
-type Policy = { windowMs: number; limit: number; key: "ip" | "account" | "refreshAccount" };
+type Policy = { windowMs: number; limit: number; key: "ip" | "account" | "refreshAccount" | "loginIdentity" };
 
 // Every policy receives its own express-rate-limit memory store. Keep these
 // values in sync with the API protection table in the README.
 const policies: Record<PolicyName, Policy> = {
   emailPublic: { windowMs: 15 * 60_000, limit: 30, key: "ip" },
   api: { windowMs: 60_000, limit: 1_500, key: "ip" },
-  login: { windowMs: 15 * 60_000, limit: 5, key: "ip" },
+  login: { windowMs: 15 * 60_000, limit: 300, key: "ip" },
+  loginIdentity: { windowMs: 15 * 60_000, limit: 5, key: "loginIdentity" },
   passwordChange: { windowMs: 15 * 60_000, limit: 5, key: "account" },
   refreshIp: { windowMs: 60_000, limit: 300, key: "ip" },
   refreshAccount: { windowMs: 60_000, limit: 30, key: "refreshAccount" },
@@ -92,6 +95,13 @@ function createLimiter(
     limit: policy.limit,
     keyGenerator: (req: Request) => {
       if (policy.key === "ip") return ipKeyGenerator(req.ip || "127.0.0.1", 56);
+      if (policy.key === "loginIdentity") {
+        const identifier = typeof req.body?.student_employee_id === "string"
+          ? req.body.student_employee_id.trim().toLowerCase() : "";
+        return createHash("sha256").update(JSON.stringify([
+          ipKeyGenerator(req.ip || "127.0.0.1", 56), identifier,
+        ])).digest("hex");
+      }
       if (policy.key === "refreshAccount") return refreshAccountKey(req);
       return accountKey(req);
     },
@@ -99,11 +109,12 @@ function createLimiter(
       || (name === "refreshAccount" && !(req as RateLimitUserRequest).rateLimitUserId),
     standardHeaders: true,
     legacyHeaders: false,
+    skipSuccessfulRequests: name === "loginIdentity",
     handler: (req: Request, res: import("express").Response) => {
       const resetTime = (req as RateLimitUserRequest).rateLimit?.resetTime;
       const retryAfterSeconds = Math.max(1, Math.ceil(((resetTime?.getTime() ?? Date.now() + policy.windowMs) - Date.now()) / 1_000));
       res.status(429).json({
-        message: name === "login" ? "Too many login attempts. Try again later." : "Too many requests. Try again later.",
+        message: name === "login" || name === "loginIdentity" ? "Too many login attempts. Try again later." : "Too many requests. Try again later.",
         code: "RATE_LIMITED",
         retryAfterSeconds,
       });

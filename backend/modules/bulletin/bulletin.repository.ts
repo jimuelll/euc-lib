@@ -104,7 +104,8 @@ const findComments = async (postId: number): Promise<BulletinCommentRow[]> => {
   const [comments] = await db.query<BulletinCommentRow[]>(
     `SELECT bc.id, bc.text, bc.created_at, u.name AS author, u.id AS author_id
      FROM bulletin_comments bc JOIN users u ON u.id = bc.user_id
-     WHERE bc.post_id = ? AND bc.deleted_at IS NULL ORDER BY bc.created_at ASC`,
+     JOIN bulletin_posts bp ON bp.id = bc.post_id
+     WHERE bc.post_id = ? AND bc.deleted_at IS NULL AND bp.deleted_at IS NULL ORDER BY bc.created_at ASC`,
     [postId],
   );
   return comments;
@@ -131,12 +132,10 @@ const findPostForDelete = async (postId: number, includeArchived = false): Promi
 
 const archivePost = async (postId: number, userId: number): Promise<void> => {
   await db.query("UPDATE bulletin_posts SET deleted_at = NOW(), deleted_by = ?, is_pinned = 0 WHERE id = ?", [userId, postId]);
-  await db.query("UPDATE bulletin_comments SET deleted_at = NOW(), deleted_by = ? WHERE post_id = ?", [userId, postId]);
 };
 
 const restorePost = async (postId: number): Promise<void> => {
   await db.query("UPDATE bulletin_posts SET deleted_at = NULL, deleted_by = NULL WHERE id = ?", [postId]);
-  await db.query("UPDATE bulletin_comments SET deleted_at = NULL, deleted_by = NULL WHERE post_id = ?", [postId]);
 };
 
 const pinPost = async (postId: number, pinned: boolean): Promise<void> => {
@@ -172,13 +171,26 @@ const getLikes = async (postId: number): Promise<LikePersonRow[] | null> => {
 };
 
 const addComment = async (postId: number, userId: number, text: string): Promise<BulletinCommentRow | undefined> => {
-  const [result] = await db.query<ResultSetHeader>("INSERT INTO bulletin_comments (post_id, user_id, text) VALUES (?, ?, ?)", [postId, userId, text]);
-  const [[comment]] = await db.query<BulletinCommentRow[]>(
-    `SELECT bc.id, bc.text, bc.created_at, u.name AS author, u.id AS author_id
-     FROM bulletin_comments bc JOIN users u ON u.id = bc.user_id WHERE bc.id = ?`,
-    [result.insertId],
-  );
-  return comment;
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Serialize against both direct archive updates and publisher row locks.
+    const [[post]] = await conn.query<BulletinPostIdRow[]>(
+      "SELECT id FROM bulletin_posts WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [postId],
+    );
+    if (!post) throw Object.assign(new Error("Post not found"), { status: 404 });
+    const [result] = await conn.query<ResultSetHeader>("INSERT INTO bulletin_comments (post_id, user_id, text) VALUES (?, ?, ?)", [postId, userId, text]);
+    const [[comment]] = await conn.query<BulletinCommentRow[]>(
+      `SELECT bc.id, bc.text, bc.created_at, u.name AS author, u.id AS author_id
+       FROM bulletin_comments bc JOIN users u ON u.id = bc.user_id WHERE bc.id = ?`,
+      [result.insertId],
+    );
+    await conn.commit();
+    return comment;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally { conn.release(); }
 };
 
 const findComment = async (commentId: number): Promise<CommentOwnerRow | null> => {

@@ -70,9 +70,15 @@ async function performRestore(backup: SnapshotPayload, {
     require('./backup.safety').setProgress('failed',snapshotLabel,{safetySnapshotId:safetyId,committed});
     throw Object.assign(error as Error,{safetySnapshotId:safetyId,restoreCommitted:committed});
   } finally {
-    await setMaintenance("normal").catch(() => {});
-    await lockConnection.query("SELECT RELEASE_LOCK('euc-library-restore')").catch(() => {});
-    lockConnection.release();
+    try { await setMaintenance("normal"); }
+    catch { console.error("[restore] Maintenance cleanup failed; recovery will retry after the restore lock is released."); }
+    try {
+      await lockConnection.query("SELECT RELEASE_LOCK('euc-library-restore')");
+      lockConnection.release();
+    } catch {
+      console.error("[restore] Lock cleanup failed; discarding the restore connection.");
+      lockConnection.destroy();
+    }
   }
 }
 

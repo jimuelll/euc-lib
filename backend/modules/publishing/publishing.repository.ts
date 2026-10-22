@@ -65,7 +65,6 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
                 await conn.query("UPDATE academic_subscriptions SET deleted_at=NOW(),deleted_by=? WHERE id=?", [actor, item.id]);
             if (kind === "bulletin") {
                 await conn.query("UPDATE bulletin_posts SET deleted_at=NOW(),deleted_by=?,is_pinned=0 WHERE id=?", [actor, item.id]);
-                await conn.query("UPDATE bulletin_comments SET deleted_at=NOW(),deleted_by=? WHERE post_id=?", [actor, item.id]);
             }
             if (kind === "guide")
                 await conn.query("UPDATE user_guide_modules SET slug=CONCAT(slug,'-archived-',id),deleted_at=NOW(),updated_by=? WHERE id=?", [actor, item.id]);
@@ -101,8 +100,6 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
         }
         if (item.id) {
             await conn.query(`UPDATE ${table} SET ${fields.map(field => field + "=?").join(",")} WHERE id=?`, [...values, item.id]);
-            if (kind === "bulletin" && Boolean(original?.archived) !== Boolean(item.archived))
-                await conn.query("UPDATE bulletin_comments SET deleted_at=?,deleted_by=? WHERE post_id=?", [item.archived ? new Date() : null, item.archived ? actor : null, item.id]);
         }
         else {
             const creator = kind === "bulletin" ? "author_id" : "created_by";

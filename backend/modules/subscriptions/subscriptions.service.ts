@@ -7,17 +7,6 @@ import type {
   UpdateSubscriptionInput,
 } from "./subscriptions.types";
 
-const { v2: cloudinary } = require("cloudinary");
-
-const deleteFromCloudinary = async (publicId: string | null | undefined): Promise<void> => {
-  if (!publicId) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (error) {
-    console.warn("[subscriptions] Cloudinary delete failed for:", publicId, error);
-  }
-};
-
 function getAllSubscriptions(): Promise<SubscriptionRecord[]>;
 function getAllSubscriptions(showArchived: boolean, options: PaginationOptions): Promise<SubscriptionRecord[] | SubscriptionPage>;
 function getAllSubscriptions(
@@ -54,9 +43,7 @@ const updateSubscription = async (
 };
 
 const deleteSubscription = async (id: number): Promise<void> => {
-  const subscription = await repository.getSubscriptionById(id);
   await repository.deleteSubscription(id);
-  if (subscription?.image_public_id) await deleteFromCloudinary(subscription.image_public_id);
 };
 
 const restoreSubscription = async (id: number): Promise<SubscriptionRecord> => {
@@ -69,7 +56,6 @@ const reorderSubscriptions = (orderedIds: number[], updatedBy?: number | null): 
   repository.reorderSubscriptions(orderedIds, updatedBy);
 
 export = {
-  deleteFromCloudinary,
   getAllSubscriptions,
   getActiveSubscriptions,
   getSubscriptionById,

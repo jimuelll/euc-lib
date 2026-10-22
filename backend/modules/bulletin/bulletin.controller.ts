@@ -66,7 +66,7 @@ const createPost: RequestHandler = async (req, res) => {
       title, content, image_url, image_public_id, is_pinned, post_type,
       event_starts_at, event_ends_at, event_location, event_registration_url,
     } = req.body;
-    const result = await service.createPost((req as AuthenticatedRequest).user.id, {
+    const result = await service.createPost((req as AuthenticatedRequest).user, {
       title,
       content,
       image_url,

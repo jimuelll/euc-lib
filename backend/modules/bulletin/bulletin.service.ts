@@ -7,24 +7,8 @@ import type {
   ToggleLikeResult,
 } from "./bulletin.types";
 
-const cloudinary = require("cloudinary").v2;
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 const CAN_POST_ROLES = ["staff", "admin", "super_admin"];
-
-const destroyCloudinaryImage = async (publicId: string | null | undefined): Promise<void> => {
-  if (!publicId) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (err) {
-    console.warn("[bulletin] Cloudinary destroy failed for", publicId, err);
-  }
-};
+const ADMIN_ROLES = ["admin", "super_admin"];
 
 const getPosts = async (
   userId: number | null,
@@ -43,7 +27,7 @@ const getPostById = async (postId: number, userId: number | null) => {
   return { ...post, comments: await repository.findComments(postId) };
 };
 
-const createPost = async (authorId: number, {
+const createPost = async (author: BulletinUser, {
   title,
   content,
   image_url,
@@ -55,6 +39,9 @@ const createPost = async (authorId: number, {
   event_location,
   event_registration_url,
 }: CreateBulletinPostInput) => {
+  if (!CAN_POST_ROLES.includes(author.role) || (is_pinned && !ADMIN_ROLES.includes(author.role))) {
+    throw Object.assign(new Error("Forbidden"), { status: 403 });
+  }
   if (!title?.trim() || !content?.trim()) {
     throw Object.assign(new Error("title and content are required"), { status: 400 });
   }
@@ -66,7 +53,7 @@ const createPost = async (authorId: number, {
     content: content.trim(),
     imageUrl: image_url?.trim() ?? null,
     imagePublicId: image_public_id?.trim() ?? null,
-    authorId,
+    authorId: author.id,
     pinned: is_pinned,
     postType,
     eventStartsAt: postType === "event" ? sqlDate(event_starts_at) : null,
@@ -83,7 +70,7 @@ const deletePost = async (postId: number, requestingUser: BulletinUser): Promise
   const isAdmin = ["admin", "super_admin"].includes(requestingUser.role);
   if (!isOwner && !isAdmin) throw Object.assign(new Error("Forbidden"), { status: 403 });
   await repository.archivePost(postId, requestingUser.id);
-  await destroyCloudinaryImage(post.image_public_id);
+  // Archived content and retained snapshots must keep their media restorable.
 };
 
 const restorePost = async (postId: number, requestingUser: BulletinUser): Promise<{ message: string }> => {
@@ -98,7 +85,7 @@ const restorePost = async (postId: number, requestingUser: BulletinUser): Promis
 
 const pinPost = async (postId: number, pinned: boolean, requestingUser: BulletinUser): Promise<{ pinned: boolean }> => {
   if (!await repository.getPostForPin(postId)) throw Object.assign(new Error("Post not found"), { status: 404 });
-  if (!CAN_POST_ROLES.includes(requestingUser.role)) throw Object.assign(new Error("Forbidden"), { status: 403 });
+  if (!ADMIN_ROLES.includes(requestingUser.role)) throw Object.assign(new Error("Forbidden"), { status: 403 });
   await repository.pinPost(postId, pinned);
   return { pinned };
 };

@@ -30,7 +30,7 @@ function authMiddleware(roles: string[] = []): RequestHandler {
       const token = authHeader.split(" ")[1];
       const payload = auth.verifyAccessToken(token) as AuthTokenPayload;
       if (!(await isAccessTokenCurrent(payload))) {
-        res.status(401).json({ message: "Your session ended because the system was restored. Please log in again." });
+        res.status(401).json({ message: "Your session ended. Please sign in again." });
         return;
       }
       if (!(await isUserAccessActive(payload.id))) {

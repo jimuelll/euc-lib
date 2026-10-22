@@ -289,7 +289,8 @@ single backend instance; counts reset when that process restarts.
 | Policy | Covered requests | Budget | Key |
 | --- | --- | ---: | --- |
 | API baseline | All `/api` requests except CORS preflight | 1,500/minute | IP |
-| Login | `POST /api/auth/login` | 5/15 minutes | IP |
+| Login total | `POST /api/auth/login` | 300/15 minutes | IP |
+| Login failures | `POST /api/auth/login` | 5 failed attempts/15 minutes | Normalized identifier + IP (hashed); successes do not consume this budget |
 | Password change | `POST /api/auth/change-password` | 5/15 minutes | Account |
 | Refresh flood | Every `POST /api/auth/refresh` | 300/minute | IP |
 | Refresh sessions | Refresh with a valid signed cookie | 30/minute | Verified account |
@@ -300,7 +301,7 @@ single backend instance; counts reset when that process restarts.
 | Notifications | `POST /api/admin/notifications` | 20/10 minutes | Account |
 | Public catalogue | Public catalogue schema/search and seed-book recommendations | 300/minute | IP |
 | Authenticated catalogue | Borrowing/reservation searches and personal recommendations | 120/minute | Account |
-| Student transactions | Self-service borrowing/returning and reservation/cancellation | 30/minute | Account |
+| Student transactions | Self-service borrowing and reservation/cancellation | 30/minute | Account |
 | Desk transactions | Scanner and circulation borrow/return/renew; reservation ready/fulfill/cancel | 120/minute | Operator account |
 | Attendance scans | `POST /api/attendance/scan` | 120/minute | Operator account |
 | AI reports | `POST /api/analytics/dashboard/ai-report` | 10/10 minutes | Account |
@@ -316,6 +317,14 @@ shares concurrent refresh requests and observes the refresh cooldown without
 clearing the current session. Verify `trust proxy` against the deployed
 forwarding chain before release; incorrect proxy settings can group visitors
 under the wrong IP address. Use a shared store before adding backend instances.
+
+### Production recovery and content retention
+
+- Startup verifies restore maintenance before listening or starting workers. Recovery checks repeat every 60 seconds and use the same database lock as restores; an active restore is never cleared. Stale maintenance recovery invalidates sessions and records a system audit event atomically. Review restore history and safety snapshots after recovery: recovery does not infer whether the interrupted restore committed.
+- A role change increments the account session version and revokes refresh sessions in the account-update transaction. The account must sign in again; ordinary profile edits and unchanged roles preserve sessions.
+- Physical book returns must be processed at the library desk through the staff/scanner circulation workflow. The legacy patron self-return endpoint responds with HTTP 410 and makes no circulation changes.
+- Archived bulletin posts retain their images and individual comment moderation state. Previously deleted comments remain hidden, including legacy comments whose original deletion reason cannot be reconstructed. Missing and archived posts reject new comments.
+- Bulletin and academic-resource images are preserved on archive, removal, and replacement so retained records and snapshots do not lose media. Permanent content-media cleanup is a separate task; preserved media may accumulate. These changes cannot recover assets already deleted from Cloudinary.
 
 ## Security notes
 

@@ -17,7 +17,7 @@ router.get("/catalogue/search",               limiters.authenticatedCatalogue, c
 router.get ("/borrows/active",                controller.getActiveBorrows);
 router.get ("/borrows/history",               controller.getBorrowHistory);
 router.post("/borrows/:bookId",               limiters.studentTransaction, controller.borrowBook);
-router.post("/borrows/:borrowingId/return",   limiters.studentTransaction, controller.returnBook);
+router.post("/borrows/:borrowingId/return",   controller.returnBook);
 
 // ─── Barcode scan — book copy preview ────────────────────────────────────────
 router.get ("/scan/copy/:barcode",            scannerOrAbove, controller.getCopyByBarcode);

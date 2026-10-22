@@ -75,20 +75,7 @@ const borrowBook: RequestHandler = async (req, res) => {
 };
 
 const returnBook: RequestHandler = async (req, res) => {
-  try {
-    const borrowingId = parseInteger(req.params.borrowingId);
-    if (Number.isNaN(borrowingId) || borrowingId < 1) {
-      res.status(400).json({ message: "Invalid borrowing ID" });
-      return;
-    }
-    await service.returnBook(borrowingId, authUser(req).id);
-    res.locals.auditEnqueued = true;
-    res.json({ message: "Book returned successfully" });
-  } catch (error: unknown) {
-    logError("[borrowing] returnBook:", error);
-    const caught = requestError(error);
-    res.status(caught.status ?? 500).json({ message: caught.message ?? "Failed to return book" });
-  }
+  res.status(410).json({ message: "Returns must be processed by library staff at the circulation desk." });
 };
 
 /**

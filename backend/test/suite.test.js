@@ -58,3 +58,6 @@ require("./email.workflows.test");
 require("./email.database.integration.test");
 
 require("./profile.test");
+require("./production-readiness.test");
+require("./production-readiness.auth.test");
+require("./production-readiness.database.integration.test");

@@ -5,7 +5,7 @@ const { handleLogin, handleChangePassword, handleRefresh, handleLogout } = requi
 
 const router = express.Router();
 
-router.post("/login", limiters.login, handleLogin);
+router.post("/login", limiters.login, limiters.loginIdentity, handleLogin);
 router.post("/change-password", authMiddleware(), limiters.passwordChange, handleChangePassword);
 router.post("/refresh", limiters.refreshIp, identifyRefreshLimitAccount, limiters.refreshAccount, handleRefresh);
 router.post("/logout", handleLogout);

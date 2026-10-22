@@ -91,13 +91,9 @@ const updateSubscription: RequestHandler = async (req, res) => {
     let finalPublicId: string | null | undefined;
 
     if (remove_image === true || remove_image === "true") {
-      await subscriptionService.deleteFromCloudinary(existing.image_public_id);
       finalImageUrl = null;
       finalPublicId = null;
     } else if (image_url !== undefined) {
-      if (image_public_id && existing.image_public_id && image_public_id !== existing.image_public_id) {
-        await subscriptionService.deleteFromCloudinary(existing.image_public_id);
-      }
       finalImageUrl = image_url || null;
       finalPublicId = image_public_id || null;
     }

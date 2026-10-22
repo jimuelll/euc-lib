@@ -222,6 +222,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
   if (Object.prototype.hasOwnProperty.call(updates,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
   const conn = await repository.getConnection();
   let deactivatedUserId: number | null = null;
+  let roleChangedUserId: number | null = null;
   try {
     await conn.beginTransaction();
     const existing = await repository.findUserForUpdate(student_employee_id, conn);
@@ -267,6 +268,11 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       deactivatedUserId = existing.id;
     }
     await repository.updateUser(student_employee_id, normalized, conn);
+    if (normalized.role !== undefined && normalized.role !== existing.role) {
+      await conn.query("UPDATE users SET session_version = session_version + 1 WHERE id = ?", [existing.id]);
+      await conn.query("UPDATE auth_refresh_sessions SET revoked_at = UTC_TIMESTAMP() WHERE user_id = ? AND revoked_at IS NULL", [existing.id]);
+      roleChangedUserId = existing.id;
+    }
     const after = await repository.findUserByIdForAudit(existing.id, conn);
     await enqueueTransactionalAudit(conn, {
       actorId: requesterId,
@@ -288,6 +294,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     try { await revokeAllRefreshSessionsForUser(deactivatedUserId); }
     catch (error) { console.error("[admin] User deactivation committed; refresh-session revocation failed:", error); }
   }
+  if (roleChangedUserId) require("../../realtime/notificationHub").closeUserConnections(roleChangedUserId);
   return { message: "User updated successfully" };
 };
 
