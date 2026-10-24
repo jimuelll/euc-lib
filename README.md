@@ -47,7 +47,7 @@ Features span public discovery, patron services, daily desk work, and library ad
 
 ### Reservation processing
 
-- Let eligible patrons reserve books against available accessioned, lendable capacity, with checks against duplicate active reservations and overcommitting copies.
+- Let eligible patrons reserve one book at a time against currently available accessioned, lendable capacity. Pending and ready reservations block another request, and pending commitments are deducted from available capacity; unavailable copies cannot be reserved in advance.
 - Give desk staff a reservation workspace for reviewing pending requests, preparing a specific copy, marking it ready, and fulfilling collection as a loan.
 - Support patron and staff cancellation, reservation history, and archiving or restoring records where allowed.
 - Automatically expire elapsed reservations and release their commitments; notify patrons about reservation creation, readiness, and cancellation.

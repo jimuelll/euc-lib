@@ -62,12 +62,18 @@ const reserveBook = async (userId: number, bookId: number, hoursUntilExpiry = RE
       throw serviceError("This book has no accessioned copies available for reservation", 409);
     }
 
-    const existing = await repository.findActiveReservationByUserBook(userId, bookId, conn);
+    // assertEligible holds the user row lock until commit. Use a current locking
+    // read so concurrent requests for different books share one reservation slot.
+    const existing = await repository.findActiveReservationByUser(userId, conn);
     if (existing) {
-      throw serviceError("You already have an active reservation for this book", 409);
+      throw serviceError("You already have an active reservation. Only one book can be reserved at a time", 409);
     }
     const existingBorrowing = await repository.findActiveBorrowingByUserBook(userId, bookId, conn);
     if (existingBorrowing) throw serviceError("Return this book before reserving another copy of the same title", 409);
+    const capacity = await repository.getReservationCapacityForBook(bookId, conn);
+    if (capacity.available <= capacity.pending) {
+      throw serviceError("No copy is currently available to reserve", 409);
+    }
     const openReservations = await repository.getOpenReservationCountForBook(bookId, conn);
     if (openReservations >= Number(book.registered_copy_count)) {
       throw serviceError("All accessioned lendable copies are already committed to pending or ready reservations", 409);

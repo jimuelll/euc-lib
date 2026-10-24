@@ -48,7 +48,7 @@ export default function CatalogueResult({ book, schema, expanded, onToggle }: { 
     </div>
     <div className="catalogue-record-side">
       <Availability book={book} />
-      {!reference && Number(book.canReserve) === 1 && <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>{Number(book.available) > 0 ? "Reserve" : "Reserve when returned"}</Link>}
+      {!reference && Number(book.canReserve) === 1 && Number(book.available) > 0 && <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link>}
     </div>
     {expanded && <div className="catalogue-similar" id={"recommendations-" + book.id}><RecommendationStrip seedBookId={book.id} materialType={book.material_type || "book"} title={(reference ? "Related theses for " : "Similar books to ") + book.title} /></div>}
   </article>;

@@ -18,7 +18,7 @@ interface ReserveTabProps {
   pagination: { page: number; totalPages: number; total: number }; onPageChange: (page: number) => void;
   onReserveSuccess: (reservation: ActiveReservation, bookId: number) => void; onCancelSuccess: (id: number) => void;
 }
-const isReservable = (book: CatalogBook) => Number(book.reservations_full) !== 1 && book.material_type !== "thesis" && book.canReserve !== false && Number(book.canReserve) !== 0 && Number(book.registered_copies ?? book.copies) > 0;
+const isReservable = (book: CatalogBook) => Number(book.reservations_full) !== 1 && book.material_type !== "thesis" && book.canReserve !== false && Number(book.canReserve) !== 0 && Number(book.registered_copies ?? book.copies) > 0 && Number(book.available) > 0;
 const colors = ["#7a0000", "#5c1a1a", "#3d2b3d", "#4a2c1c", "#2b3a42"];
 function expiryLabel(value: string | null, now: number) {
   if (!value) return null;
@@ -44,6 +44,7 @@ export default function ReserveTab(props: ReserveTabProps) {
   const reserveMutation = useMutation({ mutationFn: reserveBook });
   const cancelMutation = useMutation({ mutationFn: cancelReservation });
   const reservedIds = new Set(activeReservations.map(res => res.book_id));
+  const hasActiveReservation = activeReservations.length > 0;
   const { hash } = useLocation();
   const targetId = /^#reservation-([1-9]\d*)$/.exec(hash)?.[1];
   const targetPresent = activeReservations.some(res => String(res.id) === targetId);
@@ -55,7 +56,7 @@ export default function ReserveTab(props: ReserveTabProps) {
   }, [targetId, targetPresent, dataLoading, props.activeError]);
   const busy = reservingId !== null || cancellingId !== null;
   const currentConfirmationBook = catalog.find(book => book.id === confirmationBook?.id);
-  const confirmationEligible = !!currentConfirmationBook && isReservable(currentConfirmationBook) && !reservedIds.has(currentConfirmationBook.id) && !dataLoading && !props.activeError;
+  const confirmationEligible = !!currentConfirmationBook && isReservable(currentConfirmationBook) && !hasActiveReservation && !dataLoading && !props.activeError;
   const handleReserve = async () => {
     if (reservationInFlight.current || !confirmationEligible || !currentConfirmationBook) return;
     const book = currentConfirmationBook;
@@ -81,21 +82,21 @@ export default function ReserveTab(props: ReserveTabProps) {
     {props.searchField}<p className="reservation-message" role="status" tabIndex={-1} ref={messageRef}>{message}</p>
     <h2 className="reservation-section-label">{hasSearched || props.selected ? catalogLoading ? "Searching…" : `${pagination.total} result${pagination.total === 1 ? "" : "s"}` : "Browse books to reserve"}</h2>
     {props.selected && <button className="service-link" onClick={props.onClearSelection}>Browse all books</button>}
+    {hasActiveReservation && <p className="text-sm text-muted-foreground">You can reserve one book at a time. Complete or cancel your current reservation before reserving another.</p>}
     {props.catalogError ? <div className="service-error" role="alert"><p>{props.catalogError}</p>{props.onRetryCatalog && <button className="service-link" onClick={props.onRetryCatalog}>Try again</button>}</div> : catalogLoading ? <div className="service-loading" role="status" aria-label="Loading books">{[0, 1, 2].map(id => <Skeleton key={id} className="h-24 w-full" />)}</div> : catalog.length === 0 ? <p className="service-empty">{props.selected ? "This book is no longer available in the reservation catalogue. Browse all books to choose another title." : hasSearched ? "No titles match. Try a title, an author, or an ISBN." : "No books are currently listed for reservation."}</p> : catalog.map(book => {
       const reserved = reservedIds.has(book.id);
       const full = Number(book.reservations_full) === 1;
       const eligible = isReservable(book);
-      const waiting = eligible && Number(book.available) === 0;
       const initials = book.title.replace(/^(the|a)\s/i, "").split(/\s+/).slice(0, 2).map(word => word[0]).join("").toUpperCase();
       return <article className="reservation-book" key={book.id}>
         <div className="reservation-cover" aria-hidden="true" style={{ "--reservation-cover-color": colors[book.id % colors.length] } as CSSProperties}>{initials}</div>
-        <div className="reservation-book-copy"><h3>{book.title}</h3><small>{book.author || "Unknown author"}</small><p className={"reservation-book-availability " + (book.available > 0 ? "is-available" : "")}>{book.material_type === "thesis" ? "Reference only" : book.registered_copies === 0 ? "Not on the shelf yet" : `${book.available} of ${book.registered_copies ?? book.copies} copies available`}</p>{waiting && !reserved && <small id={`reservation-wait-${book.id}`}>Wait for a copy to become available. Waiting reservations expire after 24 hours.</small>}</div>
-        <button className="service-button" aria-describedby={waiting && !reserved ? `reservation-wait-${book.id}` : undefined} disabled={busy || dataLoading || !!props.activeError || reserved || !eligible} onClick={event => { triggerRef.current = event.currentTarget; focusSuccess.current = false; setConfirmationError(""); setConfirmationBook(book); }}>{reservingId === book.id ? <><Loader2 className="animate-spin" aria-hidden="true" />Reserving…</> : reserved ? "Reserved" : full ? "Reservations full" : !eligible ? "Unavailable" : waiting ? "Reserve when returned" : "Reserve"}</button>
+        <div className="reservation-book-copy"><h3>{book.title}</h3><small>{book.author || "Unknown author"}</small><p className={"reservation-book-availability " + (book.available > 0 ? "is-available" : "")}>{book.material_type === "thesis" ? "Reference only" : book.registered_copies === 0 ? "Not on the shelf yet" : `${book.available} of ${book.registered_copies ?? book.copies} copies available`}</p></div>
+        <button className="service-button" disabled={busy || dataLoading || !!props.activeError || hasActiveReservation || !eligible} onClick={event => { triggerRef.current = event.currentTarget; focusSuccess.current = false; setConfirmationError(""); setConfirmationBook(book); }}>{reservingId === book.id ? <><Loader2 className="animate-spin" aria-hidden="true" />Reserving…</> : reserved ? "Reserved" : full ? "Reservations full" : Number(book.available) === 0 && Number(book.registered_copies ?? book.copies) > 0 ? "No copies available" : !eligible ? "Unavailable" : "Reserve"}</button>
       </article>;
     })}
     {!props.selected && !catalogLoading && !props.catalogError && <ReservationPagination pagination={pagination} onPageChange={onPageChange} />}
   </section><aside className="reservation-sidebar" aria-label="Your reservations">
-    <div className="reservation-sidebar-heading"><h2>Your reservations <span className="service-chip">{dataLoading || props.activeError ? "—" : activeReservations.length}</span></h2><p>Waiting reservations expire after 24 hours. Once marked ready, you have 24 hours to pick up your book. Bring your student or employee ID to the front desk.</p></div>
+    <div className="reservation-sidebar-heading"><h2>Your reservations <span className="service-chip">{dataLoading || props.activeError ? "—" : activeReservations.length}</span></h2><p>Once marked ready, you have 24 hours to pick up your book. Bring your student or employee ID to the front desk.</p></div>
     {targetId && !dataLoading && !props.activeError && !targetPresent && <p role="status">This reservation is no longer active.</p>}
     {props.activeError ? <div className="service-error" role="alert"><p>{props.activeError}</p><button className="service-link" onClick={props.onRetryActive}>Try again</button></div> : dataLoading ? <p className="service-empty" role="status">Loading your reservations…</p> : !activeReservations.length ? <p className="service-empty">No active reservations. Reserve a book from the list.</p> : activeReservations.map(res => {
       const expiry = expiryLabel(res.expires_at, now);
@@ -122,7 +123,6 @@ export default function ReserveTab(props: ReserveTabProps) {
         <div className="reservation-confirmation-guidance">
           <p>Your reservation starts as <strong>Pending</strong>. Wait until the library marks it <strong>Ready</strong> before heading to the library.</p>
           <p>You’ll receive a library notification when it’s ready.</p>
-          {Number(currentConfirmationBook?.available ?? confirmationBook?.available) === 0 && <p>No copy is available now. Your request waits for a copy to become available and be prepared.</p>}
           <p>Once ready, collect it within <strong>24 hours</strong> and bring your student or employee ID.</p>
           <p>Pending reservations expire after 24 hours unless marked ready.</p>
         </div>

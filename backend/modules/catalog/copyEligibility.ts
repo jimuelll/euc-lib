@@ -15,4 +15,8 @@ const hasPreparedReservation = (alias = "bc", reservationAlias = "r"): string =>
 const hasActiveBookPolicy = (bookAlias = "bk"): string => `(${bookAlias}.book_type_id IS NOT NULL AND EXISTS (SELECT 1 FROM book_types active_policy WHERE active_policy.id = ${bookAlias}.book_type_id AND active_policy.is_active = 1))`;
 const availableToBorrow = (alias = "bc"): string => `(${activeLendableCopy(alias)} AND ${hasAccession(alias)} AND EXISTS (SELECT 1 FROM books eligible_book WHERE eligible_book.id = ${alias}.book_id AND eligible_book.deleted_at IS NULL AND eligible_book.material_type = 'book' AND ${hasActiveBookPolicy("eligible_book")}) AND NOT ${hasActiveLoan(alias)} AND NOT ${hasPreparedReservation(alias)})`;
 
-export = { activeLendableCopy, hasAccession, hasActiveLoan, hasPreparedReservation, hasActiveBookPolicy, availableToBorrow };
+const pendingReservationCount = (bookId: string): string => `(SELECT COUNT(*) FROM reservations pending_capacity
+  WHERE pending_capacity.book_id = ${bookId} AND pending_capacity.status = 'pending'
+    AND pending_capacity.deleted_at IS NULL AND (pending_capacity.expires_at IS NULL OR pending_capacity.expires_at > NOW()))`;
+
+export = { activeLendableCopy, hasAccession, hasActiveLoan, hasPreparedReservation, hasActiveBookPolicy, availableToBorrow, pendingReservationCount };

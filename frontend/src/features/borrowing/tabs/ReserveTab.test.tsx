@@ -34,21 +34,12 @@ describe("reservation actions", () => {
     expect(screen.queryByText(/Wait for a copy/)).not.toBeInTheDocument();
   });
 
-  it("explains the wait and submits a pending reservation when no copy is available", async () => {
-    const deadline = "2026-10-25T08:00:00Z";
-    api.reserveBook.mockResolvedValue({ reservationId: 5, expiresAt: deadline });
-    const { onReserveSuccess: onSuccess } = mount({ available: 0 });
-    const button = screen.getByRole("button", { name: "Reserve when returned" });
-    expect(button).toBeEnabled();
-    expect(button).toHaveAccessibleDescription(/Waiting reservations expire after 24 hours/);
-    fireEvent.click(button);
-    const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText(/No copy is available now/)).toBeInTheDocument();
+  it("does not allow a reservation when no copy is available", () => {
+    mount({ available: 0 });
+    const button = screen.getByRole("button", { name: "No copies available" });
+    expect(button).toBeDisabled();
+    expect(screen.queryByText(/Wait for a copy/)).not.toBeInTheDocument();
     expect(api.reserveBook).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm reservation" }));
-    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(expect.objectContaining({ id: 5, status: "pending", expires_at: deadline }), 1));
-    expect(api.reserveBook).toHaveBeenCalledWith(1);
-    expect(screen.getByRole("status")).toHaveTextContent("Reservation submitted. Wait for a Ready notification before visiting the library.");
   });
 
   it("disables a full queue even when a physical copy is available", () => {

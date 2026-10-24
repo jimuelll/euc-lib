@@ -29,7 +29,7 @@ test("catalogue capacity and placement count only live pending and ready reserva
   } finally { db.query = original; }
 });
 
-test("waiting and pickup each get 24 hours and full queues reject placement", async () => {
+test("pending and pickup keep their deadlines while unavailable copies and a second active reservation are rejected", async () => {
   const servicePath = require.resolve("../modules/reservation/reservation.service");
   const stubs = {
     "../modules/borrowing/overdue.helper": { syncOverdueBorrowings: async () => {} },
@@ -53,8 +53,9 @@ test("waiting and pickup each get 24 hours and full queues reject placement", as
       getConnection: async () => tx,
       syncExpired: async () => {},
       findBookForReservation: async () => ({ id: 4, title: "Naruto", material_type: "book", has_active_policy: 1, registered_copy_count: 1 }),
-      findActiveReservationByUserBook: async () => null,
+      findActiveReservationByUser: async () => null,
       findActiveBorrowingByUserBook: async () => null,
+      getReservationCapacityForBook: async () => ({ available: 1, pending: 0 }),
       getOpenReservationCountForBook: async () => 0,
       createReservation: async (user, book, hours) => { calls.push(["waiting", hours]); return { insertId: 8 }; },
       findReservationForAudit: async () => ({ id: 8, title: "Naruto", expires_at: "2026-10-25T08:00:00Z" }),
@@ -69,6 +70,17 @@ test("waiting and pickup each get 24 hours and full queues reject placement", as
     reservationRepository.getOpenReservationCountForBook = async () => 1;
     await assert.rejects(service.reserveBook(3, 4), { status: 409 });
     assert.equal(calls.length, 2);
+    reservationRepository.getOpenReservationCountForBook = async () => 0;
+    for (const capacity of [{ available: 0, pending: 0 }, { available: 1, pending: 1 }]) {
+      reservationRepository.getReservationCapacityForBook = async () => capacity;
+      await assert.rejects(service.reserveBook(3, 4), { status: 409, message: "No copy is currently available to reserve" });
+    }
+    reservationRepository.getReservationCapacityForBook = async () => ({ available: 1, pending: 0 });
+    for (const status of ["pending", "ready"]) {
+      reservationRepository.findActiveReservationByUser = async () => ({ id: 9, book_id: 12, status });
+      await assert.rejects(service.reserveBook(3, 4), { status: 409, message: "You already have an active reservation. Only one book can be reserved at a time" });
+    }
+    assert.equal(calls.length, 2, "rejected reservations must not be created");
     reservationRepository.findReservationForReady = async () => ({ book_id: 4, status: "pending", within_deadline: 0 });
     await assert.rejects(service.markReservationReady(8), { status: 409 });
     assert.equal(calls.length, 2, "expired waiting reservations cannot become ready");
@@ -79,6 +91,19 @@ test("waiting and pickup each get 24 hours and full queues reject placement", as
       if (value) require.cache[path] = value;
     }
   }
+});
+
+test("the patron reservation limit reads all active titles using a current locking read", async () => {
+  let captured;
+  const result = await reservationRepository.findActiveReservationByUser(7, {
+    query: async (sql, params) => { captured = { sql, params }; return [[{ id: 8, book_id: 42 }], []]; },
+  });
+  assert.deepEqual(captured.params, [7]);
+  assert.match(captured.sql, /status IN \('pending', 'ready'\)/);
+  assert.match(captured.sql, /deleted_at IS NULL/);
+  assert.match(captured.sql, /expires_at IS NULL OR expires_at > NOW\(\)/);
+  assert.match(captured.sql, /FOR UPDATE/);
+  assert.equal(result.book_id, 42);
 });
 
 test("pickup expiry resets from preparation time and rejects expired pending rows", async () => {

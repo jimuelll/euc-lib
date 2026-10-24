@@ -30,9 +30,8 @@ function mount(url = "/services/borrowing?bookId=42") {
 }
 describe("contextual reservations", () => {
   it("fetches the exact selected ID on entry and reserves only after confirmation, despite duplicate titles", async () => {
-    api.fetchActiveReservations.mockResolvedValue([reservation]);
     api.reserveBook.mockImplementationOnce(async () => {
-      api.fetchActiveReservations.mockResolvedValue([reservation, { ...reservation, id: 8, book_id: 42 }]);
+      api.fetchActiveReservations.mockResolvedValue([{ ...reservation, id: 8, book_id: 42 }]);
       return { reservationId: 8, expiresAt: "2026-10-25T08:00:00Z" };
     });
     mount();
@@ -52,6 +51,14 @@ describe("contextual reservations", () => {
     expect(await screen.findByRole("button", { name: "Reserved" })).toBeDisabled();
     expect(screen.getByRole("searchbox")).toHaveValue("Shared title");
     expect(screen.getByText("Selected author")).toBeInTheDocument();
+  });
+  it.each(["pending", "ready"] as const)("blocks another title when a %s reservation already exists", async status => {
+    api.fetchActiveReservations.mockResolvedValue([{ ...reservation, status }]);
+    mount();
+    await screen.findByText(/You can reserve one book at a time/);
+    expect(screen.getByRole("button", { name: "Reserve" })).toBeDisabled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(api.reserveBook).not.toHaveBeenCalled();
   });
   it("responds to navigation and browser back without losing the selected ID", async () => {
     mount();

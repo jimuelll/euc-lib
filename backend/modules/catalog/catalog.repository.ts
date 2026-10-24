@@ -1,6 +1,6 @@
 const db: any = require("../../db");
 const { normalizePagination } = require("../../middlewares/numericInput");
-const { availableToBorrow, hasAccession, hasActiveBookPolicy } = require("./copyEligibility");
+const { availableToBorrow, hasAccession, hasActiveBookPolicy, pendingReservationCount } = require("./copyEligibility");
 const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
 const { buildPublicCatalogWhere, extractPublicCategories, normalizePublicCatalogFilters, publicCatalogOrder } = require("./catalog.public-search");
 
@@ -369,7 +369,7 @@ async function searchBooks({ query, publicOnly = false, showArchived = false, ma
               COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
               COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
               (COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > 0) AS canBorrow,
-              (bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) > 0) AS canReserve
+              (bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > ${pendingReservationCount("bk.id")}) AS canReserve
        FROM books bk
        LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
        LEFT JOIN copy_holdings ch ON ch.copy_id = bc.id
@@ -422,7 +422,7 @@ async function searchPublicCatalogue(options: Record<string, any> = {}) {
             COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
             COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
             (COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > 0) AS canBorrow,
-            (bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) > 0) AS canReserve
+            (bk.material_type = 'book' AND ${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > ${pendingReservationCount("bk.id")}) AS canReserve
        FROM books bk
        LEFT JOIN book_copies bc ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
        LEFT JOIN copy_holdings ch ON ch.copy_id = bc.id

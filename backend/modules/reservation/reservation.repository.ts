@@ -20,7 +20,7 @@ const { normalizePagination } = require("../../middlewares/numericInput");
 const db = require("../../db") as Pool;
 const outboxRepository = require("../delivery-outbox/outbox.repository");
 const { metadataValue } = require("../catalog/catalog.projection");
-const { availableToBorrow, hasActiveBookPolicy, hasAccession } = require("../catalog/copyEligibility");
+const { availableToBorrow, hasActiveBookPolicy, hasAccession, pendingReservationCount } = require("../catalog/copyEligibility");
 const { enqueueAuditEvent } = require("../analytics/analytics.audit.service");
 const { copyLabel } = require("../analytics/audit.copy-label");
 
@@ -188,7 +188,8 @@ async function searchCatalogue(query: string, { page, limit, bookId, showUnheldI
        COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
        COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
        (COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > 0) AS canBorrow,
-       (${reservable} AND ${openReservations} < ${registeredCopies}) AS canReserve,
+       (${reservable} AND ${openReservations} < ${registeredCopies}
+         AND COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > ${pendingReservationCount("bk.id")}) AS canReserve,
        (${reservable} AND ${openReservations} >= ${registeredCopies}) AS reservations_full
      FROM books bk
      LEFT JOIN book_copies bc
@@ -242,6 +243,41 @@ async function findActiveReservationByUserBook(userId: number, bookId: number, c
     [userId, bookId]
   );
   return rows[0] || null;
+}
+
+async function findActiveReservationByUser(userId: number, conn: PoolConnection): Promise<(RowDataPacket & { id: number; book_id: number }) | null> {
+  const [rows] = await conn.query<Array<RowDataPacket & { id: number; book_id: number }>>(
+    `SELECT id, book_id FROM reservations
+     WHERE user_id = ? AND status IN ('pending', 'ready')
+       AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())
+     LIMIT 1 FOR UPDATE`,
+    [userId],
+  );
+  return rows[0] || null;
+}
+
+async function getReservationCapacityForBook(bookId: number, conn: PoolConnection): Promise<{ available: number; pending: number }> {
+  // The caller holds the book row lock. Locking reads see the latest committed
+  // copies and reservations even if eligibility checks established an older snapshot.
+  const [copies] = await conn.query<RowDataPacket[]>(
+    `SELECT bc.id FROM book_copies bc
+     JOIN copy_holdings h ON h.copy_id = bc.id
+     LEFT JOIN accession_claim_voids v ON v.accession_number = h.accession_number
+     LEFT JOIN borrowings b ON b.copy_id = bc.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue')
+     LEFT JOIN reservations r ON r.reserved_copy_id = bc.id AND r.deleted_at IS NULL
+       AND r.status = 'ready' AND (r.expires_at IS NULL OR r.expires_at > NOW())
+     WHERE bc.book_id = ? AND bc.deleted_at IS NULL AND bc.is_active = 1 AND bc.condition IN ('good','damaged')
+       AND h.accession_number IS NOT NULL AND TRIM(h.accession_number) <> ''
+       AND v.accession_number IS NULL AND b.id IS NULL AND r.id IS NULL
+     FOR UPDATE`,
+    [bookId],
+  );
+  const [pending] = await conn.query<RowDataPacket[]>(
+    `SELECT id FROM reservations WHERE book_id = ? AND status = 'pending'
+       AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) FOR UPDATE`,
+    [bookId],
+  );
+  return { available: copies.length, pending: pending.length };
 }
 
 async function findActiveBorrowingByUserBook(userId: number, bookId: number, conn: PoolConnection): Promise<(RowDataPacket & { id: number }) | null> {
@@ -530,6 +566,8 @@ export = {
   searchCatalogue,
   findBookForReservation,
   findActiveReservationByUserBook,
+  findActiveReservationByUser,
+  getReservationCapacityForBook,
   findActiveBorrowingByUserBook,
   getOpenReservationCountForBook,
   createReservation,
