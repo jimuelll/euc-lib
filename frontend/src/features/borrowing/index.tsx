@@ -53,7 +53,7 @@ export default function LibraryServices() {
   return <ServiceInnerLayout title="Book reservations" description={selected ? "Your selected title is shown below. Reserve it to request pickup, then wait for a Ready notification before visiting the library." : "Browse books below or search the collection, then reserve a book for pickup at the library front desk."}>
     {readyCount > 0 && <div className="reservation-ready" role="status"><b>{readyCount} book{readyCount > 1 ? "s are" : " is"} ready for pickup.</b> Head to the library front desk with your student or employee ID.</div>}
     <Tabs value={tab} onValueChange={setTab}>
-      <TabsList className="reservation-tabs" aria-label="Reservation view"><TabsTrigger value="reserve">Reserve <b>{activeReservations.length}</b></TabsTrigger><TabsTrigger value="history">History</TabsTrigger></TabsList>
+      <TabsList className="reservation-tabs" aria-label="Reservation view"><TabsTrigger value="reserve">Reserve</TabsTrigger><TabsTrigger value="history">History</TabsTrigger></TabsList>
       <TabsContent value="reserve" className="reservation-tab-panel">
         <ReserveTab selected={selected} onClearSelection={clearSelection} catalog={visibleCatalogue} activeReservations={activeReservations} catalogLoading={!invalidSelection && (catalogQuery.isPending || (!selected && search !== debouncedSearch))} dataLoading={activeQuery.isPending} hasSearched={selected || !!search.trim()}
           catalogError={invalidSelection ? "This book selection is invalid. Browse all books to choose another title." : catalogQuery.isError ? getApiErrorMessage(catalogQuery.error, "Catalogue search failed") : null} activeError={activeQuery.isError ? getApiErrorMessage(activeQuery.error, "Failed to load your reservations") : null}
