@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { useSiteContent } from "@/features/site-content";
 
 const Footer = () => {
+  const { data } = useSiteContent();
+  const contacts = [data?.address, data?.contact_email, data?.contact_phone].filter(value => value?.trim());
   return (
     <footer data-library-design className="library-footer relative overflow-hidden border-t border-primary-foreground/15 bg-primary">
 
@@ -61,10 +64,7 @@ const Footer = () => {
 
           {/* Contact */}
           <FooterColumn title="Contact">
-            <FooterSpan>123 University Avenue</FooterSpan>
-            <FooterSpan>Building C, 2nd Floor</FooterSpan>
-            <FooterSpan>library@college.edu</FooterSpan>
-            <FooterSpan>(555) 123-4567</FooterSpan>
+            {contacts.length ? contacts.map((value, index) => <FooterSpan key={index}>{value}</FooterSpan>) : <FooterSpan>Contact details are currently unavailable</FooterSpan>}
           </FooterColumn>
 
         </div>

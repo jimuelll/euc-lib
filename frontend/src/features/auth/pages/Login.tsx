@@ -5,11 +5,12 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
 import "./login.css";
+import { authDestination } from "@/utils/authDestination";
 
 const benefits = [
   {
@@ -45,9 +46,10 @@ const Login = () => {
   const [capsLock, setCapsLock] = useState(false);
   const accountInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
-  const { login } = useAuth();
+  const { login, isLoggedIn, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
-  const reserving = searchParams.get("for") === "reserve";
+  const returnTo = authDestination(searchParams.get("returnTo") ?? (searchParams.get("for") === "reserve" ? "/services/borrowing" : "/"));
+  const reserving = returnTo.startsWith("/services/borrowing");
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,7 +67,7 @@ const Login = () => {
 
     setLoading(true);
     try {
-      await login(accountId, password, rememberMe);
+      await login(accountId, password, rememberMe, returnTo);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -80,6 +82,8 @@ const Login = () => {
   const readCapsLock = (event: KeyboardEvent<HTMLInputElement>) => {
     setCapsLock(event.getModifierState("CapsLock"));
   };
+
+  if (!authLoading && isLoggedIn) return <Navigate to={returnTo} replace />;
 
   return (
     <div className="min-h-screen bg-background">

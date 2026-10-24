@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { createTestQueryClient } from "@/test-utils/query-client";
 
 const { post, refreshAccessToken, toastError } = vi.hoisted(() => ({ post: vi.fn(), refreshAccessToken: vi.fn(), toastError: vi.fn() }));
@@ -88,5 +88,34 @@ describe("auth query-cache isolation", () => {
     await waitFor(() => expect(refreshAccessToken).toHaveBeenCalledTimes(2));
     expect(screen.getByText("Account A")).toBeTruthy();
     expect(toastError).toHaveBeenCalledWith("Retry in one minute.");
+  });
+});
+
+
+function DestinationProbe() {
+  const { login, changePassword, loading } = useAuth();
+  const location = useLocation();
+  return <><output aria-label="Current task">{location.pathname + location.search + location.hash}</output>
+    <button disabled={loading} onClick={() => void login("ACCOUNT-B", "password", false, "/services/borrowing?bookId=42#reservation-7")}>Resume task</button>
+    <button disabled={loading} onClick={() => void changePassword("old", "new")}>Complete password change</button></>;
+}
+function mountDestination(entry: string) {
+  return render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter initialEntries={[entry]}><AuthProvider><DestinationProbe /></AuthProvider></MemoryRouter></QueryClientProvider>);
+}
+describe("authentication navigation", () => {
+  it("navigates to the supplied task after successful login", async () => {
+    mountDestination("/login");
+    await waitFor(() => expect((screen.getByText("Resume task") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByText("Resume task"));
+    await waitFor(() => expect(screen.getByLabelText("Current task").textContent).toBe("/services/borrowing?bookId=42#reservation-7"));
+  });
+  it.each([["/services/borrowing?bookId=42#reservation-7", "/services/borrowing?bookId=42#reservation-7"], ["/change-password", "/"]])("retains gated task and standalone fallback for %s", async (entry, expected) => {
+    refreshAccessToken.mockResolvedValue(`header.${btoa(JSON.stringify({ id: 1, role: "student", name: "Account A", must_change_password: true }))}.signature`);
+    post.mockResolvedValue({ data: { accessToken: makeToken(1, "Account A") } });
+    mountDestination(entry);
+    await waitFor(() => expect((screen.getByText("Complete password change") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByText("Complete password change"));
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/auth/change-password", { oldPassword: "old", newPassword: "new" }));
+    await waitFor(() => expect(screen.getByLabelText("Current task").textContent).toBe(expected));
   });
 });

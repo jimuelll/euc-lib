@@ -7,7 +7,8 @@ import axiosInstance, {
   refreshAccessToken,
 } from "@/utils/AxiosInstance";
 import { toast } from "@/components/ui/sonner";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { authDestination } from "@/utils/authDestination";
 
 export interface User {
   id: number;
@@ -24,7 +25,7 @@ interface AuthContextProps {
   isLoggedIn: boolean;
   loading: boolean;
   mustChangePassword: boolean;
-  login: (employeeId: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (employeeId: string, password: string, rememberMe?: boolean, returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   getToken: () => string | null;
@@ -62,6 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const authenticatedUserId = useRef<number | null>(null);
 
@@ -140,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     navigate("/login", { replace: true });
   }, [clearSession, navigate]);
 
-  const login = useCallback(async (employeeId: string, password: string, rememberMe = true) => {
+  const login = useCallback(async (employeeId: string, password: string, rememberMe = true, returnTo?: string) => {
     try {
       const res = await axiosInstance.post("/api/auth/login", {
         student_employee_id: employeeId,
@@ -156,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.warning("Change your password to unlock library features.");
       }
 
-      navigate("/", { replace: true });
+      navigate(authDestination(returnTo), { replace: true });
     } catch (err: any) {
       throw new Error(err.response?.data?.message || "Login failed");
     }
@@ -176,11 +178,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       applyAccessToken(token);
 
       toast.success("Password changed successfully!");
-      navigate("/", { replace: true });
+      if (location.pathname === "/change-password") navigate("/", { replace: true });
     } catch (err: any) {
       throw new Error(err.response?.data?.message || "Failed to change password");
     }
-  }, [applyAccessToken, navigate, user]);
+  }, [applyAccessToken, navigate, user, location.pathname]);
 
   return (
     <AuthContext.Provider

@@ -26,6 +26,11 @@ const { copyLabel } = require("../analytics/audit.copy-label");
 
 type QueryConnection = Pool | PoolConnection;
 
+// Use the same live reservation count for catalogue eligibility and placement.
+const openReservationCount = (bookId: string): string => `(SELECT COUNT(*) FROM reservations capacity
+  WHERE capacity.book_id = ${bookId} AND capacity.status IN ('pending','ready')
+    AND capacity.deleted_at IS NULL AND (capacity.expires_at IS NULL OR capacity.expires_at > NOW()))`;
+
 function getConnection(): Promise<PoolConnection> {
   return db.getConnection();
 }
@@ -98,7 +103,7 @@ async function syncExpired(): Promise<ExpiredReservationRow[]> {
 
 async function findActiveReservations(userId: number): Promise<RowDataPacket[]> {
   const [rows] = await db.query<RowDataPacket[]>(
-    `SELECT r.id, bk.title, bk.author, h.location,
+    `SELECT r.id, r.book_id, bk.title, bk.author, h.location,
             r.status, r.reserved_at, r.expires_at, r.notes
      FROM reservations r
      JOIN books bk ON bk.id = r.book_id AND bk.deleted_at IS NULL
@@ -146,8 +151,13 @@ async function findReservationHistory(userId: number, { page, limit }: Reservati
     : rows;
 }
 
-async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = true }: CatalogueSearchOptions = {}): Promise<RowDataPacket[] | { rows: RowDataPacket[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+async function searchCatalogue(query: string, { page, limit, bookId, showUnheldInOpac = true }: CatalogueSearchOptions = {}): Promise<RowDataPacket[] | { rows: RowDataPacket[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
   const like = `%${query}%`;
+  const selectedFilter = bookId === undefined ? "" : "AND bk.id = ?";
+  const filters = bookId === undefined ? [like, like, like] : [like, like, like, bookId];
+  const registeredCopies = `COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END)`;
+  const reservable = `(${hasActiveBookPolicy("bk")} AND ${registeredCopies} > 0)`;
+  const openReservations = openReservationCount("bk.id");
   const { paged, safePage, safeLimit, offset } = normalizePagination(page, limit, 20, 100);
   const visibilityFilter = showUnheldInOpac ? "" : `AND EXISTS (
     SELECT 1 FROM book_copies held_bc
@@ -159,8 +169,9 @@ async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = 
         `SELECT COUNT(*) AS total FROM books bk
        WHERE bk.deleted_at IS NULL AND bk.material_type = 'book'
          AND (bk.title LIKE ? OR bk.author LIKE ? OR bk.isbn LIKE ?)
+         ${selectedFilter}
          ${visibilityFilter}`,
-      [like, like, like]
+      filters
     )
     : [[{ total: 0 } as RowDataPacket & { total: number }]];
   const total = countRows[0].total;
@@ -177,7 +188,8 @@ async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = 
        COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) AS registered_copies,
        COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) AS available,
        (COUNT(DISTINCT CASE WHEN ${availableToBorrow("bc")} THEN bc.id END) > 0) AS canBorrow,
-       (${hasActiveBookPolicy("bk")} AND COUNT(DISTINCT CASE WHEN ${hasAccession("bc", "ch")} THEN bc.id END) > 0) AS canReserve
+       (${reservable} AND ${openReservations} < ${registeredCopies}) AS canReserve,
+       (${reservable} AND ${openReservations} >= ${registeredCopies}) AS reservations_full
      FROM books bk
      LEFT JOIN book_copies bc
        ON bc.book_id = bk.id AND bc.is_active = 1 AND bc.condition IN ('good', 'damaged') AND bc.deleted_at IS NULL
@@ -191,10 +203,11 @@ async function searchCatalogue(query: string, { page, limit, showUnheldInOpac = 
        AND (bk.title LIKE ?
         OR bk.author LIKE ?
         OR bk.isbn LIKE ?)
-       ${visibilityFilter}
+       ${selectedFilter}
+         ${visibilityFilter}
      GROUP BY bk.id
      ORDER BY ${query.trim() ? "bk.title ASC" : "available DESC, bk.title ASC"}${paged ? " LIMIT ? OFFSET ?" : " LIMIT 50"}`,
-    paged ? [like, like, like, safeLimit, offset] : [like, like, like]
+    paged ? [...filters, safeLimit, offset] : filters
   );
   return paged
     ? {
@@ -243,7 +256,7 @@ async function findActiveBorrowingByUserBook(userId: number, bookId: number, con
 
 async function getOpenReservationCountForBook(bookId: number, conn: PoolConnection): Promise<number> {
   const [rows] = await conn.query<Array<RowDataPacket & { total: number | string }>>(
-    "SELECT COUNT(*) AS total FROM reservations WHERE book_id = ? AND status IN ('pending','ready') AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())",
+    `SELECT ${openReservationCount("?")} AS total`,
     [bookId],
   );
   return Number(rows[0].total || 0);

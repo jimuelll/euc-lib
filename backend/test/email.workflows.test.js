@@ -16,6 +16,21 @@ async function env(work,extra={}) {
  Object.assign(process.env,keys);
  try{return await work();}finally{for(const [key,value]of Object.entries(before))if(value===undefined)delete process.env[key];else process.env[key]=value;}
 }
+
+test('account email actions allow a super admin to manage their own account only',()=>env(async()=>{
+ const original=db.getConnection;
+ db.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){},query:async sql=>{
+  if(sql.startsWith('SELECT * FROM users'))return [[{id:42,role:'super_admin',is_active:1}]];
+  if(sql.startsWith('SELECT requests,'))return [[{requests:1,elapsed:1,since:0}]];
+  return [{affectedRows:1}];
+ }});
+ try {
+  // An allowed action reaches the existing rate limiter before any email is queued.
+  await assert.rejects(accounts.adminAction('super-one',42,'super_admin','verify'),{status:429});
+  await assert.rejects(accounts.adminAction('super-one',99,'super_admin','verify'),{status:403});
+  await assert.rejects(accounts.adminAction('super-one',42,'admin','verify'),{status:403});
+ }finally{db.getConnection=original;}
+}));
 test('email encryption authenticates content and purpose-bound HMACs do not expose codes',()=>env(async()=>{
  const protectedValue=settings.protect({code:'123456',action_url:'https://example.org/#secret'});
  assert.ok(!protectedValue.includes('123456'));

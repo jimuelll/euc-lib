@@ -18,6 +18,7 @@ const { copyLabel } = require("../analytics/audit.copy-label") as { copyLabel: (
 
 const serviceError = (message: string, status: number): ReservationError => Object.assign(new Error(message), { status });
 const hasCode = (error: unknown, code: string): error is ReservationError => (error as ReservationError | null)?.code === code;
+const RESERVATION_WINDOW_HOURS = 24;
 
 const syncExpired = async () => {
   return repository.syncExpired();
@@ -38,7 +39,7 @@ const searchCatalogue = async (query: string, options: CatalogueSearchOptions = 
   return repository.searchCatalogue(query, { ...options, showUnheldInOpac: settings.show_unheld_in_opac });
 };
 
-const reserveBook = async (userId: number, bookId: number, hoursUntilExpiry = 48) => {
+const reserveBook = async (userId: number, bookId: number, hoursUntilExpiry = RESERVATION_WINDOW_HOURS) => {
   await syncOverdueBorrowings();
   await syncExpired();
   const expiryHours = Number(hoursUntilExpiry);
@@ -179,7 +180,7 @@ const markReservationReady = async (reservationId: number, markedBy: number | nu
       throw serviceError("No borrowable copy is available to prepare for pickup", 409);
     }
 
-    const changed = await repository.markReady(reservationId, copy.id, 48, conn);
+    const changed = await repository.markReady(reservationId, copy.id, RESERVATION_WINDOW_HOURS, conn);
     if (changed !== 1) throw serviceError("This reservation changed while it was being prepared. Reload and try again.", 409);
     await notificationsService.enqueueNotification(conn, {
       type: "reservation_ready", sourceType: "reservation", sourceId: reservationId,

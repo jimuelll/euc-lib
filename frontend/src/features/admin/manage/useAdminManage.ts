@@ -84,8 +84,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const [qrTarget,      setQrTarget]      = useState<QrTarget | null>(null);
   const showArchived = params.get("archived") === "true";
   const { confirm, confirmDialog } = useAdminConfirmDialog();
-  const allowedRoles: string[] = user ? getAllowedRoles(user.role).filter(role => role !== user.role) : [];
-  const canEdit = (u: User) => allowedRoles.includes(u.role);
+  const allowedRoles: string[] = user ? getAllowedRoles(user.role) : [];
+  const canEdit = (u: User) => allowedRoles.includes(u.role) && (u.role !== "super_admin" || (user?.role === "super_admin" && u.user_id === user.id));
   const departmentsQuery = useQuery({ queryKey: manageKeys.departments(), queryFn: ({ signal }) => fetchDepartments(signal), enabled: Boolean(user) });
   const termsQuery = useQuery({ queryKey: manageKeys.terms(), queryFn: ({ signal }) => fetchAcademicTerms(signal), enabled: Boolean(user) });
   const programsQuery = useQuery({ queryKey: manageKeys.programs(), queryFn: ({ signal }) => fetchAcademicPrograms(signal), enabled: Boolean(user) });

@@ -34,7 +34,6 @@ export interface ActiveBorrow extends LibraryCoverFields {
   due_date: string;
   status: "borrowed" | "overdue";
   notes: string | null;
-  copy_barcode: string | null;
   fine_amount: number;
   fine_per_hour: number;
   hours_overdue: number;
@@ -48,9 +47,6 @@ export interface BorrowHistoryItem extends LibraryCoverFields {
   returned_at: string | null;
   due_date: string;
   status: "returned";
-  copy_id: number | null;
-  copy_barcode: string | null;
-  accession_number: string | null;
 }
 
 export interface ActiveReservation extends LibraryCoverFields {
@@ -91,9 +87,6 @@ export interface MyLibraryHistoryItem extends LibraryCoverFields {
   borrowed_at: string | null;
   returned_at: string | null;
   reserved_at: string | null;
-  copy_id?: number | null;
-  copy_barcode?: string | null;
-  accession_number?: string | null;
 }
 
 export interface MyLibraryPage<T> {

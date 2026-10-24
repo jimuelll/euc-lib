@@ -17,9 +17,9 @@ const defaults: SiteContent = {
     { day: "Saturday", time: "8:00 AM – 5:00 PM", open: true },
     { day: "Sunday", time: "Closed", open: false },
   ],
-  address: "123 University Avenue, Building C, 2nd Floor",
-  contact_email: "library@college.edu",
-  contact_phone: "(555) 123-4567",
+  address: "",
+  contact_email: "",
+  contact_phone: "",
 };
 
 const parseJson = (value: unknown, fallback: unknown): unknown => {
@@ -30,9 +30,15 @@ const parseJson = (value: unknown, fallback: unknown): unknown => {
   }
 };
 
+const cleanContact = (value: string | null | undefined, placeholder: string): string =>
+  !value || value === placeholder ? "" : value;
+
 const normalise = (row: SiteContentRow | null | undefined): SiteContent => ({
   ...defaults,
   ...(row ?? {}),
+  address: cleanContact(row?.address, "123 University Avenue, Building C, 2nd Floor"),
+  contact_email: cleanContact(row?.contact_email, "library@college.edu"),
+  contact_phone: cleanContact(row?.contact_phone, "(555) 123-4567"),
   hours: parseJson(row?.hours, defaults.hours) as SiteContent["hours"],
   hero_stats: parseJson(row?.hero_stats, defaults.hero_stats) as SiteContent["hero_stats"],
 });
@@ -50,7 +56,7 @@ const update = async (payload: SiteContentInput, userId?: number): Promise<SiteC
     || value.hero_stats.some((stat) => !stat.value?.trim() || !stat.label?.trim())) {
     throw Object.assign(new Error("Provide a value and label for all three hero statistics"), { status: 400 });
   }
-  if (!value.hero_title?.trim() || !value.hero_highlight?.trim() || !value.address?.trim() || !value.contact_email?.trim()) {
+  if (!value.hero_title?.trim() || !value.hero_highlight?.trim()) {
     throw Object.assign(new Error("Complete the required site content fields"), { status: 400 });
   }
 
@@ -62,8 +68,8 @@ const update = async (payload: SiteContentInput, userId?: number): Promise<SiteC
     hero_highlight: value.hero_highlight.trim(),
     hero_description: value.hero_description?.trim() || "",
     hero_image_url: value.hero_image_url?.trim() || null,
-    address: value.address.trim(),
-    contact_email: value.contact_email.trim(),
+    address: value.address?.trim() || "",
+    contact_email: value.contact_email?.trim() || "",
     contact_phone: value.contact_phone?.trim() || "",
   }, userId);
   return get();

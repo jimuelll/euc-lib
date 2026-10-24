@@ -7,6 +7,90 @@ const myLibraryRepository = require("../modules/my-library/my-library.repository
 const reservationService = require("../modules/reservation/reservation.service");
 const reservationController = require("../modules/reservation/reservation.controller");
 
+test("catalogue capacity and placement count only live pending and ready reservations", async () => {
+  const original = db.query;
+  let catalogueSql;
+  let placementSql;
+  db.query = async sql => { catalogueSql = sql; return [[], []]; };
+  try {
+    await reservationRepository.searchCatalogue("");
+    await reservationRepository.getOpenReservationCountForBook(4, {
+      query: async sql => { placementSql = sql; return [[{ total: 1 }], []]; },
+    });
+    assert.match(catalogueSql, /AS canReserve/);
+    assert.match(catalogueSql, /AS reservations_full/);
+    assert.match(catalogueSql, /\) < COUNT\(DISTINCT/);
+    assert.match(catalogueSql, /\) >= COUNT\(DISTINCT/);
+    for (const sql of [catalogueSql, placementSql]) {
+      assert.match(sql, /capacity.status IN \('pending','ready'\)/);
+      assert.match(sql, /capacity.deleted_at IS NULL/);
+      assert.match(sql, /capacity.expires_at IS NULL OR capacity.expires_at > NOW\(\)/);
+    }
+  } finally { db.query = original; }
+});
+
+test("waiting and pickup each get 24 hours and full queues reject placement", async () => {
+  const servicePath = require.resolve("../modules/reservation/reservation.service");
+  const stubs = {
+    "../modules/borrowing/overdue.helper": { syncOverdueBorrowings: async () => {} },
+    "../modules/clearance/clearance.service": { assertEligible: async () => {} },
+    "../modules/analytics/transactional-audit": { enqueueTransactionalAudit: async () => {} },
+    "../modules/notifications/notifications.service": { enqueueNotification: async () => {} },
+  };
+  const cached = new Map([[servicePath, require.cache[servicePath]]]);
+  const originals = { ...reservationRepository };
+  const calls = [];
+  const tx = { beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release() {} };
+  try {
+    for (const [name, exports] of Object.entries(stubs)) {
+      const path = require.resolve(name);
+      cached.set(path, require.cache[path]);
+      require.cache[path] = { id: path, filename: path, loaded: true, exports };
+    }
+    delete require.cache[servicePath];
+    const service = require(servicePath);
+    Object.assign(reservationRepository, {
+      getConnection: async () => tx,
+      syncExpired: async () => {},
+      findBookForReservation: async () => ({ id: 4, title: "Naruto", material_type: "book", has_active_policy: 1, registered_copy_count: 1 }),
+      findActiveReservationByUserBook: async () => null,
+      findActiveBorrowingByUserBook: async () => null,
+      getOpenReservationCountForBook: async () => 0,
+      createReservation: async (user, book, hours) => { calls.push(["waiting", hours]); return { insertId: 8 }; },
+      findReservationForAudit: async () => ({ id: 8, title: "Naruto", expires_at: "2026-10-25T08:00:00Z" }),
+      findReservationBookId: async () => ({ book_id: 4 }),
+      findReservationForReady: async () => ({ id: 8, book_id: 4, user_id: 2, title: "Naruto", status: "pending", within_deadline: 1 }),
+      findAvailableCopyForReservation: async () => ({ id: 10 }),
+      markReady: async (id, copy, hours) => { calls.push(["pickup", hours]); return 1; },
+    });
+    await service.reserveBook(2, 4);
+    await service.markReservationReady(8);
+    assert.deepEqual(calls, [["waiting", 24], ["pickup", 24]]);
+    reservationRepository.getOpenReservationCountForBook = async () => 1;
+    await assert.rejects(service.reserveBook(3, 4), { status: 409 });
+    assert.equal(calls.length, 2);
+    reservationRepository.findReservationForReady = async () => ({ book_id: 4, status: "pending", within_deadline: 0 });
+    await assert.rejects(service.markReservationReady(8), { status: 409 });
+    assert.equal(calls.length, 2, "expired waiting reservations cannot become ready");
+  } finally {
+    Object.assign(reservationRepository, originals);
+    for (const [path, value] of cached) {
+      delete require.cache[path];
+      if (value) require.cache[path] = value;
+    }
+  }
+});
+
+test("pickup expiry resets from preparation time and rejects expired pending rows", async () => {
+  const calls = [];
+  await reservationRepository.markReady(8, 10, 24, {
+    query: async (sql, params) => { calls.push({ sql, params }); return [{ affectedRows: 1 }]; },
+  });
+  assert.match(calls[0].sql, /expires_at = TIMESTAMPADD\(HOUR, \?, NOW\(\)\)/);
+  assert.match(calls[0].sql, /expires_at IS NULL OR expires_at > NOW\(\)/);
+  assert.deepEqual(calls[0].params, [10, 24, 8]);
+});
+
 test("reservation browse accepts an empty query and keeps paged availability ordering", async () => {
   const originalSearch = reservationService.searchCatalogue;
   const originalQuery = db.query;
@@ -85,4 +169,36 @@ test("reservation history bounds fractional pages, malformed pages, and oversize
   } finally {
     db.query = originalQuery;
   }
+});
+
+
+test("selected reservation catalogue validates IDs and applies an exact parameterized filter", async () => {
+  const originalSearch = reservationService.searchCatalogue;
+  const originalQuery = db.query;
+  const calls = [];
+  try {
+    reservationService.searchCatalogue = async (query, options) => { calls.push({ query, options }); return { rows: [] }; };
+    const response = { status(value) { this.code = value; return this; }, json(value) { this.payload = value; return this; } };
+    for (const bookId of ["0", "-1", "1.2", "bad", "9007199254740992", ["42"], {}]) {
+      await reservationController.searchCatalogue({ query: { bookId } }, response);
+      assert.equal(response.code, 400);
+    }
+    assert.equal(calls.length, 0);
+    await reservationController.searchCatalogue({ query: { bookId: "42", page: "1", limit: "6" } }, response);
+    assert.equal(calls[0].options.bookId, 42);
+    db.query = async (sql, params) => { calls.push({ sql, params }); return sql.includes("COUNT(*) AS total") ? [[{ total: 1 }], []] : [[{ id: 42 }], []]; };
+    const result = await reservationRepository.searchCatalogue("", { bookId: 42, page: 1, limit: 6, showUnheldInOpac: false });
+    assert.equal(result.rows[0].id, 42);
+    for (const call of calls.slice(1)) {
+      assert.match(call.sql, /AND bk.id = \?/);
+      assert.match(call.sql, /bk.deleted_at IS NULL/);
+      assert.match(call.sql, /held_bc/);
+      assert.equal(call.params[3], 42);
+    }
+    assert.deepEqual(calls.at(-1).params, ["%%", "%%", "%%", 42, 6, 0]);
+    let activeSql;
+    db.query = async sql => { activeSql = sql; return [[], []]; };
+    await reservationRepository.findActiveReservations(1);
+    assert.match(activeSql, /SELECT r.id, r.book_id/);
+  } finally { reservationService.searchCatalogue = originalSearch; db.query = originalQuery; }
 });

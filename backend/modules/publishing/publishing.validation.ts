@@ -25,9 +25,9 @@ export function validateDraft(value: unknown): asserts value is Payload {
 export function validatePublished(kind: Section, payload: Payload, base: Payload): void {
     validateDraft(payload);
     if (kind === "homepage") {
-        for (const key of ["hero_title", "hero_highlight", "address", "contact_email"])
+        for (const key of ["hero_title", "hero_highlight"])
             required(payload[key], key.replaceAll("_", " "));
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.contact_email))
+        if (payload.contact_email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.contact_email))
             fail("Enter a valid contact email.");
         safeUrl(payload.hero_image_url, "homepage image", true);
         if (!Array.isArray(payload.hero_stats) || payload.hero_stats.length !== 3)

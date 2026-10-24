@@ -29,7 +29,7 @@ beforeEach(() => {
 const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catalogue", includeRecommendationLink = false) => {
   const QueryWrapper = createTestQueryClientWrapper();
   searchPublicCatalogue.mockResolvedValue({
-    rows: [{ id: 14, title: "Sample catalogue title", author: "Test Author", material_type: materialType, available: 1, registered_copies: 1 }],
+    rows: [{ id: 14, title: "Sample catalogue title", author: "Test Author", material_type: materialType, canReserve: materialType === "book", available: 1, registered_copies: 1 }],
     pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     facets: { format: { all: 1, book: materialType === "book" ? 1 : 0, thesis: materialType === "thesis" ? 1 : 0 }, availability: { all: 1, available: 1, unavailable: 0 }, categories: [] },
   });
@@ -37,6 +37,16 @@ const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catal
 };
 
 describe("catalogue recommendation action", () => {
+  it("exposes the availability switch state in words and filters the query", async () => {
+    renderCatalogue("book");
+    await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
+    const toggle = screen.getByRole("switch", { name: /Available now: off/ });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText("1 of 1 copies available")).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByRole("switch", { name: /Available now: on/ })).toBeChecked();
+    await waitFor(() => expect(searchPublicCatalogue).toHaveBeenLastCalledWith(expect.objectContaining({ availability: "available" }), expect.any(AbortSignal)));
+  }, 20000);
   it("disables loaded zero-result choices while keeping the selected choice and reset usable", async () => {
     renderCatalogue("book", "/catalogue?format=thesis");
     await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
@@ -86,4 +96,24 @@ describe("catalogue recommendation action", () => {
     await waitFor(() => expect(searchPublicCatalogue).toHaveBeenCalledTimes(1));
     expect(searchPublicCatalogue).toHaveBeenCalledWith(expect.objectContaining({ query: "Recommended title" }), expect.any(AbortSignal));
   }, 20000);
+});
+
+
+describe("catalogue reservation links", () => {
+  it("carries the exact book ID in list and grid views", async () => {
+    renderCatalogue("book");
+    const link = await screen.findByRole("link", { name: "Reserve Sample catalogue title" });
+    expect(link).toHaveAttribute("href", "/services/borrowing?bookId=14");
+    expect(link).toHaveClass("catalogue-primary");
+    const side = link.closest(".catalogue-record-side")!;
+    expect(side).toHaveTextContent("1 of 1 copies available");
+    expect(side).not.toContainElement(screen.getByRole("button", { name: "View similar books for Sample catalogue title" }));
+    fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
+    expect(screen.getByRole("link", { name: "Reserve Sample catalogue title" })).toHaveAttribute("href", "/services/borrowing?bookId=14");
+  });
+  it("does not offer reservation for reference-only theses", async () => {
+    renderCatalogue("thesis");
+    await screen.findByRole("button", { name: "Sample catalogue title" });
+    expect(screen.queryByRole("link", { name: /^Reserve/ })).not.toBeInTheDocument();
+  });
 });

@@ -84,6 +84,7 @@ export interface ReservationHistoryOptions {
 }
 
 export interface CatalogueSearchOptions extends ReservationHistoryOptions {
+  bookId?: number;
   showUnheldInOpac?: boolean;
 }
 

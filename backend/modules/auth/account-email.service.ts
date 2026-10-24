@@ -163,7 +163,8 @@ export async function adminAction(identifier:string,actorId:number,actorRole:str
   return transaction(async conn=>{
     const [[user]]=await conn.query<RowDataPacket[]>('SELECT * FROM users WHERE student_employee_id=? AND deleted_at IS NULL AND is_active=1 FOR UPDATE',[identifier]);
     const roles:Record<string,string[]>={super_admin:['admin','staff','scanner','employee','alumni','student'],admin:['staff','scanner','employee','alumni','student'],staff:['scanner','employee','alumni','student']};
-    if(!user || !roles[actorRole]?.includes(user.role))throw Object.assign(new Error('You cannot manage this account'),{status:403});
+    const isOwnSuperAdmin=actorRole==='super_admin' && user?.role==='super_admin' && user.id===actorId;
+    if(!user || (!isOwnSuperAdmin && !roles[actorRole]?.includes(user.role)))throw Object.assign(new Error('You cannot manage this account'),{status:403});
     if(!await throttle(conn,`admin-${action}:${user.id}`))throw Object.assign(new Error('Wait before requesting another email.'),{status:429});
     if(action==='invite'){if(!user.setup_pending)throw Object.assign(new Error('Account setup is already complete'),{status:409});await challenge(conn,user,'setup',normalizeEmail(user.email));}
     if(action==='verify'){const address=user.pending_email||user.email;if(!address)throw Object.assign(new Error('Add an email address first'),{status:400});await challenge(conn,user,'verify_email',normalizeEmail(address));}

@@ -3,6 +3,7 @@
 export type UserRole = "super_admin" | "admin" | "staff" | "scanner" | "employee" | "student" | "alumni";
 
 export interface User {
+  user_id?: number;
   student_employee_id: string;
   name:                string;
   role:                string;

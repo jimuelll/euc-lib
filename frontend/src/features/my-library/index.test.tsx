@@ -135,6 +135,35 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("My Library workspace", () => {
+  it("omits internal copy identifiers from current loans and history even in older responses", async () => {
+    const identifiers = { copy_id: 51, copy_barcode: "LIB-000051-001", accession_number: "ACC-PRIVATE-1" };
+    api.fetchMyLibraryDashboard.mockResolvedValue({
+      ...dashboard,
+      active_borrows: [{
+        ...identifiers, id: 1, title: "Current loan", author: "Author", status: "borrowed",
+        borrowed_at: "2026-10-08T08:00:00Z", due_date: "2026-11-08T08:00:00Z",
+        location: "Main library", notes: null, fine_amount: 0,
+      }],
+    });
+    api.fetchMyLibraryHistory.mockResolvedValue({
+      rows: [{
+        ...identifiers, id: 2, title: "86—Eighty-Six, Vol. 1", author: "Asato Asato",
+        kind: "borrowing", status: "returned", occurred_at: "2026-10-08T08:00:00Z",
+        borrowed_at: "2026-10-08T08:00:00Z", returned_at: "2026-10-08T08:00:00Z", reserved_at: null,
+      }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+    renderLibrary();
+    await screen.findByText("Current loan");
+    fireEvent.click(screen.getByText("Loan details"));
+    expect(screen.getByText("Main library")).toBeInTheDocument();
+    expect(screen.queryByText(/Copy barcode|LIB-000051-001|ACC-PRIVATE-1/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "History" }));
+    await screen.findByText("86—Eighty-Six, Vol. 1");
+    expect(screen.getByText("Borrowed:")).toBeInTheDocument();
+    expect(screen.getByText("Returned:")).toBeInTheDocument();
+    expect(screen.queryByText(/Copy:|Accession:|LIB-000051-001|ACC-PRIVATE-1/)).not.toBeInTheDocument();
+  });
   it("defaults invalid views to Overview and loads history only when visited", async () => {
     renderLibrary("/my-library?view=invalid&keep=yes");
     expect(

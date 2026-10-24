@@ -167,22 +167,6 @@ export default function MyLibraryHistoryPanel({
                               </dd>
                             </div>
                           )}
-                          {(item.copy_barcode || item.copy_id) && (
-                            <div className="break-all">
-                              <dt className="inline">Copy: </dt>
-                              <dd className="inline">
-                                {item.copy_barcode || item.copy_id}
-                              </dd>
-                            </div>
-                          )}
-                          {item.accession_number && (
-                            <div className="break-all">
-                              <dt className="inline">Accession: </dt>
-                              <dd className="inline">
-                                {item.accession_number}
-                              </dd>
-                            </div>
-                          )}
                         </dl>
                       </article>
                     ))}

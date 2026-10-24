@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookMarked, BrainCircuit, Loader2, X } from "@/components/ui/library-glyphs";
-import { LibraryIcon } from "@/components/ui/library-icon";
 import { toast } from "@/components/ui/sonner";
 import { dismissRecommendation, fetchRecommendations, type RecommendationsResponse } from "../api";
 import { recommendationsKeys } from "../recommendations.keys";
@@ -75,6 +74,10 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
   const pageCount = Math.max(1, Math.ceil(rows.length / cardsPerPage));
   const activePage = Math.min(pageIndex, pageCount - 1);
   const visibleRows = rows.slice(activePage * cardsPerPage, (activePage + 1) * cardsPerPage);
+  const aiCount = rows.filter(book => book.source === "ai").length;
+  const selectionLabel = aiCount > 0
+    ? aiCount === rows.length ? "AI-selected, ranked by relevance" : "Includes AI selections, ranked by relevance"
+    : materialType === "book" ? "Books selected for relevance" : "Reference-only research";
   const availabilityLabel = (book: Recommendation) => {
     if (book.material_type === "thesis" || book.availability_status === "reference_only") return "Reference only";
     switch (book.availability_status) {
@@ -88,29 +91,28 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
   return <section ref={sectionRef} className="library-recommendations border border-border bg-card" aria-label={heading}>
     <div className="library-recommendation-heading flex items-start gap-2 border-b border-border bg-background px-3.5 py-2">
       {materialType === "book" ? <BookMarked className="size-4 shrink-0" /> : <BrainCircuit className="size-4 shrink-0" />}
-      <div className="min-w-0 flex-1"><h2>{heading}</h2><p className="mt-1 text-xs text-muted-foreground">{materialType === "book" ? "Books selected for relevance" : "Reference-only research"}</p></div>
+      <div className="min-w-0 flex-1"><h2>{heading}</h2><p className="mt-1 text-xs text-muted-foreground">{selectionLabel}</p></div>
     </div>
     {loading ? <div className="flex h-28 items-center justify-center" role="status" aria-label="Loading recommendations"><Loader2 className="h-4 w-4 animate-spin text-warning" /></div> : <div className="grid gap-3 p-3" style={{ gridTemplateColumns: `repeat(${cardsPerPage}, minmax(0, 1fr))` }}>
       {visibleRows.map((book) => <article key={book.id} className="group relative flex min-w-0 flex-col border border-border bg-card transition-colors hover:border-primary/50 hover:bg-muted/20">
         <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="flex min-w-0 flex-1 items-start gap-3 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           <RecommendationCover book={book} />
           <div className="flex min-w-0 flex-1 flex-col py-0.5">
-            {book.source === "ai" ? <span className="library-recommendation-marker mb-1.5 inline-flex h-6 w-fit items-center gap-1 border border-warning/50 bg-primary px-1.5 text-warning" role="img" aria-label="AI recommendation" title="AI recommendation"><LibraryIcon name="ai" className="size-4" aria-hidden="true" /><span className="text-xs font-bold leading-none" aria-hidden="true">AI</span></span> : null}
             <p className="library-recommendation-title break-words text-base font-bold leading-5 text-foreground group-hover:text-primary">{book.title}</p>
             <p className="mt-1 break-words text-[13px] leading-5 text-muted-foreground">{book.author || "Unknown author"}</p>
-            <p className="mt-2 break-words text-[13px] leading-5 text-muted-foreground">{book.reason}</p>
+            {book.reason?.trim() && !/^similar subject and catalogue details[.!]?$/i.test(book.reason.trim()) && <p className="mt-2 break-words text-[13px] leading-5 text-muted-foreground">{book.reason}</p>}
           </div>
         </Link>
-        <div className={`flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${book.material_type === "thesis" ? "text-warning" : book.availability_status === "available" || (!book.availability_status && Number(book.available || 0) > 0) ? "text-success" : book.availability_status === "unavailable" || (!book.availability_status && book.needs_policy) ? "text-destructive" : "text-muted-foreground"}`}>
-          <span>{availabilityLabel(book)}</span>
+        <div className={`flex items-center justify-between gap-2 border-t border-border px-3 py-2 text-sm font-bold ${book.material_type === "thesis" ? "text-warning" : availabilityLabel(book) === "Available" ? "text-success" : book.availability_status === "unavailable" || (!book.availability_status && book.needs_policy) ? "text-destructive" : "text-muted-foreground"}`}>
+          <span className="inline-flex items-center gap-2">{availabilityLabel(book) === "Available" && <i aria-hidden="true" className="h-4 w-[7px] shrink-0 border-[1.5px] border-current bg-current" />}{availabilityLabel(book)}</span>
           {personal ? <button type="button" onClick={() => void dismiss(book.id)} aria-label={`Not interested in ${book.title}`} className="grid size-11 shrink-0 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"><X className="size-4" /></button> : null}
         </div>
       </article>)}
     </div>}
     {!loading && pageCount > 1 ? <nav className="library-recommendation-pagination flex items-center justify-between gap-3 border-t border-border px-3.5 py-2" aria-label={`${heading} pages`}>
       <span className="text-xs text-muted-foreground" aria-live="polite">{activePage + 1} of {pageCount}</span><div className="flex gap-1">
-        <button type="button" onClick={() => setPageIndex(Math.max(0, activePage - 1))} disabled={activePage === 0} aria-label="Previous recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ArrowLeft className="size-4" /></button>
-        <button type="button" onClick={() => setPageIndex(Math.min(pageCount - 1, activePage + 1))} disabled={activePage >= pageCount - 1} aria-label="Next recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ArrowRight className="size-4" /></button>
+        <button type="button" onClick={() => setPageIndex(Math.max(0, activePage - 1))} disabled={activePage === 0} aria-label="Previous recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground"><ArrowLeft className="size-4" /></button>
+        <button type="button" onClick={() => setPageIndex(Math.min(pageCount - 1, activePage + 1))} disabled={activePage >= pageCount - 1} aria-label="Next recommendations" className="grid size-11 place-items-center border border-border hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground"><ArrowRight className="size-4" /></button>
       </div></nav> : null}
   </section>;
 }

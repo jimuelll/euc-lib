@@ -8,7 +8,7 @@ import { useAdminManage } from "./useAdminManage";
 import * as api from "./api";
 configure({asyncUtilTimeout:5000});
 const signedIn=vi.hoisted(()=>({role:"super_admin"}));
-vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{role:signedIn.role}})}));
+vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{id:42,role:signedIn.role}})}));
 vi.mock("./api",()=>({searchUsers:vi.fn(),fetchAcademicPrograms:vi.fn(),fetchAcademicTerms:vi.fn(),fetchDepartments:vi.fn(),createUser:vi.fn(),updateUser:vi.fn(),archiveUser:vi.fn(),restoreUser:vi.fn(),requestAccountEmail:vi.fn()}));
 const patron = {name:"Alex Rivera",student_employee_id:"CARD-1",library_card_number:"CARD-1",student_number:"ST-1",role:"student",program_id:1,academic_term_id:1,year_level:"2nd Year",is_active:1,active_loans:2,overdue_loans:1,unpaid_fines:1260,active_reservations:1};
 const admin = {name:"Desk Admin",student_employee_id:"admin-one",username:"admin-one",role:"admin",email:"desk@example.edu",email_verified_at:"2026-10-01",is_active:1,active_loans:0,overdue_loans:0,unpaid_fines:0,active_reservations:0};
@@ -36,4 +36,27 @@ it.each(["admin","staff","scanner","student","employee","alumni"])("hides email 
 });
 it("shows email delivery and allowance for super admins",async()=>{
  mount();expect(await screen.findByRole("link",{name:"Email delivery and allowance"})).toBeTruthy();
+});
+
+const ownSuperAdmin={...admin,user_id:42,name:"My Super Admin",student_employee_id:"super-one",username:"super-one",role:"super_admin"};
+it("allows super admins to save their own details while preserving their role and archive protection",async()=>{
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[ownSuperAdmin],pagination:{page:1,limit:25,total:1,totalPages:1}});
+ mount();fireEvent.click(await screen.findByRole("button",{name:"My Super Admin"}));
+ expect(screen.getByRole("combobox",{name:"Role *"}).hasAttribute("disabled")).toBe(true);
+ expect(screen.queryByRole("button",{name:"Archive user"})).toBeNull();
+ fireEvent.change(screen.getByLabelText("Full name"),{target:{value:"Updated Super Admin"}});
+ fireEvent.click(screen.getByRole("button",{name:"Save changes"}));
+ await waitFor(()=>expect(api.updateUser).toHaveBeenCalledWith("super-one",expect.objectContaining({fullName:"Updated Super Admin",role:"super_admin"})));
+});
+it("keeps another super admin record read-only",async()=>{
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[{...ownSuperAdmin,user_id:99}],pagination:{page:1,limit:25,total:1,totalPages:1}});
+ mount();fireEvent.click(await screen.findByRole("button",{name:"My Super Admin"}));
+ expect(screen.getByLabelText("Full name").hasAttribute("disabled")).toBe(true);
+ expect(screen.queryByRole("button",{name:"Save changes"})).toBeNull();
+});
+function RolesHarness(){const state=useAdminManage();return <output data-testid="allowed-roles">{state.allowedRoles.join(",")}</output>;}
+it.each(["super_admin","admin","staff"])("only super admins can select the super admin role for creation (%s)",role=>{
+ signedIn.role=role;const Wrapper=createTestQueryClientWrapper(createTestQueryClient());
+ render(<Wrapper><MemoryRouter><RolesHarness/></MemoryRouter></Wrapper>);
+ expect(screen.getByTestId("allowed-roles").textContent?.split(",").includes("super_admin")).toBe(role==="super_admin");
 });

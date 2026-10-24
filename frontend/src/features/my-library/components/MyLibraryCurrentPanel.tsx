@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   AlertCircle,
   ArrowDown,
@@ -144,12 +145,6 @@ export default function MyLibraryCurrentPanel({
                         {book.location || "Library circulation desk"}
                       </dd>
                     </div>
-                    {book.copy_barcode && (
-                      <div>
-                        <dt className="text-muted-foreground">Copy barcode</dt>
-                        <dd className="mt-1 break-all">{book.copy_barcode}</dd>
-                      </div>
-                    )}
                     {book.notes && (
                       <div>
                         <dt className="text-muted-foreground">Notes</dt>
@@ -197,15 +192,13 @@ export default function MyLibraryCurrentPanel({
                   </div>
                 </div>
                 <div className="mt-4 space-y-1 text-sm">
-                  {item.status === "ready" && (
-                    <p className="font-medium">
+                  <p className="font-medium">
                       {deadlineLabel(
                         item.expires_at,
-                        "Pick up by",
-                        "Pickup deadline unavailable",
+                        item.status === "ready" ? "Pick up by" : "Waiting expires",
+                        item.status === "ready" ? "Pickup deadline unavailable" : "Waiting deadline unavailable",
                       )}
-                    </p>
-                  )}
+                  </p>
                   <p className="break-words text-muted-foreground">
                     {item.status === "ready" ? "Pickup: " : "Location: "}
                     {item.location || "Main circulation desk"}
@@ -213,6 +206,7 @@ export default function MyLibraryCurrentPanel({
                   <p className="text-muted-foreground">
                     Reserved {formatDate(item.reserved_at)}
                   </p>
+                  <Link className="inline-flex min-h-11 items-center text-action underline-offset-4 hover:underline" to={`/services/borrowing#reservation-${item.id}`} aria-label={`Manage reservation for ${item.title}`}>Manage reservation</Link>
                   {item.notes && (
                     <p className="break-words text-muted-foreground">
                       {item.notes}

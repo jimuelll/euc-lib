@@ -16,7 +16,9 @@ const searchCatalogue: RequestHandler = async (req, res) => {
   try {
     const query = req.query.query;
     if (query !== undefined && typeof query !== "string") return void res.status(400).json({ message: "Search query must be text" });
-    const books = await service.searchCatalogue((query ?? "").trim(), { page: req.query.page, limit: req.query.limit });
+    const bookId = req.query.bookId === undefined ? undefined : typeof req.query.bookId === "string" ? parsePositiveSafeInteger(req.query.bookId) : null;
+    if (bookId === null) return void res.status(400).json({ message: "Invalid book ID" });
+    const books = await service.searchCatalogue((query ?? "").trim(), { page: req.query.page, limit: req.query.limit, bookId });
     res.json(books);
   } catch (error: unknown) {
     logError("[reservation] searchCatalogue:", error);

@@ -8,19 +8,13 @@ const hours = [
   { day: "Sunday",          time: "Closed",             open: false },
 ];
 
-const contactDetails = [
-  { icon: MapPin, label: "Address", value: "123 University Avenue, Building C, 2nd Floor" },
-  { icon: Mail,   label: "Email",   value: "library@college.edu"                           },
-  { icon: Phone,  label: "Phone",   value: "(555) 123-4567"                                },
-];
-
 const LibraryHoursSection = () => {
   const reducedMotion = useReducedMotion();
   const { data: content } = useSiteContent();
   const visibleHours = content?.hours || hours;
   const visibleContact = content ? [
     { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },
-  ] : contactDetails;
+  ].filter(item => item.value?.trim()) : [];
   return (
     <section id="library-hours" data-library-design className="border-b border-border bg-background py-16 sm:py-20">
       <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
@@ -120,6 +114,7 @@ const LibraryHoursSection = () => {
 
             {/* Contact rows */}
             <div className="flex-1 px-6 py-4 sm:px-8">
+              {!visibleContact.length && <p className="py-4 text-sm text-muted-foreground">Contact details are currently unavailable</p>}
               {visibleContact.map((item, i) => {
                 const Icon = item.icon;
                 return (

@@ -35,7 +35,7 @@ const row = (overrides: Partial<Recommendation> & Pick<Recommendation, "id" | "t
 });
 
 describe("recommendation cards", () => {
-  it("shows up to three cards at a time with covers, fallbacks, actual availability, icon-only AI marker, and catalogue links", async () => {
+  it("shows covers, availability, panel-level AI disclosure, and catalogue links", async () => {
     setViewport(1440);
     fetchRecommendations.mockResolvedValue({ rows: [
       row({ id: 1, title: "Cover book", image_url: "https://covers.example/book.jpg", source: "ai" }),
@@ -55,8 +55,8 @@ describe("recommendation cards", () => {
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByText("Checked out")).toBeInTheDocument();
     expect(screen.getByText("Reserved")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "AI recommendation" })).toBeInTheDocument();
-    expect(screen.queryByText("AI recommendations")).not.toBeInTheDocument();
+    expect(screen.getByText("Includes AI selections, ranked by relevance")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "AI recommendation" })).not.toBeInTheDocument();
     expect(screen.queryByText("Browse all")).not.toBeInTheDocument();
     expect(screen.getByText("Cover book").closest("a")).toHaveAttribute("href", "/catalogue?q=Cover%20book");
     expect(screen.getByText("1 of 3")).toBeInTheDocument();
@@ -69,6 +69,18 @@ describe("recommendation cards", () => {
     expect(screen.getByText("Unavailable")).toBeInTheDocument();
     expect(screen.getByText("2 of 3")).toBeInTheDocument();
   }, 12000);
+
+  it("omits generic reasons while keeping specific reasons and discloses AI once", async () => {
+    setViewport(1440);
+    fetchRecommendations.mockResolvedValue({ rows: [
+      row({ id: 1, title: "First book", source: "ai", reason: "Similar subject and catalogue details" }),
+      row({ id: 2, title: "Second book", source: "ai", reason: "Same author: Test Author" }),
+    ] });
+    render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
+    expect(await screen.findByText("AI-selected, ranked by relevance")).toBeInTheDocument();
+    expect(screen.queryByText("Similar subject and catalogue details")).not.toBeInTheDocument();
+    expect(screen.getByText("Same author: Test Author")).toBeInTheDocument();
+  });
 
   it.each([[390, 1, 8], [768, 2, 4], [960, 3, 3], [1440, 3, 3]])("paginates to fit %i px wide layouts", async (width, cards, pages) => {
     setViewport(width);

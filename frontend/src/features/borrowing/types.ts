@@ -12,9 +12,11 @@ export interface CatalogBook {
   available: number;
   material_type?: "book" | "thesis";
   canReserve?: boolean;
+  reservations_full?: boolean | number;
 }
 
 export interface ActiveReservation {
+  book_id: number;
   id: number;
   title: string;
   author: string;

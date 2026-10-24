@@ -1,3 +1,4 @@
+import { loginDestination } from "@/utils/authDestination";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, GraduationCap } from "@/components/ui/library-glyphs";
 import Navbar from "@/components/layout/Navbar";
@@ -17,11 +18,11 @@ export default function Services() {
     <Navbar />
     <main data-library-design className="library-information-page"><div className="library-information-inner">
       <header className="library-information-heading"><div className="library-information-kicker">EUC Library</div><h1>Library services</h1><p>Explore the services that support your academic journey.</p></header>
-      {!isLoggedIn && <div className="library-service-note"><p>Services below need a library account.</p><Link to="/login" className="library-information-button is-outline">Sign in</Link></div>}
+      {!isLoggedIn && <div className="library-service-note"><p>Services below need a library account.</p><Link to={loginDestination("/services")} className="library-information-button is-outline">Sign in</Link></div>}
       <div className="library-service-list">{services.map(({ icon: Icon, title, description, link }) => <article className="library-service-row" key={title}>
         <div className="library-service-plate" aria-hidden="true"><Icon /></div>
         <div><h2>{title}</h2><p>{description}</p></div>
-        <Link to={isLoggedIn ? link : "/login"} className="library-information-button" aria-label={`${isLoggedIn ? "Open" : "Sign in to open"} ${title}`}>{isLoggedIn ? "Open" : "Sign in to open"}<ArrowRight aria-hidden="true" /></Link>
+        <Link to={isLoggedIn ? link : loginDestination(link)} className="library-information-button" aria-label={`${isLoggedIn ? "Open" : "Sign in to open"} ${title}`}>{isLoggedIn ? "Open" : "Sign in to open"}<ArrowRight aria-hidden="true" /></Link>
       </article>)}</div>
       <section className="library-borrowing-guide" aria-labelledby="borrowing-guide-title">
         <h2 id="borrowing-guide-title" className="library-information-section-title">How borrowing works</h2>

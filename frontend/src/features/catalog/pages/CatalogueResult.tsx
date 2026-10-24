@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { ChevronDown } from "@/components/ui/library-glyphs";
 import { RecommendationStrip } from "@/features/recommendations";
 import type { PublicCatalogBook as Book, PublicCatalogSchemaField } from "../api";
@@ -22,7 +23,7 @@ function Availability({ book }: { book: Book }) {
   if (total === 0) return <div className="catalogue-status is-unheld"><strong>Not yet on the shelf</strong><span>No copies accessioned</span></div>;
   return <div className={"catalogue-status " + (available > 0 ? "is-available" : "is-unavailable")}>
     <strong><span className="catalogue-pips" aria-hidden="true">{Array.from({ length: Math.min(total ?? available, 8) }, (_, index) => <i key={index} className={index < available ? "is-filled" : ""} />)}</span>{available > 0 ? "Available" : total === null ? "Availability not recorded" : "Unavailable"}</strong>
-    <span>{total === null ? available > 0 ? available + " copies available" : "Check with the library" : available + " of " + total + " accessioned copies available"}</span>
+    <span>{total === null ? available > 0 ? available + " copies available" : "Check with the library" : available + " of " + total + " copies available"}</span>
   </div>;
 }
 
@@ -41,9 +42,14 @@ export default function CatalogueResult({ book, schema, expanded, onToggle }: { 
       <div className="catalogue-author">{book.author || "Unknown author"}{book.category && book.category !== "Uncategorized" && <> · <b>{book.category}</b></>}</div>
       {metadata && <p className="catalogue-metadata">{metadata}</p>}
       {fields.length > 0 && <dl className="catalogue-extra-fields">{fields.map(field => <div key={field.label}><dt>{field.label}:</dt><dd>{field.value}</dd></div>)}</dl>}
+      <div className="catalogue-record-actions">
+      <button type="button" className="catalogue-similar-action" aria-label={action + " for " + book.title} aria-expanded={expanded} aria-controls={expanded ? "recommendations-" + book.id : undefined} onClick={onToggle}>{action}<ChevronDown aria-hidden="true" /></button>
+      </div>
     </div>
-    <Availability book={book} />
-    <button type="button" className="catalogue-similar-action" aria-label={action + " for " + book.title} aria-expanded={expanded} aria-controls={expanded ? "recommendations-" + book.id : undefined} onClick={onToggle}>{action}<ChevronDown aria-hidden="true" /></button>
+    <div className="catalogue-record-side">
+      <Availability book={book} />
+      {!reference && Number(book.canReserve) === 1 && <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>{Number(book.available) > 0 ? "Reserve" : "Reserve when returned"}</Link>}
+    </div>
     {expanded && <div className="catalogue-similar" id={"recommendations-" + book.id}><RecommendationStrip seedBookId={book.id} materialType={book.material_type || "book"} title={(reference ? "Related theses for " : "Similar books to ") + book.title} /></div>}
   </article>;
 }

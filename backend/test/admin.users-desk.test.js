@@ -3,6 +3,54 @@ const assert=require("node:assert/strict");
 const repo=require("../modules/admin/admin.repository");
 const overdue=require("../modules/borrowing/overdue.helper");
 const service=require("../modules/admin/admin.service");
+const accounts=require("../modules/auth/account-email.service");
+const outbox=require("../modules/delivery-outbox/outbox.repository");
+
+async function mutationFixture(work) {
+ const original={...repo},invite=accounts.invite,enqueue=outbox.enqueue;
+ const user={id:42,name:"Super Admin",username:"super-one",student_employee_id:"super-one",role:"super_admin",is_active:1};
+ const writes=[],events=[];let committed=0;
+ repo.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>committed++,rollback:async()=>{},release(){},query:async()=>[[user]]});
+ repo.findUserForUpdate=async()=>user;
+ repo.findExistingUser=async()=>[];
+ repo.findUserByIdForAudit=async()=>user;
+ repo.updateUser=async(identifier,values)=>writes.push({identifier,values});
+ repo.createUser=async values=>{writes.push(values);return "LIB-USER-000042";};
+ accounts.invite=async(conn,created)=>events.push({invited:created.id});
+ outbox.enqueue=async(kind,event)=>events.push({kind,event});
+ try{await work({user,writes,events,committed:()=>committed});}
+ finally{Object.assign(repo,original);accounts.invite=invite;outbox.enqueue=enqueue;}
+}
+
+test("super admins can create invited super admin accounts",()=>mutationFixture(async f=>{
+ await service.createUser({name:"New Super",username:"new-super",role:"super_admin",email:"super@example.edu"},"super_admin",42);
+ assert.equal(f.writes[0].role,"super_admin");
+ assert.equal(f.writes[0].username,"new-super");
+ assert.ok(f.writes[0].passwordHash);
+ assert.ok(f.events.some(event=>event.invited===42));
+ assert.ok(f.events.some(event=>event.kind==="audit"));
+ assert.equal(f.committed(),1);
+ for(const role of ["admin","staff"])await assert.rejects(service.createUser({role:"super_admin"},role,42),{status:403});
+}));
+
+test("super admins can update their own user record with an unchanged role",()=>mutationFixture(async f=>{
+ await service.updateUser("super-one",{name:"Updated",username:"renamed",role:"super_admin",address:"Campus",contact:"09123456789",remarks:"New details"},"super_admin",42);
+ assert.equal(f.writes[0].values.name,"Updated");
+ assert.equal(f.writes[0].values.student_employee_id,"renamed");
+ assert.equal(f.writes[0].values.address,"Campus");
+ assert.equal(f.writes[0].values.contact,"09123456789");
+ assert.equal(f.committed(),1);
+ assert.ok(f.events.some(event=>event.kind==="audit"));
+}));
+
+test("self editing does not allow other super admin edits, self demotion or archival",()=>mutationFixture(async f=>{
+ await assert.rejects(service.updateUser("super-one",{name:"Other"},"super_admin",99),{status:403});
+ await assert.rejects(service.updateUser("super-one",{name:"Other"},"admin",42),{status:403});
+ await assert.rejects(service.updateUser("super-one",{role:"admin"},"super_admin",42),{status:403});
+ await assert.rejects(service.updateUser("super-one",{is_active:0},"super_admin",42),{status:403});
+ await assert.rejects(service.deleteUser("super-one","super_admin",42),{status:403});
+ assert.equal(f.writes.length,0);
+}));
 async function fixture(work){const search=repo.searchUsers,list=overdue.listUnsettledBorrowings;let options;repo.searchUsers=async value=>{options=value;return [{user_id:1,name:"Alex",student_employee_id:"CARD-1",role:"student",is_active:1,active_loans:2,overdue_loans:1},{user_id:2,name:"Jamie",student_employee_id:"CARD-2",role:"student",is_active:0,active_loans:0,overdue_loans:0},{user_id:3,name:"Pat",student_employee_id:"admin-one",role:"admin",is_active:1,active_loans:0,overdue_loans:0},{user_id:4,name:"Taylor",student_employee_id:"CARD-3",role:"student",is_active:0,deleted_at:"2026-10-01",active_loans:0,overdue_loans:0}];};overdue.listUnsettledBorrowings=async()=>({rows:[{user_id:1,unsettled_amount:1260},{user_id:2,unsettled_amount:25}]});try{await work(()=>options);}finally{repo.searchUsers=search;overdue.listUnsettledBorrowings=list;}}
 test("users desk counts statuses across pages and adds authoritative borrowing balances",()=>fixture(async getOptions=>{const result=await service.searchUsers({page:1,limit:1,status:"active"},"super_admin");assert.equal(result.rows.length,1);assert.equal(result.rows[0].unpaid_fines,1260);assert.equal(result.summary.total,4);assert.equal(result.summary.active,2);assert.equal(result.summary.needsAttention,2);assert.deepEqual(result.summary.statuses,{active:2,inactive:1,archived:1,all:4});assert.ok(getOptions().allowedRoles.includes("super_admin"));assert.equal(result.pagination.total,2);}));
 test("users desk filters attention before pagination and retains role counts",()=>fixture(async()=>{const result=await service.searchUsers({page:1,status:"all",role:"student",access:"attention",sort:"attention"},"super_admin");assert.deepEqual(result.rows.map(row=>row.name),["Alex","Jamie"]);assert.equal(result.summary.roles.admin,1);assert.equal(result.summary.statuses.active,1);assert.equal(result.summary.statuses.all,3);}));

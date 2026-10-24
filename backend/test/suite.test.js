@@ -61,3 +61,5 @@ require("./profile.test");
 require("./production-readiness.test");
 require("./production-readiness.auth.test");
 require("./production-readiness.database.integration.test");
+
+require("./site-content.contacts.test");

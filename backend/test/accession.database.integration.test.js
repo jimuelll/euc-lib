@@ -410,12 +410,14 @@ test("database: checkout and exact-copy return resolve accession and QR barcode"
   await catalogQueryService.deleteBook(fixture.bookId, 1);
   const history = await myLibraryRepository.findBorrowHistory(fixture.userId);
   assert.equal(history.length, 2);
-  assert.ok(history.every((row) => Number(row.copy_id) === copy.id));
-  assert.ok(history.every((row) => row.copy_barcode === copy.barcode && row.accession_number === copy.accession));
+  assert.ok(history.every((row) => loans.some((loan) => Number(loan.id) === Number(row.id))));
   const combinedHistory = await myLibraryRepository.getHistory(fixture.userId, 1, 10);
-  assert.ok(combinedHistory.rows.filter((row) => row.kind === "borrowing").every((row) => (
-    Number(row.copy_id) === copy.id && row.copy_barcode === copy.barcode && row.accession_number === copy.accession
-  )));
+  assert.equal(combinedHistory.rows.filter((row) => row.kind === "borrowing").length, 2);
+  for (const row of [...history, ...combinedHistory.rows]) {
+    for (const field of ["copy_id", "copy_barcode", "accession_number"]) {
+      assert.equal(Object.hasOwn(row, field), false, `patron history omits ${field}`);
+    }
+  }
   const [[currentEligibility]] = await db.query(
     `SELECT ${availableToBorrow("bc")} AS eligible
        FROM book_copies bc WHERE bc.id = ?`,

@@ -81,9 +81,16 @@
 .reservation-history-row time { color:hsl(var(--muted-foreground)); }
 .reservation-pagination { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px; }
 .reservation-pagination span { color:hsl(var(--muted-foreground)); font-size:13px; }
-.service-inner-page :is(a,button,input,[role=tab]):focus-visible { outline:2px solid var(--library-gold); outline-offset:2px; }
+.service-inner-page .reservation-held:focus, .service-inner-page :is(a,button,input,[role=tab]):focus-visible { outline:2px solid var(--library-gold); outline-offset:2px; }
 .dark .service-inner-page .subscription-logo { box-shadow:4px 5px 0 #000a; }
 .dark .service-inner-page .reservation-sidebar { box-shadow:5px 6px 0 #000a; }
-@media(max-width:900px) { .reservation-layout { grid-template-columns:minmax(0,1fr); } .reservation-sidebar { position:static !important; order:-1; } .subscription-row { grid-template-columns:140px minmax(0,1fr); } .subscription-action { grid-column:1/-1; } }
+@media(max-width:900px) { .reservation-layout { grid-template-columns:minmax(0,1fr); } .reservation-sidebar { position:static !important; order:-1; } .reservation-layout.is-selected .reservation-sidebar { order:0; } .subscription-row { grid-template-columns:140px minmax(0,1fr); } .subscription-action { grid-column:1/-1; } }
 @media(max-width:640px) { .subscription-row { grid-template-columns:minmax(0,1fr); } .subscription-logo { width:100%; max-width:240px; } .reservation-book { grid-template-columns:52px minmax(0,1fr); } .reservation-book > button { grid-column:2; justify-self:start; } .reservation-history-row { grid-template-columns:minmax(0,1fr); } }
 @media(prefers-reduced-motion:reduce) { .service-inner-page * { transition:none !important; } }
+
+.reservation-confirmation-book { min-width:0; padding-bottom:14px; border-bottom:1px solid hsl(var(--border)); }
+.reservation-confirmation-book h3 { margin:0 0 4px; font:700 22px/1.3 "Fraunces",Georgia,serif; overflow-wrap:anywhere; }
+.reservation-confirmation-book p { margin:0; color:hsl(var(--muted-foreground)); }
+.reservation-confirmation-guidance { display:grid; gap:12px; font-size:14px; line-height:1.6; }
+.reservation-confirmation-guidance p { margin:0; }
+.reservation-confirmation [data-library-ui=dialog-footer] button { min-height:44px; white-space:normal; }

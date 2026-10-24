@@ -304,7 +304,12 @@ test("database: OPAC, recommendations, inventory, and history follow the copy li
     const historicalBook = historicalUsage.rows.find((row) => row.title === fixture.title);
     assert.equal(Number(historicalBook?.borrowings), 1);
     const patronHistory = await myLibraryRepository.findBorrowHistory(fixture.userId);
-    assert.ok(patronHistory.some((row) => Number(row.copy_id) === fixture.copyId && row.copy_barcode === fixture.barcode));
+    assert.ok(patronHistory.some((row) => row.title === fixture.title));
+    for (const row of patronHistory) {
+      for (const field of ["copy_id", "copy_barcode", "accession_number"]) {
+        assert.equal(Object.hasOwn(row, field), false, `patron history omits ${field}`);
+      }
+    }
   } finally {
     await catalogSettings.updateCatalogSettings(initialSettings.show_unheld_in_opac, 1);
   }

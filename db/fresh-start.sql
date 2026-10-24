@@ -1465,7 +1465,7 @@ ON DUPLICATE KEY UPDATE `overdue_fine_per_hour` = VALUES(`overdue_fine_per_hour`
 INSERT INTO `catalog_settings` (`id`, `show_unheld_in_opac`) VALUES (1, 1)
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 INSERT INTO `site_content_settings` (`id`, `hero_kicker`, `hero_title`, `hero_highlight`, `hero_description`, `hours`, `hero_stats`, `address`, `contact_email`, `contact_phone`) VALUES
-(1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '123 University Avenue, Building C, 2nd Floor', 'library@college.edu', '(555) 123-4567')
+(1, 'Manuel S. Enverga University Foundation — Candelaria Inc.', 'Enverga-Candelaria', 'Library', 'Digitalized inventory tracking, book reservations, and seamless access to library services — built for academic excellence.', '[{"day":"Monday – Friday","time":"7:00 AM – 9:00 PM","open":true},{"day":"Saturday","time":"8:00 AM – 5:00 PM","open":true},{"day":"Sunday","time":"Closed","open":false}]', '[{"value":"12,000+","label":"Volumes"},{"value":"400+","label":"Journals"},{"value":"24/7","label":"Digital Access"}]', '', '', '')
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
 INSERT INTO `auth_restore_state` (`id`) VALUES (1)
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);

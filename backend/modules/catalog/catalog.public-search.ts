@@ -96,7 +96,10 @@ function buildPublicCatalogWhere(filters: PublicCatalogFilters, { showUnheldInOp
     conditions.push(`bk.material_type = 'book' AND ${filters.availability === "available" ? available : `NOT ${available}`}`);
   }
   if (!omitFacets && filters.category) {
-    conditions.push("LOWER(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))) = LOWER(?)");
+    const category = "NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(bk.metadata, '$.category'))), '')";
+    conditions.push(filters.category.toLowerCase() === "uncategorized"
+      ? `(${category} IS NULL OR ${category} = 'null' OR LOWER(${category}) = LOWER(?))`
+      : `LOWER(${category}) = LOWER(?)`);
     params.push(filters.category);
   }
 
@@ -119,10 +122,9 @@ function extractPublicCategories(rows: PublicCatalogRow[]): Array<{ value: strin
     if (typeof metadata === "string") {
       try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
     }
-    if (!metadata || typeof metadata !== "object") continue;
-    const value = String((metadata as Record<string, any>).category ?? "").trim();
+    const raw = metadata && typeof metadata === "object" ? (metadata as Record<string, any>).category : null;
+    const value = raw == null || String(raw).trim() === "" || String(raw).trim() === "null" ? "Uncategorized" : String(raw).trim();
     const key = value.toLocaleLowerCase();
-    if (!value) continue;
     const current = categories.get(key) ?? { value, count: 0 };
     current.count += 1;
     categories.set(key, current);

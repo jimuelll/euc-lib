@@ -20,7 +20,7 @@ test("public catalogue filter builder combines search, format, availability, and
   assert.match(where.clause, /bk\.isbn LIKE \?/);
   assert.match(where.clause, /bk\.material_type = \?/);
   assert.match(where.clause, /book_copies filter_copy/);
-  assert.match(where.clause, /LOWER\(JSON_UNQUOTE\(JSON_EXTRACT\(bk\.metadata, '\$\.category'\)\)\) = LOWER\(\?\)/);
+  assert.match(where.clause, /LOWER\(NULLIF\(TRIM\(JSON_UNQUOTE\(JSON_EXTRACT\(bk\.metadata, '\$\.category'\)\)\), ''\)\) = LOWER\(\?\)/);
   assert.doesNotMatch(where.clause, /\$\.subjects/);
   assert.deepEqual(where.params, ["%history%", "%history%", "%history%", "%history%", "%atlas%", "%lee%", "%9780%", "book", "General Reference"]);
   assert.equal(filters.page, 3);
@@ -37,10 +37,25 @@ test("public category facet counts one category per catalog record", () => {
     { metadata: JSON.stringify({ category: "History", subjects: ["Oral History", "History"] }) },
     { metadata: { category: "History", subjects: ["Oral History", "Archives"] } },
     { metadata: "invalid json" },
+    { metadata: null },
+    { metadata: { category: "  " } },
+    { metadata: { category: "Uncategorized" } },
+    { metadata: { category: null } },
   ]);
   assert.deepEqual(categories, [
+    { value: "Uncategorized", count: 5 },
     { value: "History", count: 2 },
   ]);
+});
+
+test("uncategorized filtering includes missing, blank, JSON null, and explicit categories", () => {
+  const filters = normalizePublicCatalogFilters({ category: "Uncategorized" });
+  const where = buildPublicCatalogWhere(filters);
+  assert.match(where.clause, /NULLIF\(TRIM\(JSON_UNQUOTE\(JSON_EXTRACT/);
+  assert.match(where.clause, /IS NULL OR/);
+  assert.match(where.clause, /= 'null' OR LOWER/);
+  assert.deepEqual(where.params, ["Uncategorized"]);
+  assert.doesNotMatch(buildPublicCatalogWhere(filters, { omitFacets: true }).clause, /category/);
 });
 
 test("publication year filters are parameterized and availability sorting uses the recorded count", () => {

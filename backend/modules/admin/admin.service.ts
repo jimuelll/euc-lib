@@ -85,7 +85,7 @@ const roleProfile = (input: UserInput, role: string): UserProfile => {
 const createUser = async (input: UserInput, creatorRole: string, creatorId: number | null = null) => {
   const { name, role: requestedRole, address, contact, program_id, academic_term_id, department_id, year_level, email } = input;
   const role = String(requestedRole || "");
-  if (!roleHierarchy[creatorRole]?.includes(role)) throw new Error("You are not allowed to create a user with this role");
+  if (!(creatorRole === "super_admin" && role === "super_admin") && !roleHierarchy[creatorRole]?.includes(role)) throw forbidden("You are not allowed to create a user with this role");
   if (role === creatorRole && creatorRole !== "super_admin") throw new Error("You cannot create a user with your own role");
   if (Object.prototype.hasOwnProperty.call(input,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
   if (!String(name || "").trim()) throw new Error("Name is required");
@@ -227,11 +227,15 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     await conn.beginTransaction();
     const existing = await repository.findUserForUpdate(student_employee_id, conn);
     if (!existing) throw Object.assign(new Error("User not found"), { status: 404 });
-    if (!roleHierarchy[requesterRole]?.includes(existing.role)) throw forbidden("You are not allowed to update this user");
+    const isOwnSuperAdmin = requesterRole === "super_admin" && existing.role === "super_admin" && existing.id === requesterId;
+    if (!isOwnSuperAdmin && !roleHierarchy[requesterRole]?.includes(existing.role)) throw forbidden("You are not allowed to update this user");
+    if (isOwnSuperAdmin && ((updates.role !== undefined && updates.role !== existing.role) || (updates.is_active !== undefined && updates.is_active !== 1 && updates.is_active !== true))) {
+      throw forbidden("You cannot change your own super admin role or deactivate your own account");
+    }
     const normalized: Record<string, unknown> = {};
     const nextRole = String(updates.role || existing.role);
     if (updates.name) normalized.name = updates.name;
-    if (updates.role) {
+    if (updates.role && !isOwnSuperAdmin) {
       const role = String(updates.role);
       if (!roleHierarchy[requesterRole]?.includes(role)) throw forbidden("You are not allowed to assign this role");
       if (role === requesterRole) throw forbidden("You cannot assign a user with your own role");

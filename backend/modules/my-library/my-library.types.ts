@@ -26,7 +26,6 @@ export interface ActiveBorrowRow extends RowDataPacket, LibraryCoverFields {
   due_date: Date | string | null;
   status: string;
   notes: string | null;
-  copy_barcode: string | null;
   fine_amount?: number | string | null;
 }
 
@@ -38,9 +37,6 @@ export interface BorrowHistoryRow extends RowDataPacket, LibraryCoverFields {
   returned_at: Date | string | null;
   due_date: Date | string | null;
   status: string;
-  copy_id: number | null;
-  copy_barcode: string | null;
-  accession_number: string | null;
 }
 
 export interface ActiveReservationRow extends RowDataPacket, LibraryCoverFields {
@@ -81,9 +77,6 @@ export interface HistoryItemRow extends RowDataPacket, LibraryCoverFields {
   borrowed_at: Date | string | null;
   returned_at: Date | string | null;
   reserved_at: Date | string | null;
-  copy_id: number | null;
-  copy_barcode: string | null;
-  accession_number: string | null;
 }
 
 export interface AttendanceSession {
