@@ -59,7 +59,7 @@ describe("recommendation cards", () => {
     expect(screen.queryByRole("img", { name: "AI recommendation" })).not.toBeInTheDocument();
     expect(screen.queryByText("Browse all")).not.toBeInTheDocument();
     expect(screen.getByText("Cover book").closest("a")).toHaveAttribute("href", "/catalogue?q=Cover%20book");
-    expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
 
     fireEvent.error(cover);
     await waitFor(() => expect(cover).toHaveAttribute("src", "/book-cover-fallback.svg"));
@@ -67,7 +67,7 @@ describe("recommendation cards", () => {
     expect(await screen.findByText("Unavailable book")).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByText("Unavailable")).toBeInTheDocument();
-    expect(screen.getByText("2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
   }, 12000);
 
   it("omits generic reasons while keeping specific reasons and discloses AI once", async () => {
@@ -87,7 +87,7 @@ describe("recommendation cards", () => {
     fetchRecommendations.mockResolvedValue({ rows: Array.from({ length: 8 }, (_, index) => row({ id: index + 1, title: `Book ${index + 1}` })) });
     render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
 
-    expect(await screen.findByText(`1 of ${pages}`)).toBeInTheDocument();
+    expect(await screen.findByText(`Page 1 of ${pages}`)).toBeInTheDocument();
     expect(screen.getAllByRole("article")).toHaveLength(cards);
   });
 
@@ -98,11 +98,11 @@ describe("recommendation cards", () => {
     fetchRecommendations.mockResolvedValueOnce({ rows: firstSet }).mockResolvedValueOnce({ rows: secondSet });
     const { rerender } = render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} /></MemoryRouter></QueryWrapper>);
     fireEvent.click(await screen.findByRole("button", { name: "Next recommendations" }));
-    expect(screen.getByText("2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
 
     rerender(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={43} /></MemoryRouter></QueryWrapper>);
     expect(await screen.findByText("Second set 1")).toBeInTheDocument();
-    expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
   });
 
   it("keeps a personal recommendation page valid after a dismissal", async () => {
@@ -111,10 +111,10 @@ describe("recommendation cards", () => {
       .mockResolvedValue({ rows: Array.from({ length: 4 }, (_, index) => row({ id: index + 1, title: `Personal book ${index + 1}` })) });
     render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" personal /></MemoryRouter></QueryWrapper>);
     fireEvent.click(await screen.findByRole("button", { name: "Next recommendations" }));
-    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Not interested in Personal book 5" }));
 
-    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(1));
     expect(screen.getByText("Personal book 4")).toBeInTheDocument();
     expect(screen.queryByText("Personal book 5")).not.toBeInTheDocument();
@@ -135,4 +135,36 @@ describe("recommendation cards", () => {
     await waitFor(() => expect(dismissRecommendation).toHaveBeenCalledWith(3));
     await waitFor(() => expect(screen.queryByText("Thesis example")).not.toBeInTheDocument());
   });
+});
+
+
+it("uses compact catalogue covers, copy counts and one AI disclosure", async () => {
+  setViewport(390);
+  fetchRecommendations.mockResolvedValue({ rows: [
+    row({ id: 1, title: "A specific book", source: "ai", reason: "Similar subject and catalogue details", total_copies: 1 }),
+    row({ id: 2, title: "Another book", reason: "Same author: Test Author", available: 2, total_copies: 3 }),
+  ] });
+  render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} compact /></MemoryRouter></QueryWrapper>);
+  expect(await screen.findByRole("img", { name: "Cover not available: A specific book" })).toBeInTheDocument();
+  expect(screen.getByText("1 copy")).toBeInTheDocument();
+  expect(screen.getByText("2 of 3 copies")).toBeInTheDocument();
+  expect(screen.getAllByText("Includes AI selections, ranked by relevance")).toHaveLength(1);
+  expect(screen.getAllByLabelText("AI recommendation")).toHaveLength(1);
+  expect(screen.queryByText("Similar subject and catalogue details")).not.toBeInTheDocument();
+  expect(screen.getByText("Same author: Test Author")).toBeInTheDocument();
+});
+
+
+it("omits generic compact reasons and AI marks when selections are rule-based", async () => {
+  setViewport(390);
+  fetchRecommendations.mockResolvedValue({ rows: [
+    row({ id: 1, title: "Generic reason book", reason: "Related catalogue title" }),
+    row({ id: 2, title: "Specific reason book", reason: "Similar category: Fiction" }),
+  ] });
+  render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} compact /></MemoryRouter></QueryWrapper>);
+  expect(await screen.findByText("Generic reason book")).toBeInTheDocument();
+  expect(screen.queryByText("Related catalogue title")).not.toBeInTheDocument();
+  expect(screen.getByText("Similar category: Fiction")).toBeInTheDocument();
+  expect(screen.queryByLabelText("AI recommendation")).not.toBeInTheDocument();
+  expect(screen.queryByText("Includes AI selections, ranked by relevance")).not.toBeInTheDocument();
 });

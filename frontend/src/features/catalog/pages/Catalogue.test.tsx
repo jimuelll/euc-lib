@@ -37,14 +37,14 @@ const renderCatalogue = (materialType: "book" | "thesis", initialEntry = "/catal
 };
 
 describe("catalogue recommendation action", () => {
-  it("exposes the availability switch state in words and filters the query", async () => {
+  it("exposes the availability switch state accessibly and filters the query", async () => {
     renderCatalogue("book");
     await screen.findByRole("button", { name: "Sample catalogue title" }, { timeout: 10000 });
-    const toggle = screen.getByRole("switch", { name: /Available now: off/ });
+    const toggle = screen.getByRole("switch", { name: /Available now/ });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText("1 of 1 copies available")).toBeInTheDocument();
+    expect(screen.getByText("1 copy")).toBeInTheDocument();
     fireEvent.click(toggle);
-    expect(screen.getByRole("switch", { name: /Available now: on/ })).toBeChecked();
+    expect(screen.getByRole("switch", { name: /Available now/ })).toBeChecked();
     await waitFor(() => expect(searchPublicCatalogue).toHaveBeenLastCalledWith(expect.objectContaining({ availability: "available" }), expect.any(AbortSignal)));
   }, 20000);
   it("disables loaded zero-result choices while keeping the selected choice and reset usable", async () => {
@@ -106,7 +106,7 @@ describe("catalogue reservation links", () => {
     expect(link).toHaveAttribute("href", "/services/borrowing?bookId=14");
     expect(link).toHaveClass("catalogue-primary");
     const side = link.closest(".catalogue-record-side")!;
-    expect(side).toHaveTextContent("1 of 1 copies available");
+    expect(side).toHaveTextContent("1 copy");
     expect(side).not.toContainElement(screen.getByRole("button", { name: "View similar books for Sample catalogue title" }));
     fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
     expect(screen.getByRole("link", { name: "Reserve Sample catalogue title" })).toHaveAttribute("href", "/services/borrowing?bookId=14");
@@ -115,5 +115,31 @@ describe("catalogue reservation links", () => {
     renderCatalogue("thesis");
     await screen.findByRole("button", { name: "Sample catalogue title" });
     expect(screen.queryByRole("link", { name: /^Reserve/ })).not.toBeInTheDocument();
+  });
+});
+
+
+describe("grid recommendation placement", () => {
+  it("opens one row panel at a time and returns focus on Escape", async () => {
+    const QueryWrapper = createTestQueryClientWrapper();
+    searchPublicCatalogue.mockResolvedValue({
+      rows: [14, 15, 16].map(id => ({ id, title: `Book ${id}`, author: "Author", available: 1, registered_copies: 1 })),
+      pagination: { page: 1, limit: 20, total: 3, totalPages: 1 },
+      facets: { format: { all: 3, book: 3, thesis: 0 }, availability: { all: 3, available: 3, unavailable: 0 }, categories: [] },
+    });
+    render(<QueryWrapper><MemoryRouter initialEntries={["/catalogue?view=grid"]}><Catalogue /></MemoryRouter></QueryWrapper>);
+    const first = await screen.findByRole("button", { name: "View books similar to Book 14" });
+    fireEvent.click(first);
+    expect(screen.getAllByRole("region", { name: "Similar books" })).toHaveLength(1);
+    expect(document.querySelector(".catalogue-panel-row")?.parentElement).toHaveClass("is-grid");
+    expect(first).toHaveAttribute("aria-expanded", "true");
+    const second = screen.getByRole("button", { name: "View books similar to Book 15" });
+    fireEvent.click(second);
+    expect(screen.getAllByRole("region", { name: "Similar books" })).toHaveLength(1);
+    expect(first).toHaveAttribute("aria-expanded", "false");
+    expect(second).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Similar books" })).not.toBeInTheDocument();
+    expect(second).toHaveFocus();
   });
 });
