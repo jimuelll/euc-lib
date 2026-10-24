@@ -199,10 +199,6 @@ export default function MyLibraryCurrentPanel({
                         item.status === "ready" ? "Pickup deadline unavailable" : "Waiting deadline unavailable",
                       )}
                   </p>
-                  <p className="break-words text-muted-foreground">
-                    {item.status === "ready" ? "Pickup: " : "Location: "}
-                    {item.location || "Main circulation desk"}
-                  </p>
                   <p className="text-muted-foreground">
                     Reserved {formatDate(item.reserved_at)}
                   </p>
