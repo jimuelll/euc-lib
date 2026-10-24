@@ -67,7 +67,7 @@ export default function ReserveTab(props: ReserveTabProps) {
       setMessage(notice); toast.success(notice);
       focusSuccess.current = true;
       setConfirmationBook(null);
-      onReserveSuccess({ id: result.reservationId, book_id: book.id, title: book.title, author: book.author, location: book.location, status: "pending", reserved_at: new Date().toISOString(), expires_at: result.expiresAt }, book.id);
+      onReserveSuccess({ id: result.reservationId, book_id: book.id, title: book.title, author: book.author, status: "pending", reserved_at: new Date().toISOString(), expires_at: result.expiresAt }, book.id);
     } catch (error) { setConfirmationError(getApiErrorMessage(error, "Failed to reserve book. Please try again.")); }
     finally { reservationInFlight.current = false; setReservingId(null); }
   };
@@ -89,7 +89,7 @@ export default function ReserveTab(props: ReserveTabProps) {
       const initials = book.title.replace(/^(the|a)\s/i, "").split(/\s+/).slice(0, 2).map(word => word[0]).join("").toUpperCase();
       return <article className="reservation-book" key={book.id}>
         <div className="reservation-cover" aria-hidden="true" style={{ "--reservation-cover-color": colors[book.id % colors.length] } as CSSProperties}>{initials}</div>
-        <div className="reservation-book-copy"><h3>{book.title}</h3><small>{book.author || "Unknown author"}</small><p className={"reservation-book-availability " + (book.available > 0 ? "is-available" : "")}>{book.material_type === "thesis" ? "Reference only" : book.registered_copies === 0 ? "Not on the shelf yet" : `${book.available} of ${book.registered_copies ?? book.copies} copies available`}</p>{waiting && !reserved && <small id={`reservation-wait-${book.id}`}>Wait for a copy to become available. Waiting reservations expire after 24 hours.</small>}{book.location && <small>{book.location}</small>}</div>
+        <div className="reservation-book-copy"><h3>{book.title}</h3><small>{book.author || "Unknown author"}</small><p className={"reservation-book-availability " + (book.available > 0 ? "is-available" : "")}>{book.material_type === "thesis" ? "Reference only" : book.registered_copies === 0 ? "Not on the shelf yet" : `${book.available} of ${book.registered_copies ?? book.copies} copies available`}</p>{waiting && !reserved && <small id={`reservation-wait-${book.id}`}>Wait for a copy to become available. Waiting reservations expire after 24 hours.</small>}</div>
         <button className="service-button" aria-describedby={waiting && !reserved ? `reservation-wait-${book.id}` : undefined} disabled={busy || dataLoading || !!props.activeError || reserved || !eligible} onClick={event => { triggerRef.current = event.currentTarget; focusSuccess.current = false; setConfirmationError(""); setConfirmationBook(book); }}>{reservingId === book.id ? <><Loader2 className="animate-spin" aria-hidden="true" />Reserving…</> : reserved ? "Reserved" : full ? "Reservations full" : !eligible ? "Unavailable" : waiting ? "Reserve when returned" : "Reserve"}</button>
       </article>;
     })}
@@ -99,7 +99,7 @@ export default function ReserveTab(props: ReserveTabProps) {
     {targetId && !dataLoading && !props.activeError && !targetPresent && <p role="status">This reservation is no longer active.</p>}
     {props.activeError ? <div className="service-error" role="alert"><p>{props.activeError}</p><button className="service-link" onClick={props.onRetryActive}>Try again</button></div> : dataLoading ? <p className="service-empty" role="status">Loading your reservations…</p> : !activeReservations.length ? <p className="service-empty">No active reservations. Reserve a book from the list.</p> : activeReservations.map(res => {
       const expiry = expiryLabel(res.expires_at, now);
-      return <div className="reservation-held" id={`reservation-${res.id}`} tabIndex={-1} aria-label={`Reservation for ${res.title}`} key={res.id}><h3>{res.title}</h3><small>{res.author}</small>{res.location && <small>{res.location}</small>}
+      return <div className="reservation-held" id={`reservation-${res.id}`} tabIndex={-1} aria-label={`Reservation for ${res.title}`} key={res.id}><h3>{res.title}</h3><small>{res.author}</small>
         <div className="reservation-held-meta"><div><small>{res.status === "ready" ? "Pick up by" : "Waiting expires"}</small><br /><strong>{expiry?.date ?? "Not yet set"}</strong>{expiry && <small> · {expiry.remaining}</small>}</div><span className={"reservation-status " + (res.status === "ready" ? "is-ready" : "")}>{res.status === "ready" ? <CheckCircle2 aria-hidden="true" /> : <Clock aria-hidden="true" />}{res.status === "ready" ? "Ready" : "Pending"}</span></div>
         {res.notes && <p className="reservation-notes">{res.notes}</p>}
         {res.status === "pending" && (confirmId === res.id ? <div className="reservation-confirm"><span>Cancel this reservation?</span><button className="service-button is-outline" disabled={busy} onClick={() => void handleCancel(res)}>{cancellingId === res.id ? "Cancelling…" : "Yes, cancel"}</button><button className="service-link" disabled={busy} onClick={() => setConfirmId(null)}>Keep it</button></div> : <button className="service-link" disabled={busy} aria-label={`Cancel reservation for ${res.title}`} onClick={() => setConfirmId(res.id)}>Cancel reservation</button>)}
