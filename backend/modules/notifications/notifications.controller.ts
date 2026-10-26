@@ -85,9 +85,11 @@ catch (error) {
 const createAdminNotification = adminHandler(req => admin.create(req.body, (req as AuthenticatedRequest).user.id), 201);
 const listAdminNotifications = adminHandler(req => admin.list(req.query));
 const countAdminRecipients = adminHandler(async (req) => ({ count: await admin.count(req.query) }));
+const previewAdminEmail = adminHandler(req => admin.emailPreview(req.query));
 const notificationDetails = adminHandler(req => admin.details(String(req.params.key)));
 const notificationAction = adminHandler(req => admin.action(String(req.params.key), String(req.params.action), (req as AuthenticatedRequest).user.id, req.body));
 export = {
+    previewAdminEmail,
     countAdminRecipients,
     notificationDetails,
     notificationAction,

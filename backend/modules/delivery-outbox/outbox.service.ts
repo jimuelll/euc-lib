@@ -5,6 +5,10 @@ let draining = false;
 
 async function dispatch(row: DeliveryOutboxRow): Promise<void> {
   if (row.event_type === "notification") {
+    if (row.payload.manualNotification === true || (row.payload.createdBy != null && !row.payload.sourceType)) {
+      await require('../notifications/notifications.email.service').publish({...row.payload,sendEmail:row.payload.sendEmail===true && !row.payload.suppressEmail,deliveryKey:row.id});
+      return;
+    }
     const notifications = require("../notifications/notifications.service");
     await notifications.createNotification({ ...row.payload, deliveryKey: row.id });
     await require("../email/email.service").queueNotification(row.payload, row.id, row.created_at);

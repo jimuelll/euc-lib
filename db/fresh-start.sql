@@ -622,6 +622,9 @@ CREATE TABLE `notifications` (
   `source_type` varchar(50) DEFAULT NULL,
   `source_id` bigint(20) DEFAULT NULL,
   `delivery_key` varchar(64) DEFAULT NULL,
+  `email_requested` tinyint(1) NOT NULL DEFAULT 0,
+  `email_batch_id` char(36) DEFAULT NULL,
+  `email_expires_at` datetime DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -1650,6 +1653,8 @@ CREATE TABLE email_request_limits (
   requests int UNSIGNED NOT NULL
 ) ENGINE=InnoDB;
 CREATE TABLE email_deliveries (
+  notification_id bigint(20) UNSIGNED DEFAULT NULL,
+  KEY idx_email_notification (notification_id,status),
   id char(36) NOT NULL PRIMARY KEY,
   user_id bigint UNSIGNED NOT NULL,
   recipient varchar(255) NOT NULL,

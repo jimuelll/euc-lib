@@ -54,6 +54,8 @@ require('./audit.feed.test');
 require('./backup.safety.test.js');
 
 require("./email.workflows.test");
+require('./notifications.email.test');
+require('./notifications.email.database.integration.test');
 
 require("./email.database.integration.test");
 

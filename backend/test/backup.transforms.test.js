@@ -16,11 +16,18 @@ test("backup values preserve buffers and normalize JSON for restore", () => {
   assert.throws(() => decodeValue("{broken", "json"), /invalid JSON/i);
 });
 
+test('version 18 notifications upgrade to in-app-only defaults without creating email intent',()=>{
+ const backup={format:'euc-library-backup',version:18,tables:{notifications:[{id:7,title:'Existing announcement'}]}};
+ backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};
+ const upgraded=upgradeBackup(backup);assert.equal(upgraded.version,19);
+ assert.deepEqual(upgraded.tables.notifications[0],{id:7,title:'Existing announcement',email_requested:0,email_batch_id:null,email_expires_at:null});
+});
+
 test("version 15 snapshots upgrade with empty private drafts and a verified checksum", () => {
   const backup = {format:"euc-library-backup",version:15,tables:{books:[]}};
   backup.integrity={algorithm:"sha256",checksum:payloadChecksum(backup)};
   const upgraded=upgradeBackup(backup);
-  assert.equal(upgraded.version,18);
+  assert.equal(upgraded.version,19);
   assert.deepEqual(upgraded.tables.website_content_drafts,[]);
   assert.ok(upgraded.tableManifest.includes("website_content_drafts"));
   assert.equal(upgraded.integrity.checksum,payloadChecksum(upgraded));

@@ -52,3 +52,14 @@
 .notification-drawer button:disabled {opacity:1;background:hsl(var(--muted));color:hsl(var(--muted-foreground));border-color:hsl(var(--border));}
 .notifications-workspace :is(button,a,input,textarea):focus-visible,.notification-drawer :is(button,a,input,textarea):focus-visible {outline:2px solid hsl(var(--ring));outline-offset:3px;}
 @media(max-width:640px){.notifications-workspace {gap:20px;}.notifications-workspace .admin-desk-header-actions {width:100%;flex-wrap:wrap;}.notification-row {grid-template-columns:minmax(0,1fr) 40px;gap:12px;padding:16px 12px;}.notification-row > .notification-delivery {grid-column:1;grid-row:2;flex-direction:row;align-items:center;}.notification-row > button {grid-column:2;grid-row:1;align-self:start;}.notification-drawer .admin-record-footer > .notification-footer-scope {flex-basis:100%;}.notification-drawer .admin-record-footer > button {flex:1;min-height:44px;}.notification-pagination {flex-wrap:wrap;}.notification-pagination > span {flex-basis:100%;}.notification-row-top {gap:8px;} .notifications-workspace .admin-desk-page-tabs {overflow-x:auto;flex-wrap:nowrap;}.notification-search input {font-size:16px;}}
+
+.notification-email-options,.notification-email-results {border-block:1px solid hsl(var(--border));padding:16px 0;display:flex;flex-direction:column;gap:10px;}
+.notification-email-toggle {display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer;}
+.notification-email-toggle input {width:18px;height:18px;flex-shrink:0;accent-color:hsl(var(--primary));}
+.notification-email-toggle input:focus-visible {outline:2px solid hsl(var(--ring));outline-offset:3px;}
+.notification-email-options p,.notification-email-results p {font-size:14px;line-height:1.6;overflow-wrap:anywhere;}
+.notification-email-options [aria-live] {display:flex;flex-direction:column;gap:8px;}
+.notification-email-results h4 {font-weight:600;}
+.notification-email-results dl {display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;}
+.notification-email-results dl>div {display:flex;justify-content:space-between;gap:8px;}
+.notification-email-results dd {font-variant-numeric:tabular-nums;font-weight:600;}

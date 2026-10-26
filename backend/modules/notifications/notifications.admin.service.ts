@@ -1,10 +1,13 @@
 import * as repository from './notifications.admin.repository';
 import notifications = require('./notifications.service');
 import hub = require('../../realtime/notificationHub');
+import * as email from './notifications.email.service';
+import * as emailRepository from './notifications.email.repository';
 const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
 const roles = ['student', 'alumni', 'employee', 'scanner', 'staff', 'admin', 'super_admin'];
 const destinations = ['/my-library', '/bulletin', '/services/borrowing', '/catalogue'];
 export function validate(input: any, now = new Date()) {
+    if (input.sendEmail !== undefined && typeof input.sendEmail !== 'boolean') fail('Choose whether to send email.');
     if (typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200)
         fail('Enter a title of up to 200 characters.');
     if (typeof input.body !== 'string' || !input.body.trim() || input.body.length > 2000)
@@ -25,10 +28,13 @@ export function validate(input: any, now = new Date()) {
     const expires = input.expiresAt ? new Date(input.expiresAt) : null;
     if (expires && (!Number.isFinite(expires.getTime()) || expires <= (scheduled || now)))
         fail('Expiry must be after the send time.');
-    return { type: input.type, title: input.title.trim(), body: input.body.trim(), href: input.href || null, audienceType: input.audienceType, audienceUserId: input.audienceType === 'user' ? Number(input.audienceUserId) : null, audienceRole: input.audienceType === 'role' ? input.audienceRole : null, expiresAt: expires, scheduledAt: scheduled };
+    return { type: input.type, title: input.title.trim(), body: input.body.trim(), href: input.href || null, audienceType: input.audienceType, audienceUserId: input.audienceType === 'user' ? Number(input.audienceUserId) : null, audienceRole: input.audienceType === 'role' ? input.audienceRole : null, expiresAt: expires, scheduledAt: scheduled,sendEmail:input.sendEmail === true };
 }
 export async function count(input: any) { const type = String(input.audienceType || 'all'); if (!['all', 'role', 'user'].includes(type) || type === 'role' && !roles.includes(input.audienceRole))
-    fail('Choose a valid audience.'); return repository.audienceCount(type, input.audienceRole || null, Number(input.audienceUserId) || null); }
+    fail('Choose a valid audience.');
+    if (type==='user' && (!Number.isSafeInteger(Number(input.audienceUserId)) || Number(input.audienceUserId)<1)) fail('Select an active patron.');
+    return repository.audienceCount(type, input.audienceRole || null, Number(input.audienceUserId) || null); }
+export async function emailPreview(input:any) { await count(input); return email.preview(input); }
 export async function create(input: any, actor: number) {
     const value = validate(input);
     const recipients = await count(value);
@@ -36,11 +42,18 @@ export async function create(input: any, actor: number) {
         fail('This audience has no active recipients.');
     if (value.audienceType !== 'user' && Number(input.confirmedRecipientCount) !== recipients)
         fail('The recipient count changed. Review the audience and confirm again.', 409);
+    if (value.sendEmail) {
+        const preview = await email.preview(value);
+        if (!preview.enabled) fail(preview.reason || 'Email delivery is paused.',409);
+        if (!preview.emailCount) fail('This audience has no verified email recipients. Uncheck email to send in-app only.',409);
+        if (Number(input.confirmedEmailCount)!==preview.emailCount || Number(input.confirmedRecipientCount)!==preview.inAppCount) fail('The recipient counts changed. Review and confirm again.',409);
+    }
     const { scheduledAt, ...payload } = value;
     if (scheduledAt) {
-        const queueId = await repository.enqueue({ ...payload, createdBy: actor, scheduledAt: scheduledAt.toISOString() }, scheduledAt);
+        const queueId = await repository.enqueue({ ...payload, manualNotification:true,createdBy: actor, scheduledAt: scheduledAt.toISOString() }, scheduledAt);
         return { queueId, status: 'scheduled', recipientCount: recipients };
     }
+    if (value.sendEmail) return email.publish({...payload,createdBy:actor},{total:Number(input.confirmedRecipientCount),email:Number(input.confirmedEmailCount)});
     return notifications.createNotification({ ...payload, createdBy: actor });
 }
 export async function list(input: any) {
@@ -79,7 +92,10 @@ export async function action(key: string, action: string, actor: number, input: 
             fail('Delivery already started. Refresh and try again.', 409);
         return { success: true };
     }
-    return notifications.createNotification({ type: record.type, title: record.title, body: record.body, href: record.href, audienceType: record.audience_type, audienceUserId: record.audience_user_id, audienceRole: record.audience_role, expiresAt: null, createdBy: actor, sourceType: record.source_type });
+    fail('Open the compose form to resend with fresh recipient confirmation.',409);
 }
 export async function details(key: string) { const record = await repository.get(key); if (!record)
-    fail('Notification not found.', 404); const day = new Date(record.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Ulaanbaatar' }); return record.origin === 'automatic' ? repository.group(record.type, day, record.delivery_status) : [record]; }
+    fail('Notification not found.', 404); const day = new Date(record.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Ulaanbaatar' });
+    const rows=record.origin === 'automatic' ? await repository.group(record.type, day, record.delivery_status) : [record];
+    return Promise.all(rows.map(async row=>({...row,email_requested:Boolean(Number(row.email_requested)),email_summary:row.email_batch_id ? await emailRepository.summary(row.id,row.email_batch_id) : null})));
+}

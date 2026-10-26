@@ -5,13 +5,13 @@ import { provider, prepareEmailRequest, SendFailure, type EmailMessage } from '.
 import outbox = require('../delivery-outbox/outbox.repository');
 const db = require('../../db') as Pool;
 type Connection = Pool | PoolConnection;
-interface Delivery extends RowDataPacket { id: string; user_id: number; recipient: string; purpose: string; priority: number; challenge_id: string | null; content_encrypted: string | null; context_json: string | Record<string, unknown> | null; attempts: number; status: string }
+interface Delivery extends RowDataPacket { id: string; user_id: number; recipient: string; purpose: string; priority: number; challenge_id: string | null; content_encrypted: string | null; context_json: string | Record<string, unknown> | null; attempts: number; status: string; notification_id?:number|null }
 export interface QueueEmail { userId: number; recipient: string; purpose: string; dedupeKey: string; challengeId?: string; security?: boolean; expiresAt: Date; message?: EmailMessage; context?: Record<string, unknown> }
 export async function enqueue(conn: PoolConnection, input: QueueEmail): Promise<string | null> {
   if (!config().enabled) return null;
   const id = randomUUID();
-  await conn.query(`INSERT INTO email_deliveries (id,user_id,recipient,purpose,dedupe_key,challenge_id,priority,content_encrypted,context_json,expires_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE id=id`, [id,input.userId,input.recipient,input.purpose,input.dedupeKey,input.challengeId || null,input.security ? 1 : 0,input.message ? protect(input.message) : null, JSON.stringify(input.context || {}),sqlDate(input.expiresAt)]);
+  await conn.query(`INSERT INTO email_deliveries (id,user_id,recipient,purpose,dedupe_key,challenge_id,priority,content_encrypted,context_json,expires_at,next_attempt_at,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE id=id`, [id,input.userId,input.recipient,input.purpose,input.dedupeKey,input.challengeId || null,input.security ? 1 : 0,input.message ? protect(input.message) : null, JSON.stringify(input.context || {}),sqlDate(input.expiresAt)]);
   const [[row]] = await conn.query<RowDataPacket[]>('SELECT id FROM email_deliveries WHERE dedupe_key=?',[input.dedupeKey]);
   if (row.id !== id) return row.id;
   await outbox.enqueue('email', { deliveryId: row.id }, conn, row.id);
@@ -63,7 +63,7 @@ export async function queueNotification(payload: Record<string, unknown>, eventI
   } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
 }
 async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage | null> {
-  const [[user]] = await conn.query<RowDataPacket[]>('SELECT id,email,pending_email,email_verified_at,name,is_active,deleted_at,setup_pending FROM users WHERE id=?',[row.user_id]);
+  const [[user]] = await conn.query<RowDataPacket[]>('SELECT id,email,pending_email,email_verified_at,name,is_active,deleted_at,setup_pending,role FROM users WHERE id=?',[row.user_id]);
   if (!user || !user.is_active || user.deleted_at) return null;
   const context = (typeof row.context_json === 'string' ? JSON.parse(row.context_json) : row.context_json) || {};
   if (row.challenge_id) {
@@ -71,6 +71,16 @@ async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage |
     if (!challenge || challenge.email !== row.recipient || ![user.email,user.pending_email].filter(Boolean).map(value=>String(value).trim().toLowerCase()).includes(row.recipient)) return null;
     if (challenge.purpose === 'recovery' && (!user.email_verified_at || String(user.email).trim().toLowerCase() !== row.recipient || user.setup_pending)) return null;
   } else if (!context.oldVerifiedAddress && (!user.email_verified_at || user.setup_pending || String(user.email).trim().toLowerCase() !== row.recipient)) return null;
+  if (row.purpose==='manual_notification') {
+    if (!row.notification_id || !context.manualBatch) return null;
+    const [[notice]]=await conn.query<RowDataPacket[]>(`SELECT * FROM notifications WHERE id=? AND email_batch_id=? AND email_requested=1
+      AND is_active=1 AND (expires_at IS NULL OR expires_at>NOW()) AND email_expires_at>UTC_TIMESTAMP()`,[row.notification_id,context.manualBatch]);
+    if (!notice || (notice.audience_type==='role' && notice.audience_role!==user.role) || (notice.audience_type==='user' && Number(notice.audience_user_id)!==Number(user.id))) return null;
+    const destinations=['/my-library','/bulletin','/services/borrowing','/catalogue'];
+    if (notice.href && !destinations.includes(notice.href)) throw new SendFailure('permanent','Invalid notification email destination');
+    return {recipient:row.recipient,name:user.name,subject:notice.title,message:notice.body,
+      ...(notice.href ? {action_url:new URL(notice.href,config().url).href,action_label:'Open library'} : {})};
+  }
   if (!row.priority && context.sourceId) {
     if (context.sourceType === 'reservation') {
       const [[reservation]] = await conn.query<RowDataPacket[]>('SELECT status,expires_at,deleted_at FROM reservations WHERE id=? AND user_id=?',[context.sourceId,row.user_id]);

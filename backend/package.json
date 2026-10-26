@@ -5,7 +5,8 @@
     "dev": "nodemon --watch . --ext ts --exec \"node -r ts-node/register\" server.ts",
     "test": "node -r ts-node/register test/suite.test.js",
     "architecture:test": "node -r ts-node/register test/suite.test.js",
-    "invite-super-admin": "node -r ts-node/register scripts/invite-super-admin.ts"
+    "invite-super-admin": "node -r ts-node/register scripts/invite-super-admin.ts",
+    "migrate-manual-email": "node -r ts-node/register scripts/migrate-manual-email.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

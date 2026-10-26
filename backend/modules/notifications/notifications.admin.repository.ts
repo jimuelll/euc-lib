@@ -8,7 +8,8 @@ const feed = `SELECT CONCAT('notification:',n.id) AS record_key, n.id, NULL AS q
  n.created_at,n.expires_at,NULL AS scheduled_at,n.created_by,n.source_type,
  CASE WHEN n.source_type IS NOT NULL OR n.created_by IS NULL THEN 'automatic' ELSE 'manual' END AS origin,
  CASE WHEN n.is_active=0 OR n.expires_at<=NOW() THEN 'expired' ELSE 'available' END AS delivery_status,
- NULL AS last_error,(SELECT COUNT(*) FROM notification_reads r WHERE r.notification_id=n.id) AS read_count
+ NULL AS last_error,(SELECT COUNT(*) FROM notification_reads r WHERE r.notification_id=n.id) AS read_count,
+ n.email_requested,n.email_batch_id,DATE_FORMAT(n.email_expires_at,'%Y-%m-%dT%H:%i:%sZ') AS email_expires_at
  FROM notifications n
  UNION ALL SELECT CONCAT('queue:',o.id),NULL,o.id,
  ${json('type')},${json('title')},${json('body')},${json('href')},${json('audienceType')},
@@ -16,7 +17,8 @@ const feed = `SELECT CONCAT('notification:',n.id) AS record_key, n.id, NULL AS q
  ${json('createdBy')},${json('sourceType')},
  CASE WHEN ${json('sourceType')} IS NOT NULL OR ${json('createdBy')} IS NULL THEN 'automatic' ELSE 'manual' END,
  CASE WHEN ${json('cancelledAt')} IS NOT NULL THEN 'expired' WHEN o.last_error IS NOT NULL THEN 'failed'
- WHEN o.available_at>NOW() THEN 'scheduled' ELSE 'queued' END,o.last_error,0
+ WHEN o.available_at>NOW() THEN 'scheduled' ELSE 'queued' END,o.last_error,0,
+ CASE WHEN ${json('sendEmail')}='true' THEN 1 ELSE 0 END,NULL,NULL
  FROM delivery_outbox o WHERE o.event_type='notification' AND (o.status='pending' OR ${json('cancelledAt')} IS NOT NULL)`;
 const grouped = `SELECT f.*,CASE WHEN origin='automatic' THEN CONCAT(type,':',DATE(created_at),':',delivery_status) ELSE record_key END COLLATE utf8mb4_unicode_ci AS group_key FROM (${feed}) f`;
 const ranked = `SELECT f.*,ROW_NUMBER() OVER(PARTITION BY group_key ORDER BY created_at DESC,record_key DESC) AS row_rank,
@@ -92,7 +94,18 @@ export async function expire(recordKey: string) {
     const row = await get(recordKey);
     if (!row)
         return false;
-    const [result] = row.queue_id ? await db.query<ResultSetHeader>(`UPDATE delivery_outbox SET status='delivered',payload=JSON_SET(payload,'$.cancelledAt',DATE_FORMAT(NOW(),'%Y-%m-%dT%H:%i:%s')),locked_at=NULL WHERE id=? AND status='pending' AND locked_at IS NULL`, [row.queue_id]) : await db.query<ResultSetHeader>('UPDATE notifications SET is_active=0,expires_at=NOW() WHERE id=? AND is_active=1', [row.id]);
-    return result.affectedRows === 1;
+    if (row.queue_id) {
+        const [result] = await db.query<ResultSetHeader>(`UPDATE delivery_outbox SET status='delivered',payload=JSON_SET(payload,'$.cancelledAt',DATE_FORMAT(NOW(),'%Y-%m-%dT%H:%i:%s')),locked_at=NULL WHERE id=? AND status='pending' AND locked_at IS NULL`, [row.queue_id]);
+        return result.affectedRows===1;
+    }
+    const conn=await db.getConnection();let locked=false;
+    try {
+        const [[lock]]=await conn.query<RowDataPacket[]>("SELECT GET_LOCK('euc-library-email-dispatch',20) AS acquired");
+        if (!lock.acquired) throw Object.assign(new Error('Email delivery is busy. Try expiring this notification again.'),{status:409});
+        locked=true;await conn.beginTransaction();
+        const [result]=await conn.query<ResultSetHeader>('UPDATE notifications SET is_active=0,expires_at=NOW() WHERE id=? AND is_active=1',[row.id]);
+        await require('./notifications.email.repository').cancelUnsent(conn,row.id);
+        await conn.commit();return result.affectedRows===1;
+    } catch(error) {await conn.rollback();throw error;} finally {if(locked)await conn.query("SELECT RELEASE_LOCK('euc-library-email-dispatch')");conn.release();}
 }
 export async function retry(queueId: string) { const [result] = await db.query<ResultSetHeader>("UPDATE delivery_outbox SET available_at=NOW(),last_error=NULL,locked_at=NULL WHERE id=? AND event_type='notification' AND status='pending' AND locked_at IS NULL", [queueId]); return result.affectedRows === 1; }

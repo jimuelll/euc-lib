@@ -1,6 +1,9 @@
 import axiosInstance from "@/utils/AxiosInstance";
 export type AudienceType = "all" | "user" | "role";
 export interface AdminNotification {
+    email_requested?: boolean | number;
+    email_expires_at?: string | null;
+    email_summary?: EmailSummary | null;
     audience_user_patron_id: string | null;
     record_key: string;
     id: number | null;
@@ -68,6 +71,8 @@ export const searchNotificationRecipients = async (query: string, signal?: Abort
     recipients: NotificationRecipient[];
 }>("/api/admin/notifications/recipients", { params: { q: query }, signal })).data.recipients;
 export interface NotificationCompose {
+    sendEmail?: boolean;
+    confirmedEmailCount?: number;
     type: string;
     title: string;
     body: string;
@@ -85,3 +90,10 @@ export const countNotificationRecipients = async (params: Pick<NotificationCompo
 }>('/api/admin/notifications/audience-count', { params, signal })).data.count;
 export const notificationDetails = async (key: string, signal?: AbortSignal) => (await axiosInstance.get<AdminNotification[]>(`/api/admin/notifications/${encodeURIComponent(key)}/details`, { signal })).data;
 export const notificationAction = async (key: string, action: 'resend' | 'expire', confirmedRecipientCount?: number) => { await axiosInstance.post(`/api/admin/notifications/${encodeURIComponent(key)}/${action}`, { confirmedRecipientCount }); };
+export interface EmailSummary { queued:number;processing:number;accepted:number;failed:number;unknown:number;cancelled:number }
+export interface NotificationEmailPreview {
+    inAppCount:number;emailCount:number;skippedCount:number;enabled:boolean;reason:string|null;
+    dailyLimit:number;securityReserve:number;usedToday:number;queuedRoutine:number;remainingRoutine:number;resetAt:string;
+}
+export const previewNotificationEmail = async (params: Pick<NotificationCompose,'audienceType'|'audienceRole'|'audienceUserId'>,signal?:AbortSignal) =>
+    (await axiosInstance.get<NotificationEmailPreview>('/api/admin/notifications/email-preview',{params,signal})).data;

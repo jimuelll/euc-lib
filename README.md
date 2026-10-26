@@ -282,7 +282,7 @@ Use the field names in [backend/email.env.example](backend/email.env.example) wi
 
 The backend renders account and library emails locally as HTML and plain text; no Brevo dashboard templates are required. Existing encrypted queued messages remain compatible. Preserve `EMAIL_ENCRYPTION_KEY` and existing quota usage when migrating. The application allows 300 send attempts per UTC day by default, with the final 50 reserved for account emails. It counts its own API attempts; Brevo enforces account-wide credits separately. See [email deployment instructions](backend/modules/email/README.md) for migration steps.
 
-`EMAIL_ROUTINE_ENABLED=true` enables routine library emails. Non-production `EMAIL_MODE=capture` stores outgoing messages in process memory for development and tests; it does not deliver them to an inbox or expose them through a public route.
+`EMAIL_ROUTINE_ENABLED=true` enables routine library emails. It also enables the optional **Also send by email** control for manual notifications to individuals, roles, or all active users. Only verified, setup-complete recipients are emailed; overflow queues across days and expires within seven days. Apply [the manual-email migration](db/migrations/2026-10-27-manual-notification-email.sql) before deploying this feature, or run `npm --prefix backend run migrate-manual-email -- --apply`. Notification details show email outcomes separately from in-app delivery. Non-production `EMAIL_MODE=capture` stores outgoing messages in process memory for development and tests; it does not deliver them to an inbox or expose them through a public route.
 
 With email configured, invite an existing active super administrator from the repository root:
 

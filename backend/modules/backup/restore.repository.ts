@@ -231,7 +231,7 @@ async function replaceApplicationData(backup: SnapshotPayload, {
       );
     }
     await connection.query("UPDATE account_challenges SET consumed_at=UTC_TIMESTAMP() WHERE consumed_at IS NULL");
-    await connection.query("UPDATE email_deliveries SET status='cancelled',content_encrypted=NULL,last_error='Cancelled by restore' WHERE status IN ('queued','processing')");
+    await connection.query("UPDATE email_deliveries SET status='cancelled',content_encrypted=NULL,last_error='Cancelled by restore' WHERE status IN ('queued','processing','failed')");
     await connection.query("UPDATE delivery_outbox SET status='delivered',locked_at=NULL WHERE event_type='email' AND status='pending'");
     await connection.query("UPDATE delivery_outbox SET payload=JSON_SET(payload,'$.suppressEmail',true) WHERE event_type='notification' AND status='pending'");
     await connection.query("DELETE FROM email_address_claims");
