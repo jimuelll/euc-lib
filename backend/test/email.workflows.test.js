@@ -11,7 +11,7 @@ const snapshots=require('../modules/backup/snapshot.transforms');
 const registry=require('../modules/backup/snapshot.registry');
 
 async function env(work,extra={}) {
- const keys={EMAIL_ENABLED:'true',EMAIL_MODE:'capture',EMAIL_ENCRYPTION_KEY:'04'.repeat(32),PUBLIC_APP_URL:'http://localhost:8080',...extra};
+ const keys={EMAIL_ENABLED:'true',EMAIL_MODE:'capture',EMAIL_DAILY_LIMIT:'300',EMAIL_SECURITY_RESERVE:'50',BREVO_SENDER_NAME:'Enverga Library',EMAIL_ENCRYPTION_KEY:'04'.repeat(32),PUBLIC_APP_URL:'http://localhost:8080',...extra};
  const before=Object.fromEntries(Object.keys(keys).map(key=>[key,process.env[key]]));
  Object.assign(process.env,keys);
  try{return await work();}finally{for(const [key,value]of Object.entries(before))if(value===undefined)delete process.env[key];else process.env[key]=value;}
@@ -51,20 +51,38 @@ test('production email configuration fails closed and local capture performs no 
  try{await transport.provider.send({recipient:'member@example.edu',name:'Member',subject:'Test',message:'Captured'},true);assert.equal(called,false);assert.equal(transport.capturedEmails.pop().recipient,'member@example.edu');}finally{global.fetch=oldFetch;}
  await env(async()=>assert.throws(settings.validateConfig,/Production email/),{NODE_ENV:'production'});
 }));
-test('EmailJS uses documented request fields, treats 200 as acceptance, and classifies uncertain outcomes',()=>env(async()=>{
+test('Brevo uses documented request fields, treats 201 as acceptance, and classifies uncertain outcomes',()=>env(async()=>{
  const oldFetch=global.fetch;let request;
  try {
-  global.fetch=async(url,options)=>{request={url,body:JSON.parse(options.body)};return new Response('OK',{status:200});};
+  global.fetch=async(url,options)=>{request={url,headers:options.headers,body:JSON.parse(options.body)};return new Response(JSON.stringify({messageId:'test-id'}),{status:201});};
   const message={recipient:'member@example.edu',name:'Member',subject:'Account',message:'Use this code',code:'123456'};
   await transport.provider.send(message,true);
-  assert.equal(request.url,'https://api.emailjs.com/api/v1.0/email/send');assert.equal(request.body.user_id,'public');assert.equal(request.body.accessToken,'private');assert.equal(request.body.template_id,'accounts');assert.equal(request.body.template_params.to_email,message.recipient);
+  assert.equal(request.url,'https://api.brevo.com/v3/smtp/email');assert.equal(request.headers['api-key'],'private');assert.deepEqual(request.body.sender,{email:'library@example.edu',name:'Enverga Library'});assert.equal(request.body.to[0].email,message.recipient);assert.equal(request.body.subject,'Account');assert.match(request.body.htmlContent,/123456/);assert.match(request.body.textContent,/123456/);assert.ok(!JSON.stringify(request.body).includes('private'));
   global.fetch=async()=>new Response('do not log this secret',{status:429,headers:{'Retry-After':'20'}});
   await assert.rejects(transport.provider.send(message,true),error=>error.kind==='retry'&&error.retryAfterSeconds===20&&!error.message.includes('secret'));
-  for(const status of [503,408]){global.fetch=async()=>new Response('',{status});await assert.rejects(transport.provider.send(message,true),error=>error.kind==='unknown');}
+  for(const status of [503,408,200,202]){global.fetch=async()=>new Response('',{status});await assert.rejects(transport.provider.send(message,true),error=>error.kind==='unknown');}
   global.fetch=async()=>{throw new Error('timeout');};await assert.rejects(transport.provider.send(message,true),error=>error.kind==='unknown');
   global.fetch=async()=>new Response('private provider detail',{status:400});await assert.rejects(transport.provider.send(message,true),error=>error.kind==='permanent'&&!error.message.includes('detail'));
  }finally{global.fetch=oldFetch;}
-},{EMAIL_MODE:'emailjs',EMAILJS_SERVICE_ID:'service',EMAILJS_PUBLIC_KEY:'public',EMAILJS_PRIVATE_KEY:'private',EMAILJS_ACCOUNT_TEMPLATE_ID:'accounts',EMAILJS_LIBRARY_TEMPLATE_ID:'library'}));
+},{EMAIL_MODE:'brevo',BREVO_API_KEY:'private',BREVO_SENDER_EMAIL:'library@example.edu'}));
+
+test('Brevo renders escaped account and library content without active HTML or unsafe links',()=>env(async()=>{
+ const message={recipient:'member@example.edu',name:'<script>alert(1)</script>',subject:'<Account>',message:'Line one\nLine two',login_identifier:'ID&123',code:'123456',action_url:'https://library.example/#token=a&next=b',action_label:'Open <account>',as_of:'Today',loans:[{title:'<Book>',due:'Tomorrow',balance:'12.50'}]};
+ const account=transport.renderEmail(message,true),library=transport.renderEmail(message,false);
+ assert.ok(!account.htmlContent.includes('<script>'));assert.match(account.htmlContent,/&lt;script&gt;/);assert.match(account.htmlContent,/ID&amp;123/);assert.match(account.htmlContent,/token=a&amp;next=b/);assert.match(account.htmlContent,/Line one<br>Line two/);
+ assert.match(library.htmlContent,/&lt;Book&gt;/);assert.match(library.textContent,/Unsettled balance: PHP 12.50/);assert.match(library.textContent,/Balances as of Today/);assert.ok(!library.textContent.includes('123456'));
+ assert.throws(()=>transport.prepareEmailRequest({...message,action_url:'javascript:alert(1)'},true),error=>error.kind==='permanent');
+ assert.throws(()=>transport.prepareEmailRequest({...message,message:'x'.repeat(50_000)},true),error=>error.kind==='permanent');
+}));
+
+test('live Brevo configuration requires credentials, sender and validates the daily limit',()=>env(async()=>{
+ settings.validateConfig();
+ await env(async()=>assert.throws(settings.validateConfig,/BREVO_API_KEY/),{EMAIL_MODE:'brevo',BREVO_API_KEY:''});
+ await env(async()=>assert.throws(settings.validateConfig,/valid email/),{EMAIL_MODE:'brevo',BREVO_SENDER_EMAIL:'invalid'});
+ await env(async()=>assert.throws(settings.validateConfig,/quota/),{EMAIL_MODE:'brevo',EMAIL_DAILY_LIMIT:'0'});
+ await env(async()=>assert.throws(settings.validateConfig,/Invalid email mode/),{EMAIL_MODE:'emailjs'});
+ await env(async()=>settings.validateConfig(),{EMAIL_MODE:'brevo',NODE_ENV:'production',PUBLIC_APP_URL:'https://library.example'});
+},{EMAIL_MODE:'brevo',BREVO_API_KEY:'private',BREVO_SENDER_EMAIL:'library@example.edu'}));
 
 async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=true,sendError=null}={}){
  return env(async()=>{
@@ -84,12 +102,34 @@ async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=tr
   db.getConnection=async()=>({query,beginTransaction:async()=>calls.push({sql:'BEGIN'}),commit:async()=>calls.push({sql:'COMMIT'}),rollback:async()=>calls.push({sql:'ROLLBACK'}),release(){}});
   db.query=query;transport.provider.send=async()=>{sent++;if(sendError)throw sendError;};
   try{await work({calls,sent:()=>sent});}finally{db.getConnection=original.get;db.query=original.query;transport.provider.send=original.send;}
- },{EMAIL_MODE:'emailjs',EMAIL_MONTHLY_LIMIT:'200',EMAIL_SECURITY_RESERVE:'50',EMAIL_QUOTA_PERIOD_START:new Date().toISOString().slice(0,10),EMAIL_QUOTA_PERIOD_END:new Date(Date.now()+86400_000).toISOString().slice(0,10)});
+ },{EMAIL_MODE:'brevo',EMAIL_DAILY_LIMIT:'300',EMAIL_SECURITY_RESERVE:'50'});
 }
 test('quota reserves final 50 requests for account mail and stops every category at total limit',async()=>{
- await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);assert.ok(f.calls.some(c=>c.sql.includes('Paused by email quota')));},{used:150});
- await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);assert.ok(f.calls.some(c=>c.sql.includes('requests_used=requests_used+1')));},{used:150,priority:1});
- await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);},{used:200,priority:1});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);},{used:249});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);assert.ok(f.calls.some(c=>c.sql.includes('Paused by daily email quota')));},{used:250});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);assert.ok(f.calls.some(c=>c.sql.includes('requests_used=requests_used+1')));},{used:250,priority:1});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);},{used:299,priority:1});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);},{used:300,priority:1});
+});
+
+test('daily quota rolls at UTC midnight and ignores obsolete monthly environment settings',()=>env(async()=>{
+ assert.equal(settings.config().limit,300);
+ assert.deepEqual(settings.dailyQuotaPeriod(new Date('2026-12-31T23:59:59.999Z')),{periodStart:'2026-12-31',periodEnd:'2027-01-01'});
+ assert.deepEqual(settings.dailyQuotaPeriod(new Date('2027-01-01T00:00:00Z')),{periodStart:'2027-01-01',periodEnd:'2027-01-02'});
+ assert.deepEqual(settings.dailyQuotaPeriod(new Date('2028-02-29T12:00:00Z')),{periodStart:'2028-02-29',periodEnd:'2028-03-01'});
+},{EMAIL_DAILY_LIMIT:'300',EMAIL_MONTHLY_LIMIT:'200',EMAIL_QUOTA_PERIOD_START:'2000-01-01',EMAIL_QUOTA_PERIOD_END:'2000-02-01'}));
+
+test('dispatch reuses the persisted daily counter and defers exhausted mail until midnight',async()=>{
+ const period=settings.dailyQuotaPeriod();
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();assert.equal(f.sent(),0);
+  const read=f.calls.find(call=>call.sql.includes('SELECT requests_used'));
+  assert.deepEqual(read.values,[period.periodStart]);
+  const pause=f.calls.find(call=>call.sql.includes('Paused by daily email quota'));
+  assert.equal(pause.values[0],`${period.periodEnd} 00:00:00`);
+  assert.ok(!f.calls.some(call=>call.sql.includes('requests_used=requests_used+1')));
+ },{used:300,priority:1});
+ await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);},{used:0,priority:1});
 });
 test('shared rate slot and recipient eligibility prevent sends before quota reservation',async()=>{
  for(const options of [{waiting:true},{eligible:false}])await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);assert.ok(!f.calls.some(c=>c.sql.includes('requests_used=requests_used+1')));},options);

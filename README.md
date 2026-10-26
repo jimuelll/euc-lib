@@ -274,13 +274,13 @@ New account creation, password setup, email verification, and password recovery 
 
 Use the field names in [backend/email.env.example](backend/email.env.example) with your own values. To deliver email, configure:
 
-- `EMAIL_ENABLED=true` and `EMAIL_MODE=emailjs`.
+- `EMAIL_ENABLED=true` and `EMAIL_MODE=brevo`.
 - `PUBLIC_APP_URL` as the frontend's absolute URL.
 - `EMAIL_ENCRYPTION_KEY` as 32 random bytes encoded as 64 hexadecimal characters; the secret-generation command above produces this format.
-- `EMAILJS_SERVICE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY`, `EMAILJS_ACCOUNT_TEMPLATE_ID`, and `EMAILJS_LIBRARY_TEMPLATE_ID`.
-- `EMAIL_QUOTA_PERIOD_START` and `EMAIL_QUOTA_PERIOD_END` as the actual quota period dates in `YYYY-MM-DD` format; the end date is exclusive.
+- `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and optionally `BREVO_SENDER_NAME`. Verify the sender/domain in Brevo; use an API key rather than an SMTP key.
+- `EMAIL_DAILY_LIMIT=300` for Brevo Free, with `EMAIL_SECURITY_RESERVE=50` for account emails. The application counter resets automatically at 00:00 UTC (08:00 Philippine time); remove the old monthly limit and manual quota-period settings.
 
-Account templates receive `to_email`, `to_name`, `subject`, `message`, `action_url`, `action_label`, `code`, and `login_identifier`. Library templates can also receive `loans` and `as_of`. Set up the templates to display the fields needed by each workflow.
+The backend renders account and library emails locally as HTML and plain text; no Brevo dashboard templates are required. Existing encrypted queued messages remain compatible. Preserve `EMAIL_ENCRYPTION_KEY` and existing quota usage when migrating. The application allows 300 send attempts per UTC day by default, with the final 50 reserved for account emails. It counts its own API attempts; Brevo enforces account-wide credits separately. See [email deployment instructions](backend/modules/email/README.md) for migration steps.
 
 `EMAIL_ROUTINE_ENABLED=true` enables routine library emails. Non-production `EMAIL_MODE=capture` stores outgoing messages in process memory for development and tests; it does not deliver them to an inbox or expose them through a public route.
 
@@ -344,4 +344,4 @@ Set `VITE_BASE_URL` to the backend's absolute HTTPS API URL before building the 
 
 Update the origin allowlist in [backend/app.ts](backend/app.ts) for your frontend domain. [frontend/vercel.json](frontend/vercel.json) includes an API rewrite to the project's Render hostname; update it for your own backend when using Vercel.
 
-Use `NODE_ENV=production`, private database and JWT credentials, and HTTPS. Production email additionally requires `EMAIL_MODE=emailjs` and an HTTPS `PUBLIC_APP_URL`. Replace the seeded development account's credentials before making an installation accessible.
+Use `NODE_ENV=production`, private database and JWT credentials, and HTTPS. Production email additionally requires `EMAIL_MODE=brevo` and an HTTPS `PUBLIC_APP_URL`. Replace the seeded development account's credentials before making an installation accessible.

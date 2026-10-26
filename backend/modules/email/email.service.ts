@@ -128,15 +128,11 @@ export async function dispatchOne(): Promise<boolean> {
       return true;
     }
     if (!message) { await conn.query("UPDATE email_deliveries SET status='cancelled',content_encrypted=NULL,last_error='No longer eligible' WHERE id=?",[row.id]); await conn.commit(); return true; }
-    if (c.mode === 'emailjs') {
-      const today = new Date().toISOString().slice(0,10);
-      if (today < c.periodStart || today >= c.periodEnd) {
-        await conn.query("UPDATE email_deliveries SET next_attempt_at=DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR),last_error='Quota period needs configuration' WHERE id=?",[row.id]); await conn.commit(); return false;
-      }
+    if (c.mode === 'brevo') {
       await conn.query('INSERT INTO email_quota_usage(period_start,period_end) VALUES (?,?) ON DUPLICATE KEY UPDATE period_start=period_start',[c.periodStart,c.periodEnd]);
       const [[quota]] = await conn.query<RowDataPacket[]>('SELECT requests_used FROM email_quota_usage WHERE period_start=? FOR UPDATE',[c.periodStart]);
       if (Number(quota.requests_used) >= (row.priority ? c.limit : c.limit-c.reserve)) {
-        await conn.query("UPDATE email_deliveries SET next_attempt_at=DATE_ADD(UTC_TIMESTAMP(),INTERVAL 1 HOUR),last_error='Paused by email quota' WHERE id=?",[row.id]); await conn.commit(); return false;
+        await conn.query("UPDATE email_deliveries SET next_attempt_at=?,last_error='Paused by daily email quota' WHERE id=?",[`${c.periodEnd} 00:00:00`,row.id]); await conn.commit(); return false;
       }
       await conn.query('UPDATE email_quota_usage SET requests_used=requests_used+1 WHERE period_start=?',[c.periodStart]);
     }
@@ -192,7 +188,7 @@ export async function adminStatus() {
   const c=config();
   const [usage] = await db.query<RowDataPacket[]>('SELECT * FROM email_quota_usage WHERE period_start=?',[c.periodStart || '1970-01-01']);
   const [rows] = await db.query<RowDataPacket[]>('SELECT id,user_id,recipient,purpose,status,attempts,last_error,created_at,accepted_at FROM email_deliveries ORDER BY created_at DESC LIMIT 100');
-  return { enabled:c.enabled,routineEnabled:c.routineEnabled,mode:c.mode,limit:c.limit,reserve:c.reserve,used:Number(usage[0]?.requests_used || 0),periodStart:c.periodStart,periodEnd:c.periodEnd,periodValid:c.mode==='capture' || (c.periodStart<=new Date().toISOString().slice(0,10) && c.periodEnd>new Date().toISOString().slice(0,10)),rows };
+  return { enabled:c.enabled,routineEnabled:c.routineEnabled,mode:c.mode,limit:c.limit,reserve:c.reserve,used:Number(usage[0]?.requests_used || 0),periodStart:c.periodStart,periodEnd:c.periodEnd,periodValid:true,rows };
 }
 export async function retryDelivery(id: string) {
   const conn=await db.getConnection();

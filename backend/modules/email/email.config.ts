@@ -1,29 +1,34 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 
+export function dailyQuotaPeriod(now = new Date()) {
+  return { periodStart: now.toISOString().slice(0,10), periodEnd: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()+1)).toISOString().slice(0,10) };
+}
+
 export function config() {
   const enabled = process.env.EMAIL_ENABLED === 'true';
-  const mode = process.env.EMAIL_MODE || (process.env.NODE_ENV === 'production' ? 'emailjs' : 'capture');
-  const limit = Number(process.env.EMAIL_MONTHLY_LIMIT || 200);
+  const mode = process.env.EMAIL_MODE || (process.env.NODE_ENV === 'production' ? 'brevo' : 'capture');
+  const limit = Number(process.env.EMAIL_DAILY_LIMIT || 300);
   const reserve = Number(process.env.EMAIL_SECURITY_RESERVE || 50);
   const url = process.env.PUBLIC_APP_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8080');
   return { enabled, routineEnabled: process.env.EMAIL_ROUTINE_ENABLED === "true", mode, limit, reserve, url,
-    serviceId: process.env.EMAILJS_SERVICE_ID || '', publicKey: process.env.EMAILJS_PUBLIC_KEY || '',
-    privateKey: process.env.EMAILJS_PRIVATE_KEY || '', accountTemplate: process.env.EMAILJS_ACCOUNT_TEMPLATE_ID || '',
-    libraryTemplate: process.env.EMAILJS_LIBRARY_TEMPLATE_ID || '',
-    periodStart: process.env.EMAIL_QUOTA_PERIOD_START || '', periodEnd: process.env.EMAIL_QUOTA_PERIOD_END || '',
+    apiKey: process.env.BREVO_API_KEY || '', senderEmail: process.env.BREVO_SENDER_EMAIL || '',
+    senderName: process.env.BREVO_SENDER_NAME || 'Enverga Library',
+    ...dailyQuotaPeriod(),
     timezone: process.env.EMAIL_DIGEST_TIMEZONE || 'Asia/Manila', time: process.env.EMAIL_DIGEST_TIME || '09:00' };
 }
 export function validateConfig() {
   const c = config();
   if (!c.enabled) return;
-  if (!['capture','emailjs'].includes(c.mode) || !Number.isInteger(c.limit) || c.limit < 1 || !Number.isInteger(c.reserve) || c.reserve < 0 || c.reserve > c.limit) throw new Error('Invalid email mode or quota configuration');
+  if (!['capture','brevo'].includes(c.mode) || !Number.isInteger(c.limit) || c.limit < 1 || !Number.isInteger(c.reserve) || c.reserve < 0 || c.reserve > c.limit) throw new Error('Invalid email mode or quota configuration');
   const url = new URL(c.url);
-  if (process.env.NODE_ENV === 'production' && (c.mode !== 'emailjs' || url.protocol !== 'https:')) throw new Error('Production email requires EmailJS and an HTTPS PUBLIC_APP_URL');
+  if (process.env.NODE_ENV === 'production' && (c.mode !== 'brevo' || url.protocol !== 'https:')) throw new Error('Production email requires Brevo and an HTTPS PUBLIC_APP_URL');
   encryptionKey();
   new Intl.DateTimeFormat('en', { timeZone: c.timezone });
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(c.time)) throw new Error('EMAIL_DIGEST_TIME must be HH:mm');
-  if (c.mode === 'emailjs' && (!c.serviceId || !c.publicKey || !c.privateKey || !c.accountTemplate || !c.libraryTemplate)) throw new Error('EmailJS credentials and both templates are required');
-  if (c.mode === 'emailjs' && (!/^\d{4}-\d{2}-\d{2}$/.test(c.periodStart) || !/^\d{4}-\d{2}-\d{2}$/.test(c.periodEnd) || c.periodEnd <= c.periodStart)) throw new Error('Configure the actual EmailJS quota period start and exclusive end (YYYY-MM-DD)');
+  if (c.mode === 'brevo') {
+    if (!c.apiKey || !c.senderEmail) throw new Error('BREVO_API_KEY and BREVO_SENDER_EMAIL are required');
+    normalizeEmail(c.senderEmail);
+  }
 }
 function encryptionKey() {
   const raw = process.env.EMAIL_ENCRYPTION_KEY;
