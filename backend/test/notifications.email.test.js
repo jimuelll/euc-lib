@@ -79,7 +79,7 @@ test('manual email worker rechecks role, address, verification and notification 
   if(sql.includes('accepted_at=CASE')||sql.includes("status='cancelled'" )&&sql.includes('WHERE id=?'))finalStatus=values?.[0]||'cancelled';
   return [{affectedRows:1}];
  };
- db.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});db.query=query;transport.provider.send=async message=>sent.push(message);
+ db.getConnection=async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}});db.query=query;transport.provider.send=async message=>{sent.push(message);};
  try{
   await delivery.dispatchOne();assert.equal(sent.length,1);assert.equal(finalStatus,'accepted');assert.equal(sent[0].action_url,'https://library.example/bulletin');assert.match(transport.renderEmail(sent[0],false).htmlContent,/&lt;updated&gt;/);
   for(const invalid of [{role:'alumni'},{email:'changed@example.edu'},{email_verified_at:null},{setup_pending:1},{is_active:0}]){

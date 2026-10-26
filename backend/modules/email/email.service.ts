@@ -102,8 +102,8 @@ async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage |
   try { return unprotect<EmailMessage>(row.content_encrypted); }
   catch { throw new SendFailure('permanent','Stored email content cannot be read; request a fresh email'); }
 }
-async function finish(id: string, status: string, error: string | null = null) {
-  await db.query("UPDATE email_deliveries SET status=?,last_error=?,content_encrypted=CASE WHEN priority=1 OR ?<>'failed' THEN NULL ELSE content_encrypted END,accepted_at=CASE WHEN ?='accepted' THEN UTC_TIMESTAMP() ELSE accepted_at END WHERE id=?",[status,error,status,status,id]);
+async function finish(id: string, status: string, error: string | null = null, providerMessageId?:string | void) {
+  await db.query("UPDATE email_deliveries SET status=?,last_error=?,content_encrypted=CASE WHEN priority=1 OR ?<>'failed' THEN NULL ELSE content_encrypted END,accepted_at=CASE WHEN ?='accepted' THEN UTC_TIMESTAMP() ELSE accepted_at END,context_json=CASE WHEN ?='accepted' THEN JSON_SET(COALESCE(context_json,JSON_OBJECT()),'$.providerMessageId',?,'$.providerMode',?) ELSE context_json END WHERE id=?",[status,error,status,status,status,providerMessageId || null,config().mode,id]);
 }
 /** Lock shared with restore: no network send may overlap application replacement. */
 export async function dispatchOne(): Promise<boolean> {
@@ -150,7 +150,12 @@ export async function dispatchOne(): Promise<boolean> {
     await conn.query('UPDATE email_dispatch_state SET next_send_at=DATE_ADD(UTC_TIMESTAMP(3),INTERVAL 1100000 MICROSECOND) WHERE id=1');
     await conn.commit();
     claimed = row;
-    try { await provider.send(message,Boolean(row.priority)); await finish(row.id,'accepted'); }
+    try {
+      const messageId=await provider.send(message,Boolean(row.priority));
+      await finish(row.id,'accepted',null,messageId);
+      // Provider references are safe to log; recipients, tokens and message bodies are not.
+      if(messageId)console.info(`[email] Brevo accepted delivery ${row.id}; message ID: ${messageId}`);
+    }
     catch (error) {
       if (error instanceof SendFailure && error.kind === 'retry' && row.attempts + 1 < 5) {
         const seconds = Math.ceil(Math.max(error.retryAfterSeconds,5*2**row.attempts));
@@ -197,7 +202,10 @@ export function startEmailJob() {
 export async function adminStatus() {
   const c=config();
   const [usage] = await db.query<RowDataPacket[]>('SELECT * FROM email_quota_usage WHERE period_start=?',[c.periodStart || '1970-01-01']);
-  const [rows] = await db.query<RowDataPacket[]>('SELECT id,user_id,recipient,purpose,status,attempts,last_error,created_at,accepted_at FROM email_deliveries ORDER BY created_at DESC LIMIT 100');
+  const [rows] = await db.query<RowDataPacket[]>(`SELECT id,user_id,recipient,purpose,status,attempts,last_error,created_at,accepted_at,
+    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.providerMessageId')),'null') AS provider_message_id,
+    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.providerMode')),'null') AS provider_mode
+    FROM email_deliveries ORDER BY created_at DESC LIMIT 100`);
   return { enabled:c.enabled,routineEnabled:c.routineEnabled,mode:c.mode,limit:c.limit,reserve:c.reserve,used:Number(usage[0]?.requests_used || 0),periodStart:c.periodStart,periodEnd:c.periodEnd,periodValid:true,rows };
 }
 export async function retryDelivery(id: string) {

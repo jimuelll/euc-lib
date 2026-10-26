@@ -65,13 +65,14 @@ test('database: scheduled manual notifications capture recipients at publication
  const [[again]]=await db.query('SELECT COUNT(*) AS total FROM email_deliveries WHERE notification_id=?',[notice.id]);assert.equal(Number(again.total),3);
 }));
 test('database: manual mail uses the shared daily reserve, and quota-paused emails remain queued until midnight',options,()=>fixture(async f=>{
- const original=provider.provider.send;const captured=[];provider.provider.send=async message=>captured.push(message);
+ const original=provider.provider.send;const captured=[];provider.provider.send=async message=>{captured.push(message);return '<test-receipt@example>';};
  try{
   const publication=await repo.publish(f.base);await outbox.drainOutbox();
   process.env.EMAIL_MODE='brevo';const c=settings.config();
   await db.query('INSERT INTO email_quota_usage(period_start,period_end,requests_used) VALUES (?,?,249) ON DUPLICATE KEY UPDATE requests_used=249',[c.periodStart,c.periodEnd]);
   await email.dispatchOne();await db.query('UPDATE email_dispatch_state SET next_send_at=NULL WHERE id=1');await email.dispatchOne();
   assert.equal(captured.length,1);assert.equal(captured[0].subject,f.prefix);
+  const [[receipt]]=await db.query("SELECT JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.providerMessageId')) AS receipt FROM email_deliveries WHERE notification_id=? AND status='accepted'",[publication.record.id]);assert.equal(receipt.receipt,'<test-receipt@example>');
   const counts=await repo.summary(publication.record.id,publication.record.email_batch_id);assert.equal(counts.accepted,1);assert.equal(counts.queued,1);
   const [[paused]]=await db.query("SELECT DATE_FORMAT(next_attempt_at,'%Y-%m-%d %H:%i:%s') AS next FROM email_deliveries WHERE notification_id=? AND status='queued'",[publication.record.id]);assert.equal(paused.next,`${c.periodEnd} 00:00:00`);
  }finally{provider.provider.send=original;}

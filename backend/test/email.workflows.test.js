@@ -56,8 +56,12 @@ test('Brevo uses documented request fields, treats 201 as acceptance, and classi
  try {
   global.fetch=async(url,options)=>{request={url,headers:options.headers,body:JSON.parse(options.body)};return new Response(JSON.stringify({messageId:'test-id'}),{status:201});};
   const message={recipient:'member@example.edu',name:'Member',subject:'Account',message:'Use this code',code:'123456'};
-  await transport.provider.send(message,true);
+  assert.equal(await transport.provider.send(message,true),'test-id');
   assert.equal(request.url,'https://api.brevo.com/v3/smtp/email');assert.equal(request.headers['api-key'],'private');assert.deepEqual(request.body.sender,{email:'library@example.edu',name:'Enverga Library'});assert.equal(request.body.to[0].email,message.recipient);assert.equal(request.body.subject,'Account');assert.match(request.body.htmlContent,/123456/);assert.match(request.body.textContent,/123456/);assert.ok(!JSON.stringify(request.body).includes('private'));
+  global.fetch=async()=>new Response('not JSON',{status:201});
+  assert.equal(await transport.provider.send(message,true),undefined);
+  global.fetch=async()=>new Response(JSON.stringify({messageId:'unsafe\nlog'}),{status:201});
+  assert.equal(await transport.provider.send(message,true),undefined);
   global.fetch=async()=>new Response('do not log this secret',{status:429,headers:{'Retry-After':'20'}});
   await assert.rejects(transport.provider.send(message,true),error=>error.kind==='retry'&&error.retryAfterSeconds===20&&!error.message.includes('secret'));
   for(const status of [503,408,200,202]){global.fetch=async()=>new Response('',{status});await assert.rejects(transport.provider.send(message,true),error=>error.kind==='unknown');}
@@ -84,7 +88,7 @@ test('live Brevo configuration requires credentials, sender and validates the da
  await env(async()=>settings.validateConfig(),{EMAIL_MODE:'brevo',NODE_ENV:'production',PUBLIC_APP_URL:'https://library.example'});
 },{EMAIL_MODE:'brevo',BREVO_API_KEY:'private',BREVO_SENDER_EMAIL:'library@example.edu'}));
 
-async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=true,sendError=null}={}){
+async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=true,sendError=null,receipt=undefined}={}){
  return env(async()=>{
   const original={get:db.getConnection,query:db.query,send:transport.provider.send};
   const calls=[];let sent=0;
@@ -100,7 +104,7 @@ async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=tr
    return [{affectedRows:1}];
   };
   db.getConnection=async()=>({query,beginTransaction:async()=>calls.push({sql:'BEGIN'}),commit:async()=>calls.push({sql:'COMMIT'}),rollback:async()=>calls.push({sql:'ROLLBACK'}),release(){}});
-  db.query=query;transport.provider.send=async()=>{sent++;if(sendError)throw sendError;};
+  db.query=query;transport.provider.send=async()=>{sent++;if(sendError)throw sendError;return receipt;};
   try{await work({calls,sent:()=>sent});}finally{db.getConnection=original.get;db.query=original.query;transport.provider.send=original.send;}
  },{EMAIL_MODE:'brevo',EMAIL_DAILY_LIMIT:'300',EMAIL_SECURITY_RESERVE:'50'});
 }
@@ -110,6 +114,15 @@ test('quota reserves final 50 requests for account mail and stops every category
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);assert.ok(f.calls.some(c=>c.sql.includes('requests_used=requests_used+1')));},{used:250,priority:1});
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);},{used:299,priority:1});
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);},{used:300,priority:1});
+});
+
+test('accepted deliveries retain the provider receipt and send mode without retaining security content',async()=>{
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();
+  const saved=f.calls.find(call=>call.sql.includes('accepted_at=CASE'));
+  assert.equal(saved.values[0],'accepted');assert.equal(saved.values[5],'<receipt@example>');assert.equal(saved.values[6],'brevo');
+  assert.match(saved.sql,/providerMessageId/);assert.match(saved.sql,/providerMode/);assert.match(saved.sql,/priority=1/);
+ },{priority:1,receipt:'<receipt@example>'});
 });
 
 test('daily quota rolls at UTC midnight and ignores obsolete monthly environment settings',()=>env(async()=>{
@@ -221,3 +234,22 @@ test('worker failures back off and redact error details instead of logging on ev
   assert.equal(delivery.workerFailureCode({code:'private@example.edu'}),'INTERNAL_ERROR');
  }finally{db.getConnection=getConnection;global.setInterval=interval;Date.now=now;console.error=log;console.info=info;}
 },{EMAIL_ROUTINE_ENABLED:'false'}));
+
+
+test('branded layout uses live values for all email kinds without preview content',()=>{
+ const base={recipient:'actual@example.edu',name:'Actual Member',subject:'Actual notice',message:'Actual message'};
+ for(const account of [true,false]) {
+  const rendered=transport.renderEmail(base,account);
+  assert.match(rendered.htmlContent,/EUC Library/);
+  assert.match(rendered.htmlContent,/Actual Member/);
+  assert.match(rendered.htmlContent,/<h1[^>]*>Actual notice<\/h1>/);
+  assert.match(rendered.htmlContent,/Actual message/);
+  assert.match(rendered.htmlContent,/max-width:640px/);
+  assert.match(rendered.htmlContent,/@media\(max-width:600px\)/);
+  assert.doesNotMatch(rendered.htmlContent,/Hello Alex|482619|DESIGN PREVIEW|library\.example/);
+ }
+ const recovery=transport.renderEmail({...base,code:'930172'},true);
+ assert.match(recovery.htmlContent,/class="recovery-code"[^>]*>930172/);
+ assert.match(recovery.textContent,/Your recovery code: 930172/);
+ assert.doesNotMatch(transport.renderEmail({...base,code:'930172'},false).htmlContent,/930172/);
+});
