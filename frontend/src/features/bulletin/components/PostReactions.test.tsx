@@ -18,6 +18,15 @@ it('uses one public Like signal and an independent private Save action',async()=
 it('removes Like without removing Save',async()=>{
  vi.mocked(api.setPostHelpful).mockResolvedValue({...summary,helpful_count:0,helpful_by_me:false,saved_by_me:true,reaction_total:0,my_reaction:null});show({summary:{...summary,saved_by_me:true}});fireEvent.click(screen.getByRole('button',{name:'Liked'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Like'})).toHaveAttribute('aria-pressed','false'));expect(api.setPostHelpful).toHaveBeenCalledWith(4,false);expect(screen.getByRole('button',{name:'Saved to My Library'})).toHaveAttribute('aria-pressed','true');expect(screen.queryByText(/0 likes/)).not.toBeInTheDocument();
 });
+it('keeps a confirmed like when a parent briefly supplies an older post summary',async()=>{
+ vi.mocked(api.setPostHelpful).mockResolvedValue({...summary,helpful_count:2,helpful_by_me:true,reaction_total:2,likes:2,liked_by_me:true});
+ const view=show({summary:{...summary,helpful_count:1,helpful_by_me:false,reaction_total:1,likes:1,liked_by_me:false}});
+ fireEvent.click(screen.getByRole('button',{name:'Like'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Liked'})).toHaveAttribute('aria-pressed','true'));
+ view.rerender(<MemoryRouter><PostReactions postId={4} summary={{...summary,helpful_count:1,helpful_by_me:false,reaction_total:1,likes:1,liked_by_me:false}}/></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Liked'})).toHaveAttribute('aria-pressed','true');
+ expect(screen.getByRole('button',{name:'View people who liked this post'})).toHaveTextContent('2 likes');
+});
 it('requires sign-in and preserves state after an action fails',async()=>{
  const login=vi.fn();state.user=null;const view=show({onRequireLogin:login});fireEvent.click(screen.getByRole('button',{name:'Save to My Library'}));expect(login).toHaveBeenCalled();expect(api.setPostSaved).not.toHaveBeenCalled();state.user={id:7};view.rerender(<MemoryRouter><PostReactions postId={4} summary={summary}/></MemoryRouter>);vi.mocked(api.setPostHelpful).mockRejectedValue(new Error('offline'));fireEvent.click(screen.getByRole('button',{name:'Liked'}));await screen.findByRole('alert');expect(screen.getByRole('button',{name:'Liked'})).toHaveAttribute('aria-pressed','true');
 });
