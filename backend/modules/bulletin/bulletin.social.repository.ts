@@ -85,7 +85,7 @@ export async function addReply(postId:number,userId:number,text:string,parentId:
  });
 }
 export async function removeComment(postId:number,commentId:number,actor:{id:number;role:string}){
- return transaction(async conn=>{await lockPost(conn,postId);const [[row]]=await conn.query<RowDataPacket[]>('SELECT user_id FROM bulletin_comments WHERE id=? AND post_id=? AND deleted_at IS NULL FOR UPDATE',[commentId,postId]);if(!row)fail('Comment not found',404);if(Number(row.user_id)!==actor.id&&!['admin','super_admin'].includes(actor.role))fail('Forbidden',403);await conn.query('UPDATE bulletin_comments SET deleted_at=NOW(),deleted_by=? WHERE id=?',[actor.id,commentId]);await require('./bulletin.moderation.repository').withdrawAutoCase(conn,commentId,actor.id);});
+  return transaction(async conn=>{await lockPost(conn,postId);const [[row]]=await conn.query<RowDataPacket[]>('SELECT user_id FROM bulletin_comments WHERE id=? AND post_id=? AND deleted_at IS NULL FOR UPDATE',[commentId,postId]);if(!row)fail('Comment not found',404);const isAuthor=Number(row.user_id)===Number(actor.id);if(!isAuthor&&!['admin','super_admin'].includes(actor.role))fail('Forbidden',403);await conn.query('UPDATE bulletin_comments SET deleted_at=NOW(),deleted_by=? WHERE id=?',[actor.id,commentId]);await require('./bulletin.moderation.repository').withdrawAutoCase(conn,commentId,actor.id);});
 }
 
 export async function reportComment(postId:number,commentId:number,actor:{id:number;role:string},input:any={}){return require('./bulletin.moderation.repository').report(postId,commentId,actor,input);}
