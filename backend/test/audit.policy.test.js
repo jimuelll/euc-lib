@@ -275,3 +275,12 @@ test("audit capture refuses to attribute a concurrent later edit to an earlier u
     { id: 8, status: "pending" }, { id: 8, status: "cancelled" }, readyPolicy,
   ), true);
 });
+
+test("username and email availability reads do not create audit events", () => {
+  assert.equal(audit.getAuditPolicy("POST", "/api/admin/users/availability"), null);
+});
+
+test("archive explanations remain auditable while contact details and generic reasons stay redacted",()=>{
+ const {redact,REDACTED}=require('../modules/analytics/audit.feed.helpers');
+ assert.deepEqual(redact({reason:'Private note',archive_reason:'Departed; desk@example.edu'}),{reason:REDACTED,archive_reason:'Departed; '+REDACTED});
+});

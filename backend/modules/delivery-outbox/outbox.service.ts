@@ -10,8 +10,8 @@ async function dispatch(row: DeliveryOutboxRow): Promise<void> {
       return;
     }
     const notifications = require("../notifications/notifications.service");
-    await notifications.createNotification({ ...row.payload, deliveryKey: row.id });
-    await require("../email/email.service").queueNotification(row.payload, row.id, row.created_at);
+    const notice=await notifications.createNotification({ ...row.payload, deliveryKey: row.id });
+    await require("../email/email.service").queueNotification(row.payload, row.id, row.created_at,notice?.id);
     return;
   }
   if (row.event_type === "email") return; // Durable handoff; the email worker sends independently.

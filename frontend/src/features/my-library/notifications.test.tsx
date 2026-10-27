@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 const service = vi.hoisted(() => ({
   fetchNotifications: vi.fn(),
   fetchUnreadCount: vi.fn(),
   markAllNotificationsRead: vi.fn(),
   markNotificationRead: vi.fn(),
+  fetchNotification:vi.fn(),
 }));
 vi.mock("@/features/notifications/notifications.service", () => service);
 vi.mock("@/context/AuthContext", () => ({
@@ -21,6 +22,7 @@ import {
   NotificationsProvider,
   useNotifications,
 } from "@/context/NotificationsContext";
+import {createTestQueryClientWrapper} from "@/test-utils/query-client";
 import MyLibraryUpdatesPanel from "./components/MyLibraryUpdatesPanel";
 function Updates() {
   const value = useNotifications();
@@ -39,13 +41,15 @@ function Updates() {
     </>
   );
 }
-const showUpdates = () =>
+function NotificationLocation(){return <output data-testid="notification-location">{useLocation().search}</output>;}
+const showUpdates = (url="/my-library?view=updates") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <NotificationsProvider>
-        <Updates />
+        <Updates /><NotificationLocation/>
       </NotificationsProvider>
     </MemoryRouter>,
+    {wrapper:createTestQueryClientWrapper()},
   );
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,4 +95,12 @@ describe("notification failure states", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Date unavailable")).toBeInTheDocument();
   });
+});
+
+it('opens an update in the shared reader instead of navigating directly',async()=>{
+ const record={id:41,type:'announcement',title:'Full notice',body:'Full message',href:'/bulletin',audience_type:'all',audience_user_id:null,audience_role:null,created_at:'2026-10-27T00:00:00Z',expires_at:null,is_active:true,created_by:1,is_read:false,read_at:null};
+ service.fetchNotifications.mockResolvedValue([record]);service.fetchNotification.mockResolvedValue(record);service.markNotificationRead.mockResolvedValue({unreadCount:0});showUpdates();fireEvent.click(await screen.findByRole('button',{name:/Full notice/}));await screen.findByRole('dialog');await waitFor(()=>expect(service.fetchNotification).toHaveBeenCalledWith(41,expect.any(AbortSignal)));expect(screen.getByTestId('notification-location').textContent).toContain('notification=41');expect(screen.getByTestId('notification-location').textContent).toContain('view=updates');
+});
+it('restores a notification deep link and leaves Updates visible after closing',async()=>{
+ service.fetchNotification.mockResolvedValue({id:41,type:'announcement',title:'Deep-linked notice',body:'Full message',href:null,created_at:'2026-10-27T00:00:00Z',expires_at:null,is_read:true});showUpdates('/my-library?view=updates&notification=41');const dialog=within(await screen.findByRole('dialog'));await dialog.findByRole('heading',{name:'Deep-linked notice'});fireEvent.click(dialog.getAllByRole('button',{name:'Close'})[0]);await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());expect(screen.getByTestId('notification-location').textContent).toBe('?view=updates');
 });

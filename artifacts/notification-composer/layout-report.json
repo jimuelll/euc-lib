@@ -1,0 +1,214 @@
+[
+  {
+    "size": "desktop",
+    "theme": "light",
+    "drawer": {
+      "x": 400,
+      "y": 0,
+      "width": 1040,
+      "height": 1000,
+      "bottom": 1000,
+      "right": 1440
+    },
+    "form": {
+      "x": 419,
+      "y": 171.78125,
+      "width": 665,
+      "height": 745.21875,
+      "bottom": 917,
+      "right": 1084
+    },
+    "preview": {
+      "x": 1102,
+      "y": 171.78125,
+      "width": 320,
+      "height": 745.21875,
+      "bottom": 917,
+      "right": 1422
+    },
+    "footer": {
+      "x": 401,
+      "y": 935,
+      "width": 1039,
+      "height": 65,
+      "bottom": 1000,
+      "right": 1440
+    },
+    "button": {
+      "x": 1277.375,
+      "y": 948,
+      "width": 144.625,
+      "height": 40,
+      "bottom": 988,
+      "right": 1422,
+      "background": "rgb(122, 0, 0)",
+      "color": "rgb(255, 255, 255)"
+    },
+    "placeholder": {
+      "color": "rgb(107, 97, 98)",
+      "background": "rgb(244, 241, 234)",
+      "contrast": 5.301819475596207
+    },
+    "overflow": false,
+    "overflowElements": []
+  },
+  {
+    "size": "desktop",
+    "theme": "dark",
+    "drawer": {
+      "x": 400,
+      "y": 0,
+      "width": 1040,
+      "height": 1000,
+      "bottom": 1000,
+      "right": 1440
+    },
+    "form": {
+      "x": 419,
+      "y": 171.78125,
+      "width": 665,
+      "height": 745.21875,
+      "bottom": 917,
+      "right": 1084
+    },
+    "preview": {
+      "x": 1102,
+      "y": 171.78125,
+      "width": 320,
+      "height": 745.21875,
+      "bottom": 917,
+      "right": 1422
+    },
+    "footer": {
+      "x": 401,
+      "y": 935,
+      "width": 1039,
+      "height": 65,
+      "bottom": 1000,
+      "right": 1440
+    },
+    "button": {
+      "x": 1277.375,
+      "y": 948,
+      "width": 144.625,
+      "height": 40,
+      "bottom": 988,
+      "right": 1422,
+      "background": "rgb(122, 0, 0)",
+      "color": "rgb(255, 255, 255)"
+    },
+    "placeholder": {
+      "color": "rgb(166, 157, 156)",
+      "background": "rgb(18, 17, 19)",
+      "contrast": 7.105019242659653
+    },
+    "overflow": false,
+    "overflowElements": []
+  },
+  {
+    "size": "mobile",
+    "theme": "light",
+    "drawer": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "bottom": 844,
+      "right": 390
+    },
+    "form": {
+      "x": 15,
+      "y": 166.1875,
+      "width": 361,
+      "height": 358.8125,
+      "bottom": 525,
+      "right": 376
+    },
+    "preview": {
+      "x": 15,
+      "y": 539,
+      "width": 361,
+      "height": 200,
+      "bottom": 739,
+      "right": 376
+    },
+    "footer": {
+      "x": 1,
+      "y": 753,
+      "width": 389,
+      "height": 91,
+      "bottom": 844,
+      "right": 390
+    },
+    "button": {
+      "x": 200.5,
+      "y": 790,
+      "width": 175.5,
+      "height": 44,
+      "bottom": 834,
+      "right": 376,
+      "background": "rgb(122, 0, 0)",
+      "color": "rgb(255, 255, 255)"
+    },
+    "placeholder": {
+      "color": "rgb(107, 97, 98)",
+      "background": "rgb(244, 241, 234)",
+      "contrast": 5.301819475596207
+    },
+    "overflow": false,
+    "overflowElements": []
+  },
+  {
+    "size": "mobile",
+    "theme": "dark",
+    "drawer": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "bottom": 844,
+      "right": 390
+    },
+    "form": {
+      "x": 15,
+      "y": 166.1875,
+      "width": 361,
+      "height": 358.8125,
+      "bottom": 525,
+      "right": 376
+    },
+    "preview": {
+      "x": 15,
+      "y": 539,
+      "width": 361,
+      "height": 200,
+      "bottom": 739,
+      "right": 376
+    },
+    "footer": {
+      "x": 1,
+      "y": 753,
+      "width": 389,
+      "height": 91,
+      "bottom": 844,
+      "right": 390
+    },
+    "button": {
+      "x": 200.5,
+      "y": 790,
+      "width": 175.5,
+      "height": 44,
+      "bottom": 834,
+      "right": 376,
+      "background": "rgb(122, 0, 0)",
+      "color": "rgb(255, 255, 255)"
+    },
+    "placeholder": {
+      "color": "rgb(166, 157, 156)",
+      "background": "rgb(18, 17, 19)",
+      "contrast": 7.105019242659653
+    },
+    "overflow": false,
+    "overflowElements": []
+  }
+]

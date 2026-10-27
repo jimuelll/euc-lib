@@ -1,7 +1,8 @@
+import {notificationImage} from '../notifications/notifications.image.service';
 import { config } from './email.config';
 import { brandedEmail } from './email.template';
 
-export interface EmailMessage { recipient: string; name: string; subject: string; message: string; action_url?: string; action_label?: string; code?: string; login_identifier?: string; loans?: { title: string; due: string; balance: string }[]; as_of?: string }
+export interface EmailMessage { recipient: string; name: string; subject: string; message: string; image_url?:string; image_public_id?:string; image_alt?:string; action_url?: string; action_label?: string; code?: string; login_identifier?: string; loans?: { title: string; due: string; balance: string }[]; as_of?: string }
 export interface EmailProvider { send(message: EmailMessage, account: boolean): Promise<string | void> }
 export class SendFailure extends Error {
   constructor(public kind: 'permanent' | 'retry' | 'unknown', public safeMessage: string, public retryAfterSeconds = 0) { super(safeMessage); }
@@ -10,6 +11,9 @@ export class SendFailure extends Error {
 export const capturedEmails: EmailMessage[] = [];
 // Render locally so deployment needs no provider-hosted templates. Escape every value.
 export function renderEmail(message: EmailMessage, account: boolean) {
+  if(!account && message.image_url) {
+    try{notificationImage({imageUrl:message.image_url,imagePublicId:message.image_public_id,imageAlt:message.image_alt});}catch{throw new SendFailure('permanent','Invalid notification email image');}
+  }
   const text = [message.subject, `Hello ${message.name},`, message.message];
   const paragraph = (value: string) => { text.push(value); };
   if (account) {
@@ -19,6 +23,7 @@ export function renderEmail(message: EmailMessage, account: boolean) {
     if (message.as_of) paragraph(`Balances as of ${message.as_of}. Amounts are in PHP.`);
     for (const loan of message.loans || []) paragraph(`${loan.title}\nDue: ${loan.due}\nUnsettled balance: PHP ${loan.balance}`);
   }
+  if(!account && message.image_url)text.push(`Image: ${message.image_alt}\n${message.image_url}`);
   if (message.action_url) {
     let url: URL;
     try { url = new URL(message.action_url); } catch { throw new SendFailure('permanent', 'Invalid email action URL'); }

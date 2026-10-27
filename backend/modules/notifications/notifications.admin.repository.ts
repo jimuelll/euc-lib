@@ -9,7 +9,8 @@ const feed = `SELECT CONCAT('notification:',n.id) AS record_key, n.id, NULL AS q
  CASE WHEN n.source_type IS NOT NULL OR n.created_by IS NULL THEN 'automatic' ELSE 'manual' END AS origin,
  CASE WHEN n.is_active=0 OR n.expires_at<=NOW() THEN 'expired' ELSE 'available' END AS delivery_status,
  NULL AS last_error,(SELECT COUNT(*) FROM notification_reads r WHERE r.notification_id=n.id) AS read_count,
- n.email_requested,n.email_batch_id,DATE_FORMAT(n.email_expires_at,'%Y-%m-%dT%H:%i:%sZ') AS email_expires_at
+ NULL AS audience_user_ids,
+ n.image_url,n.image_public_id,n.image_alt,n.email_requested,n.email_batch_id,DATE_FORMAT(n.email_expires_at,'%Y-%m-%dT%H:%i:%sZ') AS email_expires_at
  FROM notifications n
  UNION ALL SELECT CONCAT('queue:',o.id),NULL,o.id,
  ${json('type')},${json('title')},${json('body')},${json('href')},${json('audienceType')},
@@ -18,7 +19,7 @@ const feed = `SELECT CONCAT('notification:',n.id) AS record_key, n.id, NULL AS q
  CASE WHEN ${json('sourceType')} IS NOT NULL OR ${json('createdBy')} IS NULL THEN 'automatic' ELSE 'manual' END,
  CASE WHEN ${json('cancelledAt')} IS NOT NULL THEN 'expired' WHEN o.last_error IS NOT NULL THEN 'failed'
  WHEN o.available_at>NOW() THEN 'scheduled' ELSE 'queued' END,o.last_error,0,
- CASE WHEN ${json('sendEmail')}='true' THEN 1 ELSE 0 END,NULL,NULL
+ JSON_EXTRACT(o.payload,'$.audienceUserIds'),${json('imageUrl')},${json('imagePublicId')},${json('imageAlt')},CASE WHEN ${json('sendEmail')}='true' THEN 1 ELSE 0 END,NULL,NULL
  FROM delivery_outbox o WHERE o.event_type='notification' AND (o.status='pending' OR ${json('cancelledAt')} IS NOT NULL)`;
 const grouped = `SELECT f.*,CASE WHEN origin='automatic' THEN CONCAT(type,':',DATE(created_at),':',delivery_status) ELSE record_key END COLLATE utf8mb4_unicode_ci AS group_key FROM (${feed}) f`;
 const ranked = `SELECT f.*,ROW_NUMBER() OVER(PARTITION BY group_key ORDER BY created_at DESC,record_key DESC) AS row_rank,
@@ -41,8 +42,8 @@ function where(options: FeedOptions, filter = true) {
             params.push(options.filter);
     }
     if (options.search) {
-        sql += ` AND EXISTS(SELECT 1 FROM (${grouped}) matched WHERE matched.group_key=f.group_key AND (matched.title LIKE ? OR matched.body LIKE ? OR matched.type LIKE ? OR EXISTS(SELECT 1 FROM users u WHERE u.id=matched.audience_user_id AND u.name LIKE ?)))`;
-        params.push(...Array(4).fill(`%${options.search}%`));
+        sql += ` AND EXISTS(SELECT 1 FROM (${grouped}) matched WHERE matched.group_key=f.group_key AND (matched.title LIKE ? OR matched.body LIKE ? OR matched.type LIKE ? OR EXISTS(SELECT 1 FROM users u WHERE u.id=matched.audience_user_id AND u.name LIKE ?) OR EXISTS(SELECT 1 FROM users u WHERE ((matched.queue_id IS NULL AND EXISTS(SELECT 1 FROM notification_recipients r WHERE r.notification_id=matched.id AND r.user_id=u.id)) OR (matched.queue_id IS NOT NULL AND JSON_CONTAINS(matched.audience_user_ids,CAST(u.id AS CHAR)))) AND u.name LIKE ?)))`;
+        params.push(...Array(5).fill(`%${options.search}%`));
     }
     return { sql, params };
 }
@@ -54,9 +55,10 @@ export async function list(options: FeedOptions) {
  ${match.sql} ORDER BY f.created_at DESC,f.record_key DESC LIMIT ? OFFSET ?`, [...match.params, options.limit, (options.page - 1) * options.limit]);
     const [[count]] = await db.query<RowDataPacket[]>(`SELECT COUNT(*) total FROM (${ranked}) f ${match.sql}`, match.params);
     const [[counts]] = await db.query<RowDataPacket[]>(`SELECT COUNT(*) AS all_count,SUM(origin='manual') AS manual,SUM(origin='automatic') AS automatic,SUM(delivery_status='failed') AS failed FROM (${ranked}) f ${base.sql}`, base.params);
+    await Promise.all(rows.map(hydrateAudience));
     return { rows, total: Number(count.total), counts: { manual: Number(counts.manual || 0), automatic: Number(counts.automatic || 0), failed: Number(counts.failed || 0), all: Number(counts.all_count || 0) } };
 }
-export async function audienceCount(type: string, role: string | null, userId: number | null) {
+export async function audienceCount(type: string, role: string | null, userId: number | null, userIds: number[] = []) {
     const params: unknown[] = [];
     let sql = "SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL AND is_active=1";
     if (type === 'role') {
@@ -67,10 +69,15 @@ export async function audienceCount(type: string, role: string | null, userId: n
         sql += ' AND id=?';
         params.push(userId);
     }
+    if (type === 'users') {
+        if (!userIds.length) return 0;
+        sql += ` AND id IN (${userIds.map(() => '?').join(',')})`;
+        params.push(...userIds);
+    }
     const [[row]] = await db.query<RowDataPacket[]>(sql, params);
     return Number(row.total);
 }
-export async function get(recordKey: string) { const [[row]] = await db.query<RowDataPacket[]>(`SELECT f.*,u.name AS audience_user_name,u.student_employee_id AS audience_user_patron_id,COALESCE(u.username,u.student_employee_id) AS audience_user_identifier FROM (${feed}) f LEFT JOIN users u ON u.id=f.audience_user_id WHERE record_key=?`, [recordKey]); return row || null; }
+export async function get(recordKey: string) { const [[row]] = await db.query<RowDataPacket[]>(`SELECT f.*,u.name AS audience_user_name,u.student_employee_id AS audience_user_patron_id,COALESCE(u.username,u.student_employee_id) AS audience_user_identifier FROM (${feed}) f LEFT JOIN users u ON u.id=f.audience_user_id WHERE record_key=?`, [recordKey]); if (row) await hydrateAudience(row); return row || null; }
 export async function group(type: string, day: string, status: string) { const [rows] = await db.query<RowDataPacket[]>(`SELECT f.*,u.name AS audience_user_name,u.student_employee_id AS audience_user_patron_id FROM (${feed}) f LEFT JOIN users u ON u.id=f.audience_user_id WHERE origin='automatic' AND type=? AND DATE(created_at)=? AND delivery_status=? ORDER BY created_at DESC LIMIT 100`, [type, day, status]); return rows; }
 export async function enqueue(payload: Record<string, unknown>, when: Date) {
     const conn = await db.getConnection();
@@ -109,3 +116,14 @@ export async function expire(recordKey: string) {
     } catch(error) {await conn.rollback();throw error;} finally {if(locked)await conn.query("SELECT RELEASE_LOCK('euc-library-email-dispatch')");conn.release();}
 }
 export async function retry(queueId: string) { const [result] = await db.query<ResultSetHeader>("UPDATE delivery_outbox SET available_at=NOW(),last_error=NULL,locked_at=NULL WHERE id=? AND event_type='notification' AND status='pending' AND locked_at IS NULL", [queueId]); return result.affectedRows === 1; }
+
+async function hydrateAudience(row: RowDataPacket) {
+    if (row.audience_type !== 'users') return;
+    // Read memberships normally: JSON_ARRAYAGG is unavailable on older supported MariaDB installs.
+    const [members] = row.id && !row.queue_id ? await db.query<RowDataPacket[]>('SELECT user_id FROM notification_recipients WHERE notification_id=? ORDER BY user_id',[row.id]) : [[]];
+    const raw = row.id && !row.queue_id ? members.map(member=>Number(member.user_id)) : typeof row.audience_user_ids === 'string' ? JSON.parse(row.audience_user_ids) : row.audience_user_ids;
+    row.audience_user_ids = Array.isArray(raw) ? raw.map(Number) : [];
+    if (!row.audience_user_ids.length) { row.audience_users = []; return; }
+    const [users] = await db.query<RowDataPacket[]>(`SELECT id,name,role,student_employee_id,library_card_number,student_number,employee_number,username FROM users WHERE id IN (${row.audience_user_ids.map(() => '?').join(',')})`, row.audience_user_ids);
+    row.audience_users = users;
+}

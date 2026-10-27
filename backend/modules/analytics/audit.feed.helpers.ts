@@ -1,6 +1,7 @@
 const sensitive=/(password|token|secret|authorization|cookie|session.?id|email|phone|contact|address|student.?employee|personal|birth|remarks|notes|reason|distributor)/i;
 export const REDACTED='Redacted (sensitive)';
-export function sensitiveField(field:string){return sensitive.test(field)||/^(name|patron name|user name)$/i.test(field.trim());}
+// Server-authored archive explanations are intentionally auditable; redact() still scrubs email addresses and tokens in their text.
+export function sensitiveField(field:string){return field !== 'archive_reason' && (sensitive.test(field)||/^(name|patron name|user name)$/i.test(field.trim()));}
 export function redact(value:any,key=''):any{
  if(sensitiveField(key))return REDACTED;
  if(Array.isArray(value))return value.map(item=>redact(item));

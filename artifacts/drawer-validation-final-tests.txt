@@ -1,0 +1,17 @@
+
+> vite_react_shadcn_ts@0.0.0 test:unit
+> vitest run --passWithNoTests --run src/features/admin/manage/useUserValidation.test.tsx --maxWorkers=1 --testTimeout=15000
+
+
+ RUN  v3.2.4 C:/Users/Jimuel Jean Untalan/Downloads/Capstone/frontend
+
+ ✓ src/features/admin/manage/useUserValidation.test.tsx (3 tests) 2309ms
+   ✓ ignores responses for values replaced while a check was pending  957ms
+   ✓ blocks submission and shows a retryable error when availability fails  455ms
+   ✓ retains server conflicts until that field or its role changes  894ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  08:37:26
+   Duration  14.44s (transform 226ms, setup 0ms, collect 1.50s, tests 2.31s, environment 6.84s, prepare 3.00s)
+

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { ArrowUpRight } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +14,7 @@ import type { DashboardNotification } from "../types";
 type Props = {
   notifications: DashboardNotification[];
   unreadCount: number;
-  markAsRead: (id: number) => Promise<void>;
+  openNotification: (id: number) => void;
   markAllAsRead: () => Promise<void>;
   state: {
     loading: boolean;
@@ -27,7 +26,7 @@ type Props = {
 export default function MyLibraryUpdatesPanel({
   notifications,
   unreadCount,
-  markAsRead,
+  openNotification,
   markAllAsRead,
   state,
 }: Props) {
@@ -91,18 +90,10 @@ export default function MyLibraryUpdatesPanel({
             {notifications.length ? (
               <PanelList>
                 {notifications.map((notification) => (
-                  <Link
+                  <button type="button"
                     key={notification.id}
-                    to={notification.href || "/my-library?view=updates"}
-                    onClick={() => {
-                      if (!notification.is_read)
-                        void markAsRead(notification.id).catch(() =>
-                          setError(
-                            "This update could not be marked as read. Please try again.",
-                          ),
-                        );
-                    }}
-                    className="block px-5 py-5 transition-colors hover:bg-muted/40 sm:px-6"
+                    onClick={() => openNotification(notification.id)}
+                    className="block w-full text-left px-5 py-5 transition-colors hover:bg-muted/40 sm:px-6"
                   >
                     <div className="flex items-start gap-3">
                       {!notification.is_read && (
@@ -129,7 +120,7 @@ export default function MyLibraryUpdatesPanel({
                         aria-hidden="true"
                       />
                     </div>
-                  </Link>
+                  </button>
                 ))}
               </PanelList>
             ) : (

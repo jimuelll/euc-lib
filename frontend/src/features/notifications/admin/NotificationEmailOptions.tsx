@@ -6,7 +6,7 @@ export function NotificationEmailOptions({checked,onChange,preview,loading,error
 }) {
   return <section className="notification-email-options" aria-label="Email delivery option">
     <label className="notification-email-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)} aria-describedby="notification-email-help"/>Also send by email</label>
-    <p id="notification-email-help">Email goes only to active users with verified addresses. In-app delivery proceeds while email waits.</p>
+    <p id="notification-email-help">{checked && preview ? `${preview.skippedCount.toLocaleString()} patrons will get in-app only${preview.exclusions ? `: ${preview.exclusions.missingAddress} have no email address, ${preview.exclusions.unverifiedAddress} have no verified email, ${preview.exclusions.incompleteSetup} have incomplete account setup` : ' because their accounts are not eligible for email'}.` : 'Email goes only to active patrons with a verified address and completed account setup.'}</p>
     {checked && <div aria-live="polite">
       {loading ? <p role="status">Checking email recipients and allowance…</p> : error ? <p role="alert">Email preview could not be loaded. <Button type="button" variant="outline" onClick={onRetry}>Try again</Button></p> : preview && <>
         <p><strong>{scheduled?'Estimated email audience: ': 'This will email '}{preview.emailCount.toLocaleString()} users{scheduled?'.':'.'}</strong></p>

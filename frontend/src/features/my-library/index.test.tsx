@@ -34,6 +34,7 @@ const notices = vi.hoisted(() => ({
   loading: false,
   error: null as string | null,
   markAsRead: vi.fn(),
+  openNotification:vi.fn(),
   markAllAsRead: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -327,9 +328,8 @@ describe("My Library workspace", () => {
     renderLibrary("/my-library?view=updates");
     fireEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
     await waitFor(() => expect(notices.markAllAsRead).toHaveBeenCalledOnce());
-    const notice = screen.getByRole("link", { name: /Library notice/ });
-    expect(notice).toHaveAttribute("href", "/bulletin");
+    const notice = screen.getByRole("button", { name: /Library notice/ });
     fireEvent.click(notice);
-    expect(notices.markAsRead).toHaveBeenCalledWith(42);
+    expect(notices.openNotification).toHaveBeenCalledWith(42);
   });
 });

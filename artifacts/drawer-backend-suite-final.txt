@@ -1,0 +1,511 @@
+
+> test
+> node -r ts-node/register test/suite.test.js
+
+[dotenv@17.3.1] injecting env (32) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+✔ calendar dates and dashboard labels retain UTC+08 midnight boundaries (23.3801ms)
+✔ dashboard range defaults to seven days and supports configured ranges (1.6493ms)
+✔ analytics series fills missing labels with numeric zeroes (0.9517ms)
+✔ daily evidence preserves SQL dates at UTC+08 and keeps attendance and fine ledger totals (443.3246ms)
+✔ AI briefs use pesos and discard unrecorded prior-period growth claims (10.9436ms)
+✔ period charts use bounded event dates and borrowed_at for circulation demand (1.4122ms)
+✔ attendance visits pair scans before filtering and pagination; summary is not filtered by tile (1.7572ms)
+✔ empty visits have valid numeric zero counters (0.7011ms)
+✔ time out all skips a changed visit and records only the confirmed check-in (1.8298ms)
+✔ scan lock, check and insert use the same connection; release is guaranteed (2.7513ms)
+✔ central rate-limit policy values and account scopes match the documented plan (0.9283ms)
+✔ account budgets are shared across resource IDs and aliases, but isolated by account (564.0837ms)
+✔ independent limiter instances reset after their configured window (1195.9331ms)
+✔ IP identity normalizes IPv6 subnets and keeps IPv4 clients distinct (110.3117ms)
+✔ attendance and desk transactions use separate operator-account budgets (29.0608ms)
+✔ CORS exposes rate-limit headers and preflight passes without consuming API quota (163.6598ms)
+✔ refresh account identity is attached only from a successfully verified token (350.1633ms)
+✖ API rate limits are attached after authentication and before protected handlers (38.0976ms)
+✔ concurrent refresh attempts use one atomic rotation and only one can succeed (12.3026ms)
+✔ access tokens at or before the restore marker are rejected (0.8645ms)
+﹣ database: concurrent refresh rotation consumes the old session once and rejects expired or revoked sessions (0.3124ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+✔ staff and admin mutation routes resolve to an explicit audit policy (2.3505ms)
+✔ batch audit entries summarize the affected record type and count (2.6982ms)
+✔ body-less embedding backfill requests produce audit metadata safely (1.4342ms)
+✔ audit values keep numeric one separate from boolean Yes (5.8719ms)
+✔ holding audit snapshots show financial changes approved for super admins (1.6383ms)
+✔ voiding an accession audits the persisted Assigned to Voided transition without the reason (0.7516ms)
+✔ policy deletion audit records its name and affected book count (1.6431ms)
+✔ clearance audit reads persisted amounts and receipt references while redacting free text (1.8359ms)
+✔ copy audit summaries identify the book and stable barcode sequence (2.7351ms)
+✔ legacy copy audit summaries resolve current labels and use ID fallback for deleted copies (1.9967ms)
+✔ permanent accession audit labels remain stable across application snapshot restores (0.748ms)
+✔ new copy audit labels remain stable after copy IDs are reused by restore (0.6501ms)
+✔ user audit changes hide personal values and distinguish no change from failed capture (2.4973ms)
+✔ audit capture refuses to attribute a concurrent later edit to an earlier update (25.2972ms)
+✔ username and email availability reads do not create audit events (0.7824ms)
+✔ archive explanations remain auditable while contact details and generic reasons stay redacted (1.6533ms)
+✔ new user audit entries store lookup names and keep personal changes redacted (1.3622ms)
+✔ event-time lookup resolves both sides of a changed reference and falls back clearly (73.8752ms)
+✔ holding programs, book policies, and book references resolve to their names (48.3441ms)
+✔ historical audit display resolves current names without rewriting stored metadata (3.1882ms)
+✔ historical book IDs resolve to current titles and missing rows keep labeled ID fallbacks (1.1514ms)
+✔ audit rows still display labeled ID fallbacks when lookup queries fail (80.0688ms)
+﹣ database: accession collision is atomic, survives archive, and serializes concurrent assignment (0.2995ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test; fixtures permanently reserve accessions
+﹣ database: holdings audits preserve rapid before/after values and roll back when audit enqueue fails (0.3037ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: copy-count audit records the persisted pre-edit count and every retired copy label (0.3118ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: voided accessions stay attached and claimed while current lending excludes the copy (0.2043ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: retained accession identity is barcode based after snapshot copy IDs change (0.2119ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: barcode retained by an orphaned claim cannot be reused by another book (0.1962ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout and exact-copy return resolve accession and QR barcode (0.2678ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: count reduction retires copies, growth creates new identities, and restore is explicit (0.3916ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout and reduction serialize without retiring a loaned copy (0.3137ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: payment and patron archive serialize without archiving an unpaid account (0.276ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: pending and ready reservations protect copy reduction and exact-copy fulfillment (0.2961ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: application restore retains a claim made after the saved snapshot (0.2673ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: concurrent renewal and return leave one returned loan and a consistent fine cycle (0.2783ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: count reduction retires unaccessioned and returned copies but preserves loan and reservation commitments (0.2694ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: pending reservations keep a preparation copy and preparation locks the catalog record (0.2545ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout racing reservation preparation cannot take the last committed copy (0.2525ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: cancelling an expired reservation races expiry synchronization to one terminal state (0.2916ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: OPAC, recommendations, inventory, and history follow the copy lifecycle (0.2617ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: checkout commits with a durable notification event and cannot be duplicated while delivery is pending (30.3844ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: unpaid ledger balances block user, book, direct-edit, and loan archives until payment (0.2477ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: term assignment and concurrent Set Current preserve one current term (0.1912ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: program, department, and holiday lifecycle preserves references and restores archived settings (0.2531ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+﹣ database: policy reassignment/deletion and archival keep historical previews, filters, exports, and aggregates (0.2276ms) # requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test
+✔ users service delegates persistence to its repository (4.9024ms)
+✔ feature facades do not own database imports (4.946ms)
+✔ repository-backed services delegate persistence to repositories (259.3502ms)
+✔ borrowing read service delegates SQL to its repository (3.07ms)
+✔ database-aware helpers delegate persistence to repositories (3.0662ms)
+✔ backend transport and scheduled files respect database boundaries (174.3598ms)
+✔ module registry is the stable route registration boundary (1.2294ms)
+✔ restore upgrades the previous snapshot version and adds newly registered tables (4.5901ms)
+✔ restore upgrades v11 with holdings defaults and preserves tables that already exist (4.388ms)
+✔ restore upgrades v12 loan provenance and preserves outbox, holdings, settings and delivery keys (1.5247ms)
+✔ restore preflight rejects malformed rows before restore can begin (1.9842ms)
+✔ v13 upgrade derives permanent claims from the snapshot's existing holdings (1.7713ms)
+✔ restore retains a claim made after the snapshot and reapplies the holding to the same barcode (1.8163ms)
+✔ restore reconciles a permanent claim by barcode when its prior copy ID was reused (0.6454ms)
+✔ restore rejects an accession assigned to another physical copy (0.871ms)
+✔ restore keeps claims orphaned when their physical copy is absent (0.526ms)
+✔ restoring a snapshot from before a correction keeps the replacement accession current (0.853ms)
+✔ restore retains void state and permanent claims made after an older snapshot (0.6317ms)
+✔ backup values preserve buffers and normalize JSON for restore (1.0669ms)
+✔ version 18 notifications upgrade to in-app-only defaults without creating email intent (0.7982ms)
+✔ version 15 snapshots upgrade with empty private drafts and a verified checksum (1.7847ms)
+✔ backup validation and checksums reject malformed payloads (1.0348ms)
+✔ version 20 backups acquire an empty selected-recipient table with a valid checksum (2.1113ms)
+✔ drafts allow incomplete records; publication validates dates, IDs, and safe URLs (3.679ms)
+✔ individual publication retains other saved drafts; publish all rolls back every section on failure (38.2473ms)
+✔ published guide addresses cannot be changed (0.8216ms)
+✔ discard also restores a previously saved legacy guide draft (3.9465ms)
+✔ save, publish, conflicts, discard, and failed publication preserve transaction boundaries (49.52ms)
+✔ notification scheduling validates dates, destinations, lengths and roles (2.1112ms)
+✔ broadcasts require the current count; scheduling queues without creating a public message (2.6524ms)
+✔ failed deliveries retry the original event and cannot resend an in-flight schedule (1.6408ms)
+✔ selected audience normalizes duplicates and rejects malformed or empty IDs (2.7612ms)
+✔ selected patrons retain their IDs through scheduling, count confirmation and retry (2.8273ms)
+✔ one publication commits memberships and optional email atomically before targeted realtime (3.9782ms)
+✔ membership failure or changed count rolls back; repeated queue delivery cannot expand membership (2.7095ms)
+✔ all patron read paths enforce membership through the common authorization predicate (2.5067ms)
+✔ email exclusions are exclusive and sum to in-app-only accounts (1.4271ms)
+✔ borrowing pagination clamps invalid and oversized values (1.5523ms)
+✔ borrowing money values are rounded to cents (0.3998ms)
+✔ fine displays use saved loan terms and fall back only for legacy rows (20.2681ms)
+✔ fine detail lookup retains archived borrowing, patron, book, and copy labels (1.1222ms)
+✔ circulation history searches ISBN and keeps date filters in all count queries (1.5603ms)
+✔ copy lookup previews the configured loan policy instead of assuming seven days (1.1449ms)
+✔ admin queue filters live work while counts ignore status and preserve search (4.6895ms)
+✔ cancellation reason is appended without overwriting existing notes (1.2101ms)
+✔ borrowing archive checks ledger fines and commits its before/after audit with the state change (157.4336ms)
+✔ borrowing archive rolls back if its durable audit event cannot be enqueued (23.9259ms)
+✔ borrowing restore is transactional, records its actor, and checks affected rows (24.4644ms)
+✔ desk undo tokens reject another actor, forged and expired intents (6.751ms)
+✔ desk undo commits a correction and its audit together (199.9814ms)
+✔ desk undo rejects changed records and every fine-related record (49.9029ms)
+✔ return undo rejects re-borrowed copies, ready holds and pending queues (52.4939ms)
+✔ failed durable audit rolls back the reversal (15.1132ms)
+✔ history counts ignore status and repository sorts urgent work before pagination (1.251ms)
+✔ copy count increases create new copy identities and never reactivate retired rows (2.2133ms)
+✔ catalog edit lock reads persisted title and core fields for an accurate audit snapshot (1.2413ms)
+▶ copy count reduction names borrowed, prepared, and pending commitments
+  ✔ borrowed copies cannot be removed (2.9432ms)
+  ✔ prepared copies cannot be removed (1.1041ms)
+  ✔ pending copies cannot be removed (0.5915ms)
+✔ copy count reduction names borrowed, prepared, and pending commitments (11.7337ms)
+✔ copy count reduction retires unaccessioned copies and preserves one eligible copy per pending reservation (3.0154ms)
+✔ explicit copy retirement protects pending reservations and restoration is an explicit action (3.8371ms)
+✔ weeded and discarded conditions preserve loan and reservation commitments (2.9599ms)
+✔ catalog status counts precede pagination and the needs-holdings predicate applies to list and total (3.2724ms)
+✔ adding copies locks inventory and increments it without retiring existing copies (2.468ms)
+✔ holdings summary counts ignore the selected state while row filters apply (1.9199ms)
+✔ catalog image validation enforces supported image signatures and the 5 MB limit (1.1699ms)
+✔ book image routes require catalog staff authorization before upload handling (0.9171ms)
+✖ cover replacement saves the new Cloudinary image before deleting the old image (6.3039ms)
+✔ thesis image upload is rejected and removing a book image clears storage and Cloudinary (7.6507ms)
+✔ ISBN lookup queries both providers and uses Google Books for the cleaned synopsis (2085.3759ms)
+✔ ISBN lookup merges Google Books fields when Open Library search has gaps (4110.8262ms)
+✔ ISBN lookup keeps Open Library details when Google Books is unavailable (3068.8944ms)
+✔ Google Books remains a fallback when Open Library is unavailable (4669.3617ms)
+✔ ISBN lookup keeps its unavailable error when both providers fail (4135.5447ms)
+✔ Google Books synopsis cleaning removes markup, decodes entities, and caps its length (0.8253ms)
+✔ public catalogue filter builder combines search, format, availability, and category safely (5.6466ms)
+✔ public category facet counts one category per catalog record (1.1461ms)
+✔ uncategorized filtering includes missing, blank, JSON null, and explicit categories (1.4586ms)
+✔ publication year filters are parameterized and availability sorting uses the recorded count (1.9177ms)
+✔ public search returns server pagination, filter counts, cover URL, and empty pages (14.9511ms)
+✔ outbox retries notifications with the same idempotency key (4.9272ms)
+✔ outbox forwards stable event keys for audit records (2.3221ms)
+✔ fine calculation has no charge at the due instant and charges the next interval after it (0.6319ms)
+✔ daily fines round up at a day boundary and use the return time when present (0.5235ms)
+✔ invalid dates and missing due dates never produce NaN fines (1.0725ms)
+✔ clearance queue groups blocked first and retains counts across filters (1131.0985ms)
+✔ confirmed partial payments allocate only the amount received and generate a receipt (173.1986ms)
+✔ a changed balance rejects the payment before ledger writes (267.7511ms)
+✔ overpayments and invalid amounts never create ledger entries (299.8757ms)
+✔ full payment remains compatible and records all allocations atomically (307.626ms)
+✔ staff cannot record partial payments and rejection leaves the ledger untouched (40.8623ms)
+✔ staff can record full payment with a confirmed balance (216.9106ms)
+✔ super admins retain partial payment access (123.7676ms)
+✔ role gates retain staff desk access and reserve backup for super admins (5846.2919ms)
+✔ payment permission comes from the authenticated user, never the request body (1.6628ms)
+[0mGET /api/admin/dashboard [32m200[0m 5.312 ms - 34[0m
+[0mGET /api/admin/users [32m200[0m 4.507 ms - 30[0m
+[0mGET /api/admin/circulation/log [32m200[0m 5.751 ms - 40[0m
+[0mGET /api/admin/catalog-schema [32m200[0m 3.002 ms - 39[0m
+[0mGET /api/admin/catalog-settings [32m200[0m 5.748 ms - 41[0m
+[0mGET /api/admin/book-types [32m200[0m 1.869 ms - 35[0m
+[0mGET /api/admin/academic-programs [32m200[0m 8.690 ms - 42[0m
+[0mGET /api/admin/books [32m200[0m 4.736 ms - 30[0m
+[0mGET /api/admin/holdings [32m200[0m 0.924 ms - 33[0m
+[0mGET /api/admin/books/1/copies [32m200[0m 1.343 ms - 39[0m
+[0mGET /api/admin/books/1/holdings [32m200[0m 1.015 ms - 41[0m
+[0mPOST /api/admin/books [32m200[0m 80.690 ms - 30[0m
+[0mPUT /api/admin/books/1 [32m200[0m 6.392 ms - 32[0m
+[0mDELETE /api/admin/books/1 [32m200[0m 2.810 ms - 32[0m
+[0mPOST /api/admin/books/1/restore [32m200[0m 2.671 ms - 40[0m
+[0mPOST /api/admin/books/1/copies [32m200[0m 6.410 ms - 39[0m
+[0mPUT /api/admin/copies/1/holding [32m200[0m 1.987 ms - 41[0m
+[0mPOST /api/admin/copies/1/retire [32m200[0m 3.018 ms - 40[0m
+[0mPOST /api/admin/copies/1/restore [32m200[0m 1.318 ms - 41[0m
+[0mPATCH /api/admin/copies/1 [32m200[0m 2.818 ms - 33[0m
+[0mGET /api/admin/reservations [32m200[0m 1.955 ms - 37[0m
+[0mPOST /api/admin/reservations/1/ready [32m200[0m 3.492 ms - 45[0m
+[0mPOST /api/admin/reservations/1/fulfill [32m200[0m 7.552 ms - 47[0m
+[0mPOST /api/admin/reservations/1/cancel [32m200[0m 3.846 ms - 46[0m
+[0mDELETE /api/admin/reservations/1 [32m200[0m 0.936 ms - 39[0m
+[0mPATCH /api/admin/reservations/1/restore [32m200[0m 2.095 ms - 47[0m
+[0mGET /api/admin/clearance/profile?student_employee_id=TEST-1 [32m200[0m 8.739 ms - 69[0m
+[0mGET /api/admin/clearance/queue [32m200[0m 3.469 ms - 40[0m
+[0mGET /api/admin/clearance/receipts/TEST-RECEIPT [32m200[0m 2.387 ms - 56[0m
+[0mGET /api/admin/query [33m403[0m 0.873 ms - 23[0m
+[0mGET /api/admin/query/meta [33m403[0m 0.734 ms - 23[0m
+[0mGET /api/admin/query/export [33m403[0m 4.044 ms - 23[0m
+[0mGET /api/admin/query/reports [33m403[0m 1.407 ms - 23[0m
+[0mGET /api/admin/query/reports/export [33m403[0m 3.431 ms - 23[0m
+[0mGET /api/admin/backup/status [33m403[0m 3.289 ms - 23[0m
+[0mPOST /api/admin/backup/restore [33m403[0m 3.506 ms - 23[0m
+[0mGET /api/admin/catalog-schema/impact [33m403[0m 1.722 ms - 27[0m
+[0mPUT /api/admin/catalog-schema [33m403[0m 1.435 ms - 27[0m
+[0mPUT /api/admin/catalog-settings [33m403[0m 1.027 ms - 27[0m
+[0mPOST /api/admin/book-types [33m403[0m 1.691 ms - 27[0m
+[0mPOST /api/admin/copies/1/holding/void-accession [33m403[0m 5.176 ms - 27[0m
+[0mGET /api/admin/recommendations/books [33m403[0m 3.106 ms - 27[0m
+[0mPOST /api/admin/clearance/borrowings/1/adjust [33m403[0m 1.830 ms - 23[0m
+[0mPOST /api/admin/clearance/transactions/1/reverse [33m403[0m 2.123 ms - 23[0m
+[clearance] Error: Staff can record full payment only. An administrator is required for partial payments.
+    at createServiceError (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\clearance\clearance.service.ts:53:128)
+    at Object.recordFullPayment (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\clearance\clearance.service.ts:160:110)
+    at async C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\clearance\clearance.controller.ts:12:20 {
+  status: 403
+}
+[0mPOST /api/admin/clearance/payment [33m403[0m 25.814 ms - 100[0m
+[0mPOST /api/admin/clearance/payment [32m200[0m 8.064 ms - 275[0m
+[0mGET /api/admin/query [32m200[0m 1.160 ms - 30[0m
+[0mGET /api/admin/backup/status [33m403[0m 1.146 ms - 23[0m
+[0mGET /api/admin/backup/status [32m200[0m 3.531 ms - 38[0m
+✔ staff desk features work through the application mounts while financial and settings restrictions remain enforced (7019.8446ms)
+✔ super admins can create invited super admin accounts (593.1175ms)
+✔ super admins can update their own user record with an unchanged role (2.3763ms)
+✔ self editing does not allow other super admin edits, self demotion or archival (2.0407ms)
+✔ users desk counts statuses across pages and adds authoritative borrowing balances (5.3155ms)
+✔ users desk filters attention before pagination and retains role counts (0.9314ms)
+✔ users desk refuses a role outside the operator's search scope (0.3824ms)
+✔ users academic reference filters constrain both rows and summary (1.1864ms)
+✔ availability checks exclude only accounts the actor may manage (1.2381ms)
+✔ email history enforces target permissions and exposes only delivery state (1.0337ms)
+✔ archive requires a nonempty reason (0.5688ms)
+✔ duplicate create identifiers return inline field errors (521.3401ms)
+✔ email claims conflicting during create return inline email errors (576.3479ms)
+✔ archive records its reason transactionally and retains outstanding-loan checks (2.9475ms)
+✔ holding saves validate accession uniqueness inputs and preserve cent values (4.3166ms)
+✔ existing accession cannot change while a copy is loaned or prepared (0.9373ms)
+✔ copy resolution accepts an accession or the existing QR barcode, and returns the exact copy loan (1.8481ms)
+✔ historical patron borrowing rows keep the physical copy identity after copy archival (0.712ms)
+✔ all checkout and reservation copy selectors filter to accessioned copies (3.5814ms)
+✔ global holdings search applies course, completion, and circulation filters (1.1154ms)
+✔ catalog visibility setting can be saved in both states (2.5574ms)
+✔ patron borrowing and recommendations follow the catalog visibility setting (75.1083ms)
+✔ desk checkout blocks unaccessioned QR copies and rejects reservation copy mismatches (112.6388ms)
+✔ bulk accessions preserve zeros, map selected order, and commit one audit (3.022ms)
+✔ route IDs must be complete positive safe integers (0.4005ms)
+✔ catalog and reservation routes reject partial ID strings with 400 (0.8859ms)
+✔ pagination clamps fractions, invalid values, huge offsets, and page sizes (0.4139ms)
+✔ catalogue pagination accepts only numeric input and caps public page size (0.4506ms)
+✔ deleting an assigned policy is rejected without clearing active or archived assignments (1.5556ms)
+✔ deleting a missing policy rolls the transaction back (0.806ms)
+✔ an unused policy deletes without changing books (1.2365ms)
+✔ policy management loads inactive policies with active and archived assignment counts (160.3693ms)
+✔ a permanently deleted policy name can be reused (2.3414ms)
+✔ copy availability requires an active book policy (0.3649ms)
+✔ new and reassigned books only accept active policies under a row lock (0.6757ms)
+✔ policy removal is super-admin only (0.546ms)
+✔ needs-policy catalog filter is applied to both rows and pagination counts (1.1888ms)
+✔ reservation creation and preparation stop when the book has no active policy (121.5633ms)
+✔ renewal is blocked for an active loan whose book no longer has a policy (67.8864ms)
+✔ an active loan remains returnable after its book loses the current policy (122.1018ms)
+✔ query service exposes only approved operational datasets (1.2523ms)
+✔ clearance query narrows live exceptions without changing the source rows (1.5366ms)
+✔ query export date-times stop at minutes and dates remain date-only (0.5624ms)
+✔ query service validates date ranges and keeps catalog soft deletes out (1.2296ms)
+✔ query service rejects unsupported filter values (0.5207ms)
+✔ catalog query and availability filter share accessioned circulation eligibility (0.4901ms)
+✔ borrowing history uses the saved policy snapshot and includes archived records (0.4825ms)
+✔ reservation reporting labels the live policy separately from historical loan policy (0.3903ms)
+✔ seed and personal recommendations return book image URLs and null for missing covers (15.001ms)
+✔ thesis recommendations serialize their image value for the thesis fallback (1.2639ms)
+✔ recommendation responses expose current available, checked out, reserved, and unavailable book statuses (1.5891ms)
+✔ AI backfill selects books with missing, stale, or failed embeddings (2.2389ms)
+✔ AI backfill reuses useful saved metadata when only an embedding needs repair (1.7409ms)
+✔ online metadata lookup failures are tracked separately from embedding failures (3033.2325ms)
+✔ Google Books can enrich a book when Open Library is unavailable (4048.1663ms)
+✔ Open Library ISBN search enriches books without a Google Books key (4041.2338ms)
+✔ an imported synopsis is saved privately and included in the generated embedding (3010.6109ms)
+✔ automatic ISBN enrichment does not replace staff-entered AI metadata (0.8807ms)
+✔ a successful Google Books check with no description is marked complete and remains visible to staff (2010.7062ms)
+✔ book details expose a safe online lookup error to staff (0.987ms)
+✔ embedding status counts books with no embedding record (2.3838ms)
+✔ manual books with blank summaries stay in the attention list with a missing synopsis status (1.6022ms)
+✔ the attention-list query includes blank summaries independently of manual metadata (1.237ms)
+✔ a 429 retries once then pauses the batch and leaves remaining books deferred (2012.3521ms)
+✔ Google Books lookup exposes long Retry-After values without waiting past the cap (1.0389ms)
+✔ provider failures finish with errors even when embeddings succeed (4035.476ms)
+✔ book recommendation endpoints return eight unique picks and fill short AI sets with ranked rules (3.3733ms)
+✔ thesis recommendations stay capped at five (1.1197ms)
+✔ holdings inventory validates and composes its current snapshot filters (1.4116ms)
+✔ holdings inventory paginates and exports copy level rows without date filters (5.7783ms)
+✔ historical fine and usage reports retain archived loans and use saved policy names (34.3894ms)
+✔ catalogue capacity and placement count only live pending and ready reservations (5.7995ms)
+✔ pending and pickup keep their deadlines while unavailable copies and a second active reservation are rejected (87.8845ms)
+✔ the patron reservation limit reads all active titles using a current locking read (1.3139ms)
+✔ pickup expiry resets from preparation time and rejects expired pending rows (1.2313ms)
+✔ reservation browse accepts an empty query and keeps paged availability ordering (2.8752ms)
+✔ active reservation views omit expired pending and ready rows consistently (1.3166ms)
+✔ reservation history synchronizes expired rows before reading history (0.7047ms)
+✔ reservation history bounds fractional pages, malformed pages, and oversized limits (1.1178ms)
+✔ selected reservation catalogue validates IDs and applies an exact parameterized filter (1.9592ms)
+✔ exports validate selected columns and neutralize spreadsheet formulas (1.704ms)
+✔ record exports require an administrator and audit before releasing personal records (2.3848ms)
+✔ report sorting uses dates and fine totals include rows outside the current page (1.3371ms)
+✔ report preview carries institutional metadata and preserves fine currency totals (1.4819ms)
+✔ term dates reject impossible dates and reversed ranges before any write (1.2457ms)
+✔ term peer validation blocks duplicate names and inclusive overlaps while holding locks (1.6345ms)
+✔ permanent removal checks current references and refuses without deleting (1.5368ms)
+✔ explicit archive retains an unused department for restoration (1.2321ms)
+✔ holiday imports roll back the whole batch and audit if one date conflicts (4.7279ms)
+✔ holiday imports reject invalid dates and oversized lists (0.9887ms)
+✔ changed loan terms require a written reason before any update (2.9477ms)
+✔ policy edits and audit enqueue are atomic (audit failure: false) (4.2897ms)
+✔ policy edits and audit enqueue are atomic (audit failure: true) (1.1164ms)
+✔ exact policy filter is used for Catalog counts and rows with correctly ordered parameters (1.3219ms)
+✔ assigned policies cannot be archived, including archived books (2.3258ms)
+✔ policy list uses retained event metadata and saved loan snapshots (0.7753ms)
+✔ previous-terms loans filter agrees with policy counts and preserves bound parameters (2.6158ms)
+✔ usage counts preserve zero, exclude archived records from missing counts and inspect both scopes (1.1171ms)
+✔ schema transaction: success (5.1113ms)
+✔ schema transaction: visibility change (1.1258ms)
+✔ schema transaction: audit failure (1.6147ms)
+✔ schema transaction: stale revision (0.4399ms)
+✔ schema transaction: used deletion (0.8102ms)
+✔ schema transaction: unused deletion (1.7585ms)
+✔ dropdown duplicates are rejected on the server (3.549ms)
+✔ retired choices cannot also be active or contain duplicates (1.5749ms)
+✔ option totals account for all stored values, including retired values (0.8797ms)
+✔ configuration record filters bind metadata keys and apply to totals and rows (1.2562ms)
+✔ missing filters include absent/null/blank values and accession filter follows eligibility (0.6753ms)
+✔ required Theses fields do not block Books but are enforced for Theses (1.3525ms)
+✔ archive attribution is taken from captured audit transitions (1.8181ms)
+✔ configuration impact skips audit history when no fields are archived (0.7906ms)
+✔ progress returns idle when no run has ever been recorded (301.5392ms)
+✔ backfill options reject unsupported scopes, excessive limits and empty selections (1.4944ms)
+✔ coverage total counts active books, including books without embeddings (1.059ms)
+✔ readiness filters are applied before both count and pagination (1.58ms)
+✔ selected backfill constrains IDs and limit and scopes avoid unrelated work (1.8023ms)
+✔ concurrent starts reserve one run and cancellation defers remaining books without provider calls (8.3043ms)
+✔ AI matching failures are persisted for failure-only retries (10.3584ms)
+✔ audit redaction keeps policy names and numeric diffs while masking personal and nested secrets (0.6465ms)
+✔ audit filters bind actor, exact record and search, and reject reversed dates (1.7186ms)
+✔ feed retains captured routes after legacy enrichment and resolves policy links (170.961ms)
+✔ CSV neutralizes spreadsheet formulas (0.4889ms)
+✔ quick filters use server identity for Mine and reject arbitrary SQL selectors (0.8552ms)
+✔ export is released only after its audit succeeds: success (2.1709ms)
+✔ export is released only after its audit succeeds: failure (0.5781ms)
+✔ request context is captured and sanitized on direct audit writes (1.5319ms)
+✔ derived categories and high impact describe the changed fields, without classifying every policy (0.7666ms)
+✔ a contradictory patron summary cannot link to an unrelated book type policy (1.0802ms)
+✔ restore requires the exact acknowledgement and the active super-admin password (18.3654ms)
+✔ restore impact counts added, changed and absent records instead of guessing losses from dates (2.7181ms)
+✔ daily and weekly schedules use UTC+08:00 and move strictly into the future (1.5231ms)
+✔ pinned deletion is blocked before deleting records or cloud objects (2.0401ms)
+✔ verification rejects a corrupted checksum instead of marking it verified (183.1324ms)
+[backup] Error: Use a name up to 120 characters and notes up to 500 characters.
+    at Object.saveSnapshot (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\backup\backup.controller.ts:87:155)
+    at TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\backup.safety.test.js:28:350)
+    at async Test.run (node:internal/test_runner/test:1404:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+  status: 400
+}
+✔ snapshot creation validates and passes optional names and notes into storage (10.2773ms)
+✔ impact includes settings and holdings using their actual primary keys and excludes retained registries (2.5157ms)
+✔ safety snapshot must verify before replacement (failure: false) (88.2193ms)
+✔ safety snapshot must verify before replacement (failure: true) (9.8237ms)
+✔ impact compares the accession-adjusted restore tables rather than overstating preserved holding changes (0.9441ms)
+✔ account email actions allow a super admin to manage their own account only (5.8927ms)
+✔ email encryption authenticates content and purpose-bound HMACs do not expose codes (3.5234ms)
+✔ email input and password validation supports normalized addresses and rejects bcrypt truncation (1.3549ms)
+✔ production email configuration fails closed and local capture performs no fetch (2.7953ms)
+✔ Brevo uses documented request fields, treats 201 as acceptance, and classifies uncertain outcomes (20.1809ms)
+✔ Brevo renders escaped account and library content without active HTML or unsafe links (5.8854ms)
+✔ live Brevo configuration requires credentials, sender and validates the daily limit (11.0888ms)
+✔ quota reserves final 50 requests for account mail and stops every category at total limit (20.6087ms)
+[email] Brevo accepted delivery delivery-1; message ID: <receipt@example>
+✔ accepted deliveries retain the provider receipt and send mode without retaining security content (4.0039ms)
+✔ daily quota rolls at UTC midnight and ignores obsolete monthly environment settings (2.1858ms)
+✔ dispatch reuses the persisted daily counter and defers exhausted mail until midnight (6.2659ms)
+✔ shared rate slot and recipient eligibility prevent sends before quota reservation (2.5888ms)
+✔ ambiguous sends become unknown without retry; explicit rate rejection schedules a retry (3.2005ms)
+✔ Manila digest date rolls at Philippine midnight independently of host timezone (1.9169ms)
+✔ per-account version invalidates legacy access/refresh signatures after recovery (0.4969ms)
+✔ snapshot upgrade preserves legacy access and excludes live challenges/quota/delivery controls (0.7355ms)
+✔ failed recovery codes consume persistent attempts; exhausted challenges cannot reset a password (6.4544ms)
+✔ recovery requests do not expose unknown accounts and obey persistent cooldown (2.7296ms)
+✔ refresh issuance keeps the authenticated version rather than adopting a concurrent password reset (1.7121ms)
+✔ restored pending in-app jobs cannot recreate external email deliveries (0.7675ms)
+✔ overdue summary includes zero-fine loans and refreshes balances through the existing ledger (3.1347ms)
+✔ worker failures back off and redact error details instead of logging on every tick (3.8287ms)
+✔ branded layout uses live values for all email kinds without preview content (1.2458ms)
+✔ delivery filters validate categories, dates, paging and untrusted query shapes (2.0953ms)
+✔ delivery queries partition historical records and parameterize recipient or provider searches (1.6715ms)
+✔ delivery listing counts before paging, returns shared capacity, and exposes safe metadata only (2.9606ms)
+✔ delivery list, detail and retry authorize super admins only (271.126ms)
+✔ manual email preview counts verified recipients and pending mail before exposing routine capacity (4.0183ms)
+✔ manual email creation rejects stale counts, disabled delivery and zero verified recipients; opt-out never queues email (1.862ms)
+✔ publication snapshots all audience modes with set-based inserts, atomic handoffs and post-commit realtime (2.3649ms)
+✔ publication rollback leaves no partial in-app/email batch; duplicate scheduled delivery never snapshots twice (1.8159ms)
+✔ manual email worker rechecks role, address, verification and notification activity before sending (4.5157ms)
+✔ per-notification summaries expose every status without recipient addresses and stay within a publication batch (0.9676ms)
+✔ scheduled publication resolves its audience at dispatch, remains idempotent, and suppresses restored emails (2.4755ms)
+✔ manual notification email preview and creation authorize admins and super admins only (337.7065ms)
+✔ notification images require a complete reference in this cloud and folder, with alt text (1.8382ms)
+✔ notification uploads validate byte signatures and size rather than trusting file names (0.7593ms)
+✔ notification image upload requests immutable JPEG output bounded to 1600px (1.1708ms)
+✔ notification email images are escaped hosted content and account emails remain image-free (1.0992ms)
+✔ version 19 backups upgrade to text-only defaults without queuing retrospective emails (0.5313ms)
+✔ notification image endpoint enforces roles and accepts real multipart uploads (123.8286ms)
+✔ automatic notification emails use their published notification ID while legacy handoffs keep their destination (7.7445ms)
+﹣ database: all/role/individual manual emails freeze verified recipients and preserve seven-day or explicit deadlines (0.3865ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: stale email confirmation rolls publication back and duplicate handoffs cannot expand a frozen audience (0.9983ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: scheduled manual notifications capture recipients at publication, not schedule creation (0.589ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: selected audiences publish once, isolate patron reads and freeze only active memberships (0.2649ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: selected memberships roll back together and scheduled inactive patrons never gain access (0.2959ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: manual mail uses the shared daily reserve, and quota-paused emails remain queued until midnight (0.2416ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: delivery pages partition history, filter before paging, search provider IDs and share allowance (0.1836ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: notification images survive immediate and scheduled publication and recipient access stays scoped (0.1697ms) # requires RUN_DB_INTEGRATION=1 and prepared euc_manual_email_test schema
+﹣ database: invitation completion is single-use under concurrency and verifies ownership (0.1702ms) # requires RUN_DB_INTEGRATION=1 and dedicated *_test database with email migration
+﹣ database: account and invitation delivery roll back together (0.1682ms) # requires RUN_DB_INTEGRATION=1 and dedicated *_test database with email migration
+✔ self profile validation rejects privilege and password mutations (1.7807ms)
+✔ self update checks persisted role, scopes writes to own ID, audits and rolls back conflicts (1.9298ms)
+✔ staff creation and direct pin service cannot change pins; admins can (1.9934ms)
+✔ direct and publisher archive/restore preserve moderation fields and media (271.6391ms)
+[subscriptions] updateSubscription: Error: simulated database failure
+    at Object.service.updateSubscription (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\production-readiness.test.js:72:92)
+    at Object.updateSubscription (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\subscriptions\subscriptions.controller.ts:101:43)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\production-readiness.test.js:74:7)
+    at async Test.run (node:internal/test_runner/test:1404:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+[subscriptions] updateSubscription: Error: simulated database failure
+    at Object.service.updateSubscription (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\production-readiness.test.js:72:92)
+    at Object.updateSubscription (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\modules\subscriptions\subscriptions.controller.ts:101:43)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\production-readiness.test.js:74:7)
+    at async Test.run (node:internal/test_runner/test:1404:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+✔ resource image removal/replacement keeps assets even if the database update fails (278.2096ms)
+✔ comments lock the active parent before insertion and roll back rejected or failed writes (1.8824ms)
+[restore-recovery] Recovered interrupted maintenance; review restore history and safety snapshots.
+✔ restore recovery leaves active restores alone and recovers stale maintenance exactly once (23.9666ms)
+✔ recovery rolls back both session invalidation and maintenance changes on failure (63.9444ms)
+✔ server awaits recovery before listening; periodic recovery checks never overlap (28.072ms)
+✔ legacy patron returns report 410 without touching circulation or audits (1144.669ms)
+✔ role changes revoke sessions atomically; unchanged roles and failed updates preserve access (763.9969ms)
+✔ 110 school users share one IP; failed budgets normalize identity and isolate other users/IPs (2467.9799ms)
+✔ aggregate login budget counts successes and failure windows reset (1273.9244ms)
+﹣ database: direct and item/section/bulk publication preserve moderated and legacy deleted comments (0.2699ms) # requires RUN_DB_INTEGRATION=1 and a dedicated *_test database
+﹣ database: missing/archived comments are rejected and archive wins a waiting comment insert (0.1744ms) # requires RUN_DB_INTEGRATION=1 and a dedicated *_test database
+﹣ database: role changes atomically invalidate access and revoke persisted refresh sessions (0.1853ms) # requires RUN_DB_INTEGRATION=1 and a dedicated *_test database
+﹣ database: active restore lock blocks recovery; failures roll back; concurrent recovery records one audit (0.1594ms) # requires RUN_DB_INTEGRATION=1 and a dedicated *_test database
+﹣ database: killed restore processes recover safely before and after database commit (0.3405ms) # requires RUN_DB_INTEGRATION=1 and a dedicated *_test database
+✔ site contacts remove only exact seed placeholders and permit blank published contacts (1.7889ms)
+ℹ tests 372
+ℹ suites 0
+ℹ pass 331
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 39
+ℹ todo 0
+ℹ duration_ms 107278.5513
+
+✖ failing tests:
+
+test at test\rate-limit.test.js:219:1
+✖ API rate limits are attached after authentication and before protected handlers (38.0976ms)
+  AssertionError [ERR_ASSERTION]: query/query.routes.ts must attach its rate limit before the handler
+      at TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\rate-limit.test.js:246:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'const express = require("express");\nconst { authMiddleware } = require("../auth/auth.middleware");\nconst controller = require("./query.controller");\nconst { limiters } = require("../../middlewares/rateLimiter");\n\nconst router = express.Router();\n// Mounted at /api/admin alongside desk features. Gate matching report routes\n// only, otherwise staff requests to later routers would be rejected here.\nconst adminOnly = authMiddleware(["admin", "super_admin"]);\nrouter.get("/query/meta", adminOnly, controller.getMeta);\n...',
+    expected: /"\/query\/reports\/export", limiters\.reportExport/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\catalog.image.test.js:36:1
+✖ cover replacement saves the new Cloudinary image before deleting the old image (6.3039ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   bytes: undefined,
+  +   height: undefined,
+      image_public_id: 'library/catalog/books/new',
+      image_url: 'https://new/cover.jpg',
+  +   width: undefined
+    }
+  
+      at TestContext.<anonymous> (C:\Users\Jimuel Jean Untalan\Downloads\Capstone\backend\test\catalog.image.test.js:68:12)
+      at processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -34,16 +34,21 @@ router.delete("/book-types/:id", requireSuperAdminRole, validateBookTypeId, cont
 router.put   ("/catalog-schema", requireSuperAdminRole, validateSchemaPayload, controller.updateSchema);
 
 router.get   ("/books",          requireCatalogRole,                       controller.getBooks);
+router.get   ("/books/isbn-check/:isbn", requireCatalogRole, controller.checkIsbn);
 router.get   ("/books/isbn/:isbn", requireCatalogRole, limiters.isbnLookup, controller.lookupIsbn);
 router.post  ("/books",          requireCatalogRole, validateCreateBookPayload,           controller.createBook);
 router.post  ("/books/:id/image", requireCatalogRole, limiters.imageUpload, validateBookId, parseCatalogImage, controller.uploadBookImage);
+router.get   ("/books/:id/image/metadata", requireCatalogRole, validateBookId, controller.getImageMetadata);
+router.post  ("/books/:id/image/isbn", requireCatalogRole, limiters.imageUpload, validateBookId, controller.importIsbnImage);
 router.delete("/books/:id/image", requireCatalogRole, validateBookId, controller.removeBookImage);
 router.put   ("/books/:id",      requireCatalogRole, validateBookId, validateUpdateBookPayload, controller.updateBook);
 router.delete("/books/:id",      requireCatalogRole, validateBookId,        controller.deleteBook);
 
 router.post  ("/books/:id/copies", requireCatalogRole, validateBookId, controller.addBookCopies);
+router.post  ("/books/:id/accessions", requireCatalogRole, validateBookId, controller.assignAccessionRange);
 router.get   ("/books/:id/copies",           requireCatalogRole, validateBookId,  controller.getBookCopies);
 router.get   ("/books/:id/holdings",          requireCatalogRole, validateBookId, controller.getBookHoldings);
+router.get   ("/holding-options", requireCatalogRole, controller.getHoldingOptions);
 router.get   ("/holdings",                    requireCatalogRole, controller.getHoldings);
 router.put   ("/copies/:copyId/holding",      requireCatalogRole, validateCopyIdParam, controller.updateHolding);
 router.post  ("/copies/:copyId/holding/void-accession", requireSuperAdminRole, validateCopyIdParam, controller.voidAccession);

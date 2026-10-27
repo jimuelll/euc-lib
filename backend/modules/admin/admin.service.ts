@@ -1,3 +1,4 @@
+import * as accountRepository from "./admin.account.repository";
 import bcrypt = require("bcryptjs");
 import { randomBytes } from "node:crypto";
 import * as accountEmail from "../auth/account-email.service";
@@ -5,13 +6,11 @@ import { normalizeEmail } from "../email/email.config";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import repository = require("./admin.repository");
 import type { AdminRole, UserProfile, UserSearchQuery } from "./admin.types";
-
 const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service") as { revokeAllRefreshSessionsForUser: (userId: number) => Promise<void> };
 const fineLedger = require("../borrowing/fine-ledger.service");
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit") as {
   enqueueTransactionalAudit: (conn: PoolConnection, entry: Record<string, unknown>) => Promise<void>;
 };
-
 const ACADEMIC_ROLES = ["student", "alumni"];
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy: Record<string, string[]> = {
@@ -24,42 +23,34 @@ const searchRoleHierarchy: Record<string, string[]> = {
   admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
   staff: ["employee", "alumni", "student"],
 };
-
 interface ServiceError extends Error {
   status?: number;
   outstandingAmount?: number;
   affectedLoans?: number;
 }
-
 interface DatabaseError extends Error {
   code?: string;
 }
-
 type UserInput = Record<string, unknown>;
-
 const conflict = (message: string): ServiceError => Object.assign(new Error(message), { status: 409 });
 const forbidden = (message: string): ServiceError => Object.assign(new Error(message), { status: 403 });
 const hasDuplicateKeyError = (error: unknown): boolean => (error as DatabaseError | null)?.code === "ER_DUP_ENTRY";
-
 const assertUserHasNoOutstandingFines = async (userId: number, conn: PoolConnection): Promise<void> => {
   const borrowingIds = await repository.findAllBorrowingIdsForUser(userId, conn);
   await fineLedger.assertNoOutstandingFines(borrowingIds, conn, "This patron cannot be archived");
 };
-
 const ensureProgramExists = async (programId: unknown, conn: PoolConnection): Promise<number | null> => {
   if (!programId) return null;
   const program = await repository.findActiveProgram(programId as number | string, conn);
   if (!program) throw new Error("Select a valid active program / course");
   return program.id;
 };
-
 const ensureDepartmentExists = async (departmentId: unknown, conn: PoolConnection): Promise<number | null> => {
   if (!departmentId) return null;
   const department = await repository.findActiveDepartment(departmentId as number | string, conn);
   if (!department) throw new Error("Select a valid active department");
   return department.id;
 };
-
 const roleProfile = (input: UserInput, role: string): UserProfile => {
   const value = (key: string): string => String(input[key] || "").trim();
   const libraryCardNumber = value("library_card_number");
@@ -81,7 +72,6 @@ const roleProfile = (input: UserInput, role: string): UserProfile => {
   if (!username) throw new Error("Username is required");
   return { studentEmployeeId: username, libraryCardNumber: null, studentNumber: null, employeeNumber: null, username };
 };
-
 const createUser = async (input: UserInput, creatorRole: string, creatorId: number | null = null) => {
   const { name, role: requestedRole, address, contact, program_id, academic_term_id, department_id, year_level, email } = input;
   const role = String(requestedRole || "");
@@ -95,7 +85,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
-    if ((await repository.findExistingUser(identity.studentEmployeeId, conn)).length) throw Object.assign(new Error("User already exists"), { status: 409 });
+    if ((await repository.findExistingUser(identity.studentEmployeeId, conn)).length) throw Object.assign(new Error("User already exists"), { status: 409, fieldErrors: { [role === "student" || role === "alumni" ? "libraryCardNumber" : role === "employee" ? "employeeNumber" : "username"]: "This identifier already belongs to another user." } });
     const programId = ACADEMIC_ROLES.includes(role) && role !== "alumni" ? await ensureProgramExists(program_id, conn) : null;
     const departmentId = role === "employee" ? await ensureDepartmentExists(department_id, conn) : null;
     let academicTermId: number | null = null;
@@ -108,6 +98,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
         academicTermId = (await repository.findCurrentAcademicTerm(conn))?.id ?? null;
       }
     }
+    if (role === "student" && !academicTermId) throw Object.assign(new Error("Select an academic term"), {fieldErrors:{academicTermId:"Select an academic term."}});
     const barcode = await repository.createUser({
       ...identity,
       email: accountAddress,
@@ -140,14 +131,14 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
       isCreation: true,
     });
     await conn.commit();
-    return { message: "Account created; invitation queued", barcode };
+    return { message: "Account created; invitation queued. Creation recorded in the audit log.", barcode };
   } catch (error) {
     await conn.rollback();
-    throw error;
+    throw userFieldError(error, role);
   } finally { conn.release(); }
 };
-
-const deleteUser = async (student_employee_id: string, requesterRole: string, requesterId: number) => {
+const deleteUser = async (student_employee_id: string, requesterRole: string, requesterId: number, reason = "") => {
+  if (!reason.trim() || reason.trim().length > 500) throw Object.assign(new Error("Enter an archive reason (up to 500 characters)."), {status:400});
   const conn = await repository.getConnection();
   let archivedUserId = 0;
   try {
@@ -172,6 +163,7 @@ const deleteUser = async (student_employee_id: string, requesterRole: string, re
       route: `/api/admin/users/${encodeURIComponent(student_employee_id)}`,
       action: "archived",
       description: "Archived user account",
+      extraMetadata: { archive_reason: reason.trim() },
       before: user,
       after,
     });
@@ -186,7 +178,6 @@ const deleteUser = async (student_employee_id: string, requesterRole: string, re
   catch (error) { console.error("[admin] User archival committed; refresh-session revocation failed:", error); }
   return { message: "User archived successfully" };
 };
-
 const restoreUser = async (student_employee_id: string, requesterRole: string, requesterId: number | null = null) => {
   const conn = await repository.getConnection();
   try {
@@ -217,7 +208,6 @@ const restoreUser = async (student_employee_id: string, requesterRole: string, r
   } finally { conn.release(); }
   return { message: "User restored successfully" };
 };
-
 const updateUser = async (student_employee_id: string, updates: UserInput, requesterRole: string, requesterId: number | null = null) => {
   if (Object.prototype.hasOwnProperty.call(updates,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
   const conn = await repository.getConnection();
@@ -227,6 +217,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     await conn.beginTransaction();
     const existing = await repository.findUserForUpdate(student_employee_id, conn);
     if (!existing) throw Object.assign(new Error("User not found"), { status: 404 });
+    if (existing.id === requesterId && updates.role !== undefined && updates.role !== existing.role) throw forbidden("You can’t change your own role.");
     const isOwnSuperAdmin = requesterRole === "super_admin" && existing.role === "super_admin" && existing.id === requesterId;
     if (!isOwnSuperAdmin && !roleHierarchy[requesterRole]?.includes(existing.role)) throw forbidden("You are not allowed to update this user");
     if (isOwnSuperAdmin && ((updates.role !== undefined && updates.role !== existing.role) || (updates.is_active !== undefined && updates.is_active !== 1 && updates.is_active !== true))) {
@@ -247,6 +238,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       Object.assign(normalized, { student_employee_id: profile.studentEmployeeId, library_card_number: profile.libraryCardNumber, student_number: profile.studentNumber, employee_number: profile.employeeNumber, username: profile.username });
       normalized.program_id = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? await ensureProgramExists(updates.program_id ?? existing.program_id, conn) : null;
       normalized.department_id = nextRole === "employee" ? await ensureDepartmentExists(updates.department_id ?? existing.department_id, conn) : null;
+      if (nextRole !== "student") normalized.academic_term_id = null;
       normalized.year_level = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? (updates.year_level ?? existing.year_level) : null;
     }
     if (updates.email !== undefined && String(updates.email || "").trim().toLowerCase() !== String(existing.email || "").trim().toLowerCase()) {
@@ -262,7 +254,6 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     }
     if (updates.is_active !== undefined) normalized.is_active = updates.is_active ? 1 : 0;
     if (!Object.keys(normalized).length && updates.email === undefined) throw new Error("No valid fields to update");
-
     if (normalized.is_active === 0) {
       await assertUserHasNoOutstandingFines(existing.id, conn);
       const activeBorrows = await repository.findActiveBorrowings(existing.id, conn);
@@ -290,10 +281,8 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     await conn.commit();
   } catch (error) {
     await conn.rollback();
-    if (hasDuplicateKeyError(error)) throw Object.assign(new Error("That user identifier or email is already in use"), { status: 409 });
-    throw error;
+    throw userFieldError(error, String(updates.role || ""));
   } finally { conn.release(); }
-
   if (deactivatedUserId) {
     try { await revokeAllRefreshSessionsForUser(deactivatedUserId); }
     catch (error) { console.error("[admin] User deactivation committed; refresh-session revocation failed:", error); }
@@ -301,7 +290,6 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
   if (roleChangedUserId) require("../../realtime/notificationHub").closeUserConnections(roleChangedUserId);
   return { message: "User updated successfully" };
 };
-
 const searchUsers = async (query: UserSearchQuery, requesterRole: string) => {
   const allowedRoles = searchRoleHierarchy[requesterRole];
   if (!allowedRoles?.length) throw new Error("You are not allowed to search users");
@@ -342,7 +330,6 @@ const searchUsers = async (query: UserSearchQuery, requesterRole: string) => {
   const limit = Math.min(100, Math.max(1, Math.floor(Number(query.limit) || 25)));
   return { rows: rows.slice((page - 1) * limit, page * limit), summary, pagination: { page, limit, total: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / limit)) } };
 };
-
 const queryToolsSearch = async (term: string, requesterRole: string) => {
   const query = term?.trim();
   if (!query) throw new Error("Search term is required");
@@ -350,5 +337,32 @@ const queryToolsSearch = async (term: string, requesterRole: string) => {
   if (!allowedRoles?.length) throw new Error("You are not allowed to search query tools");
   return repository.queryToolsSearch(query, allowedRoles);
 };
-
-export = { createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };
+function userFieldError(error: unknown, role: string) {
+  const e = error as Error & {status?: number; fieldErrors?: Record<string,string>};
+  if (e.fieldErrors) return e;
+  const email = /email|address/i.test(e.message || '');
+  if (hasDuplicateKeyError(error) || e.status === 409 && email) {
+    const field = email ? 'email' : ['student','alumni'].includes(role) ? 'libraryCardNumber' : role === 'employee' ? 'employeeNumber' : 'username';
+    return Object.assign(new Error(email ? 'This email already belongs to another user.' : 'This identifier already belongs to another user.'), {status:409, fieldErrors:{[field]:email ? 'This email already belongs to another user.' : 'This identifier already belongs to another user.'}});
+  }
+  return error;
+}
+async function managedAccount(identifier: string, actorRole: string, actorId: number) {
+  const account = await accountRepository.accountByIdentifier(identifier);
+  if (!account || !(account.id === actorId || roleHierarchy[actorRole]?.includes(account.role))) throw forbidden('You cannot manage this account');
+  return account;
+}
+const checkAvailability = async (input: UserInput, actorRole: string, actorId: number) => {
+  if (!roleHierarchy[actorRole]) throw forbidden('You cannot manage accounts');
+  if (!['email','username'].includes(String(input.field))) throw new Error('Choose email or username');
+  const field = input.field as 'email'|'username';
+  const value = field === 'email' ? normalizeEmail(input.value) : String(input.value || '').trim();
+  if (!value || value.length > (field === 'username' ? 64 : 255)) throw new Error('Enter a valid value');
+  const excluded = input.excludeIdentifier ? await managedAccount(String(input.excludeIdentifier), actorRole, actorId) : null;
+  return {available:await accountRepository.available(field,value,Number(excluded?.id || 0))};
+};
+const getAccountEmailStatus = async (identifier: string, actorRole: string, actorId: number) => {
+  const account = await managedAccount(identifier,actorRole,actorId);
+  return {deliveries:await accountRepository.accountEmailStatus(account.id)};
+};
+export = { checkAvailability, getAccountEmailStatus, createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };

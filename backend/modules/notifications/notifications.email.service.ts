@@ -9,14 +9,15 @@ export async function preview(input: CreateNotificationInput) {
   let reason: string | null = enabled ? null : 'Email delivery is paused. Enable account and routine email sending in the backend environment.';
   if (enabled) { try { validateConfig(); } catch { reason = 'Email configuration needs attention. Contact the deployment administrator.'; } }
   return { inAppCount:counts.total,emailCount:counts.eligible,skippedCount:counts.total-counts.eligible,
-    enabled:enabled && !reason,reason,dailyLimit:c.limit,securityReserve:c.reserve,usedToday:counts.used,queuedRoutine:counts.queued,
+    enabled:enabled && !reason,reason,exclusions:counts.exclusions,dailyLimit:c.limit,securityReserve:c.reserve,usedToday:counts.used,queuedRoutine:counts.queued,
     remainingRoutine:Math.max(0,c.limit-c.reserve-counts.used-counts.queued),resetAt:`${c.periodEnd}T00:00:00Z` };
 }
 export async function publish(input: repository.ManualPublication, confirmed?: { total:number; email:number }) {
   const result = await repository.publish(input,confirmed);
   if (result.created) {
     try {
-      if (result.record.audience_type === 'user') hub.pushNotification(result.record.audience_user_id,{type:'notification.audience_changed'});
+      if (result.record.audience_type === 'users') for (const id of result.record.audience_user_ids || []) hub.pushNotification(id,{type:'notification.audience_changed'});
+      else if (result.record.audience_type === 'user') hub.pushNotification(result.record.audience_user_id,{type:'notification.audience_changed'});
       else hub.pushAudienceChanged({audienceType:result.record.audience_type,audienceRole:result.record.audience_role});
     } catch { console.error('[notifications] Manual notification saved; realtime refresh failed.'); }
   }

@@ -27,7 +27,7 @@ const buildAudienceWhere = (): string => `
   AND (n.expires_at IS NULL OR n.expires_at > NOW())
   AND (
     n.audience_type = 'all'
-    OR (n.audience_type = 'user' AND n.audience_user_id = ?)
+    OR (n.audience_type IN ('user','users') AND EXISTS(SELECT 1 FROM users audience_user WHERE audience_user.id=? AND audience_user.deleted_at IS NULL AND audience_user.is_active=1 AND ((n.audience_type='user' AND n.audience_user_id=audience_user.id) OR (n.audience_type='users' AND EXISTS(SELECT 1 FROM notification_recipients r WHERE r.notification_id=n.id AND r.user_id=audience_user.id)))))
     OR (n.audience_type = 'role' AND n.audience_role = ?)
   )`;
 
@@ -121,14 +121,14 @@ const findExistingNotification = async ({
 };
 
 const updateNotification = async ({
-  notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey = null,
+  notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey = null,imageUrl=null,imagePublicId=null,imageAlt=null,
 }: NotificationUpdateInput): Promise<void> => {
   await db.query(
     `UPDATE notifications
-        SET title = ?, body = ?, href = ?, expires_at = ?, created_by = ?,
+        SET image_url=?,image_public_id=?,image_alt=?,title = ?, body = ?, href = ?, expires_at = ?, created_by = ?,
             source_type = ?, source_id = ?, delivery_key = COALESCE(?, delivery_key), is_active = 1, created_at = NOW()
       WHERE id = ?`,
-    [title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey, notificationId],
+    [imageUrl,imagePublicId,imageAlt,title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey, notificationId],
   );
   await db.query("DELETE FROM notification_reads WHERE notification_id = ?", [notificationId]);
 };
@@ -140,26 +140,26 @@ const findNotificationByDeliveryKey = async (deliveryKey: string): Promise<Notif
 
 const createNotification = async ({
   type, title, body, href, audienceType, audienceUserId, audienceRole,
-  expiresAt, createdBy, sourceType, sourceId,
+  expiresAt, createdBy, sourceType, sourceId,imageUrl=null,imagePublicId=null,imageAlt=null,
 }: NotificationWrite): Promise<number> => {
   const [result] = await db.query<ResultSetHeader>(
     `INSERT INTO notifications
-      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId],
+      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id,image_url,image_public_id,image_alt, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId,imageUrl,imagePublicId,imageAlt],
   );
   return result.insertId;
 };
 
 const createNotificationWithDeliveryKey = async ({
   type, title, body, href, audienceType, audienceUserId, audienceRole,
-  expiresAt, createdBy, sourceType, sourceId, deliveryKey,
+  expiresAt, createdBy, sourceType, sourceId, deliveryKey,imageUrl=null,imagePublicId=null,imageAlt=null,
 }: NotificationWrite & { deliveryKey: string }): Promise<{ id: number; created: boolean }> => {
   const [result] = await db.query<ResultSetHeader>(
     `INSERT IGNORE INTO notifications
-      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, delivery_key, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId, deliveryKey],
+      (type, title, body, href, audience_type, audience_user_id, audience_role, expires_at, created_by, source_type, source_id, delivery_key,image_url,image_public_id,image_alt, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [type, title, body, href, audienceType, audienceUserId, audienceRole, expiresAt, createdBy, sourceType, sourceId, deliveryKey,imageUrl,imagePublicId,imageAlt],
   );
   if (result.affectedRows === 1) return { id: result.insertId, created: true };
   const [[row]] = await db.query<NotificationIdRow[]>("SELECT id FROM notifications WHERE delivery_key = ? LIMIT 1", [deliveryKey]);
@@ -224,7 +224,7 @@ const getAdminStats = async (): Promise<NotificationAdminStats | null> => {
     `SELECT COUNT(*) AS total_notifications,
             SUM(CASE WHEN created_at >= CURDATE() THEN 1 ELSE 0 END) AS created_today,
             SUM(CASE WHEN audience_type = 'all' THEN 1 ELSE 0 END) AS broadcast_notifications,
-            SUM(CASE WHEN audience_type = 'user' THEN 1 ELSE 0 END) AS direct_notifications
+            SUM(CASE WHEN audience_type IN ('user','users') THEN 1 ELSE 0 END) AS direct_notifications
        FROM notifications`,
   );
   return row ?? null;

@@ -84,6 +84,56 @@ const normaliseHolding = async (body: HoldingBody = {}, conn: PoolConnection, ex
 const getBookHoldings = async (bookId: number): Promise<CopyRow[]> => repository.getBookHoldings(bookId);
 const searchHoldings = async (options: Record<string, any> = {}): Promise<{ rows: CopyRow[]; total: number; page: number; limit: number; summary: Record<string,number> }> => repository.searchHoldings(options);
 
+const getHoldingOptions = async (accession: unknown) => {
+  const [claims] = await db.query<RowDataPacket[]>("SELECT accession_number FROM accession_claims WHERE accession_number REGEXP '^[1-9][0-9]*$' ORDER BY LENGTH(accession_number), accession_number");
+  let next = 1n;
+  for (const row of claims) { const value = BigInt(row.accession_number); if (value === next) next++; else if (value > next) break; }
+  const [matches] = typeof accession === "string" && accession.trim() ? await db.query<RowDataPacket[]>("SELECT 1 FROM accession_claims WHERE accession_number = ? LIMIT 1", [accession.trim()]) : [[]];
+  const [locations] = await db.query<RowDataPacket[]>("SELECT DISTINCT location FROM copy_holdings WHERE location IS NOT NULL AND TRIM(location) <> '' ORDER BY location LIMIT 500");
+  return { nextAccession: next.toString(), claimed: matches.length > 0, locations: locations.map(row => row.location) };
+};
+
+// Claims and their audit entry must commit together: accession numbers are permanent.
+const assignAccessionRange = async (bookId: number, body: { copyIds?: unknown; start?: unknown }, userId: number) => {
+  const ids = body.copyIds;
+  const start = body.start;
+  if (!Number.isSafeInteger(bookId) || bookId < 1 || !Array.isArray(ids) || ids.length < 1 || ids.length > 100 ||
+      ids.some(id => !Number.isSafeInteger(id) || id < 1) || new Set(ids).size !== ids.length ||
+      typeof start !== "string" || !/^\d{1,64}$/.test(start)) {
+    throw Object.assign(new Error("Enter a numeric start and select 1–100 different copies"), { status: 400 });
+  }
+  const numbers = ids.map((_, index) => (BigInt(start) + BigInt(index)).toString().padStart(start.length, "0"));
+  if (numbers.some(number => number.length > 64)) throw Object.assign(new Error("Accession numbers must be 64 characters or fewer"), { status: 400 });
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [[book]] = await conn.query<RowDataPacket[]>("SELECT id, title FROM books WHERE id = ? AND deleted_at IS NULL AND material_type = 'book' FOR UPDATE", [bookId]);
+    if (!book) throw Object.assign(new Error("Active book not found"), { status: 404 });
+    const copies = new Map<number, CopyRow>();
+    for (const id of [...ids].sort((a, b) => a - b)) {
+      const copy = await repository.getCopyForUpdate(id, conn);
+      if (!copy || Number(copy.book_id) !== bookId || !copy.is_active || copy.accession_number || copy.accession_voided) {
+        throw Object.assign(new Error("A selected copy is no longer eligible. Refresh and try again."), { status: 409 });
+      }
+      copies.set(id, copy);
+    }
+    const assignments = [];
+    for (let i = 0; i < ids.length; i++) {
+      const copy = copies.get(ids[i])!;
+      await repository.insertAccessionClaim(copy, numbers[i], userId, conn);
+      await repository.insertHolding(copy.id, { accessionNumber: numbers[i], price: null, programId: null, courseCode: null, location: null, dateAcquired: null, distributor: null, invoiceReference: null }, userId, conn);
+      assignments.push({ copy_id: copy.id, barcode: copy.barcode, accession_number: numbers[i] });
+    }
+    await transactionalAudit.enqueueTransactionalAudit(conn, { actorId: userId, route: `/api/admin/books/${bookId}/accessions`, description: `Assigned ${ids.length} accession numbers to “${book.title}”`, before: { assignments: [] }, after: { assignments }, extraMetadata: { permanent_accession_event: true, assignments } });
+    await conn.commit();
+    return { assignments };
+  } catch (error: any) {
+    await conn.rollback();
+    if (error?.code === "ER_DUP_ENTRY") throw Object.assign(new Error("An accession number has already been claimed. Choose another range."), { status: 409 });
+    throw error;
+  } finally { conn.release(); }
+};
+
 const updateHolding = async (copyId: number, body: HoldingBody = {}, userId: number): Promise<{ auditEnqueued: boolean }> => {
   if (!Number.isSafeInteger(copyId) || copyId < 1) throw Object.assign(new Error("Invalid copy ID"), { status: 400 });
   const conn = await db.getConnection();
@@ -187,4 +237,4 @@ const voidAccession = async (copyId: number, body: HoldingBody = {}, userId: num
   } finally { conn.release(); }
 };
 
-export = { getBookHoldings, searchHoldings, updateHolding, voidAccession };
+export = { getHoldingOptions, getBookHoldings, searchHoldings, updateHolding, voidAccession, assignAccessionRange };

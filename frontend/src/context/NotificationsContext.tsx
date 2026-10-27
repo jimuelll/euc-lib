@@ -1,3 +1,6 @@
+import {useLocation,useNavigate} from 'react-router-dom';
+import NotificationReader from '@/features/notifications/NotificationReader';
+import {LibraryDesignProvider} from '@/components/ui/library-design';
 import React, {
   createContext,
   useCallback,
@@ -24,6 +27,7 @@ interface NotificationsContextValue {
   markAsRead: (notificationId: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   refresh: () => Promise<void>;
+  openNotification:(id:number)=>void;
 }
 
 const NotificationsContext = createContext<
@@ -42,6 +46,11 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user, loading: authLoading, getToken } = useAuth();
+  const location=useLocation(),navigate=useNavigate(),notificationOpener=useRef<HTMLElement|null>(null);
+  const selected=Number(new URLSearchParams(location.search).get('notification'));
+  const notificationId=Number.isSafeInteger(selected)&&selected>0?selected:null;
+  const openNotification=useCallback((id:number)=>{const active=document.activeElement as HTMLElement;const menu=active?.closest('[role="menu"]');const trigger=menu?Array.from(document.querySelectorAll<HTMLElement>('[aria-controls]')).find(element=>element.getAttribute('aria-controls')===menu.id):undefined;notificationOpener.current=trigger || active;const search=new URLSearchParams(location.search);search.set('notification',String(id));navigate({pathname:location.pathname,search:search.toString()},{state:location.state});},[location,navigate]);
+  const closeNotification=()=>{const search=new URLSearchParams(location.search);search.delete('notification');navigate({pathname:location.pathname,search:search.toString()},{replace:true,state:location.state});};
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -195,8 +204,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [user?.id]);
 
-  const markAsRead = async (notificationId: number) => {
-    await markNotificationRead(notificationId);
+  const markAsRead = useCallback(async (notificationId: number) => {
+    const result=await markNotificationRead(notificationId);
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === notificationId
@@ -208,10 +217,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
           : notification,
       ),
     );
-    setUnreadCount((count) => Math.max(0, count - 1));
-  };
+    setUnreadCount((count) => typeof result?.unreadCount==='number'?result.unreadCount:Math.max(0, count - 1));
+  },[]);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     await markAllNotificationsRead();
     setNotifications((current) =>
       current.map((notification) => ({
@@ -221,7 +230,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       })),
     );
     setUnreadCount(0);
-  };
+  },[]);
 
   const value = useMemo(
     () => ({
@@ -231,14 +240,15 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       error,
       markAsRead,
       markAllAsRead,
-      refresh,
+      refresh,openNotification,
     }),
-    [notifications, unreadCount, loading, error, refresh],
+    [notifications, unreadCount, loading, error, refresh,openNotification,markAsRead,markAllAsRead],
   );
 
   return (
     <NotificationsContext.Provider value={value}>
       {children}
+      <LibraryDesignProvider><NotificationReader key={notificationId || "closed"} id={notificationId} userId={user?.id || null} onClose={closeNotification} onMarkRead={markAsRead} onDestination={href=>navigate(href)} onAfterClose={()=>{const target=notificationOpener.current; if(target?.isConnected)target.focus();else {const fallback=Array.from(document.querySelectorAll<HTMLElement>('[aria-label*="notifications" i]')).find(element=>element.offsetParent!==null) || document.querySelector<HTMLElement>('#admin-main,main');if(fallback){if(!fallback.hasAttribute('tabindex')&&fallback.tagName==='MAIN')fallback.tabIndex=-1;fallback.focus();}}}}/></LibraryDesignProvider>
     </NotificationsContext.Provider>
   );
 };

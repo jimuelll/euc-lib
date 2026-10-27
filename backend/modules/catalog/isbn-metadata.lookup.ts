@@ -8,6 +8,7 @@ interface IsbnMetadataLookup {
   copyright_year: string;
   publication_place: string;
   physical_description: string;
+  cover_url?: string;
   subjects: string[];
   categories: string[];
   description: string;
@@ -70,6 +71,15 @@ const textValue = (value: unknown): string => {
   return textValue(record.name ?? record.key ?? record.value ?? record.text);
 };
 const firstText = (...values: unknown[]): string => values.map(textValue).find(Boolean) || "";
+const safeCoverUrl = (...values: unknown[]): string | undefined => {
+  for (const value of values) {
+    try {
+      const url = new URL(textValue(value).replace(/^http:\/\//i, "https://"));
+      if (url.protocol === "https:" && !url.username && !url.password && !url.port && ["covers.openlibrary.org", "books.google.com", "books.googleusercontent.com"].includes(url.hostname)) return url.toString();
+    } catch { /* Ignore missing or malformed provider images. */ }
+  }
+  return undefined;
+};
 const firstValue = (...values: unknown[]): string | number | null => {
   const value = values.find(Boolean);
   return typeof value === "number" || typeof value === "string" ? value : null;
@@ -420,6 +430,7 @@ const lookupIsbnMetadata = async (isbn: string, options: IsbnLookupOptions = {})
     copyright_year: publishedDate.match(/\d{4}/)?.[0] || "",
     publication_place: firstText(openPublicationPlaces[0]),
     physical_description: pageCount !== null && Number(pageCount) > 0 ? `${pageCount} pages` : "",
+    cover_url: safeCoverUrl(toRecord(open.cover).large, toRecord(open.cover).medium, toRecord(google.imageLinks).thumbnail),
     subjects: uniqueText([...openSubjects, ...googleCategories]),
     categories: uniqueText(googleCategories),
     description,

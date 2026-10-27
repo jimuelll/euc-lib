@@ -5,8 +5,9 @@ export interface NotificationItem {
   type: string;
   title: string;
   body: string;
+  image_url?:string|null; image_public_id?:string|null; image_alt?:string|null;
   href: string | null;
-  audience_type: "all" | "user" | "role";
+  audience_type: "all" | "user" | "role" | "users";
   audience_user_id: number | null;
   audience_role: string | null;
   created_at: string;
@@ -36,3 +37,5 @@ export async function markAllNotificationsRead() {
   const res = await axiosInstance.post("/api/notifications/read-all");
   return res.data;
 }
+
+export async function fetchNotification(id:number,signal?:AbortSignal):Promise<NotificationItem>{return (await axiosInstance.get(`/api/notifications/${id}/details`,{signal})).data;}

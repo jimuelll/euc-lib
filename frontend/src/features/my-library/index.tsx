@@ -72,7 +72,7 @@ export default function MyLibrary() {
     refresh: refreshNotifications,
     loading: notificationsLoading,
     error: notificationsError,
-    markAsRead,
+    openNotification,
     markAllAsRead,
   } = useNotifications();
   const [qrOpen, setQrOpen] = useState(false);
@@ -270,7 +270,7 @@ export default function MyLibrary() {
                 <MyLibraryUpdatesPanel
                   notifications={notifications}
                   unreadCount={unreadCount}
-                  markAsRead={markAsRead}
+                  openNotification={openNotification}
                   markAllAsRead={markAllAsRead}
                   state={{
                     loading: notificationsLoading,

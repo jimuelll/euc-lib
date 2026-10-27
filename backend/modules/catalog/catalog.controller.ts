@@ -132,6 +132,27 @@ const lookupIsbn = async (req: CatalogHttpRequest, res: Response) => {
   catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "ISBN lookup failed" }); }
 };
 
+const checkIsbn = async (req: CatalogHttpRequest, res: Response) => {
+  try { res.json({ match: await service.checkIsbn(req.params.isbn, req.query.excludeId) }); }
+  catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "ISBN check failed" }); }
+};
+const getHoldingOptions = async (req: CatalogHttpRequest, res: Response) => {
+  try { res.json(await holdingsService.getHoldingOptions(req.query.accession)); }
+  catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Could not load holding suggestions" }); }
+};
+const assignAccessionRange = async (req: CatalogHttpRequest, res: Response) => {
+  try { const result = await holdingsService.assignAccessionRange(Number(req.params.id), req.body, req.user!.id); res.locals.auditEnqueued = true; res.json(result); }
+  catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Could not assign accession numbers" }); }
+};
+const getImageMetadata = async (req: CatalogHttpRequest, res: Response) => {
+  try { res.json(await require("./catalog.image.service").getImageMetadata(Number(req.params.id))); }
+  catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Image metadata unavailable" }); }
+};
+const importIsbnImage = async (req: CatalogHttpRequest, res: Response) => {
+  try { const result = await require("./catalog.image.service").importIsbnImage(Number(req.params.id), req.body?.isbn, req.user?.id); res.locals.auditEnqueued = true; res.json(result); }
+  catch (err: any) { res.status(err.status ?? 500).json({ message: err.message ?? "Could not import cover" }); }
+};
+
 const getPublicSchema = async (_req: CatalogHttpRequest, res: Response) => {
   try {
     const fields = await service.getSchema();
@@ -349,6 +370,11 @@ export = {
   updateSchema,
   getBooks,
   lookupIsbn,
+  checkIsbn,
+  getHoldingOptions,
+  assignAccessionRange,
+  getImageMetadata,
+  importIsbnImage,
   createBook,
   updateBook,
   uploadBookImage,

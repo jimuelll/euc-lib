@@ -9,15 +9,23 @@ export function audienceWhere(input: CreateNotificationInput) {
   let sql = 'u.deleted_at IS NULL AND u.is_active=1';
   if (input.audienceType === 'role') { sql += ' AND u.role=?'; params.push(input.audienceRole); }
   if (input.audienceType === 'user') { sql += ' AND u.id=?'; params.push(input.audienceUserId); }
+  if (input.audienceType === 'users') {
+    const ids = [...new Set(input.audienceUserIds || [])];
+    sql += ids.length ? ` AND u.id IN (${ids.map(() => '?').join(',')})` : ' AND 1=0';
+    params.push(...ids);
+  }
   return { sql, params };
 }
 const emailEligible = "u.setup_pending=0 AND u.email_verified_at IS NOT NULL AND u.email IS NOT NULL AND TRIM(u.email)<>''";
 export async function preview(input: CreateNotificationInput, day: string) {
   const audience = audienceWhere(input);
-  const [[counts]] = await db.query<RowDataPacket[]>(`SELECT COUNT(*) AS total,COALESCE(SUM(${emailEligible}),0) AS eligible FROM users u WHERE ${audience.sql}`, audience.params);
+  const [[counts]] = await db.query<RowDataPacket[]>(`SELECT COUNT(*) AS total,COALESCE(SUM(${emailEligible}),0) AS eligible,
+    COALESCE(SUM(u.email IS NULL OR TRIM(u.email)=''),0) AS missing_address,
+    COALESCE(SUM(u.email IS NOT NULL AND TRIM(u.email)<>'' AND (u.setup_pending IS NULL OR u.setup_pending<>0)),0) AS incomplete_setup,
+    COALESCE(SUM(u.email IS NOT NULL AND TRIM(u.email)<>'' AND u.setup_pending=0 AND u.email_verified_at IS NULL),0) AS unverified_address FROM users u WHERE ${audience.sql}`, audience.params);
   const [[usage]] = await db.query<RowDataPacket[]>('SELECT COALESCE(MAX(requests_used),0) AS used FROM email_quota_usage WHERE period_start=?', [day]);
   const [[pending]] = await db.query<RowDataPacket[]>("SELECT COUNT(*) AS queued FROM email_deliveries WHERE priority=0 AND status='queued' AND expires_at>UTC_TIMESTAMP()");
-  return { total: Number(counts.total), eligible: Number(counts.eligible), used: Number(usage.used), queued: Number(pending.queued) };
+  return { total: Number(counts.total), eligible: Number(counts.eligible), exclusions: {missingAddress:Number(counts.missing_address || 0), incompleteSetup:Number(counts.incomplete_setup || 0), unverifiedAddress:Number(counts.unverified_address || 0)}, used: Number(usage.used), queued: Number(pending.queued) };
 }
 
 // One transaction publishes the notification, freezes recipients and creates all handoffs.
@@ -32,11 +40,18 @@ export async function publish(input: ManualPublication, confirmed?: { total: num
     const batch = input.sendEmail ? randomUUID() : null;
     const emailExpiry = input.expiresAt ? new Date(input.expiresAt).toISOString().slice(0,19).replace('T',' ') : null;
     const [insert] = await conn.query<ResultSetHeader>(`INSERT INTO notifications
-      (type,title,body,href,audience_type,audience_user_id,audience_role,expires_at,created_by,delivery_key,email_requested,email_batch_id,email_expires_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,IF(?=1,LEAST(COALESCE(?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),NULL))
-      `, [input.type,input.title,input.body,input.href || null,input.audienceType || 'all',input.audienceUserId || null,input.audienceRole || null,input.expiresAt || null,input.createdBy || null,deliveryKey,input.sendEmail?1:0,batch,input.sendEmail?1:0,emailExpiry]);
+      (type,title,body,href,audience_type,audience_user_id,audience_role,expires_at,created_by,delivery_key,image_url,image_public_id,image_alt,email_requested,email_batch_id,email_expires_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,IF(?=1,LEAST(COALESCE(?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),NULL))
+      `, [input.type,input.title,input.body,input.href || null,input.audienceType || 'all',input.audienceUserId || null,input.audienceRole || null,input.expiresAt || null,input.createdBy || null,deliveryKey,input.imageUrl||null,input.imagePublicId||null,input.imageAlt||null,input.sendEmail?1:0,batch,input.sendEmail?1:0,emailExpiry]);
     const [[record]] = await conn.query<RowDataPacket[]>('SELECT * FROM notifications WHERE id=? FOR UPDATE', [insert.insertId]);
     const audience = audienceWhere(input);
+    if (input.audienceType === 'users') {
+      const [membership] = await conn.query<ResultSetHeader>(`INSERT INTO notification_recipients (notification_id,user_id)
+        SELECT ?,u.id FROM users u WHERE ${audience.sql}`, [record.id,...audience.params]);
+      if (confirmed && membership.affectedRows !== confirmed.total) throw Object.assign(new Error('The recipient count changed. Review the audience and confirm again.'), {status:409});
+      const [members] = await conn.query<RowDataPacket[]>('SELECT user_id FROM notification_recipients WHERE notification_id=?', [record.id]);
+      record.audience_user_ids = members.map(row => Number(row.user_id));
+    }
     if (confirmed) {
       const [[count]] = await conn.query<RowDataPacket[]>(`SELECT COUNT(*) AS total FROM users u WHERE ${audience.sql}`, audience.params);
       if (Number(count.total) !== confirmed.total) throw Object.assign(new Error('The recipient count changed. Review the audience and confirm again.'), { status:409 });
@@ -44,8 +59,9 @@ export async function publish(input: ManualPublication, confirmed?: { total: num
     if (input.sendEmail) {
       const [snapshot] = await conn.query<ResultSetHeader>(`INSERT INTO email_deliveries
         (id,user_id,recipient,purpose,dedupe_key,priority,notification_id,context_json,expires_at,next_attempt_at,created_at)
-        SELECT UUID(),u.id,LOWER(TRIM(u.email)),'manual_notification',CONCAT('manual:',?,':',u.id),0,?,JSON_OBJECT('manualBatch',?),n.email_expires_at,UTC_TIMESTAMP(),UTC_TIMESTAMP()
+        SELECT UUID(),u.id,LOWER(TRIM(u.email)),'manual_notification',CONCAT('manual:',?,':',u.id),0,?,JSON_OBJECT('manualBatch',?,'notificationDetail',true),n.email_expires_at,UTC_TIMESTAMP(),UTC_TIMESTAMP()
         FROM users u JOIN notifications n ON n.id=? WHERE ${audience.sql} AND ${emailEligible}
+        AND (n.audience_type<>'users' OR EXISTS(SELECT 1 FROM notification_recipients r WHERE r.notification_id=n.id AND r.user_id=u.id))
         AND n.is_active=1 AND n.email_expires_at>UTC_TIMESTAMP()`, [batch,record.id,batch,record.id,...audience.params]);
       if (confirmed && snapshot.affectedRows !== confirmed.email) throw Object.assign(new Error('The verified email recipient count changed. Review and confirm again.'), { status:409 });
       await conn.query(`INSERT INTO delivery_outbox (id,event_type,payload)

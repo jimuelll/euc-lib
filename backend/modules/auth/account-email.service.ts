@@ -167,7 +167,7 @@ export async function adminAction(identifier:string,actorId:number,actorRole:str
     if(!user || (!isOwnSuperAdmin && !roles[actorRole]?.includes(user.role)))throw Object.assign(new Error('You cannot manage this account'),{status:403});
     if(!await throttle(conn,`admin-${action}:${user.id}`))throw Object.assign(new Error('Wait before requesting another email.'),{status:429});
     if(action==='invite'){if(!user.setup_pending)throw Object.assign(new Error('Account setup is already complete'),{status:409});await challenge(conn,user,'setup',normalizeEmail(user.email));}
-    if(action==='verify'){const address=user.pending_email||user.email;if(!address)throw Object.assign(new Error('Add an email address first'),{status:400});await challenge(conn,user,'verify_email',normalizeEmail(address));}
+    if(action==='verify'){if(user.email_verified_at && !user.pending_email)throw Object.assign(new Error('Email is already verified'),{status:409});const address=user.pending_email||user.email;if(!address)throw Object.assign(new Error('Add an email address first'),{status:400});await challenge(conn,user,'verify_email',normalizeEmail(address));}
     if(action==='recovery'){if(!user.email_verified_at || user.setup_pending)throw Object.assign(new Error('Verify email and complete setup before recovery'),{status:409});if(await throttle(conn,`recovery-email:${normalizeEmail(user.email)}`))await challenge(conn,user,'recovery',normalizeEmail(user.email));}
     await enqueueTransactionalAudit(conn,{actorId,category:'users',action:'email_requested',description:`Requested account ${action} email`,route:'/api/admin/users/account-email',extraMetadata:{target_user_id:user.id}});
     return {message:'Account email queued if eligible.'};

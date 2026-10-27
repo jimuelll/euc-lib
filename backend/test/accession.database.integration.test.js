@@ -525,7 +525,7 @@ test("database: payment and patron archive serialize without archiving an unpaid
 
   const outcomes = await Promise.allSettled([
     clearanceService.recordFullPayment({ studentEmployeeId: studentId, createdBy: 1 }),
-    adminService.deleteUser(studentId, "super_admin", 1),
+    adminService.deleteUser(studentId, "super_admin", 1, "Test archive reason"),
   ]);
   assert.equal(outcomes[0].status, "fulfilled", "the payment must still settle the ledger");
   if (outcomes[1].status === "rejected") assert.equal(outcomes[1].reason.status, 409);

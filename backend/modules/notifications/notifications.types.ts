@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 
-export type NotificationAudience = "all" | "user" | "role";
+export type NotificationAudience = "all" | "user" | "role" | "users";
 
 export interface NotificationContext {
   userId: number;
@@ -12,6 +12,9 @@ export interface NotificationRecord extends RowDataPacket {
   type: string;
   title: string;
   body: string;
+  image_url?: string | null;
+  image_public_id?: string | null;
+  image_alt?: string | null;
   href: string | null;
   audience_type: NotificationAudience;
   audience_user_id: number | null;
@@ -53,9 +56,13 @@ export interface CreateNotificationInput {
   type: string;
   title: string;
   body: string;
+  imageUrl?: string | null;
+  imagePublicId?: string | null;
+  imageAlt?: string | null;
   href?: string | null;
   audienceType?: NotificationAudience;
   audienceUserId?: number | null;
+  audienceUserIds?: number[];
   audienceRole?: string | null;
   expiresAt?: Date | string | null;
   createdBy?: number | null;
@@ -77,6 +84,7 @@ export interface NotificationWrite extends Omit<CreateNotificationInput, "replac
 }
 
 export interface NotificationUpdateInput {
+  imageUrl?: string | null; imagePublicId?: string | null; imageAlt?: string | null;
   notificationId: number;
   title: string;
   body: string;

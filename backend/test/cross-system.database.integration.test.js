@@ -354,7 +354,7 @@ test("database: unpaid ledger balances block user, book, direct-edit, and loan a
   assert.ok((await listUnsettledBorrowings({ userId: fixture.userId })).summary.total_unsettled_amount > 0);
 
   const conflicts = await Promise.allSettled([
-    adminService.deleteUser(fixture.studentId, "super_admin", 1),
+    adminService.deleteUser(fixture.studentId, "super_admin", 1, "Test archive reason"),
     adminService.updateUser(fixture.studentId, { is_active: 0 }, "super_admin", 1),
     catalogQueryService.deleteBook(fixture.bookId, 1),
     borrowingAdminService.adminDeleteBorrowing(loan.borrowingId, 1),
@@ -373,7 +373,7 @@ test("database: unpaid ledger balances block user, book, direct-edit, and loan a
   await clearanceService.recordFullPayment({ studentEmployeeId: fixture.studentId, createdBy: 1 });
   assert.equal((await listUnsettledBorrowings({ userId: fixture.userId })).summary.total_unsettled_amount, 0);
   await borrowingAdminService.adminDeleteBorrowing(loan.borrowingId, 1);
-  await adminService.deleteUser(fixture.studentId, "super_admin", 1);
+  await adminService.deleteUser(fixture.studentId, "super_admin", 1, "Test archive reason");
   await catalogQueryService.deleteBook(fixture.bookId, 1);
 
   const [[archived]] = await db.query(
@@ -522,7 +522,7 @@ test("database: policy reassignment/deletion and archival keep historical previe
   assert.ok((await listUnsettledBorrowings({ userId: fixture.userId })).summary.total_unsettled_amount > 0);
   await clearanceService.recordFullPayment({ studentEmployeeId: fixture.studentId, createdBy: 1 });
   await catalogQueryService.deleteBook(fixture.bookId, 1);
-  await adminService.deleteUser(fixture.studentId, "super_admin", 1);
+  await adminService.deleteUser(fixture.studentId, "super_admin", 1, "Test archive reason");
   await borrowingAdminService.adminDeleteBorrowing(loan.borrowingId, 1);
 
   const filtered = await queryService.listQuery({ dataset: "borrowings", page: 1, limit: 10, search: fixture.title, bookType: String(fixture.policyId) });

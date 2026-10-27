@@ -150,7 +150,7 @@ const validateBookPayload = async (req: CatalogRequest, { requireCoreFields = fa
       }
     }
     if (materialType !== "thesis" && (!Number.isInteger(Number(req.body.book_type_id)) || Number(req.body.book_type_id) < 1)) throw createValidationError("Book type is required", 400, "book_type_id");
-    for (const field of schema.filter((field) => !field.scope || field.scope === "shared" || field.scope === materialType)) {
+    for (const field of schema.filter((field) => (!field.scope || field.scope === "shared" || field.scope === materialType) && (materialType !== "thesis" || !["isbn", "copies"].includes(field.key)))) {
       if (field.required && (req.body[field.key] === undefined || String(req.body[field.key]).trim() === "")) {
         throw createValidationError(`Field "${field.label}" is required`, 400, field.key);
       }
@@ -159,7 +159,7 @@ const validateBookPayload = async (req: CatalogRequest, { requireCoreFields = fa
     const currentMetadata = typeof req.currentCatalogRecord.metadata === "string"
       ? JSON.parse(req.currentCatalogRecord.metadata || "{}") : (req.currentCatalogRecord.metadata || {});
     const current = { ...currentMetadata, ...req.currentCatalogRecord, ...req.body };
-    for (const field of schema.filter((entry) => !entry.scope || entry.scope === "shared" || entry.scope === materialType)) {
+    for (const field of schema.filter((entry) => (!entry.scope || entry.scope === "shared" || entry.scope === materialType) && (materialType !== "thesis" || !["isbn", "copies"].includes(entry.key)))) {
       if (field.required && (current[field.key] === undefined || current[field.key] === null || String(current[field.key]).trim() === "")) {
         throw createValidationError(`Field "${field.label}" is required`, 400, field.key);
       }

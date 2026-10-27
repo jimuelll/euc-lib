@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { AdminThemeToggle as ThemeToggle } from "../../components/AdminThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
+import { formatNotificationTime } from "@/features/notifications/notification-time";
 import { dashboardItem, helpItem, visibleSidebarSections, resolveCurrentItem, resolveCurrentSection } from "../AdminLayoutData";
 
 export { AdminSidebar } from "./AdminSidebar";
@@ -21,7 +22,7 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
   const current = resolveCurrentItem(pathname, search, user?.role);
   const section = current && resolveCurrentSection(current.url);
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, openNotification, markAllAsRead } = useNotifications();
   const searchTrigger = useRef<HTMLButtonElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const sections = visibleSidebarSections(user?.role);
@@ -39,7 +40,20 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
       <div className="flex min-w-0 items-center gap-2 sm:gap-3"><SidebarTrigger aria-label="Open administration navigation" className="h-11 w-11 shrink-0 md:h-9 md:w-9" /><nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">{pathname !== "/admin" && <><Link to="/admin" className="hidden text-muted-foreground hover:text-foreground md:block">Home</Link><AdminIcon name="chevronRight" className="hidden size-3 text-muted-foreground md:block" /></>}{section && <><span className="hidden text-muted-foreground lg:block">{section.label}</span><AdminIcon name="chevronRight" className="hidden size-3 text-muted-foreground lg:block" /></>}<span aria-current="page" className="truncate font-semibold md:font-medium">{current?.title || "Library administration"}{pathname.includes("/receipt/") ? " / Receipt" : ""}</span></nav></div>
       <div className="admin-topbar-actions flex shrink-0 items-center gap-1 sm:gap-2"><Button variant="outline" size="sm" className="h-11 px-2.5 md:h-9 md:px-3" ref={searchTrigger} onClick={() => setSearchOpen(true)} aria-label="Find an administration tool"><AdminIcon name="search" className="size-4 sm:mr-2" /><span className="hidden sm:inline">Find a tool</span><kbd className="ml-5 hidden text-xs text-muted-foreground xl:inline">Ctrl K</kbd></Button>
         <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="relative h-11 w-11 md:h-9 md:w-9" aria-label={unreadCount ? `${unreadCount} unread notifications` : "Notifications"}><AdminIcon name="notifications" className="size-4" />{unreadCount > 0 && <span className="admin-topbar-unread">{unreadCount > 9 ? "9+" : unreadCount}</span>}</Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0"><DropdownMenuLabel className="flex items-center justify-between border-b p-4">Notifications{unreadCount > 0 && <button className="text-xs text-action" onClick={() => void markAllAsRead()}>Mark all read</button>}</DropdownMenuLabel><div className="max-h-80 overflow-y-auto">{notifications.length ? notifications.slice(0, 8).map(notification => <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 px-4 py-3" onSelect={() => { if (!notification.is_read) void markAsRead(notification.id); if (notification.href) navigate(notification.href); else if (canManageNotifications) navigate("/admin/notifications"); }}><span className="font-medium">{notification.title}</span><span className="line-clamp-2 text-sm text-muted-foreground">{notification.body}</span>{!notification.is_read && <span className="text-xs text-action">Unread</span>}</DropdownMenuItem>) : <p className="p-6 text-sm text-muted-foreground">No notifications yet.</p>}</div>{canManageNotifications && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => navigate("/admin/notifications")} className="p-3 text-action">Manage notifications</DropdownMenuItem></>}</DropdownMenuContent>
+          <DropdownMenuContent align="end" className="w-[min(420px,calc(100vw-1rem))] p-0">
+            <DropdownMenuLabel className="flex items-center justify-between gap-3 border-b p-4">
+              <span>Notifications{unreadCount > 0 && <span className="mt-1 block text-xs font-normal text-muted-foreground">{unreadCount} unread {unreadCount === 1 ? "notification" : "notifications"}</span>}</span>
+              {unreadCount > 0 && <button type="button" className="min-h-11 text-xs font-semibold text-action hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => void markAllAsRead()}>Mark all read</button>}
+            </DropdownMenuLabel>
+            <div className="max-h-[420px] overflow-y-auto">
+              {notifications.length ? notifications.slice(0, 8).map(notification => <DropdownMenuItem key={notification.id} className={`flex w-full cursor-pointer flex-col items-stretch gap-0 rounded-none border-b border-border/50 px-4 py-3.5 text-left focus:bg-muted hover:bg-muted ${notification.is_read ? "bg-background" : "bg-action/5"}`} onSelect={() => { openNotification(notification.id); }}>
+                <div className="flex w-full items-start justify-between gap-4"><span className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">{notification.title}</span><time className="shrink-0 whitespace-nowrap text-xs leading-5 text-muted-foreground" dateTime={notification.created_at}>{formatNotificationTime(notification.created_at)}</time></div>
+                <span className="mt-1.5 line-clamp-2 w-full break-words text-sm leading-relaxed text-muted-foreground">{notification.body}</span>
+                {!notification.is_read && <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-action"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"/>Unread</span>}
+              </DropdownMenuItem>) : <p className="p-6 text-sm text-muted-foreground">No notifications yet.</p>}
+            </div>
+            {canManageNotifications && <><DropdownMenuSeparator className="m-0"/><DropdownMenuItem onSelect={() => navigate("/admin/notifications")} className="min-h-11 rounded-none px-4 py-3 text-sm font-semibold text-action">Manage notifications</DropdownMenuItem></>}
+          </DropdownMenuContent>
         </DropdownMenu><span className="hidden md:inline-flex"><ThemeToggle /></span>
         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="hidden h-9 px-2 sm:px-3 md:inline-flex" aria-label="More options"><AdminIcon name="more" className="size-4 sm:mr-2" /><span className="hidden sm:inline">More</span></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end"><DropdownMenuLabel>More</DropdownMenuLabel><DropdownMenuItem asChild><Link to={helpItem.url}><AdminIcon name="help" className="mr-2 size-4" />{helpItem.title}</Link></DropdownMenuItem><DropdownMenuItem asChild><a href="/" target="_blank" rel="noreferrer"><AdminIcon name="external" className="mr-2 size-4" />View public website</a></DropdownMenuItem></DropdownMenuContent>

@@ -74,6 +74,12 @@ test('required Theses fields do not block Books but are enforced for Theses',asy
  const thesis=response();await middleware.validateCreateBookPayload({body:{title:'Thesis title',author:'Thesis author',material_type:'thesis'}},thesis,()=>{});assert.equal(thesis.code,400);assert.match(thesis.body.message,/Academic Year/);
  }finally{repository.getSchema=original;}
 });
+test('required ISBN and copies apply only to books',async()=>{
+ const original=repository.getSchema;
+ repository.getSchema=async()=>[...base.filter(f=>!f.archived),{key:'isbn',label:'ISBN',type:'text',scope:'shared',required:true},{key:'copies',label:'Copies',type:'number',scope:'shared',required:true}];
+ try {let accepted=false;const response={status(code){this.code=code;return this;},json(body){this.body=body;return this;}};await middleware.validateCreateBookPayload({body:{title:'Thesis title',author:'Thesis author',material_type:'thesis'}},response,()=>{accepted=true;});assert.equal(accepted,true);}
+ finally {repository.getSchema=original;}
+});
 test('archive attribution is taken from captured audit transitions',async()=>{
  const original=db.query;
  db.query=async(sql,params)=>{if(sql.includes('FROM audit_events')){assert.doesNotMatch(sql,/JSON_TABLE/);assert.match(sql,/ORDER BY id DESC/);assert.deepEqual(params,['/api/admin/catalog-schema']);return [[

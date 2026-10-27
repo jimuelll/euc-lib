@@ -692,7 +692,13 @@ async function updateCopyCondition(copyId: number, condition: string, notes: str
   await conn.query("UPDATE book_copies SET `condition` = ?, notes = COALESCE(?, notes) WHERE id = ?", [condition, notes?.trim() || null, copyId]);
 }
 
+const findIsbnMatch = async (isbn: string, excludeId: number | null) => {
+  const [rows] = await db.query("SELECT id, title, deleted_at FROM books WHERE isbn = ? AND (? IS NULL OR id <> ?) LIMIT 1", [isbn, excludeId, excludeId]);
+  return rows[0] || null;
+};
+
 export = {
+  findIsbnMatch,
   getConnection,
   getSchema,
   findActiveSchemaKeys,

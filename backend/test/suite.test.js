@@ -17,6 +17,7 @@ require("./backup.accession.restore.test");
 require("./backup.transforms.test");
 require("./publishing.test");
 require("./notifications.admin.test");
+require("./notifications.recipients.test");
 require("./borrowing.helpers.test");
 require("./borrowing.desk-preview.test");
 require("./reservation.admin-queue.test");
@@ -34,6 +35,8 @@ require("./desk.permissions.test");
 require("./staff.desk.integration.test");
 require("./admin.users-desk.test");
 require("./holdings.accession.test");
+require("./catalog.bulk-accession.test");
+require("./catalog.isbn-check.test");
 require("./numeric-input.test");
 require("./policy.removal.test");
 require("./query.service.test");
@@ -54,7 +57,9 @@ require('./audit.feed.test');
 require('./backup.safety.test.js');
 
 require("./email.workflows.test");
+require("./email.admin.test");
 require('./notifications.email.test');
+require('./notification-images.test');
 require('./notifications.email.database.integration.test');
 
 require("./email.database.integration.test");

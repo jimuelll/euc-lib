@@ -166,13 +166,14 @@ test('weeded and discarded conditions preserve loan and reservation commitments'
  repository.getPendingReservationCount=async()=>pending;
  repository.getAvailableEligibleCopyCount=async()=>remaining;
  repository.updateCopyCondition=async(id,condition)=>{assert.equal(id,1);writes++;copy.condition=condition;};
- audit.enqueueTransactionalAudit=async()=>{};
+ let recordedReason; audit.enqueueTransactionalAudit=async(_conn,event)=>{recordedReason=event.extraMetadata.reason;};
  try {
+  await assert.rejects(queryService.updateCopyCondition(1,"lost", "  "),e=>e.status===400 && /reason/i.test(e.message));
   for(const condition of ['weeded','discarded']) {
-   copy.has_active_loan=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/Return/.test(e.message));
-   copy.has_active_loan=0;copy.has_prepared_reservation=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/prepared/.test(e.message));
-   copy.has_prepared_reservation=0;pending=1;await assert.rejects(queryService.updateCopyCondition(1,condition),e=>e.status===409&&/pending reservation/.test(e.message));
-   pending=0;await queryService.updateCopyCondition(1,condition,null,7);assert.equal(copy.condition,condition);
+   copy.has_active_loan=1;await assert.rejects(queryService.updateCopyCondition(1,condition,"Test reason"),e=>e.status===409&&/Return/.test(e.message));
+   copy.has_active_loan=0;copy.has_prepared_reservation=1;await assert.rejects(queryService.updateCopyCondition(1,condition,"Test reason"),e=>e.status===409&&/prepared/.test(e.message));
+   copy.has_prepared_reservation=0;pending=1;await assert.rejects(queryService.updateCopyCondition(1,condition,"Test reason"),e=>e.status===409&&/pending reservation/.test(e.message));
+   pending=0;await queryService.updateCopyCondition(1,condition,"Test reason",7);assert.equal(copy.condition,condition);assert.equal(recordedReason,"Test reason");
   }
   assert.equal(writes,2);assert.equal(conn.state.commits,2);assert.equal(conn.state.rollbacks,6);
   await assert.rejects(queryService.updateCopyCondition(1,'invalid'),{status:400});

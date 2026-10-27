@@ -6,12 +6,12 @@ import outbox = require('../delivery-outbox/outbox.repository');
 const db = require('../../db') as Pool;
 type Connection = Pool | PoolConnection;
 interface Delivery extends RowDataPacket { id: string; user_id: number; recipient: string; purpose: string; priority: number; challenge_id: string | null; content_encrypted: string | null; context_json: string | Record<string, unknown> | null; attempts: number; status: string; notification_id?:number|null }
-export interface QueueEmail { userId: number; recipient: string; purpose: string; dedupeKey: string; challengeId?: string; security?: boolean; expiresAt: Date; message?: EmailMessage; context?: Record<string, unknown> }
+export interface QueueEmail { notificationId?:number; userId: number; recipient: string; purpose: string; dedupeKey: string; challengeId?: string; security?: boolean; expiresAt: Date; message?: EmailMessage; context?: Record<string, unknown> }
 export async function enqueue(conn: PoolConnection, input: QueueEmail): Promise<string | null> {
   if (!config().enabled) return null;
   const id = randomUUID();
-  await conn.query(`INSERT INTO email_deliveries (id,user_id,recipient,purpose,dedupe_key,challenge_id,priority,content_encrypted,context_json,expires_at,next_attempt_at,created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE id=id`, [id,input.userId,input.recipient,input.purpose,input.dedupeKey,input.challengeId || null,input.security ? 1 : 0,input.message ? protect(input.message) : null, JSON.stringify(input.context || {}),sqlDate(input.expiresAt)]);
+  await conn.query(`INSERT INTO email_deliveries (id,user_id,recipient,purpose,dedupe_key,challenge_id,priority,content_encrypted,context_json,expires_at,notification_id,next_attempt_at,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE id=id`, [id,input.userId,input.recipient,input.purpose,input.dedupeKey,input.challengeId || null,input.security ? 1 : 0,input.message ? protect(input.message) : null, JSON.stringify(input.context || {}),sqlDate(input.expiresAt),input.notificationId || null]);
   const [[row]] = await conn.query<RowDataPacket[]>('SELECT id FROM email_deliveries WHERE dedupe_key=?',[input.dedupeKey]);
   if (row.id !== id) return row.id;
   await outbox.enqueue('email', { deliveryId: row.id }, conn, row.id);
@@ -51,14 +51,14 @@ export async function queueDailySummaries() {
   }
 }
 const personalTypes = new Set(['reservation_created','reservation_ready','reservation_cancelled','borrowing_created','borrowing_returned','borrowing_renewed','transaction_corrected','payment_settled']);
-export async function queueNotification(payload: Record<string, unknown>, eventId: string, createdAt?: Date | string) {
+export async function queueNotification(payload: Record<string, unknown>, eventId: string, createdAt?: Date | string, notificationId?:number) {
   const purpose = String(payload.emailPurpose || payload.type);
   if (payload.suppressEmail || !config().enabled || !config().routineEnabled || payload.audienceType !== 'user' || !personalTypes.has(purpose)) return;
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
     const [[user]] = await conn.query<RowDataPacket[]>('SELECT id,email,name FROM users WHERE id=? AND deleted_at IS NULL AND is_active=1 AND setup_pending=0 AND email_verified_at IS NOT NULL',[payload.audienceUserId]);
-    if (user) await enqueue(conn,{ userId:user.id,recipient:user.email,purpose,dedupeKey:`notification:${eventId}`,expiresAt:new Date((createdAt ? new Date(createdAt).getTime() : Date.now())+86400_000),context:{ sourceType:payload.sourceType || null,sourceId:payload.sourceId || null, dueDate:payload.emailDueDate || null },message:{recipient:user.email,name:user.name,subject:String(payload.title),message:String(payload.body),action_url:new URL('/my-library',config().url).href,action_label:'Open My Library'} });
+    if (user) await enqueue(conn,{ notificationId,userId:user.id,recipient:user.email,purpose,dedupeKey:`notification:${eventId}`,expiresAt:new Date((createdAt ? new Date(createdAt).getTime() : Date.now())+86400_000),context:{ sourceType:payload.sourceType || null,sourceId:payload.sourceId || null, dueDate:payload.emailDueDate || null },message:{recipient:user.email,name:user.name,subject:String(payload.title),message:String(payload.body),action_url:new URL(notificationId?`/my-library?view=updates&notification=${notificationId}`:'/my-library',config().url).href,action_label:notificationId?'View notification':'Open My Library'} });
     await conn.commit();
   } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
 }
@@ -75,11 +75,16 @@ async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage |
     if (!row.notification_id || !context.manualBatch) return null;
     const [[notice]]=await conn.query<RowDataPacket[]>(`SELECT * FROM notifications WHERE id=? AND email_batch_id=? AND email_requested=1
       AND is_active=1 AND (expires_at IS NULL OR expires_at>NOW()) AND email_expires_at>UTC_TIMESTAMP()`,[row.notification_id,context.manualBatch]);
+    if (notice?.audience_type === 'users') {
+      const [[membership]] = await conn.query<RowDataPacket[]>('SELECT user_id FROM notification_recipients WHERE notification_id=? AND user_id=?', [row.notification_id,user.id]);
+      if (!membership) return null;
+    }
     if (!notice || (notice.audience_type==='role' && notice.audience_role!==user.role) || (notice.audience_type==='user' && Number(notice.audience_user_id)!==Number(user.id))) return null;
     const destinations=['/my-library','/bulletin','/services/borrowing','/catalogue'];
     if (notice.href && !destinations.includes(notice.href)) throw new SendFailure('permanent','Invalid notification email destination');
     return {recipient:row.recipient,name:user.name,subject:notice.title,message:notice.body,
-      ...(notice.href ? {action_url:new URL(notice.href,config().url).href,action_label:'Open library'} : {})};
+      ...(context.notificationDetail ? {action_url:new URL(`/my-library?view=updates&notification=${row.notification_id}`,config().url).href,action_label:'View notification'} : notice.href ? {action_url:new URL(notice.href,config().url).href,action_label:'Open library'} : {}),
+      ...(notice.image_url?{image_url:notice.image_url,image_public_id:notice.image_public_id,image_alt:notice.image_alt}:{})};
   }
   if (!row.priority && context.sourceId) {
     if (context.sourceType === 'reservation') {
@@ -199,15 +204,7 @@ export function startEmailJob() {
   };
   const timer = setInterval(()=>void run(),1200); timer.unref(); void run(); return timer;
 }
-export async function adminStatus() {
-  const c=config();
-  const [usage] = await db.query<RowDataPacket[]>('SELECT * FROM email_quota_usage WHERE period_start=?',[c.periodStart || '1970-01-01']);
-  const [rows] = await db.query<RowDataPacket[]>(`SELECT id,user_id,recipient,purpose,status,attempts,last_error,created_at,accepted_at,
-    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.providerMessageId')),'null') AS provider_message_id,
-    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(context_json,'$.providerMode')),'null') AS provider_mode
-    FROM email_deliveries ORDER BY created_at DESC LIMIT 100`);
-  return { enabled:c.enabled,routineEnabled:c.routineEnabled,mode:c.mode,limit:c.limit,reserve:c.reserve,used:Number(usage[0]?.requests_used || 0),periodStart:c.periodStart,periodEnd:c.periodEnd,periodValid:true,rows };
-}
+export { adminStatus, adminDelivery } from './email.admin';
 export async function retryDelivery(id: string) {
   const conn=await db.getConnection();
   try {

@@ -93,7 +93,9 @@ export const AppRoutes = () => {
         <Route path="user-guide" element={<AdminUserGuide />} />
         <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />
         <Route path="subscriptions" element={<Navigate to="/admin/content?tab=subscriptions" replace />} />
-        <Route path="email-deliveries" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries /></ProtectedRoute>} />
+        <Route path="email-deliveries" element={<ProtectedRoute roles={["super_admin"]}><Navigate to="/admin/library-emails?tab=manual" replace /></ProtectedRoute>} />
+        <Route path="account-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="account" page="account" /></ProtectedRoute>} />
+        <Route path="library-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="library" page="library" /></ProtectedRoute>} />
         <Route path="notifications" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminNotifications /></ProtectedRoute>} />
         <Route path="attendance-logs" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAttendanceLogs /></ProtectedRoute>} />
         <Route path="edit-about" element={<Navigate to="/admin/content?tab=about" replace />} />

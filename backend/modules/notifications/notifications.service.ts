@@ -24,6 +24,7 @@ const normaliseNotification = (row: NotificationRecord) => ({
   title: row.title,
   body: row.body,
   href: row.href,
+  image_url: row.image_url ?? null, image_public_id:row.image_public_id ?? null, image_alt:row.image_alt ?? null,
   audience_type: row.audience_type,
   audience_user_id: row.audience_user_id,
   audience_role: row.audience_role,
@@ -78,7 +79,7 @@ const createNotification = async ({
   type,
   title,
   body,
-  href = null,
+  href = null, imageUrl=null, imagePublicId=null, imageAlt=null,
   audienceType = "all",
   audienceUserId = null,
   audienceRole = null,
@@ -104,6 +105,7 @@ const createNotification = async ({
     audienceType,
     audienceUserId,
     audienceRole,
+    imageUrl,imagePublicId,imageAlt,
     expiresAt,
     createdBy,
     sourceType,
@@ -111,7 +113,7 @@ const createNotification = async ({
   };
   if (notificationId) {
     if (!deliveredNotification) {
-      await repository.updateNotification({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey });
+      await repository.updateNotification({ notificationId, title, body, href, expiresAt, createdBy, sourceType, sourceId, deliveryKey,imageUrl,imagePublicId,imageAlt });
     }
   } else if (deliveryKey) {
     const created = await repository.createNotificationWithDeliveryKey({ ...write, deliveryKey });
@@ -126,7 +128,7 @@ const createNotification = async ({
     type,
     title,
     body,
-    href,
+    href, image_url:imageUrl,image_public_id:imagePublicId,image_alt:imageAlt,
     audience_type: audienceType,
     audience_user_id: audienceUserId,
     audience_role: audienceRole,

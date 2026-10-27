@@ -58,3 +58,30 @@
 @media(max-width:640px) { .users-filter-controls { grid-template-columns:1fr; gap:12px; } .users-row { grid-template-columns:24px minmax(0,1fr) 44px; gap:12px; } .users-identity { grid-column:2; } .users-borrowing { grid-column:2; grid-row:auto; margin-left:48px; } .users-row>div:last-of-type { grid-column:2; margin-left:48px; } .users-row>button:last-child { grid-column:3; grid-row:1; } .users-form-grid { grid-template-columns:1fr; } .users-borrowing-summary>div { grid-template-columns:1fr 1fr; } .users-pagination { flex-direction:column; align-items:stretch; } .users-pagination>div { justify-content:space-between; gap:8px; } .users-save-state { flex-basis:100%; } .users-page button,.users-drawer button,.users-drawer input { min-height:44px; } }
 
 .users-borrowing.users-attention>span:last-child { color:hsl(var(--admin-tone-amber)); }
+
+.users-panel { display:grid; gap:24px; min-width:0; }
+.users-drawer [hidden] { display:none !important; }
+.users-role-choices { min-width:0; border:0; padding:0; }
+.users-role-choices legend { font-weight:600; margin-bottom:12px; }
+.users-role-choices>div { display:grid; gap:8px; }
+.users-role-choice { display:flex; align-items:start; gap:12px; padding:12px; border:1px solid var(--drawer-control-border); cursor:pointer; }
+.users-role-choice:has(input:checked) { border-color:#7a0000; background:hsl(var(--muted)); outline:1px solid #7a0000; }
+.users-role-choice input { margin-top:4px; width:18px; height:18px; accent-color:#7a0000; }
+.users-drawer .users-role-choice input { min-height:18px; }
+.users-role-choice>span { display:grid; gap:4px; }
+.users-role-choice span span { font-size:13px; color:hsl(var(--muted-foreground)); line-height:1.5; }
+.users-field-error { font-size:13px; color:hsl(var(--destructive)); line-height:1.5; }
+.users-suggestion { text-decoration:underline; text-underline-offset:3px; min-height:40px; }
+.users-email-actions { display:grid; gap:12px; }
+.users-email-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.users-email-history { display:grid; gap:8px; font-size:13px; }
+.users-drawer .admin-record-header { position:relative; padding-right:112px; }
+.users-drawer .admin-record-header-actions { position:absolute; right:52px; top:16px; margin:0; }
+.users-drawer .users-hint>svg { display:inline; margin-right:6px; }
+.users-drawer .users-attention { color:#7a0000; }
+.dark .users-drawer .users-attention { color:#ffaaaa; }
+@media(max-width:640px) { .users-drawer .admin-record-header { padding-right:112px; } .users-role-choice { min-height:44px; } }
+
+.users-header-chip { display:inline-block; padding:2px 6px; border:1px solid currentColor; font-size:12px; margin-top:4px; }
+
+.dark .users-role-choice:has(input:checked) { border-color:#e4a6a6; outline-color:#e4a6a6; }

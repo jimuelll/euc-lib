@@ -12,6 +12,7 @@ import ThemeToggle from "@/components/layout/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import type { NotificationItem } from "@/features/notifications/notifications.service";
+import { formatNotificationTime } from "@/features/notifications/notification-time";
 import { getNavigationPermissions, getUserInitials, isNavigationLinkActive, type NavigationLink } from "./navbar.utils";
 
 const navLinks: NavigationLink[] = [
@@ -44,7 +45,7 @@ const Navbar = () => {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { user, logout, loading } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, openNotification, markAllAsRead } = useNotifications();
 
   const role       = user?.role ?? "guest";
   const isLoggedIn = !!user && !loading;
@@ -157,7 +158,7 @@ const Navbar = () => {
                     notifications={notifications}
                     unreadCount={unreadCount}
                     onNavigate={navigate}
-                    onMarkAsRead={markAsRead}
+                    onOpenNotification={openNotification}
                     onMarkAllAsRead={markAllAsRead}
                   />
                 </div>
@@ -166,7 +167,7 @@ const Navbar = () => {
                     notifications={notifications}
                     unreadCount={unreadCount}
                     onNavigate={navigate}
-                    onMarkAsRead={markAsRead}
+                    onOpenNotification={openNotification}
                     onMarkAllAsRead={markAllAsRead}
                   />
                 </div>
@@ -366,13 +367,13 @@ const NotificationsDropdown = ({
   notifications,
   unreadCount,
   onNavigate,
-  onMarkAsRead,
+  onOpenNotification,
   onMarkAllAsRead,
 }: {
   notifications: NotificationItem[];
   unreadCount: number;
   onNavigate: (path: string) => void;
-  onMarkAsRead: (notificationId: number) => Promise<void>;
+  onOpenNotification: (notificationId: number) => void;
   onMarkAllAsRead: () => Promise<void>;
 }) => (
   <DropdownMenu modal={false}>
@@ -386,7 +387,7 @@ const NotificationsDropdown = ({
         )}
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" sideOffset={12} className="w-[calc(100vw-1rem)] sm:w-[360px] rounded-md border-border/60 p-0 shadow-lg">
+    <DropdownMenuContent align="end" sideOffset={12} className="w-[min(420px,calc(100vw-1rem))] rounded-md border-border/60 p-0 shadow-lg">
       <div className="border-b border-border/30 bg-primary px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -396,14 +397,14 @@ const NotificationsDropdown = ({
             >
               Notifications
             </p>
-            <p className="mt-0.5 text-xs uppercase tracking-[0.15em] text-primary-foreground/80">
-              {unreadCount} unread
+            <p className="mt-1 text-xs text-primary-foreground/80" aria-live="polite">
+              {unreadCount} unread {unreadCount === 1 ? 'notification' : 'notifications'}
             </p>
           </div>
           {unreadCount > 0 && (
             <button
               onClick={() => { void onMarkAllAsRead(); }}
-              className="text-xs font-bold uppercase tracking-[0.14em] text-warning"
+              className="min-h-11 text-xs font-bold uppercase tracking-[0.14em] text-[#f9d688] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               style={{ fontFamily: "var(--font-heading)" }}
             >
               Mark all read
@@ -415,41 +416,27 @@ const NotificationsDropdown = ({
       <div className="max-h-[420px] overflow-y-auto">
         {notifications.length > 0 ? (
           notifications.slice(0, 8).map((notification) => (
-            <button
-              key={notification.id}
+            <DropdownMenuItem key={notification.id} asChild><button
               onClick={() => {
-                if (!notification.is_read) {
-                  void onMarkAsRead(notification.id);
-                }
-                onNavigate(notification.href || "/my-library");
+                onOpenNotification(notification.id);
               }}
-              className={`w-full border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-muted/10 ${
+              className={`flex w-full flex-col items-stretch gap-0 rounded-none border-b border-border/50 px-4 py-3.5 text-left transition-colors focus:bg-muted hover:bg-muted ${
                 notification.is_read ? "bg-background" : "bg-warning/5"
               }`}
             >
-              <p
-                className="text-xs font-bold uppercase tracking-[0.12em] text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                {notification.title}
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              <div className="flex w-full items-start justify-between gap-4">
+                <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">
+                  {notification.title}
+                </p>
+                <time className="shrink-0 whitespace-nowrap text-xs leading-5 text-muted-foreground" dateTime={notification.created_at}>
+                  {formatNotificationTime(notification.created_at)}
+                </time>
+              </div>
+              <p className="mt-1.5 line-clamp-2 w-full break-words text-sm leading-relaxed text-muted-foreground">
                 {notification.body}
               </p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground/70">
-                  {formatNotificationTime(notification.created_at)}
-                </span>
-                {!notification.is_read && (
-                  <span
-                    className="text-xs font-bold uppercase tracking-[0.12em] text-warning"
-                    style={{ fontFamily: "var(--font-heading)" }}
-                  >
-                    New
-                  </span>
-                )}
-              </div>
-            </button>
+              {!notification.is_read && <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-warning"><span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true"/>New</span>}
+            </button></DropdownMenuItem>
           ))
         ) : (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -469,24 +456,6 @@ const NotificationsDropdown = ({
     </DropdownMenuContent>
   </DropdownMenu>
 );
-
-const formatNotificationTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
-
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 1) return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  return date.toLocaleDateString();
-};
 
 const UserDropdown = ({
   name, role, initials, showAdminPanel, onNavigate, onLogout,

@@ -5,7 +5,7 @@ const { parseMetadata, hydrateCatalogRecord } = require("./catalog.projection");
 const isbnMetadataLookup = require("./isbn-metadata.lookup") as {
   lookupIsbnMetadata: (isbn: string) => Promise<{
     title: string; author: string; publisher: string; copyright_year: string; publication_place: string;
-    physical_description: string; subjects: string[]; description: string; metadataFound: boolean;
+    physical_description: string; subjects: string[]; description: string; cover_url?: string; metadataFound: boolean;
     openLibraryResponded: boolean;
   }>;
 };
@@ -279,6 +279,8 @@ const deleteBookType = async (id: number, actorId: number | null = null) => {
 
 const updateCopyCondition = async (copyId: number, condition: string, notes: string | null = null, userId: number | null = null): Promise<{ auditEnqueued: boolean }> => {
   if (!["good", "damaged", "lost", "weeded", "discarded"].includes(condition)) throw Object.assign(new Error("Invalid copy condition"), { status: 400 });
+  if (["lost", "weeded", "discarded"].includes(condition) && (typeof notes !== "string" || !notes.trim() || notes.trim().length > 500)) throw Object.assign(new Error("A reason of up to 500 characters is required"), { status: 400 });
+  notes = typeof notes === "string" ? notes.trim() || null : null;
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
@@ -306,7 +308,7 @@ const updateCopyCondition = async (copyId: number, condition: string, notes: str
       description,
       before,
       after,
-      extraMetadata: { copy_barcode: copy.barcode, copy_display_description: description },
+      extraMetadata: { copy_barcode: copy.barcode, copy_display_description: description, ...(notes ? { reason: notes } : {}) },
     });
     await conn.commit();
     return { auditEnqueued: true };
@@ -330,6 +332,7 @@ const lookupIsbn = async (value: unknown) => {
       copyright_year: metadata.copyright_year,
       publication_place: metadata.publication_place,
       physical_description: metadata.physical_description,
+      ...(metadata.cover_url ? { cover_url: metadata.cover_url } : {}),
       subjects: metadata.subjects,
       ...(metadata.description ? { description: metadata.description } : {}),
     };
@@ -340,4 +343,10 @@ const lookupIsbn = async (value: unknown) => {
   throw Object.assign(new Error("No metadata was found for this ISBN"), { status: 404 });
 };
 
-export = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, addBookCopies, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn };
+const checkIsbn = async (value: unknown, exclude: unknown) => {
+  const isbn = validateIsbn(value);
+  const id = Number(exclude);
+  return repository.findIsbnMatch(isbn, Number.isSafeInteger(id) && id > 0 ? id : null);
+};
+
+export = { searchBooks, searchPublicCatalogue, searchBooksPage, getCatalogRecordForValidation, createBook, updateBook, addBookCopies, deleteBook, restoreBook, getBookTypes, createBookType, updateBookType, deleteBookType, updateCopyCondition, lookupIsbn, checkIsbn };

@@ -14,7 +14,7 @@ test("v13 upgrade derives permanent claims from the snapshot's existing holdings
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 19);
+  assert.equal(upgraded.version, 21);
   assert.deepEqual(upgraded.tables.accession_claims[0], {
     accession_number: "ACC-12", copy_barcode: "LIB-000005-002", copy_id: 12,
     book_id: 5, book_title: "Atlas", claimed_by: 7, claimed_at: "2026-09-23 12:00:00",

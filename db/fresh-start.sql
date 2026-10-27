@@ -609,12 +609,15 @@ CREATE TABLE `library_holidays` (
 --
 
 CREATE TABLE `notifications` (
+  `image_url` varchar(1024) DEFAULT NULL,
+  `image_public_id` varchar(191) DEFAULT NULL,
+  `image_alt` varchar(250) DEFAULT NULL,
   `id` bigint(20) UNSIGNED NOT NULL,
   `type` varchar(50) NOT NULL DEFAULT 'announcement',
   `title` varchar(255) NOT NULL,
   `body` text NOT NULL,
   `href` varchar(255) DEFAULT NULL,
-  `audience_type` enum('all','user','role') NOT NULL DEFAULT 'all',
+  `audience_type` enum('all','user','role','users') NOT NULL DEFAULT 'all',
   `audience_user_id` bigint(20) UNSIGNED DEFAULT NULL,
   `audience_role` enum('scanner','employee','alumni','student','staff','admin','super_admin') DEFAULT NULL,
   `expires_at` datetime DEFAULT NULL,
@@ -1684,3 +1687,13 @@ CREATE TABLE email_quota_usage (
   period_end date NOT NULL,
   requests_used int UNSIGNED NOT NULL DEFAULT 0
 ) ENGINE=InnoDB;
+
+-- Explicit audiences for manual notifications.
+CREATE TABLE IF NOT EXISTS notification_recipients (
+  notification_id bigint(20) UNSIGNED NOT NULL,
+  user_id bigint(20) UNSIGNED NOT NULL,
+  PRIMARY KEY (notification_id,user_id),
+  KEY idx_notification_recipients_user (user_id,notification_id),
+  CONSTRAINT fk_notification_recipients_notice FOREIGN KEY (notification_id) REFERENCES notifications (id) ON DELETE CASCADE,
+  CONSTRAINT fk_notification_recipients_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

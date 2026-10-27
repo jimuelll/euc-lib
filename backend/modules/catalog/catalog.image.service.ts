@@ -15,6 +15,9 @@ interface CatalogImageFile {
 interface UploadedImage {
   image_url: string;
   image_public_id: string;
+  bytes?: number;
+  width?: number;
+  height?: number;
 }
 interface BookImageRow extends RowDataPacket {
   id: number;
@@ -61,7 +64,7 @@ function uploadBuffer(buffer: Buffer, bookId: number): Promise<UploadedImage> {
     }, (error: any, result: any) => {
       if (error) reject(error);
       else if (!result?.secure_url || !result?.public_id) reject(new Error("Cloudinary did not return an image URL"));
-      else resolve({ image_url: result.secure_url, image_public_id: result.public_id });
+      else resolve({ image_url: result.secure_url, image_public_id: result.public_id, ...(typeof result.bytes === "number" ? { bytes: result.bytes } : {}), ...(typeof result.width === "number" ? { width: result.width } : {}), ...(typeof result.height === "number" ? { height: result.height } : {}) });
     });
     stream.end(buffer);
   });
@@ -159,4 +162,48 @@ async function removeBookImage(bookId: number, actorId: number | null = null): P
   await destroyImageIfUnreferenced(oldPublicId);
 }
 
-export = { MAX_IMAGE_BYTES, validateCatalogImage, uploadBookImage, removeBookImage };
+async function getImageMetadata(bookId: number) {
+  const conn: PoolConnection = await repository.getConnection();
+  let publicId: string | null = null;
+  try {
+    const [[book]] = await conn.query<BookImageRow[]>("SELECT id, image_public_id FROM books WHERE id = ?", [bookId]);
+    if (!book) throw httpError("Catalog record not found", 404);
+    publicId = book.image_public_id;
+  } finally { conn.release(); }
+  if (!publicId) return { bytes: null, width: null, height: null };
+  requireCloudinary();
+  const image = await cloudinary.api.resource(publicId, { resource_type: "image" });
+  return { bytes: image.bytes ?? null, width: image.width ?? null, height: image.height ?? null };
+}
+
+async function importIsbnImage(bookId: number, isbn: unknown, actorId: number | null = null) {
+  const { lookupIsbn } = require("./catalog.query.service");
+  const metadata = await lookupIsbn(isbn);
+  if (!metadata.cover_url) throw httpError("No cover was available from the ISBN source", 404);
+  let url = new URL(metadata.cover_url);
+  let response: Response | undefined;
+  const signal = AbortSignal.timeout(10000);
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    if (url.protocol !== "https:" || !["covers.openlibrary.org", "books.google.com", "books.googleusercontent.com"].includes(url.hostname) || url.username || url.password || url.port) throw httpError("Unsupported cover source", 400);
+    response = await fetch(url, { redirect: "manual", signal });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    if (!location || redirects === 3) throw httpError("Too many cover redirects", 502);
+    url = new URL(location, url);
+  }
+  if (!response) throw httpError("Could not download the ISBN cover", 502);
+  if (!response.ok || !response.body) throw httpError("Could not download the ISBN cover", 502);
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > MAX_IMAGE_BYTES) throw httpError("Images must be 5 MB or smaller", 413);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of response.body) {
+    size += chunk.length;
+    if (size > MAX_IMAGE_BYTES) throw httpError("Images must be 5 MB or smaller", 413);
+    chunks.push(chunk);
+  }
+  const file = { buffer: Buffer.concat(chunks), size, mimetype: (response.headers.get("content-type") || "").split(";")[0].toLowerCase() };
+  return uploadBookImage(bookId, file, actorId);
+}
+
+export = { MAX_IMAGE_BYTES, validateCatalogImage, uploadBookImage, removeBookImage, getImageMetadata, importIsbnImage };

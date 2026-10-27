@@ -1,21 +1,25 @@
 // @vitest-environment jsdom
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 import AdminCatalogData from "./AdminCatalogData";
 import { DEFAULT_FIELDS } from "./AdminCatalog.types";
 import * as api from "./catalog.api";
+import { printHolding } from "./catalog.holdings-print";
 import { fetchAcademicPrograms } from "@/features/library-settings";
 import type { CatalogHolding } from "./catalog.api";
 configure({asyncUtilTimeout:5000});
+HTMLElement.prototype.scrollIntoView = vi.fn();
+vi.mock("./catalog.holdings-print",()=>({printHolding:vi.fn().mockResolvedValue(undefined)}));
 vi.mock("@/features/library-settings",()=>({fetchAcademicPrograms:vi.fn().mockResolvedValue([])}));
 vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{role:"staff"}})}));
-vi.mock("./catalog.api",()=>({searchCatalogBooks:vi.fn(),fetchBookTypes:vi.fn(),createCatalogBook:vi.fn(),updateCatalogBook:vi.fn(),archiveCatalogBook:vi.fn(),restoreCatalogBook:vi.fn(),lookupBookIsbn:vi.fn(),uploadCatalogBookImage:vi.fn(),fetchCatalogBookCopies:vi.fn(),fetchCatalogBarcode:vi.fn(),fetchCatalogHoldings:vi.fn(),fetchBookHoldings:vi.fn(),saveCopyHolding:vi.fn(),voidCopyAccession:vi.fn(),addCatalogCopies:vi.fn()}));
+vi.mock("./catalog.api",()=>({searchCatalogBooks:vi.fn(),fetchBookTypes:vi.fn(),createCatalogBook:vi.fn(),updateCatalogBook:vi.fn(),archiveCatalogBook:vi.fn(),restoreCatalogBook:vi.fn(),lookupBookIsbn:vi.fn(),checkCatalogIsbn:vi.fn(),assignAccessionRange:vi.fn(),fetchCatalogImageMetadata:vi.fn(),importCatalogIsbnImage:vi.fn(),removeCatalogBookImage:vi.fn(),uploadCatalogBookImage:vi.fn(),fetchCatalogBookCopies:vi.fn(),fetchCatalogBarcode:vi.fn(),fetchCatalogHoldings:vi.fn(),fetchBookHoldings:vi.fn(),fetchHoldingOptions:vi.fn(),saveCopyHolding:vi.fn(),voidCopyAccession:vi.fn(),updateCatalogCopyCondition:vi.fn(),addCatalogCopies:vi.fn()}));
 const book={id:1,title:"Book One",author:"Library Author",isbn:"9780306406157",material_type:"book" as const,book_type_id:1,copies:2,total_copies:2,available:1,accessioned_copies:1,unaccessioned_copies:1,active_loans:0,active_reservations:0,editors:[],subjects:["Research"]};
 function Location(){return <output data-testid="route">{useLocation().search}</output>;}
 function mount(entry="/admin/catalog"){const Wrapper=createTestQueryClientWrapper();return render(<Wrapper><MemoryRouter initialEntries={[entry]}><AdminCatalogData fields={DEFAULT_FIELDS} isSuperAdmin={false}/><Location/></MemoryRouter></Wrapper>);}
-beforeEach(()=>{vi.resetAllMocks();vi.mocked(api.fetchCatalogHoldings).mockResolvedValue({rows:[],total:0,page:1,limit:25,pagination:{page:1,limit:25,total:0,totalPages:1},summary:{needs:0,available:0,borrowed:0,reserved:0,voided:0,all:0}});vi.mocked(fetchAcademicPrograms).mockResolvedValue([]);vi.mocked(api.searchCatalogBooks).mockResolvedValue({rows:[book],summary:{active:1,archived:0,needsHoldings:1,all:1},pagination:{page:1,limit:25,total:1,totalPages:1}});vi.mocked(api.fetchBookTypes).mockResolvedValue([{id:1,name:"General",is_active:1,default_borrow_days:7,loan_duration_minutes:10080,loan_duration_unit:"day",fine_per_hour:1}]);vi.mocked(api.updateCatalogBook).mockResolvedValue({message:"Saved"});vi.mocked(api.createCatalogBook).mockResolvedValue({id:2,message:"Created"});});
+beforeEach(()=>{vi.resetAllMocks();vi.mocked(api.fetchBookHoldings).mockResolvedValue([]);vi.mocked(api.fetchHoldingOptions).mockResolvedValue({nextAccession:"1",claimed:false,locations:[]});vi.mocked(api.checkCatalogIsbn).mockResolvedValue(null);vi.mocked(api.fetchCatalogHoldings).mockResolvedValue({rows:[],total:0,page:1,limit:25,pagination:{page:1,limit:25,total:0,totalPages:1},summary:{needs:0,available:0,borrowed:0,reserved:0,voided:0,all:0}});vi.mocked(fetchAcademicPrograms).mockResolvedValue([]);vi.mocked(api.searchCatalogBooks).mockResolvedValue({rows:[book],summary:{active:1,archived:0,needsHoldings:1,all:1},pagination:{page:1,limit:25,total:1,totalPages:1}});vi.mocked(api.fetchBookTypes).mockResolvedValue([{id:1,name:"General",is_active:1,default_borrow_days:7,loan_duration_minutes:10080,loan_duration_unit:"day",fine_per_hour:1}]);vi.mocked(api.updateCatalogBook).mockResolvedValue({message:"Saved"});vi.mocked(api.createCatalogBook).mockResolvedValue({id:2,message:"Created"});});
 afterEach(cleanup);
 
 const copy = (id: number, overrides: Partial<CatalogHolding> = {}): CatalogHolding => ({
@@ -43,16 +47,19 @@ it("opens the exact Holdings copy directly and keeps page order after saved rows
   const drawer=within(screen.getByRole("dialog"));
   await drawer.findByLabelText(/Accession number/);
   expect(drawer.queryByRole("tab",{name:"Copies"})).toBeNull();
-  expect(drawer.getByRole("button",{name:"Previous"}).hasAttribute("disabled")).toBe(true);
+  expect(drawer.getByRole("button",{name:"Previous copy"}).hasAttribute("disabled")).toBe(true);
   fireEvent.change(drawer.getByLabelText(/Accession number/),{target:{value:"ACC-1"}});
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Save and next"})).toBeEnabled());
   fireEvent.click(drawer.getByRole("button",{name:"Save and next"}));
-  await drawer.findByText("LIB-000001-002");
+  await drawer.findByText(/LIB-000001-002/);
   expect(drawer.getByRole("heading",{name:"Book Two"})).toBeTruthy();
-  expect(drawer.getByText("Copies in this results page · 2 of 3")).toBeTruthy();
+  expect(drawer.getByText("Copy 2 of 3 · 2 need accession")).toBeTruthy();
   expect(api.saveCopyHolding).toHaveBeenCalledTimes(1);
-  fireEvent.click(drawer.getByRole("button",{name:"Next"}));
-  await drawer.findByText("LIB-000001-003");
-  expect(drawer.getByRole("button",{name:"Next"}).hasAttribute("disabled")).toBe(true);
+  fireEvent.click(drawer.getByRole("button",{name:"Next copy"}));
+  const discardPrefill = await screen.findByRole("alertdialog", {}, {timeout:1000}).catch(()=>null);
+  if (discardPrefill) fireEvent.click(within(discardPrefill).getByRole("button",{name:"Discard changes"}));
+  await drawer.findByText(/LIB-000001-003/);
+  expect(drawer.getByRole("button",{name:"Next copy"}).hasAttribute("disabled")).toBe(true);
   expect(drawer.getByRole("button",{name:"Save and next"}).hasAttribute("disabled")).toBe(true);
   expect(screen.getByTestId("route").textContent).toBe("?tab=holdings&completion=missing&hq=LIB&hpage=2");
 });
@@ -61,16 +68,17 @@ it("Save stays on the selected copy; a failed Save and next retains the draft", 
   fireEvent.click((await screen.findAllByRole("button",{name:"Book One"}))[1]);
   const drawer=within(screen.getByRole("dialog"));
   fireEvent.change(await drawer.findByLabelText(/Accession number/),{target:{value:"ACC-2"}});
-  fireEvent.click(drawer.getByRole("button",{name:"Save holding"}));
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Save"})).toBeEnabled());
+  fireEvent.click(drawer.getByRole("button",{name:"Save"}));
   await waitFor(()=>expect(drawer.getByLabelText(/Accession number/).hasAttribute("readonly")).toBe(true));
-  expect(drawer.getByText("Copies in this results page · 2 of 3")).toBeTruthy();
+  expect(drawer.getByText("Copy 2 of 3 · 2 need accession")).toBeTruthy();
   vi.mocked(api.saveCopyHolding).mockRejectedValueOnce(new Error("Save failed"));
-  fireEvent.change(drawer.getByLabelText("Location"),{target:{value:"Shelf C"}});
+  fireEvent.change(drawer.getByLabelText("Location (optional)"),{target:{value:"Shelf C"}});
   fireEvent.click(drawer.getByRole("button",{name:"Save and next"}));
   await waitFor(()=>expect(api.saveCopyHolding).toHaveBeenCalledTimes(2));
-  await waitFor(()=>expect(drawer.getByRole("button",{name:"Save holding"}).hasAttribute("disabled")).toBe(false));
-  expect((drawer.getByLabelText("Location") as HTMLInputElement).value).toBe("Shelf C");
-  expect(drawer.getByText("Copies in this results page · 2 of 3")).toBeTruthy();
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Save"}).hasAttribute("disabled")).toBe(false));
+  expect((drawer.getByLabelText("Location (optional)") as HTMLInputElement).value).toBe("Shelf C");
+  expect(drawer.getByText("Copy 2 of 3 · 2 need accession")).toBeTruthy();
 });
 it("guards copy navigation, record mode changes and closing, then restores list focus", async () => {
   setupCopies(); mount("/admin/catalog?tab=holdings&hstatus=all");
@@ -78,14 +86,15 @@ it("guards copy navigation, record mode changes and closing, then restores list 
   trigger.focus();fireEvent.click(trigger);
   const drawer=within(screen.getByRole("dialog"));
   fireEvent.change(await drawer.findByLabelText(/Accession number/),{target:{value:"DRAFT"}});
-  for (const name of ["Next","Edit record details","Close copy"]) {
-    fireEvent.click(drawer.getByRole("button",{name}));
+  for (const name of ["Next copy","Edit record details","Close"]) {
+    if(name==="Edit record details") { fireEvent.pointerDown(drawer.getByRole("button",{name:"Copy actions"}),{button:0,ctrlKey:false}); fireEvent.click(await screen.findByRole("menuitem",{name})); }
+    else fireEvent.click(name==="Close"?drawer.getAllByRole("button",{name})[1]:drawer.getByRole("button",{name}));
     await screen.findByRole("alertdialog");
     fireEvent.click(screen.getByRole("button",{name:"Keep editing"}));
     await waitFor(()=>expect(screen.queryByRole("alertdialog")).toBeNull());
     expect((drawer.getByLabelText(/Accession number/) as HTMLInputElement).value).toBe("DRAFT");
   }
-  fireEvent.click(drawer.getByRole("button",{name:"Close copy"}));
+  fireEvent.click(drawer.getAllByRole("button",{name:"Close"})[1]);
   fireEvent.click(await screen.findByRole("button",{name:"Discard changes"}));
   await waitFor(()=>expect(screen.queryByRole("dialog")).toBeNull());
   await waitFor(()=>expect(document.activeElement).toBe(trigger));
@@ -95,7 +104,8 @@ it("replaces the focused drawer with record details without stacking drawers", a
   setupCopies(); mount("/admin/catalog?tab=holdings");
   fireEvent.click((await screen.findAllByRole("button",{name:"Book One"}))[1]);
   await screen.findByLabelText(/Accession number/);
-  fireEvent.click(screen.getByRole("button",{name:"Edit record details"}));
+  fireEvent.pointerDown(screen.getByRole("button",{name:"Copy actions"}),{button:0,ctrlKey:false});
+  fireEvent.click(await screen.findByRole("menuitem",{name:"Edit record details"}));
   await screen.findByRole("tab",{name:"Details"});
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
   expect(screen.getByTestId("route").textContent).toBe("?tab=holdings");
@@ -107,12 +117,13 @@ it("starts accession preparation on the first active non-voided incomplete copy"
   expect(screen.getByRole("button",{name:/^Copy 3 /}).getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByRole("button",{name:/^Copy 1 /}).getAttribute("aria-expanded")).toBe("false");
   fireEvent.change(screen.getByLabelText(/Accession number/),{target:{value:"ACC-3"}});
+  await waitFor(()=>expect(screen.getByRole("button",{name:"Save and next"})).toBeEnabled());
   fireEvent.click(screen.getByRole("button",{name:"Save and next"}));
   await waitFor(()=>expect(screen.getByRole("button",{name:/^Copy 4 /}).getAttribute("aria-expanded")).toBe("true"));
   expect(api.saveCopyHolding).toHaveBeenCalledTimes(1);
 });
 it("opens Add copies for a zero-copy record and selects the newly added copy", async () => {
-  vi.mocked(api.fetchBookHoldings).mockResolvedValue([]);
+  vi.mocked(api.fetchBookHoldings).mockResolvedValue([]);vi.mocked(api.fetchHoldingOptions).mockResolvedValue({nextAccession:"1",claimed:false,locations:[]});
   vi.mocked(api.addCatalogCopies).mockImplementation(async()=>{
     vi.mocked(api.fetchBookHoldings).mockResolvedValue([copy(1)]);
     return {message:"Added",copies:1};
@@ -128,7 +139,7 @@ it("preserves the record draft while navigating its Copies tab", async () => {
   setupCopies();mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));
   fireEvent.change(screen.getByLabelText(/^Title/),{target:{value:"Record draft"}});
   fireEvent.mouseDown(screen.getByRole("tab",{name:"Copies"}),{button:0,ctrlKey:false});
-  fireEvent.click((await screen.findAllByRole("button",{name:"Add accession number"}))[0]);
+  fireEvent.click((await screen.findAllByRole("button",{name:"Assign"}))[0]);
   await screen.findByLabelText(/Accession number/);
   fireEvent.click(screen.getByRole("button",{name:"Next"}));
   await waitFor(()=>expect(screen.getByRole("button",{name:/^Copy 2 /}).getAttribute("aria-expanded")).toBe("true"));
@@ -141,19 +152,20 @@ it("keeps conflicting actions disabled throughout a save", async () => {
   mount("/admin/catalog?tab=holdings");fireEvent.click((await screen.findAllByRole("button",{name:"Book One"}))[0]);
   const drawer=within(screen.getByRole("dialog"));
   fireEvent.change(await drawer.findByLabelText(/Accession number/),{target:{value:"ACC-1"}});
-  fireEvent.click(drawer.getByRole("button",{name:"Save holding"}));
-  await waitFor(()=>expect(drawer.getByRole("button",{name:"Next"}).hasAttribute("disabled")).toBe(true));
-  expect(drawer.getByRole("button",{name:"Edit record details"}).hasAttribute("disabled")).toBe(true);
-  expect(drawer.getByRole("button",{name:"Close copy"}).hasAttribute("disabled")).toBe(true);
-  fireEvent.click(drawer.getByRole("button",{name:"Close"}));
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Save"})).toBeEnabled());
+  fireEvent.click(drawer.getByRole("button",{name:"Save"}));
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Next copy"}).hasAttribute("disabled")).toBe(true));
+  expect(drawer.getByRole("button",{name:"Copy actions"}).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("dialog").querySelector(".admin-record-footer button:last-child")).toBeDisabled();
+  fireEvent.click(drawer.getAllByRole("button",{name:"Close"}).find(button=>!button.hasAttribute("disabled"))!);
   expect(screen.getByRole("dialog")).toBeTruthy();resolveSave();
-  await waitFor(()=>expect(drawer.getByRole("button",{name:"Next"}).hasAttribute("disabled")).toBe(false));
+  await waitFor(()=>expect(drawer.getByRole("button",{name:"Next copy"}).hasAttribute("disabled")).toBe(false));
 });
 it("checks both record and copy drafts before following an editor link", async () => {
   setupCopies();mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));
   fireEvent.change(screen.getByLabelText(/^Title/),{target:{value:"Record draft"}});
   fireEvent.mouseDown(screen.getByRole("tab",{name:"Copies"}),{button:0,ctrlKey:false});
-  fireEvent.click((await screen.findAllByRole("button",{name:"Add accession number"}))[0]);
+  fireEvent.click((await screen.findAllByRole("button",{name:"Assign"}))[0]);
   fireEvent.change(await screen.findByLabelText(/Accession number/),{target:{value:"COPY-DRAFT"}});
   fireEvent.click(screen.getByRole("link",{name:"Manage programs / courses"}));
   fireEvent.click(await screen.findByRole("button",{name:"Discard changes"}));
@@ -168,11 +180,11 @@ it("shows a retry action when an exact copy cannot load", async () => {
   mount("/admin/catalog?tab=holdings");fireEvent.click((await screen.findAllByRole("button",{name:"Book One"}))[0]);
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(screen.getByRole("button",{name:"Try again"})).toBeTruthy();
-  expect(screen.queryByRole("button",{name:"Save holding"})).toBeNull();
-  expect(screen.getByRole("button",{name:"Next"}).hasAttribute("disabled")).toBe(false);
+  expect(screen.queryByRole("button",{name:"Save"})).toBeNull();
+  expect(screen.getByRole("button",{name:"Next copy"}).hasAttribute("disabled")).toBe(false);
 });
 it("uses live counted filters, URL state and one holdings action",async()=>{mount();await screen.findByRole("button",{name:"Needs holdings 1"});expect(screen.queryByRole("button",{name:"Search"})).toBeNull();expect(screen.getByRole("button",{name:"Add accession number"})).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Needs holdings 1"}));await waitFor(()=>expect(api.searchCatalogBooks).toHaveBeenLastCalledWith(expect.objectContaining({holdingStatus:"needs",status:"active"}),expect.any(AbortSignal)));expect(screen.getByTestId("route").textContent).toContain("filter=needs-holdings");});
-it("groups Details, keeps the copy count read-only and hides additional contributor links",async()=>{mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));const drawer=within(screen.getByRole("dialog"));expect(drawer.getByRole("tab",{name:"Copies"})).toBeTruthy();expect(drawer.getByRole("region",{name:"Core"})).toBeTruthy();expect(drawer.getByRole("region",{name:"Description"})).toBeTruthy();expect(drawer.queryByRole("spinbutton",{name:"Copies"})).toBeNull();expect(drawer.getByText("2 physical copies")).toBeTruthy();expect(drawer.getByRole("button",{name:"Additional contributors (0)"}).getAttribute("aria-expanded")).toBe("false");expect(drawer.queryByText("Add Editor")).toBeNull();fireEvent.click(drawer.getByRole("button",{name:"Additional contributors (0)"}));expect(drawer.getByText("Add Editor")).toBeTruthy();});
+it("groups details and creates contributor rows only when needed",async()=>{mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));const drawer=within(screen.getByRole("dialog"));expect(drawer.getByRole("tab",{name:"Copies"})).toBeTruthy();expect(drawer.getByRole("region",{name:"Book info"})).toBeTruthy();expect(drawer.getByRole("region",{name:"Description"})).toBeTruthy();expect(drawer.queryByRole("spinbutton",{name:"Copies"})).toBeNull();expect(drawer.getByText("2 physical copies")).toBeTruthy();expect(drawer.queryByLabelText("Editors 1 (optional)")).toBeNull();fireEvent.change(drawer.getByLabelText("Contributor role (optional)"),{target:{value:"editors"}});fireEvent.click(drawer.getByRole("button",{name:"Add contributor"}));expect(drawer.getByLabelText("Editors 1 (optional)")).toBeTruthy();});
 it("saves metadata without changing the physical inventory count",async()=>{mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));fireEvent.change(screen.getByLabelText("Author",{exact:false}),{target:{value:"Updated author"}});expect(screen.getByText("Unsaved changes")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Save changes"}));await waitFor(()=>expect(api.updateCatalogBook).toHaveBeenCalled());const payload=vi.mocked(api.updateCatalogBook).mock.calls[0][1];expect(payload.author).toBe("Updated author");expect(payload).not.toHaveProperty("copies");});
 it("preserves unsaved edits when closing is cancelled",async()=>{mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));fireEvent.change(screen.getByLabelText(/^Title/),{target:{value:"Updated title"}});fireEvent.click(screen.getByRole("button",{name:"Close"}));await screen.findByRole("alertdialog");fireEvent.click(screen.getByRole("button",{name:"Keep editing"}));expect((screen.getByLabelText(/^Title/) as HTMLInputElement).value).toBe("Updated title");expect(api.updateCatalogBook).not.toHaveBeenCalled();});
 it("blocks archive when a record has active loans or reservations",async()=>{vi.mocked(api.searchCatalogBooks).mockResolvedValue({rows:[{...book,active_loans:1,active_reservations:1}],pagination:{page:1,limit:25,total:1,totalPages:1}});mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));await waitFor(()=>expect(screen.getByRole("button",{name:"Archive record"}).hasAttribute("disabled")).toBe(true));expect(api.archiveCatalogBook).not.toHaveBeenCalled();});
@@ -181,7 +193,7 @@ it("previews CSV and never creates records before confirmation",async()=>{mount(
 it("uses counted holdings filters, hides empty columns and exposes selected-copy actions",async()=>{vi.mocked(api.fetchCatalogHoldings).mockResolvedValue({rows:[{copy_id:9,book_id:1,title:"Book One",barcode:"COPY-9",condition:"good",is_active:1,accession_number:null,price:null,program_id:null,course:null,course_code:null,location:null,date_acquired:null,distributor:null,invoice_reference:null,circulation_status:"available"}],total:1,page:1,limit:25,pagination:{page:1,limit:25,total:1,totalPages:1},summary:{needs:1,available:0,borrowed:0,reserved:0,voided:0,all:1}});mount();fireEvent.mouseDown(await screen.findByRole("tab",{name:"Holdings"}),{button:0,ctrlKey:false});await screen.findByRole("button",{name:"Needs accession 1"});expect(screen.queryByRole("columnheader",{name:"Location"})).toBeNull();expect(screen.queryByRole("columnheader",{name:"Course"})).toBeNull();expect(screen.getByRole("button",{name:"Add accession number"})).toBeTruthy();fireEvent.click(screen.getByRole("checkbox",{name:"Select COPY-9"}));expect(screen.getByRole("region",{name:"Selected copies"})).toBeTruthy();expect(screen.getByRole("button",{name:"Print labels"})).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Needs accession 1"}));await waitFor(()=>expect(api.fetchCatalogHoldings).toHaveBeenLastCalledWith(expect.objectContaining({completion:"missing",status:"all"}),expect.any(AbortSignal)));},15000);
 it("shows a sticky record bulk bar and requires confirmation before archive",async()=>{mount();fireEvent.click(await screen.findByRole("checkbox",{name:"Select Book One"}));const bar=within(screen.getByRole("region",{name:"Selected records"}));expect(bar.getByRole("button",{name:"Add accession number"})).toBeTruthy();fireEvent.click(bar.getByRole("button",{name:"Archive"}));await screen.findByRole("alertdialog");expect(api.archiveCatalogBook).not.toHaveBeenCalled();fireEvent.click(screen.getByRole("button",{name:"Cancel"}));expect(api.archiveCatalogBook).not.toHaveBeenCalled();});
 
-it("keeps inventory and accession editing inside Copies without a Holdings detour",async()=>{vi.mocked(api.fetchBookHoldings).mockResolvedValue([{copy_id:9,book_id:1,title:"Book One",barcode:"COPY-9",condition:"good",is_active:1,accession_number:null,price:null,program_id:null,course:null,course_code:null,location:null,date_acquired:null,distributor:null,invoice_reference:null,circulation_status:"available"}]);mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));const drawer=within(screen.getByRole("dialog"));expect(drawer.queryByRole("tab",{name:"Holdings"})).toBeNull();fireEvent.click(drawer.getByRole("button",{name:"Manage copies"}));await drawer.findByRole("button",{name:"Add accession number"});expect(drawer.getByRole("button",{name:"Add copy"})).toBeTruthy();fireEvent.click(drawer.getByRole("button",{name:"Add copy"}));const addDialog=within(await screen.findByRole("dialog",{name:"Add copies"}));expect(api.addCatalogCopies).not.toHaveBeenCalled();fireEvent.click(addDialog.getByRole("button",{name:"Cancel"}));fireEvent.click(drawer.getByRole("button",{name:"Add accession number"}));await drawer.findByLabelText(/Accession number/);fireEvent.change(drawer.getByLabelText(/Accession number/),{target:{value:"ACC-9"}});fireEvent.click(drawer.getByRole("button",{name:/^Copy 9 /}));await screen.findByRole("alertdialog");fireEvent.click(screen.getByRole("button",{name:"Discard changes"}));await drawer.findByRole("button",{name:"Add copy"});expect(drawer.queryByRole("button",{name:"View in Holdings"})).toBeNull();expect(screen.getByTestId("route").textContent).toBe("");},15000);
+it("keeps inventory and accession editing inside Copies without a Holdings detour",async()=>{vi.mocked(api.fetchBookHoldings).mockResolvedValue([{copy_id:9,book_id:1,title:"Book One",barcode:"COPY-9",condition:"good",is_active:1,accession_number:null,price:null,program_id:null,course:null,course_code:null,location:null,date_acquired:null,distributor:null,invoice_reference:null,circulation_status:"available"}]);mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));const drawer=within(screen.getByRole("dialog"));expect(drawer.queryByRole("tab",{name:"Holdings"})).toBeNull();fireEvent.click(drawer.getByRole("button",{name:"Manage copies"}));await drawer.findByRole("button",{name:"Assign"});expect(drawer.getByRole("button",{name:"Add copy"})).toBeTruthy();fireEvent.click(drawer.getByRole("button",{name:"Add copy"}));const addDialog=within(await screen.findByRole("dialog",{name:"Add copies"}));expect(api.addCatalogCopies).not.toHaveBeenCalled();fireEvent.click(addDialog.getByRole("button",{name:"Cancel"}));fireEvent.click(drawer.getByRole("button",{name:"Assign"}));await drawer.findByLabelText(/Accession number/);fireEvent.change(drawer.getByLabelText(/Accession number/),{target:{value:"ACC-9"}});fireEvent.click(drawer.getByRole("button",{name:/^Copy 9 /}));await screen.findByRole("alertdialog");fireEvent.click(screen.getByRole("button",{name:"Discard changes"}));await drawer.findByRole("button",{name:"Add copy"});expect(drawer.queryByRole("button",{name:"View in Holdings"})).toBeNull();expect(screen.getByTestId("route").textContent).toBe("");},15000);
 it("changes a copy condition directly from Holdings without opening a drawer",async()=>{
  setupCopies([copy(1)]);
  vi.mocked(api.updateCatalogCopyCondition).mockResolvedValue(undefined);
@@ -192,3 +204,89 @@ it("changes a copy condition directly from Holdings without opening a drawer",as
  expect(screen.queryByRole("dialog")).toBeNull();
  await screen.findByText("Condition updated for LIB-000001-001.");
 });
+
+
+it("ignores stale duplicate checks and preserves edits made during lookup",async()=>{
+ let resolveFirst!:(value:api.IsbnMatch|null)=>void;
+ vi.mocked(api.checkCatalogIsbn).mockImplementationOnce(()=>new Promise(resolve=>{resolveFirst=resolve;})).mockResolvedValue(null);
+ let resolveLookup!:(value:api.IsbnMetadata)=>void;
+ vi.mocked(api.lookupBookIsbn).mockImplementation(()=>new Promise(resolve=>{resolveLookup=resolve;}));
+ mount();fireEvent.click(await screen.findByRole("button",{name:"Add record"}));
+ const drawer=within(screen.getByRole("dialog"));const isbn=drawer.getByLabelText(/ISBN/);
+ fireEvent.change(isbn,{target:{value:"9780306406157"}});fireEvent.blur(isbn);
+ fireEvent.change(isbn,{target:{value:"9780131103627"}});fireEvent.click(drawer.getByRole("button",{name:"Look up"}));
+ fireEvent.change(drawer.getByLabelText(/^Title/),{target:{value:"My title"}});
+ await waitFor(()=>expect(api.lookupBookIsbn).toHaveBeenCalled());
+ resolveFirst({id:1,title:"Old result",deleted_at:null});
+ resolveLookup({title:"Lookup title",author:"Lookup author",publisher:"Publisher"});
+ await waitFor(()=>expect(drawer.getByLabelText(/^Author/)).toHaveValue("Lookup author"));
+ expect(drawer.getByLabelText(/^Title/)).toHaveValue("My title");
+ expect(drawer.queryByText(/Old result/)).toBeNull();
+ expect(drawer.getByText(/Filled from ISBN lookup:/)).toHaveTextContent("author");
+ expect(drawer.getAllByText("From ISBN lookup").length).toBeGreaterThan(0);
+},15000);
+
+it("shows duplicate records and opens their Copies after discarding the draft",async()=>{
+ setupCopies([copy(1)]);vi.mocked(api.checkCatalogIsbn).mockResolvedValue({id:1,title:"Book One",deleted_at:null});
+ mount();fireEvent.click(await screen.findByRole("button",{name:"Add record"}));
+ const drawer=within(screen.getByRole("dialog"));fireEvent.change(drawer.getByLabelText(/ISBN/),{target:{value:"9780306406157"}});fireEvent.blur(drawer.getByLabelText(/ISBN/));
+ expect(await drawer.findByText(/This ISBN is already in the catalogue: Book One/)).toBeTruthy();
+ fireEvent.click(drawer.getByRole("link",{name:"Open Copies"}));
+ fireEvent.click(await screen.findByRole("button",{name:"Discard changes"}));
+ await waitFor(()=>expect(screen.getByRole("tab",{name:"Copies"})).toHaveAttribute("aria-selected","true"));
+},15000);
+
+it("previews and submits a bulk accession range",async()=>{
+ setupCopies([copy(1),copy(2)]);vi.mocked(api.assignAccessionRange).mockResolvedValue(undefined);
+ mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));fireEvent.click(screen.getByRole("button",{name:"Manage copies"}));
+ fireEvent.click(await screen.findByRole("button",{name:"Assign accession numbers…"}));const dialog=within(await screen.findByRole("dialog",{name:"Assign accession numbers"}));
+ fireEvent.change(dialog.getByLabelText("Start number"),{target:{value:"0006"}});
+ expect(dialog.getByText(/LIB-000001-001 → 0006/)).toBeTruthy();expect(dialog.getByText(/LIB-000001-002 → 0007/)).toBeTruthy();
+ expect(api.assignAccessionRange).not.toHaveBeenCalled();fireEvent.click(dialog.getByRole("button",{name:"Confirm assignments"}));
+ await waitFor(()=>expect(api.assignAccessionRange).toHaveBeenCalledWith(1,[1,2],"0006"));
+},15000);
+
+it("applies the circulation default and resets the form after adding another",async()=>{
+ vi.mocked(api.fetchBookTypes).mockResolvedValue([{id:9,name:"Circulation",is_active:1,default_borrow_days:7,loan_duration_minutes:10080,loan_duration_unit:"day",fine_per_hour:1,fine_interval:"hour",initial_fine:0}]);
+ mount();fireEvent.click(await screen.findByRole("button",{name:"Add record"}));
+ const drawer=within(screen.getByRole("dialog"));await drawer.findByText(/7 days/);
+ expect(drawer.getByRole("button",{name:"2 required fields left"})).toBeTruthy();
+ fireEvent.change(drawer.getByLabelText(/^Title/),{target:{value:"A new book"}});
+ fireEvent.change(drawer.getByLabelText(/^Author/),{target:{value:"An author"}});
+ fireEvent.click(drawer.getByRole("button",{name:"Add record and add another"}));
+ await waitFor(()=>expect(api.createCatalogBook).toHaveBeenCalledWith(expect.objectContaining({title:"A new book",author:"An author",book_type_id:"9",copies:"1"})));
+ await waitFor(()=>expect(drawer.getByLabelText(/^Title/)).toHaveValue(""));
+ expect(drawer.getByRole("button",{name:"2 required fields left"})).toBeTruthy();
+},15000);
+
+it("filters the Copies tab from the Needs accession statistic",async()=>{
+ setupCopies([copy(1),copy(2,{accession_number:"A-2"})]);mount();fireEvent.click(await screen.findByRole("button",{name:"Book One"}));
+ fireEvent.click(await screen.findByRole("button",{name:/Show copies needing accession/}));
+ expect(await screen.findByRole("button",{name:/^Copy 1 /})).toBeTruthy();
+ expect(screen.queryByRole("button",{name:/^Copy 2 /})).toBeNull();
+ fireEvent.click(screen.getByRole("button",{name:"Show all copies"}));
+ expect(await screen.findByRole("button",{name:/^Copy 2 /})).toBeTruthy();
+},30000);
+
+it("prints the selected copy using the original holdings record layout", async () => {
+  setupCopies([copy(1,{accession_number:"ACC-1",location:"Shelf A"})]);
+  vi.mocked(api.fetchCatalogHoldings).mockResolvedValue(holdingsPage([copy(1,{accession_number:"ACC-1",location:"Shelf A"})]));
+  mount("/admin/catalog?tab=holdings");
+  fireEvent.click((await screen.findAllByRole("button",{name:"Book One"}))[0]);
+  await screen.findByLabelText(/Accession number/);
+  fireEvent.keyDown(screen.getByRole("button",{name:"Copy actions"}),{key:"Enter"});
+  fireEvent.click(await screen.findByRole("menuitem",{name:"Print holdings record"}));
+  expect(printHolding).toHaveBeenCalledWith(expect.objectContaining({copy_id:1,accession_number:"ACC-1",location:"Shelf A"}));
+}, 15000);
+
+it("does not mark an untouched form dirty when the default policy loads",async()=>{
+ let resolvePolicies!:(value:api.BookType[])=>void;
+ vi.mocked(api.fetchBookTypes).mockImplementation(()=>new Promise(resolve=>{resolvePolicies=resolve;}));
+ mount();fireEvent.click(await screen.findByRole("button",{name:"Add record"}));
+ await waitFor(()=>expect(api.fetchBookTypes).toHaveBeenCalled());
+ resolvePolicies([{id:9,name:"Circulation",is_active:1,default_borrow_days:7,loan_duration_minutes:10080,loan_duration_unit:"day",fine_per_hour:1}]);
+ const drawer=within(screen.getByRole("dialog"));await drawer.findByText(/7 days/);
+ fireEvent.click(drawer.getAllByRole("button",{name:"Close"})[0]);
+ await waitFor(()=>expect(screen.queryByRole("dialog")).toBeNull());
+ expect(screen.queryByRole("alertdialog")).toBeNull();
+},30000);

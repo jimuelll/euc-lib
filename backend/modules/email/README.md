@@ -62,3 +62,30 @@ No delivery webhooks or bulk-email controls are implemented. Delivery logs conta
 Run backend `npm test` / `npm run build`, and frontend `npm test` / `npm run build` / `npm run lint`. Optional database tests require `RUN_DB_INTEGRATION=1`, a dedicated database whose name ends in `_test`, and the current schema. Never point fixture tests at a live library database. Live Brevo tests require real credentials and consume quota.
 
 Email appearance is rendered locally by `renderEmail()` in `email.provider.ts`, using the shared cream, maroon and gold layout in `email.template.ts`. Account emails, recovery codes, manual notifications and loan summaries use real delivery data, escaped before insertion, with a plain-text alternative. No Brevo-hosted template setup is required. Rebuild and restart the backend (or deploy it) to apply template changes. Generate synthetic browser samples with `node artifacts/email-templates/build-previews.cjs` from the repository root; this does not send email.
+
+
+### Delivery workspaces
+
+Super admins open **Account emails** from Users (`/admin/account-emails`) or **Library emails** from Notifications (`/admin/library-emails?tab=manual`). Library emails has Manual notifications and Automated notices tabs, including overdue/fine summaries and circulation/payment notices. Both show the same application-wide daily allowance; separation does not create additional quota or change sending behavior. Admins retain notification-specific totals, without access to full delivery records.
+
+`GET /api/admin/email-deliveries` accepts `category=account|manual|automated|all`, `q` (recipient/delivery ID/provider message ID), `status`, `purpose`, `from`/`to` (inclusive UTC dates), `sort=newest|oldest`, `page`, and `limit=25|50|100`. New filtered requests default to 25 rows; requests with no query parameters retain the latest-100 behavior. Responses add `pagination`, `statusTotals` (before the selected status filter), `purposes` for the category, and shared `routineRemaining`, `queuedRoutine`, and `routineAfterQueue` estimates. `GET /api/admin/email-deliveries/:id` returns safe metadata and recorded UTC timestamps, never encrypted bodies, tokens or codes. All delivery list/detail/retry endpoints require a super admin. Retry eligibility is rechecked on the existing retry endpoint; unknown outcomes and account emails cannot be retried there.
+
+The old frontend `/admin/email-deliveries` URL redirects to Library emails. No migration is required. Deploy the API additions before or alongside the frontend.
+
+### Selected notification audiences
+
+Before deploying the notification composer with multi-patron selection, run `npm run migrate-notification-recipients -- --apply` from `backend`. The additive migration preserves existing all/role/user audiences, extends the enum with `users`, and adds `notification_recipients`. Fresh installs include the same schema. Do not deploy the new readers or workers before the migration completes.
+
+The manual notification create, audience-count and email-preview endpoints accept `audienceType: "users"` and `audienceUserIds: number[]` (count/preview query parameters use comma-separated IDs). IDs are deduplicated. One notification and its active recipient memberships are committed atomically, with optional email handoffs. Scheduled payloads retain the selected IDs and filter inactive/deleted accounts at publication. Backups use version 21 and preserve memberships; older snapshots upgrade with an empty membership table. Existing email quota and seven-day delivery deadline rules are unchanged.
+
+### Notification images and reader
+
+Manual notifications support one optional public image with descriptive alt text. `POST /api/admin/notifications/images` accepts one multipart `image` file (JPG/PNG/WebP, at most 5 MB), requires admin or super-admin access, and shares the existing account-scoped image upload limiter. The backend validates byte signatures and uploads immutable JPEG output bounded to 1600×1600 to the configured Cloudinary `library/notifications` folder. It returns `imageUrl` and `imagePublicId`; notification creation accepts these plus `imageAlt` (required for an image, up to 250 characters). Existing backend `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` settings are reused. Images are publicly accessible by URL, and the app does not delete them automatically.
+
+Apply `npm run migrate-notification-images -- --apply` from the backend before deploying. The SQL migration is `db/migrations/2026-10-27-notification-images.sql`; the runner is restartable. Fresh installs include nullable image fields. Backup version 20 upgrades earlier notifications with null image fields and creates no email intent.
+
+`GET /api/notifications/:notificationId/details` requires authentication and rechecks audience, activity, and expiry before returning safe notification content. In-app notification entry points open the shared reader; future manual emails and automated emails with a persisted notification link to `/my-library?view=updates&notification=<id>`. Standalone overdue summaries keep their My Library destination. Older queued manual emails retain their existing links through a publication-context flag. Account/security emails are unchanged.
+
+Email images are escaped HTTPS references, with descriptive alt text and a plain-text image link. Essential message text remains available when images are blocked. Images do not consume a separate email send. Quota, security reserve, recipient snapshots, cancellation/deadline behavior and deduplication remain in effect.
+
+The composer browser check is `node scripts/verify-notification-compose.mjs` from `frontend` with Vite running on port 8080. It opens an isolated harness, intercepts every API request with synthetic data, tests multi-patron confirmation/submission in both themes and viewport sizes, checks layout and placeholder contrast, and writes screenshots plus `layout-report.json` to `artifacts/notification-composer`. No real notification or email is sent.

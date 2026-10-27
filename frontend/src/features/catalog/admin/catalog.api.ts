@@ -3,7 +3,13 @@ import type { Book, BookType, CatalogFormValues, CatalogPagination, FormField } 
 export type { BookType } from "./AdminCatalog.types";
 
 type MessageResponse = { message: string };
-export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; copyright_year?: string | number; publication_place?: string; physical_description?: string; subjects?: string[]; description?: string };
+export type IsbnMetadata = { isbn?: string; title?: string; author?: string; publisher?: string; edition?: string; copyright_year?: string | number; publication_place?: string; physical_description?: string; subjects?: string[]; description?: string; cover_url?: string };
+export type IsbnMatch = { id: number; title: string; deleted_at: string | null };
+export async function checkCatalogIsbn(isbn: string, excludeId?: number): Promise<IsbnMatch | null> { return (await axiosInstance.get<{match:IsbnMatch|null}>(`api/admin/books/isbn-check/${encodeURIComponent(isbn)}`, {params:{excludeId}})).data.match; }
+export async function assignAccessionRange(bookId: number, copyIds: number[], start: string): Promise<void> { await axiosInstance.post(`api/admin/books/${bookId}/accessions`, { copyIds, start }); }
+export type ImageMetadata = { bytes: number | null; width: number | null; height: number | null };
+export async function fetchCatalogImageMetadata(id:number):Promise<ImageMetadata> { return (await axiosInstance.get<ImageMetadata>(`api/admin/books/${id}/image/metadata`)).data; }
+export async function importCatalogIsbnImage(id:number,isbn:string):Promise<CatalogBookImage> { return (await axiosInstance.post<CatalogBookImage>(`api/admin/books/${id}/image/isbn`,{isbn})).data; }
 export type CatalogSearchResponse = { rows: Book[]; pagination: CatalogPagination; summary?: { active: number; archived: number; needsHoldings: number; all: number } };
 
 export async function fetchCatalogSchema(signal?: AbortSignal): Promise<FormField[]> {
@@ -36,7 +42,7 @@ export async function deleteBookType(id: number): Promise<DeleteBookTypeResult> 
 export async function lookupBookIsbn(isbn: string): Promise<IsbnMetadata> { return (await axiosInstance.get<IsbnMetadata>(`api/admin/books/isbn/${encodeURIComponent(isbn)}`)).data; }
 export async function createCatalogBook(values: CatalogFormValues): Promise<MessageResponse & { id: number }> { return (await axiosInstance.post<MessageResponse & { id: number }>("api/admin/books", values)).data; }
 export async function updateCatalogBook(id: number, values: CatalogFormValues): Promise<MessageResponse> { return (await axiosInstance.put<MessageResponse>(`api/admin/books/${id}`, values)).data; }
-export type CatalogBookImage = { image_url: string; image_public_id: string };
+export type CatalogBookImage = { image_url: string; image_public_id: string; bytes?: number; width?: number; height?: number };
 export async function uploadCatalogBookImage(id: number, file: File, onProgress?: (progress: number) => void): Promise<CatalogBookImage> {
   const formData = new FormData();
   formData.append("image", file);
@@ -60,7 +66,8 @@ export type CatalogCopy = { id: number; barcode: string; accession_number?: stri
 export async function addCatalogCopies(bookId:number,count:number):Promise<{message:string;copies:number}>{return (await axiosInstance.post(`api/admin/books/${bookId}/copies`,{count})).data;}
 export async function fetchCatalogBookCopies(bookId: number, signal?: AbortSignal): Promise<CatalogCopy[]> { return (await axiosInstance.get<CatalogCopy[]>(`api/admin/books/${bookId}/copies`, { signal })).data; }
 export async function fetchCatalogBarcode(barcode: string): Promise<string> { const response = await axiosInstance.get(`api/admin/copies/${encodeURIComponent(barcode)}/barcode-png`, { responseType: "blob" }); return URL.createObjectURL(response.data); }
-export async function updateCatalogCopyCondition(copyId: number, condition: CatalogCopy["condition"]): Promise<void> { await axiosInstance.patch(`api/admin/copies/${copyId}`, { condition }); }
+export async function updateCatalogCopyCondition(copyId: number, condition: CatalogCopy["condition"], notes?: string): Promise<void> { await axiosInstance.patch(`api/admin/copies/${copyId}`, { condition, notes }); }
+export async function fetchHoldingOptions(accession = "", signal?: AbortSignal): Promise<{nextAccession: string; claimed: boolean; locations: string[]}> { return (await axiosInstance.get("api/admin/holding-options", { params: { accession }, signal })).data; }
 export async function retireCatalogCopy(copyId: number): Promise<{ copies: number }> { return (await axiosInstance.post<{ copies: number }>(`api/admin/copies/${copyId}/retire`)).data; }
 export async function restoreCatalogCopy(copyId: number): Promise<{ copies: number; lendingEligible: boolean }> { return (await axiosInstance.post<{ copies: number; lendingEligible: boolean }>(`api/admin/copies/${copyId}/restore`)).data; }
 export type CatalogCopyDetails = CatalogCopy & { title?: string; author?: string; due_date?: string; borrower_name?: string; notes?: string };

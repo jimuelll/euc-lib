@@ -22,5 +22,7 @@ export const adminAction=handle(req=>{
  if(!['invite','recovery','verify'].includes(action))throw Object.assign(new Error('Invalid account email action'),{status:400});
  return accounts.adminAction(String(req.params.identifier),(req as AuthRequest).user.id,(req as AuthRequest).user.role,action);
 });
-export const listDeliveries=handle(()=>deliveries.adminStatus());
+export const listDeliveries=handle(req=>deliveries.adminStatus(req.query));
 export const retry=handle(async req=>{await deliveries.retryDelivery(String(req.params.id));return {message:'Retry queued if eligible.'};});
+
+export const deliveryDetail=handle(req=>deliveries.adminDelivery(String(req.params.id)));

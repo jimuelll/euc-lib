@@ -1,98 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2, Upload } from "@/components/ui/library-glyphs";
+import { CatalogueCover } from "@/components/ui/catalogue-book";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
-import { removeCatalogBookImage, uploadCatalogBookImage } from "../catalog.api";
+import { fetchCatalogImageMetadata, removeCatalogBookImage, uploadCatalogBookImage, type ImageMetadata } from "../catalog.api";
 import type { Book } from "../AdminCatalog.types";
 
-type Props = {
-  book: Book;
-  onImageChange: (imageUrl: string | null, publicId: string | null) => void;
-};
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const SUPPORTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-export default function CatalogImageEditor({ book, onImageChange }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [imageUrl, setImageUrl] = useState(book.image_url ?? null);
-  const [imageFailed, setImageFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    setImageUrl(book.image_url ?? null);
-    setImageFailed(false);
-  }, [book.id, book.image_url]);
-
-  const selectImage = async (file?: File) => {
-    if (!file) return;
-    if (!SUPPORTED_TYPES.has(file.type)) {
-      toast.error("Choose a JPG, PNG, or WebP image.");
-      if (inputRef.current) inputRef.current.value = "";
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("Images must be 5 MB or smaller.");
-      if (inputRef.current) inputRef.current.value = "";
-      return;
-    }
-    setBusy(true);
-    setProgress(0);
-    try {
-      const image = await uploadCatalogBookImage(book.id, file, setProgress);
-      setImageUrl(image.image_url);
-      setImageFailed(false);
-      onImageChange(image.image_url, image.image_public_id);
-      toast.success("Book cover saved.");
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Could not upload the book cover."));
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
-
-  const removeImage = async () => {
-    setBusy(true);
-    try {
-      await removeCatalogBookImage(book.id);
-      setImageUrl(null);
-      setImageFailed(false);
-      onImageChange(null, null);
-      toast.success("Book cover removed.");
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Could not remove the book cover."));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section aria-labelledby="catalog-image-heading" className="max-w-xl py-5">
-      <h3 id="catalog-image-heading" className="text-sm font-semibold text-foreground">Book cover</h3>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">Add one cover image for the public catalogue. JPG, PNG, or WebP up to 5 MB.</p>
-      <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start">
-        <div className="flex h-56 w-40 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted/30 p-2">
-          <img
-            src={imageUrl && !imageFailed ? imageUrl : "/book-cover-fallback.svg"}
-            alt={imageUrl && !imageFailed ? `Cover of ${book.title}` : "Generic book cover preview"}
-            className="h-full w-full object-contain"
-            onError={() => setImageFailed(true)}
-          />
-        </div>
-        <div className="min-w-0 flex-1 space-y-3">
-          <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label="Choose book cover image" disabled={busy} onChange={(event) => void selectImage(event.target.files?.[0])} />
-          <Button type="button" className="min-h-11 w-full justify-start" disabled={busy} onClick={() => inputRef.current?.click()}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : imageUrl ? <Upload className="mr-2 h-4 w-4" /> : <ImagePlus className="mr-2 h-4 w-4" />}
-            {busy ? `Uploading ${progress}%` : imageUrl ? "Replace cover image" : "Upload cover image"}
-          </Button>
-          {imageUrl ? <Button type="button" variant="outline" className="min-h-11 w-full justify-start text-destructive hover:text-destructive" disabled={busy} onClick={() => void removeImage()}><Trash2 className="mr-2 h-4 w-4" />Remove cover image</Button> : null}
-          {busy ? <progress aria-label="Image upload progress" className="h-1.5 w-full accent-primary" max={100} value={progress} /> : null}
-          <p className="text-xs leading-5 text-muted-foreground">The catalogue uses a generic book cover when no image is saved. Theses always display the thesis cover.</p>
-        </div>
-      </div>
-    </section>
-  );
+type Props = {book:Book;onImageChange:(imageUrl:string|null,publicId:string|null)=>void};
+const unknown:ImageMetadata={bytes:null,width:null,height:null};
+export default function CatalogImageEditor({book,onImageChange}:Props){
+ const input=useRef<HTMLInputElement>(null);const localImage=useRef<string|null|undefined>(undefined);const [url,setUrl]=useState(book.image_url??null);const [busy,setBusy]=useState(false);const [progress,setProgress]=useState(0);const [metadata,setMetadata]=useState<ImageMetadata>(unknown);const [status,setStatus]=useState("Image changes save immediately.");
+ useEffect(()=>{let active=true;if(localImage.current!==undefined&&localImage.current===(book.image_url??null)){localImage.current=undefined;return;}setUrl(book.image_url??null);setMetadata(unknown);setStatus("Image changes save immediately.");if(book.image_url)void fetchCatalogImageMetadata(book.id).then(data=>{if(active)setMetadata(data);}).catch(()=>{if(active)setMetadata(unknown);});return()=>{active=false;};},[book.id,book.image_url]);
+ const select=async(file?:File)=>{if(!file)return;if(!["image/jpeg","image/png","image/webp"].includes(file.type)){toast.error("Choose a JPG, PNG, or WebP image.");return;}if(file.size>5*1024*1024){toast.error("Images must be 5 MB or smaller.");return;}setBusy(true);setProgress(0);setStatus("Saving image…");try{const image=await uploadCatalogBookImage(book.id,file,setProgress);setUrl(image.image_url);setMetadata({bytes:image.bytes??file.size,width:image.width??null,height:image.height??null});localImage.current=image.image_url;onImageChange(image.image_url,image.image_public_id);setStatus("Image saved immediately.");toast.success("Book cover saved.");}catch(error){setStatus("Image was not saved. Try again.");toast.error(getApiErrorMessage(error,"Could not upload the book cover."));}finally{setBusy(false);if(input.current)input.current.value="";}};
+ const remove=async()=>{setBusy(true);setStatus("Removing image…");try{await removeCatalogBookImage(book.id);setUrl(null);setMetadata(unknown);localImage.current=null;onImageChange(null,null);setStatus("Image removed immediately.");toast.success("Book cover removed.");}catch(error){setStatus("Image was not removed. Try again.");toast.error(getApiErrorMessage(error,"Could not remove the book cover."));}finally{setBusy(false);}};
+ const size=metadata.bytes===null?"Unavailable":metadata.bytes<1024?`${metadata.bytes} B`:metadata.bytes<1024*1024?`${(metadata.bytes/1024).toFixed(1)} KB`:`${(metadata.bytes/1024/1024).toFixed(2)} MB`;
+ return <section aria-labelledby="catalog-image-heading" className="catalog-image-editor"><h3 id="catalog-image-heading">Book cover</h3><p className="catalog-secondary">JPG, PNG, or WebP up to 5 MB.</p><div className="catalog-image-layout"><div><p className="catalog-secondary">Public catalogue grid preview</p><CatalogueCover book={{title:book.title,author:book.author,image_url:url,material_type:book.material_type}}/></div><div className="catalog-image-details"><p>File size: {url?size:"Unavailable"}</p><p>Dimensions: {url&&metadata.width&&metadata.height?`${metadata.width} × ${metadata.height} px`:"Unavailable"}</p><input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label="Choose book cover image" disabled={busy} onChange={event=>void select(event.target.files?.[0])}/><Button type="button" variant="outline" disabled={busy} onClick={()=>input.current?.click()}>{busy?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:url?<Upload className="mr-2 h-4 w-4"/>:<ImagePlus className="mr-2 h-4 w-4"/>}{busy?`Uploading ${progress}%`:url?"Replace cover image":"Upload cover image"}</Button>{url&&<button type="button" className="catalog-link-action catalog-danger-text" disabled={busy} onClick={()=>void remove()}><Trash2 className="h-4 w-4"/>Remove cover image</button>}{busy&&<progress aria-label="Image upload progress" max={100} value={progress}/>}<p role="status" className="catalog-secondary">{status}</p>{book.material_type==="thesis"&&<p className="catalog-secondary">Theses always display the thesis cover.</p>}</div></div></section>;
 }

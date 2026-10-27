@@ -19,6 +19,7 @@ test("ISBN lookup queries both providers and uses Google Books for the cleaned s
         publishers: [{ name: "Open Library Press" }],
         publish_places: [{ name: "New York" }],
         number_of_pages: 310,
+        cover: { large: "https://covers.openlibrary.org/b/id/42-L.jpg" },
         subjects: [{ name: "Graphic novels" }],
       } });
     }
@@ -43,6 +44,7 @@ test("ISBN lookup queries both providers and uses Google Books for the cleaned s
     assert.equal(metadata.copyright_year, "2019");
     assert.equal(metadata.publication_place, "New York");
     assert.equal(metadata.physical_description, "310 pages");
+    assert.equal(metadata.cover_url, "https://covers.openlibrary.org/b/id/42-L.jpg");
     assert.deepEqual(metadata.subjects, ["Graphic novels", "Comics & Graphic Novels", "Biography"]);
     assert.equal(metadata.description, "A & useful synopsis.\n\nSecond line.");
     assert.ok(requests.length >= 2, "metadata and synopsis lookup may make additional provider requests");

@@ -14,4 +14,5 @@ router.post('/email-change',authMiddleware(),limiters.passwordChange,controller.
 export const adminRouter = express.Router();
 adminRouter.post('/users/:identifier/account-email',authMiddleware(['staff','admin','super_admin']),limiters.passwordChange,controller.adminAction);
 adminRouter.get('/email-deliveries',authMiddleware(['super_admin']),controller.listDeliveries);
+adminRouter.get('/email-deliveries/:id',authMiddleware(['super_admin']),controller.deliveryDetail);
 adminRouter.post('/email-deliveries/:id/retry',authMiddleware(['super_admin']),limiters.passwordChange,controller.retry);

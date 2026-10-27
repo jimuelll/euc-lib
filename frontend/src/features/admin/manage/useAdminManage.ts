@@ -6,13 +6,12 @@ import { invalidateServerState } from "@/app/server-state";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import type { User, UserFormState, QrTarget, UsersSummary } from "./AdminManage.types";
+import { validateUserForm, type UserFieldErrors } from "./userForm";
 import { EMPTY_FORM, getAllowedRoles } from "./AdminManage.data";
 import { useAdminConfirmDialog } from "@/features/admin";
 import { archiveUser, createUser, fetchAcademicPrograms, fetchAcademicTerms, fetchDepartments, restoreUser, searchUsers, updateUser, type AcademicProgram, type AcademicTerm, type Department } from "./api";
 import { manageKeys } from "./manage.keys";
-
 export type { AcademicProgram, AcademicTerm, Department } from "./api";
-
 interface UseAdminManageReturn {
   // Form
   form:            UserFormState;
@@ -20,13 +19,11 @@ interface UseAdminManageReturn {
   showPassword:    boolean;
   togglePassword:  () => void;
   resetForm:       () => void;
-
   // Roles
   allowedRoles: string[];
   programs: AcademicProgram[];
   terms: AcademicTerm[];
   departments: Department[];
-
   // Search
   searchQuery:          string;
   setSearchQuery:       (v: string) => void;
@@ -39,32 +36,28 @@ interface UseAdminManageReturn {
   handleSearchUsers:    (page?: number) => Promise<void>;
   showArchived:         boolean;
   setArchivedView:      (archived: boolean) => void;
-
   // Selected user
   selectedUser:      User | null;
   selectUserForEdit: (u: User) => void;
-
   // Actions
   loading:           boolean;
   handleCreateUser:  () => Promise<boolean>;
   handleUpdateUser:  () => Promise<boolean>;
-  handleArchiveUser: () => Promise<boolean>;
+  handleArchiveUser: (reason: string) => Promise<boolean>;
+  fieldErrors: UserFieldErrors;
   handleRestoreUser: () => Promise<boolean>;
   confirmDialog: JSX.Element;
-
   summary?: UsersSummary; updatedAt: number; refreshing: boolean; error: boolean; accessFilter: string; setAccessFilter: (v: string) => void; sort: string; setSort: (v: string) => void; canEdit: (u: User) => boolean;
-
   // QR
   qrTarget:    QrTarget | null;
   setQrTarget: (v: QrTarget | null) => void;
 }
-
 export const useAdminManage = (): UseAdminManageReturn => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [params, patchParams] = useAdminUrlState();
   const currentPage = queryPage(params.get("page"));
-
+  const [fieldErrors,setFieldErrors] = useState<UserFieldErrors>({});
   const [form,          setForm]          = useState<UserFormState>(EMPTY_FORM);
   const [showPassword,  setShowPassword]  = useState(false);
   const updateLock = useRef(false);
@@ -99,20 +92,17 @@ export const useAdminManage = (): UseAdminManageReturn => {
   const invalidateUsers = () => invalidateServerState(queryClient, "user");
   const createMutation = useMutation({ mutationFn: createUser, onSuccess: invalidateUsers });
   const updateMutation = useMutation({ mutationFn: ({ id, form }: { id: string; form: UserFormState }) => updateUser(id, form), onSuccess: invalidateUsers });
-  const archiveMutation = useMutation({ mutationFn: archiveUser, onSuccess: invalidateUsers });
+  const archiveMutation = useMutation({ mutationFn: ({id,reason}:{id:string;reason:string})=>archiveUser(id,reason), onSuccess: invalidateUsers });
   const restoreMutation = useMutation({ mutationFn: restoreUser, onSuccess: invalidateUsers });
-
   // ── Form helpers ───────────────────────────────────────────────────────────
   const setField = <K extends keyof UserFormState>(key: K, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
-
   const resetForm = () => {
+    setFieldErrors({});
     setForm(EMPTY_FORM);
     setSelectedUser(null);
   };
-
   const togglePassword = () => setShowPassword((v) => !v);
-
   // ── Toggle archived view ───────────────────────────────────────────────────
   const setArchivedView = (archived: boolean) => {
     patchParams({ archived, page: null });
@@ -120,6 +110,9 @@ export const useAdminManage = (): UseAdminManageReturn => {
   };
   // ── Create ─────────────────────────────────────────────────────────────────
   const handleCreateUser = async () => {
+    const validation = validateUserForm(form,true);
+    setFieldErrors(validation);
+    if(Object.keys(validation).length) return false;
     const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks } = form;
     if (!fullName || !role || !email.trim()) {
       toast.error("All required fields must be filled");
@@ -135,13 +128,13 @@ export const useAdminManage = (): UseAdminManageReturn => {
       resetForm();
       return true;
     } catch (err: any) {
+      setFieldErrors(err.response?.data?.fieldErrors || {});
       toast.error(err.response?.data?.message || err.message || "Failed to create user");
       return false;
     } finally {
       setLoading(false);
     }
   };
-
   // ── Search ─────────────────────────────────────────────────────────────────
   const handleSearchUsers = async (page = currentPage) => {
     if (page !== currentPage) { patchParams({ page }); return; }
@@ -153,7 +146,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
       }
     } else toast.error((result.error as any)?.response?.data?.message || "Search failed");
   };
-
   const selectUserForEdit = (u: User) => {
     setSelectedUser(u);
     setForm({
@@ -169,10 +161,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
       rePassword: "",
     });
   };
-
   // ── Update ─────────────────────────────────────────────────────────────────
   const handleUpdateUser = async () => {
     if (!selectedUser || updateLock.current) return false;
+    const validation=validateUserForm(form,false);setFieldErrors(validation);if(Object.keys(validation).length)return false;
     updateLock.current = true;
     try {
     if (form.role !== selectedUser.role && !await confirm({ title: "Confirm role change?", description: `${selectedUser.name} will change from ${selectedUser.role.replace(/_/g, " ")} to ${form.role.replace(/_/g, " ")}. This changes their access and available permissions.`, actionLabel: "Confirm role change", tone: "danger" })) return false;
@@ -183,6 +175,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       resetForm();
       return true;
     } catch (err: any) {
+      setFieldErrors(err.response?.data?.fieldErrors || {});
       toast.error(err.response?.data?.message || err.message || "Update failed");
       return false;
     } finally {
@@ -190,10 +183,10 @@ export const useAdminManage = (): UseAdminManageReturn => {
     }
     } finally { updateLock.current = false; }
   };
-
   // ── Archive — DELETE /api/admin/users/:id ──────────────────────────────────
   // Sets is_active=0 and deleted_at=NOW(). One action, one outcome.
-  const handleArchiveUser = async () => {
+  const handleArchiveUser = async (reason: string) => {
+    if (!reason.trim()) return false;
     if (!selectedUser) return false;
     const shouldArchive = await confirm({
       title: `Archive ${selectedUser.name}?`,
@@ -204,7 +197,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     if (!shouldArchive) return false;
     setLoading(true);
     try {
-      const response = await archiveMutation.mutateAsync(selectedUser.student_employee_id);
+      const response = await archiveMutation.mutateAsync({id:selectedUser.student_employee_id,reason});
       toast.success(response.message || "User archived");
       resetForm();
       return true;
@@ -215,7 +208,6 @@ export const useAdminManage = (): UseAdminManageReturn => {
       setLoading(false);
     }
   };
-
   // ── Restore — PATCH /api/admin/users/:id/restore ───────────────────────────
   // Clears deleted_at and sets is_active=1. User is fully active again.
   const handleRestoreUser = async () => {
@@ -239,8 +231,8 @@ export const useAdminManage = (): UseAdminManageReturn => {
       setLoading(false);
     }
   };
-
   return {
+    fieldErrors,
     summary: usersQuery.data?.summary, updatedAt: usersQuery.dataUpdatedAt, refreshing: usersQuery.isFetching, error: usersQuery.isError, accessFilter, setAccessFilter, sort, setSort, canEdit,
     form,
     setField,

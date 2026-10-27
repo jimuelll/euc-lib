@@ -1,3 +1,4 @@
+import {notificationImage} from './notifications.image.service';
 import * as repository from './notifications.admin.repository';
 import notifications = require('./notifications.service');
 import hub = require('../../realtime/notificationHub');
@@ -14,11 +15,11 @@ export function validate(input: any, now = new Date()) {
         fail('Enter a message of up to 2,000 characters.');
     if (!['announcement', 'reminder', 'reservation_ready', 'reservation_cancelled', 'overdue_fine'].includes(input.type))
         fail('Choose a notification type.');
-    if (!['all', 'role', 'user'].includes(input.audienceType))
+    if (!['all', 'role', 'user', 'users'].includes(input.audienceType))
         fail('Choose an audience.');
     if (input.audienceType === 'role' && !roles.includes(input.audienceRole))
         fail('Choose a valid audience role.');
-    if (input.audienceType === 'user' && (!Number.isInteger(Number(input.audienceUserId)) || Number(input.audienceUserId) < 1))
+    if (input.audienceType === 'user' && (!Number.isSafeInteger(Number(input.audienceUserId)) || Number(input.audienceUserId) < 1))
         fail('Select an active patron.');
     if (input.href && !destinations.includes(input.href))
         fail('Choose a destination from the list.');
@@ -28,13 +29,25 @@ export function validate(input: any, now = new Date()) {
     const expires = input.expiresAt ? new Date(input.expiresAt) : null;
     if (expires && (!Number.isFinite(expires.getTime()) || expires <= (scheduled || now)))
         fail('Expiry must be after the send time.');
-    return { type: input.type, title: input.title.trim(), body: input.body.trim(), href: input.href || null, audienceType: input.audienceType, audienceUserId: input.audienceType === 'user' ? Number(input.audienceUserId) : null, audienceRole: input.audienceType === 'role' ? input.audienceRole : null, expiresAt: expires, scheduledAt: scheduled,sendEmail:input.sendEmail === true };
+    return { ...notificationImage(input), type: input.type, title: input.title.trim(), body: input.body.trim(), href: input.href || null, audienceType: input.audienceType, audienceUserId: input.audienceType === 'user' ? Number(input.audienceUserId) : null, audienceUserIds: input.audienceType === 'users' ? selectedUserIds(input) : undefined, audienceRole: input.audienceType === 'role' ? input.audienceRole : null, expiresAt: expires, scheduledAt: scheduled,sendEmail:input.sendEmail === true };
 }
-export async function count(input: any) { const type = String(input.audienceType || 'all'); if (!['all', 'role', 'user'].includes(type) || type === 'role' && !roles.includes(input.audienceRole))
-    fail('Choose a valid audience.');
-    if (type==='user' && (!Number.isSafeInteger(Number(input.audienceUserId)) || Number(input.audienceUserId)<1)) fail('Select an active patron.');
-    return repository.audienceCount(type, input.audienceRole || null, Number(input.audienceUserId) || null); }
-export async function emailPreview(input:any) { await count(input); return email.preview(input); }
+export function selectedUserIds(input: any): number[] {
+    const raw = input.audienceUserIds ?? input['audienceUserIds[]'];
+    const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+    if (!values.length || values.some((id: unknown) => !['string','number'].includes(typeof id) || !Number.isSafeInteger(Number(id)) || Number(id) < 1))
+        fail('Select active patrons with valid IDs.');
+    return [...new Set<number>(values.map(Number))].sort((a, b) => a - b);
+}
+export async function count(input: any) {
+    const type = String(input.audienceType || 'all');
+    if (!['all', 'role', 'user', 'users'].includes(type) || type === 'role' && !roles.includes(input.audienceRole)) fail('Choose a valid audience.');
+    if (type === 'user' && (!Number.isSafeInteger(Number(input.audienceUserId)) || Number(input.audienceUserId) < 1)) fail('Select an active patron.');
+    return repository.audienceCount(type, input.audienceRole || null, Number(input.audienceUserId) || null, type === 'users' ? selectedUserIds(input) : []);
+}
+export async function emailPreview(input: any) {
+    await count(input);
+    return email.preview({...input, ...(input.audienceType === 'users' ? {audienceUserIds:selectedUserIds(input)} : {})});
+}
 export async function create(input: any, actor: number) {
     const value = validate(input);
     const recipients = await count(value);
@@ -53,7 +66,7 @@ export async function create(input: any, actor: number) {
         const queueId = await repository.enqueue({ ...payload, manualNotification:true,createdBy: actor, scheduledAt: scheduledAt.toISOString() }, scheduledAt);
         return { queueId, status: 'scheduled', recipientCount: recipients };
     }
-    if (value.sendEmail) return email.publish({...payload,createdBy:actor},{total:Number(input.confirmedRecipientCount),email:Number(input.confirmedEmailCount)});
+    if (value.sendEmail || value.audienceType === 'users') return email.publish({...payload,createdBy:actor},{total:Number(input.confirmedRecipientCount),email:Number(input.confirmedEmailCount)});
     return notifications.createNotification({ ...payload, createdBy: actor });
 }
 export async function list(input: any) {
@@ -70,7 +83,9 @@ export async function action(key: string, action: string, actor: number, input: 
         if (!await repository.expire(key))
             fail('This notification changed or is being delivered. Refresh and try again.', 409);
         try {
-            if (record.audience_type === 'user')
+            if (record.audience_type === 'users')
+                for (const id of record.audience_user_ids || []) hub.pushNotification(id, { type: 'notification.audience_changed' });
+            else if (record.audience_type === 'user')
                 hub.pushNotification(record.audience_user_id, { type: 'notification.audience_changed' });
             else
                 hub.pushAudienceChanged({ audienceType: record.audience_type, audienceRole: record.audience_role });
@@ -80,7 +95,7 @@ export async function action(key: string, action: string, actor: number, input: 
     }
     if (action !== 'resend')
         fail('Unknown notification action.');
-    const recipients = await count({ audienceType: record.audience_type, audienceRole: record.audience_role, audienceUserId: record.audience_user_id });
+    const recipients = await count({ audienceType: record.audience_type, audienceRole: record.audience_role, audienceUserId: record.audience_user_id, audienceUserIds: record.audience_user_ids });
     if (!recipients)
         fail('This audience has no active recipients.');
     if (record.audience_type !== 'user' && Number(input.confirmedRecipientCount) !== recipients)

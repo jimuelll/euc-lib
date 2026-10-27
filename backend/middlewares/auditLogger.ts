@@ -12,6 +12,7 @@ const ignoredPaths = new Set([
 ]);
 
 const excludedMutationPaths = new Set([
+  "/api/admin/users/availability",
   "/api/admin/dashboard/ai-report",
   "/api/admin/backup/compatibility",
 ]);

@@ -1,3 +1,4 @@
+import {uploadNotificationImage} from './notifications.image.service';
 import type { Request, RequestHandler } from "express";
 import service = require("./notifications.service");
 import * as admin from './notifications.admin.service';
@@ -75,6 +76,7 @@ const markAllAsRead: RequestHandler = async (req, res) => {
     }
 };
 const adminHandler = (work: (req: Request) => Promise<unknown>, status = 200): RequestHandler => async (req, res) => { try {
+    res.set("Cache-Control","no-store");
     res.status(status).json(await work(req));
 }
 catch (error) {
@@ -88,7 +90,9 @@ const countAdminRecipients = adminHandler(async (req) => ({ count: await admin.c
 const previewAdminEmail = adminHandler(req => admin.emailPreview(req.query));
 const notificationDetails = adminHandler(req => admin.details(String(req.params.key)));
 const notificationAction = adminHandler(req => admin.action(String(req.params.key), String(req.params.action), (req as AuthenticatedRequest).user.id, req.body));
-export = {
+const uploadImage=adminHandler(req=>uploadNotificationImage((req as Request & {file?:{buffer:Buffer;size:number;mimetype:string}}).file),201);
+const getNotification=adminHandler(async req=>{const id=Number(req.params.notificationId);if(!Number.isSafeInteger(id)||id<1)throw Object.assign(new Error('Notification not found.'),{status:404});const user=(req as AuthenticatedRequest).user;const record=await service.getByIdForUser({notificationId:id,userId:user.id,role:user.role});if(!record)throw Object.assign(new Error('Notification not found.'),{status:404});return record;});
+export = {uploadImage,getNotification,
     previewAdminEmail,
     countAdminRecipients,
     notificationDetails,
