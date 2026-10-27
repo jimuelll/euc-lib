@@ -42,7 +42,16 @@ export const setDiscussionLocked=async(postId:number,locked:boolean)=>{await axi
 export const fetchCommentContext=async(postId:number,commentId:number,signal?:AbortSignal):Promise<{comment:ApiComment;ancestors:ApiComment[]}> => (await axiosInstance.get(`/api/bulletin/${postId}/comments/${commentId}/context`,{signal})).data;
 export const fetchDiscussionUpdates=async(postId:number,afterId:number,signal?:AbortSignal):Promise<{latest_id:number;newest_other_id:number;new_count:number;comment_count?:number;comments_locked:boolean}> => (await axiosInstance.get(`/api/bulletin/${postId}/discussion-updates`,{params:{afterId},signal})).data;
 
-export const setPostHelpful=async(id:number,selected:boolean):Promise<ReactionSummary> => (selected?await axiosInstance.put(`/api/bulletin/${id}/helpful`):await axiosInstance.delete(`/api/bulletin/${id}/helpful`)).data;
+export const setPostHelpful=async(id:number,selected:boolean):Promise<Partial<ReactionSummary>>=>{
+ try{return (selected?await axiosInstance.put<ReactionSummary>(`/api/bulletin/${id}/helpful`):await axiosInstance.delete<ReactionSummary>(`/api/bulletin/${id}/helpful`)).data;}
+ catch(error){
+  const status=(error as {response?:{status?:number}})?.response?.status;
+  if(status!==404&&status!==405)throw error;
+  // Keep post likes working against a backend build that still exposes the legacy toggle route.
+  const result=await toggleBulletinLike(id);
+  return {helpful_count:result.total,helpful_by_me:result.liked,likes:result.total,liked_by_me:result.liked};
+ }
+};
 export const setPostInterest=async(id:number,selected:boolean):Promise<ReactionSummary> => (selected?await axiosInstance.put(`/api/bulletin/${id}/interest`):await axiosInstance.delete(`/api/bulletin/${id}/interest`)).data;
 export const setPostSaved=async(id:number,selected:boolean):Promise<{saved_by_me:boolean}> => (selected?await axiosInstance.put(`/api/bulletin/${id}/save`):await axiosInstance.delete(`/api/bulletin/${id}/save`)).data;
 export interface SavedBulletinPost {id:number;title:string;excerpt:string;image_url?:string|null;image_alt?:string;post_type:string;created_at:string;saved_at:string;unavailable:boolean;}
