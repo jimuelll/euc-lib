@@ -23,7 +23,7 @@ export function renderEmail(message: EmailMessage, account: boolean) {
     if (message.as_of) paragraph(`Balances as of ${message.as_of}. Amounts are in PHP.`);
     for (const loan of message.loans || []) paragraph(`${loan.title}\nDue: ${loan.due}\nUnsettled balance: PHP ${loan.balance}`);
   }
-  if(!account && message.image_url)text.push(`Image: ${message.image_alt}\n${message.image_url}`);
+  if(!account && message.image_url)text.push(`Image${message.image_alt ? `: ${message.image_alt}` : ''}\n${message.image_url}`);
   if (message.action_url) {
     let url: URL;
     try { url = new URL(message.action_url); } catch { throw new SendFailure('permanent', 'Invalid email action URL'); }

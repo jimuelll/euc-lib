@@ -28,7 +28,7 @@ export function brandedEmail(message: EmailMessage, account: boolean): string {
   if(message.as_of) body+=small(escape(`Balances as of ${message.as_of}. Amounts are in PHP.`));
   for(const loan of message.loans || []) body+=`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid ${colors.line};margin-top:16px"><tr><td style="padding-top:16px;">${paragraph(`<strong>${escape(loan.title)}</strong><br>Due: ${escape(loan.due)}<br>Unsettled balance: PHP ${escape(loan.balance)}`)}</td></tr></table>`;
  }
- if(!account && message.image_url)body+=`<p style="margin:24px 0;"><img src="${escape(message.image_url)}" alt="${escape(message.image_alt || '')}" width="554" style="display:block;width:100%;max-width:554px;height:auto;border:0;"/></p>`;
+ if(!account && message.image_url)body+=`<p style="margin:24px 0;"><img src="${escape(message.image_url)}" alt="${escape(message.image_alt || 'Notification image')}" width="554" style="display:block;width:100%;max-width:554px;height:auto;border:0;"/></p>`;
  if(message.action_url) body+=button(message.action_label || 'Open library',message.action_url);
  return shell({title:message.subject,preheader:message.message.slice(0,160),heading:escape(message.subject),body,name:message.name,
   note:small(account ? 'If you did not request this, contact library staff. Never share your password or recovery code.' : 'You received this email as part of your library account notifications.'),

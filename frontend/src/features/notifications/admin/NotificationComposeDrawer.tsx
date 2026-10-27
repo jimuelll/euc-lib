@@ -52,7 +52,7 @@ export default function NotificationComposeDrawer({initial,onClose,onSent}:{init
   const expiry=form.expiresAt?new Date(form.expiresAt).getTime():null;
   const invalidTime=scheduled&&(!Number.isFinite(sendTime)||sendTime<=clock);
   const invalidExpiry=expiry!==null&&(!Number.isFinite(expiry)||expiry<=sendTime);
-  const validContent=Boolean(form.title.trim()&&form.body.trim()&&(!form.imageUrl||form.imageAlt.trim()));
+  const validContent=Boolean(form.title.trim()&&form.body.trim());
   const countReady=audienceReady&&!count.isFetching&&!count.isError&&count.data!==undefined;
   const emailReady=!form.sendEmail||(!email.isFetching&&!email.isError&&Boolean(email.data?.enabled&&email.data.emailCount));
   const canSend=validContent&&countReady&&Boolean(count.data)&&emailReady&&!invalidTime&&!invalidExpiry&&!imageUploading&&!imageBlocked&&!busy;

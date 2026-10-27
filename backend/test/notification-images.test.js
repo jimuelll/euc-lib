@@ -6,9 +6,10 @@ const db=require('../db');
 if(require.main===module)test.after(()=>db.end());
 const asset={imageUrl:'https://res.cloudinary.com/test-cloud/image/upload/v123/library/notifications/test.jpg',imagePublicId:'library/notifications/test',imageAlt:'Library hours <updated>'};
 async function env(work){const keys={CLOUDINARY_CLOUD_NAME:'test-cloud',CLOUDINARY_API_KEY:'fixture',CLOUDINARY_API_SECRET:'fixture'};const before=Object.fromEntries(Object.keys(keys).map(k=>[k,process.env[k]]));Object.assign(process.env,keys);try{return await work();}finally{for(const[k,v]of Object.entries(before))if(v===undefined)delete process.env[k];else process.env[k]=v;}}
-test('notification images require a complete reference in this cloud and folder, with alt text',()=>env(async()=>{
+test('notification images require a complete reference in this cloud and folder and accept optional descriptions',()=>env(async()=>{
  assert.deepEqual(images.notificationImage({}),{imageUrl:null,imagePublicId:null,imageAlt:null});assert.deepEqual(images.notificationImage(asset),asset);
- for(const change of [{imageUrl:'https://elsewhere.example/image.jpg'},{imageUrl:asset.imageUrl+'?x=1'},{imagePublicId:'library/catalog/books/test'},{imageAlt:''},{imageAlt:'x'.repeat(251)},{imageUrl:asset.imageUrl.replace('test-cloud','other-cloud')},{imageUrl:asset.imageUrl.replace('/test.jpg','/../test.jpg')},{imageUrl:'data:image/png;base64,abc'}])assert.throws(()=>images.notificationImage({...asset,...change}),e=>e.status===400);
+ for(const imageAlt of [undefined,null,'','   '])assert.equal(images.notificationImage({...asset,imageAlt}).imageAlt,null);
+ for(const change of [{imageUrl:'https://elsewhere.example/image.jpg'},{imageUrl:asset.imageUrl+'?x=1'},{imagePublicId:'library/catalog/books/test'},{imageAlt:123},{imageAlt:'x'.repeat(251)},{imageUrl:asset.imageUrl.replace('test-cloud','other-cloud')},{imageUrl:asset.imageUrl.replace('/test.jpg','/../test.jpg')},{imageUrl:'data:image/png;base64,abc'}])assert.throws(()=>images.notificationImage({...asset,...change}),e=>e.status===400);
 }));
 test('notification uploads validate byte signatures and size rather than trusting file names',()=>{
  images.validateImageFile({buffer:Buffer.from([255,216,255]),size:3,mimetype:'image/jpeg'});
@@ -22,6 +23,7 @@ test('notification image upload requests immutable JPEG output bounded to 1600px
 test('notification email images are escaped hosted content and account emails remain image-free',()=>env(async()=>{
  const message={recipient:'member@example.edu',name:'Member',subject:'Hours',message:'Read the new hours.',image_url:asset.imageUrl,image_public_id:asset.imagePublicId,image_alt:asset.imageAlt,action_url:'https://library.example/my-library?view=updates&notification=41',action_label:'View notification'};
  const email=templates.renderEmail(message,false);assert.match(email.htmlContent,/<img /);assert.match(email.htmlContent,/alt="Library hours &lt;updated&gt;"/);assert.match(email.htmlContent,/height:auto/);assert.ok(email.htmlContent.indexOf('Read the new hours.')<email.htmlContent.indexOf('<img '));assert.ok(email.htmlContent.indexOf('<img ')<email.htmlContent.indexOf('>View notification<'));assert.match(email.textContent,/Image: Library hours <updated>/);assert.match(email.htmlContent,/view=updates&amp;notification=41/);
+ const undescribed=templates.renderEmail({...message,image_alt:undefined},false);assert.match(undescribed.htmlContent,/alt="Notification image"/);assert.doesNotMatch(undescribed.textContent,/undefined/);
  assert.doesNotMatch(templates.renderEmail(message,true).htmlContent,/<img /);assert.throws(()=>templates.renderEmail({...message,image_url:'javascript:alert(1)'},false),e=>e.kind==='permanent');
 }));
 test('version 19 backups upgrade to text-only defaults without queuing retrospective emails',()=>{

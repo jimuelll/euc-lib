@@ -4,12 +4,13 @@ const fail=(message:string,status=400)=>Object.assign(new Error(message),{status
 export const notificationImageFolder='library/notifications';
 export function notificationImage(input:{imageUrl?:unknown;imagePublicId?:unknown;imageAlt?:unknown}) {
  if(!input.imageUrl&&!input.imagePublicId)return {imageUrl:null,imagePublicId:null,imageAlt:null};
- if(typeof input.imageUrl!=='string'||typeof input.imagePublicId!=='string'||typeof input.imageAlt!=='string'||!input.imageAlt.trim()||input.imageAlt.trim().length>250)throw fail('Add an image description of up to 250 characters.');
+ if(typeof input.imageUrl!=='string'||typeof input.imagePublicId!=='string')throw fail('Upload an image using the notification image control.');
+ if(input.imageAlt != null && (typeof input.imageAlt!=='string'||input.imageAlt.trim().length>250))throw fail('Image descriptions must be 250 characters or fewer.');
  const cloud=process.env.CLOUDINARY_CLOUD_NAME;
  let url:URL;try{url=new URL(input.imageUrl);}catch{throw fail('Upload an image using the notification image control.');}
  const id=input.imagePublicId;
  if(!cloud||!/^library\/notifications\/[a-zA-Z0-9_-]{1,100}$/.test(id)||url.protocol!=='https:'||url.hostname!=='res.cloudinary.com'||url.port||url.username||url.password||url.search||url.hash||!new RegExp(`^/${cloud.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}/image/upload/(?:v[0-9]+/)?${id}\\.jpg$`).test(url.pathname))throw fail('Upload an image using the notification image control.');
- return {imageUrl:url.href,imagePublicId:id,imageAlt:input.imageAlt.trim()};
+ return {imageUrl:url.href,imagePublicId:id,imageAlt:typeof input.imageAlt === 'string' ? input.imageAlt.trim() || null : null};
 }
 export function validateImageFile(file:{buffer:Buffer;size:number;mimetype:string}|undefined) {
  if(!file||!Buffer.isBuffer(file.buffer))throw fail('Choose an image to upload.');

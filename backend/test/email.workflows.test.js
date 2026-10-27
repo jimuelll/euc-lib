@@ -88,11 +88,11 @@ test('live Brevo configuration requires credentials, sender and validates the da
  await env(async()=>settings.validateConfig(),{EMAIL_MODE:'brevo',NODE_ENV:'production',PUBLIC_APP_URL:'https://library.example'});
 },{EMAIL_MODE:'brevo',BREVO_API_KEY:'private',BREVO_SENDER_EMAIL:'library@example.edu'}));
 
-async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=true,sendError=null,receipt=undefined}={}){
+async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=true,sendError=null,receipt=undefined,context={},loanDueDate=null}={}){
  return env(async()=>{
   const original={get:db.getConnection,query:db.query,send:transport.provider.send};
   const calls=[];let sent=0;
-  const row={id:'delivery-1',user_id:7,recipient:'member@example.edu',purpose:priority?'password_changed':'borrowing_created',priority,challenge_id:null,content_encrypted:settings.protect({recipient:'member@example.edu',name:'Member',subject:'Notice',message:'Content'}),context_json:{},attempts:0,status:'queued'};
+  const row={id:'delivery-1',user_id:7,recipient:'member@example.edu',purpose:priority?'password_changed':'borrowing_created',priority,challenge_id:null,content_encrypted:settings.protect({recipient:'member@example.edu',name:'Member',subject:'Notice',message:'Content'}),context_json:context,attempts:0,status:'queued'};
   const query=async(sql,values)=>{
    calls.push({sql,values});
    if(sql.includes('GET_LOCK'))return [[{acquired:1}]];
@@ -100,6 +100,7 @@ async function dispatchFixture(work,{used=0,priority=0,waiting=false,eligible=tr
    if(sql.includes('AS waiting'))return [[{waiting:waiting?1:0}]];
    if(sql.includes('SELECT d.*'))return [[row]];
    if(sql.includes('SELECT id,email,pending_email'))return [[{id:7,email:'member@example.edu',name:'Member',is_active:1,deleted_at:null,setup_pending:0,email_verified_at:eligible?'2026-01-01':null}]];
+   if(sql.includes('SELECT status,deleted_at,due_date FROM borrowings'))return [[loanDueDate===null?undefined:{status:'borrowed',deleted_at:null,due_date:loanDueDate}].filter(Boolean)];
    if(sql.includes('SELECT requests_used'))return [[{requests_used:used}]];
    return [{affectedRows:1}];
   };
@@ -114,6 +115,27 @@ test('quota reserves final 50 requests for account mail and stops every category
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);assert.ok(f.calls.some(c=>c.sql.includes('requests_used=requests_used+1')));},{used:250,priority:1});
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),1);},{used:299,priority:1});
  await dispatchFixture(async f=>{await delivery.dispatchOne();assert.equal(f.sent(),0);},{used:300,priority:1});
+});
+
+test('borrow email eligibility compares due dates at the DATETIME second precision',async()=>{
+ const dueDate='2026-11-03T02:28:41.537Z';
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();
+  assert.equal(f.sent(),1,'fractional seconds discarded by DATETIME do not cancel the borrow email');
+ },{context:{sourceType:'borrowing',sourceId:19,dueDate},loanDueDate:new Date('2026-11-03T02:28:41.000Z')});
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();
+  assert.equal(f.sent(),1,'fractional seconds rounded up by DATETIME do not cancel the borrow email');
+ },{context:{sourceType:'borrowing',sourceId:19,dueDate},loanDueDate:new Date('2026-11-03T02:28:42.000Z')});
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();
+  assert.equal(f.sent(),0,'a due date changed by a full second is not sent');
+  assert.ok(f.calls.some(c=>c.sql.includes("status='cancelled'")&&c.sql.includes("last_error='No longer eligible'")));
+ },{context:{sourceType:'borrowing',sourceId:19,dueDate},loanDueDate:new Date('2026-11-03T02:28:43.000Z')});
+ await dispatchFixture(async f=>{
+  await delivery.dispatchOne();
+  assert.equal(f.sent(),1,'dates already matching at whole-second precision remain eligible');
+ },{context:{sourceType:'borrowing',sourceId:19,dueDate:'2026-11-03T02:28:41.000Z'},loanDueDate:new Date('2026-11-03T02:28:41.000Z')});
 });
 
 test('accepted deliveries retain the provider receipt and send mode without retaining security content',async()=>{

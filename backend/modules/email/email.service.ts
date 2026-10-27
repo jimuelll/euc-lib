@@ -94,7 +94,11 @@ async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage |
     if (context.sourceType === 'borrowing' && ['borrowing_created','borrowing_renewed','borrowing_returned'].includes(row.purpose)) {
       const [[loan]] = await conn.query<RowDataPacket[]>('SELECT status,deleted_at,due_date FROM borrowings WHERE id=? AND user_id=?',[context.sourceId,row.user_id]);
       if (!loan || loan.deleted_at || (row.purpose==='borrowing_returned' ? loan.status !== 'returned' : loan.status === 'returned')) return null;
-      if (context.dueDate && new Date(loan.due_date).getTime() !== new Date(String(context.dueDate)).getTime()) return null;
+      if (context.dueDate) {
+        const storedDueTime = new Date(loan.due_date).getTime();
+        const queuedDueTime = new Date(String(context.dueDate)).getTime();
+        if (!Number.isFinite(storedDueTime) || !Number.isFinite(queuedDueTime) || Math.abs(storedDueTime - queuedDueTime) >= 1000) return null;
+      }
     }
   }
   if (row.purpose === 'overdue_summary') {
