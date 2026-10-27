@@ -12,9 +12,10 @@ import { getApiErrorMessage } from "@/utils/apiError";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getCirculationLog, archiveBorrowing, restoreBorrowing, type CirculationLogEntry, type CirculationLogResult } from "../circulation.api";
 import { circulationKeys } from "../circulation.keys";
+import { formatLibraryDate, formatLibraryTime } from "@/utils/libraryTime";
 
-const day = (value: string) => new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-const time = (value: string) => new Date(value).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
+const day = (value: string) => formatLibraryDate(value);
+const time = (value: string) => formatLibraryTime(value);
 const statusLabel = { borrowed: "Active", overdue: "Overdue", returned: "Returned" } as const;
 const statusIcon = { borrowed: "borrow", overdue: "overdue", returned: "return" } as const;
 const overdueDays = (row: CirculationLogEntry) => Math.max(1, Math.ceil(Number(row.hours_overdue) / 24 || (Date.now() - new Date(row.due_date).getTime()) / 86_400_000));

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AdminStatusBadge, AdminRowMenu, AdminEmptyState, useAdminConfirmDialog } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { formatLibraryDate } from "@/utils/libraryTime";
 import { fetchBookHoldings, addCatalogCopies, retireCatalogCopy, restoreCatalogCopy, assignAccessionRange, type CatalogHolding } from "../catalog.api";
 import { catalogKeys } from "../../catalog.keys";
 import { printCatalogLabels } from "../catalog.labels";
@@ -55,7 +56,7 @@ export default function BookCopiesWorkspace({bookId,bookTitle,initialCopyId,init
       </button>
       <AdminStatusBadge status={state(copy)==="Available"?"eligible":state(copy)==="Borrowed"?"borrowed":state(copy)==="Reserved"?"ready":state(copy)==="Needs accession number"||state(copy)==="Needs loan policy"?"pending":"cancelled"}>{state(copy)} · {copy.condition}</AdminStatusBadge>
      </div>
-     <p className="catalog-copy-policy catalog-secondary">{[(copy.book_type||"Not assigned")!==sharedPolicy?`Loan policy: ${copy.book_type||"Not assigned"}`:"",copy.borrower_name?`Borrowed by ${copy.borrower_name}`:"",copy.due_date?`Due ${new Date(copy.due_date).toLocaleDateString()}`:"",copy.location||""].filter(Boolean).join(" · ")}</p>
+     <p className="catalog-copy-policy catalog-secondary">{[(copy.book_type||"Not assigned")!==sharedPolicy?`Loan policy: ${copy.book_type||"Not assigned"}`:"",copy.borrower_name?`Borrowed by ${copy.borrower_name}`:"",copy.due_date?`Due ${formatLibraryDate(copy.due_date)}`:"",copy.location||""].filter(Boolean).join(" · ")}</p>
      <div className="catalog-copy-controls">
       {!copy.accession_number?.trim()&&Boolean(copy.is_active)&&!selected&&<Button variant="outline" disabled={busy||holdingBusy} onClick={()=>void selectCopy(copy.copy_id)}>Assign</Button>}
       {selected&&<AdminRowMenu disabled={busy||holdingBusy} label={`Actions for ${copy.barcode}`} items={[{label:"Print holdings record",disabled:holdingDirty,onSelect:()=>void printHolding(copy)},{label:"Print label",onSelect:()=>void printCatalogLabels([copy.barcode])},copy.is_active?{label:"Retire copy",destructive:true,disabled:Boolean(copy.has_active_loan||copy.has_ready_reservation),onSelect:()=>void retire(copy)}:{label:"Restore copy",onSelect:()=>void run(()=>restoreCatalogCopy(copy.copy_id),"Copy restored")} ]}/>}

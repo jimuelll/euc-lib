@@ -11,9 +11,10 @@ import { useReservations } from "./hooks/useReservations";
 import type { AdminReservation } from "./reservations.types";
 import "@/features/admin/compact-admin.css";
 import "./reservations.css";
+import { formatLibraryDate, formatLibraryDateTime } from "@/utils/libraryTime";
 
-const day = (value: string) => new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-const stamp = (value: string) => new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const day = (value: string) => formatLibraryDate(value);
+const stamp = (value: string) => formatLibraryDateTime(value);
 const closed = (row: AdminReservation) => ["fulfilled", "cancelled", "expired"].includes(row.status);
 export function reservationTiming(row: AdminReservation, now = Date.now()) {
   if (closed(row)) return { text: row.status === "fulfilled" ? "Pickup completed" : row.status === "cancelled" ? "Hold cancelled" : "Pickup window ended", tone: row.status === "expired" ? "red" : "neutral" };

@@ -1,5 +1,6 @@
 import { CalendarDays, GraduationCap, Search, UserRound } from "lucide-react";
-import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
+import { formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
+import { formatLibraryDate, formatLibraryDateTime } from "@/utils/libraryTime";
 import type { ActiveBorrow, ActiveReservation } from "../types";
 
 const borrowStatusConfig: Record<
@@ -46,7 +47,8 @@ const currencyFormatter = new Intl.NumberFormat("en-PH", {
 const formatDate = (value?: string | null, pattern = "MMM d, yyyy") => {
   if (!value) return "Date unavailable";
   const parsed = parseISO(value);
-  return isValid(parsed) ? format(parsed, pattern) : "Date unavailable";
+  if (!isValid(parsed)) return "Date unavailable";
+  return pattern.includes("h:mm") ? formatLibraryDateTime(value) : formatLibraryDate(value);
 };
 
 const relativeTime = (value?: string | null) => {

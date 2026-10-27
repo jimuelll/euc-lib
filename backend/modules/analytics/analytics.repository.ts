@@ -2,6 +2,7 @@ const db: any = require("../../db");
 const { availableToBorrow, hasAccession } = require("../catalog/copyEligibility");
 const { enrichCopyAuditRows } = require("./audit.copy-label");
 const { enrichAuditLookupRows } = require("./audit.lookup-labels");
+import { libraryDateKey, libraryDayRange } from "../time/library-time";
 const AUDIT_CATEGORIES = ["all", "auth", "users", "catalog", "academic_settings", "attendance", "borrowing", "reservation", "bulletin", "events", "content", "subscriptions", "notifications", "backup", "clearance", "system"];
 const AUDIT_COLLATION = "utf8mb4_unicode_ci";
 
@@ -41,7 +42,7 @@ async function recordSiteVisit({ visitorId, userId = null, path = "/", ipAddress
     `INSERT INTO site_daily_visits
        (visit_date, visitor_id, user_id, first_path, last_path, first_visited_at, last_visited_at, hit_count, ip_address, user_agent)
      VALUES
-       (CURDATE(), ?, ?, ?, ?, NOW(), NOW(), 1, ?, ?)
+       (?, ?, ?, ?, ?, NOW(), NOW(), 1, ?, ?)
      ON DUPLICATE KEY UPDATE
        user_id = COALESCE(VALUES(user_id), user_id),
        last_path = VALUES(last_path),
@@ -49,7 +50,7 @@ async function recordSiteVisit({ visitorId, userId = null, path = "/", ipAddress
        hit_count = hit_count + 1,
        ip_address = VALUES(ip_address),
        user_agent = VALUES(user_agent)`,
-    [visitorId, userId, path, path, ipAddress, userAgent]
+    [libraryDateKey(), visitorId, userId, path, path, ipAddress, userAgent]
   );
 }
 
@@ -103,14 +104,8 @@ function auditFilters({ category = "all", action = "", query = "", dateFrom = ""
     filters.push(`(${searchableColumns.map((column) => `LOCATE(LOWER(?), LOWER(COALESCE(${column}, ''))) > 0`).join(" OR ")})`);
     params.push(...searchableColumns.map(() => normalizedQuery));
   }
-  if (dateFrom) {
-    filters.push("DATE(occurred_at) >= ?");
-    params.push(dateFrom);
-  }
-  if (dateTo) {
-    filters.push("DATE(occurred_at) <= ?");
-    params.push(dateTo);
-  }
+  if (dateFrom) { filters.push("occurred_at >= ?"); params.push(libraryDayRange(dateFrom).start); }
+  if (dateTo) { filters.push("occurred_at < ?"); params.push(libraryDayRange(dateTo).end); }
   return { whereClause: `WHERE ${filters.join(" AND ")}`, params };
 }
 
@@ -207,57 +202,57 @@ async function getDashboardOverviewData(daysAgo: number) {
          (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS total_users,
          (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'borrowed') AS active_borrowings,
          (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue') AS overdue_borrowings,
-         (SELECT COUNT(*) FROM borrowings WHERE DATE(borrowed_at) = CURDATE()) AS borrowings_today,
-         (SELECT COUNT(*) FROM borrowings WHERE returned_at IS NOT NULL AND DATE(returned_at) = CURDATE()) AS returns_today,
+         (SELECT COUNT(*) FROM borrowings WHERE DATE(DATE_ADD(borrowed_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS borrowings_today,
+         (SELECT COUNT(*) FROM borrowings WHERE returned_at IS NOT NULL AND DATE(DATE_ADD(returned_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS returns_today,
          (SELECT COALESCE(COUNT(*), 0) FROM reservations WHERE deleted_at IS NULL AND status IN ('pending', 'ready') AND (expires_at IS NULL OR expires_at > NOW())) AS active_reservations,
          (SELECT COALESCE(COUNT(*), 0) FROM reservations WHERE deleted_at IS NULL AND status = 'ready' AND (expires_at IS NULL OR expires_at > NOW())) AS ready_reservations,
-         (SELECT COUNT(*) FROM reservations WHERE DATE(reserved_at) = CURDATE()) AS reservations_today,
-         (SELECT COUNT(*) FROM reservations WHERE fulfilled_at IS NOT NULL AND DATE(fulfilled_at) = CURDATE()) AS fulfilled_reservations_today,
-         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(created_at) = CURDATE()) AS attendance_today,
-         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(created_at) = CURDATE() AND purpose = 'borrowing') AS borrowing_attendance_today,
-         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(created_at) = CURDATE() AND purpose = 'entry_exit') AS entry_exit_attendance_today,
-         (SELECT COUNT(*) FROM site_daily_visits WHERE visit_date = CURDATE()) AS unique_visitors_today,
-         (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits WHERE visit_date = CURDATE()) AS visit_hits_today,
+         (SELECT COUNT(*) FROM reservations WHERE DATE(DATE_ADD(reserved_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS reservations_today,
+         (SELECT COUNT(*) FROM reservations WHERE fulfilled_at IS NOT NULL AND DATE(DATE_ADD(fulfilled_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS fulfilled_reservations_today,
+         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(DATE_ADD(created_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS attendance_today,
+         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(DATE_ADD(created_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) AND purpose = 'borrowing') AS borrowing_attendance_today,
+         (SELECT COUNT(*) FROM attendance_logs WHERE DATE(DATE_ADD(created_at, INTERVAL 8 HOUR)) = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) AND purpose = 'entry_exit') AS entry_exit_attendance_today,
+         (SELECT COUNT(*) FROM site_daily_visits WHERE visit_date = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS unique_visitors_today,
+         (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits WHERE visit_date = DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS visit_hits_today,
          (SELECT COUNT(DISTINCT visitor_id) FROM site_daily_visits) AS total_unique_visitors,
          (SELECT COALESCE(SUM(hit_count), 0) FROM site_daily_visits) AS total_visit_hits,
          (SELECT COUNT(*) FROM notifications WHERE is_active = 1) AS active_notifications,
          (SELECT COUNT(*) FROM academic_subscriptions WHERE deleted_at IS NULL AND is_active = 1) AS active_subscriptions,
-         (SELECT COUNT(*) FROM library_holidays WHERE is_active = 1 AND holiday_date >= CURDATE()) AS upcoming_holidays,
+         (SELECT COUNT(*) FROM library_holidays WHERE is_active = 1 AND holiday_date >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)) AS upcoming_holidays,
          (SELECT COALESCE(SUM(CASE WHEN kind IN ('payment','legacy_credit','reversal') THEN -amount ELSE 0 END), 0) FROM fine_ledger_entries) AS settled_fines_total,
          (SELECT COALESCE(SUM(TIMESTAMPDIFF(HOUR, due_date, NOW())), 0) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue' AND due_date < NOW()) AS overdue_hours_total,
          (SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1 LIMIT 1) AS overdue_fine_per_hour`
     ),
     db.query(
       `SELECT DATE_FORMAT(visit_date, '%Y-%m-%d') AS label, COUNT(*) AS unique_visitors, COALESCE(SUM(hit_count), 0) AS visit_hits
-       FROM site_daily_visits WHERE visit_date >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(visit_date, '%Y-%m-%d') ORDER BY label ASC`,
+       FROM site_daily_visits WHERE visit_date >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(visit_date, '%Y-%m-%d') ORDER BY label ASC`,
       [daysAgo]
     ),
     db.query(
       `SELECT label, SUM(borrowed_count) AS borrowed_count, SUM(returned_count) AS returned_count
        FROM (
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count FROM borrowings WHERE created_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, COUNT(*) AS borrowed_count, 0 AS returned_count FROM borrowings WHERE created_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(returned_at, '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(returned_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, 0 AS borrowed_count, COUNT(*) AS returned_count FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d')
        ) circulation GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT label, SUM(entry_exit_count) AS entry_exit_count, SUM(borrowing_count) AS borrowing_count
        FROM (
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, COUNT(*) AS entry_exit_count, 0 AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'entry_exit' GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, COUNT(*) AS entry_exit_count, 0 AS borrowing_count FROM attendance_logs WHERE created_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY AND purpose = 'entry_exit' GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS label, 0 AS entry_exit_count, COUNT(*) AS borrowing_count FROM attendance_logs WHERE created_at >= CURDATE() - INTERVAL ? DAY AND purpose = 'borrowing' GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, 0 AS entry_exit_count, COUNT(*) AS borrowing_count FROM attendance_logs WHERE created_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY AND purpose = 'borrowing' GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
        ) attendance GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo]
     ),
     db.query(
       `SELECT label, SUM(created_count) AS created_count, SUM(fulfilled_count) AS fulfilled_count, SUM(cancelled_count) AS cancelled_count
        FROM (
-         SELECT DATE_FORMAT(reserved_at, '%Y-%m-%d') AS label, COUNT(*) AS created_count, 0 AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE reserved_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(reserved_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(reserved_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, COUNT(*) AS created_count, 0 AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE reserved_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(DATE_ADD(reserved_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(fulfilled_at, '%Y-%m-%d') AS label, 0 AS created_count, COUNT(*) AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE fulfilled_at IS NOT NULL AND fulfilled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(fulfilled_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(fulfilled_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, 0 AS created_count, COUNT(*) AS fulfilled_count, 0 AS cancelled_count FROM reservations WHERE fulfilled_at IS NOT NULL AND fulfilled_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(DATE_ADD(fulfilled_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(cancelled_at, '%Y-%m-%d') AS label, 0 AS created_count, 0 AS fulfilled_count, COUNT(*) AS cancelled_count FROM reservations WHERE cancelled_at IS NOT NULL AND cancelled_at >= CURDATE() - INTERVAL ? DAY GROUP BY DATE_FORMAT(cancelled_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(cancelled_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS label, 0 AS created_count, 0 AS fulfilled_count, COUNT(*) AS cancelled_count FROM reservations WHERE cancelled_at IS NOT NULL AND cancelled_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY GROUP BY DATE_FORMAT(DATE_ADD(cancelled_at, INTERVAL 8 HOUR), '%Y-%m-%d')
        ) reservations_flow GROUP BY label ORDER BY label ASC`,
       [daysAgo, daysAgo, daysAgo]
     ),
@@ -266,7 +261,7 @@ async function getDashboardOverviewData(daysAgo: number) {
     db.query("SELECT role AS name, COUNT(*) AS value FROM users WHERE deleted_at IS NULL GROUP BY role ORDER BY value DESC, role ASC"),
     db.query(
       `SELECT COALESCE(bk.title, 'Deleted book') AS name, COUNT(*) AS total FROM borrowings b LEFT JOIN books bk ON bk.id = b.book_id
-       WHERE b.created_at >= CURDATE() - INTERVAL ? DAY
+       WHERE b.created_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY
        GROUP BY b.book_id, bk.title ORDER BY total DESC, bk.title ASC LIMIT 5`,
       [daysAgo]
     ),
@@ -281,16 +276,16 @@ async function getDashboardOverviewData(daysAgo: number) {
     db.query("SELECT \`condition\` AS name, COUNT(*) AS value FROM book_copies WHERE deleted_at IS NULL AND is_active = 1 GROUP BY \`condition\` ORDER BY FIELD(\`condition\`, 'good', 'damaged', 'lost', 'weeded', 'discarded')"),
     db.query(
       `SELECT u.role AS name, COUNT(*) AS value FROM borrowings b JOIN users u ON u.id = b.user_id
-       WHERE b.created_at >= CURDATE() - INTERVAL ? DAY
+       WHERE b.created_at >= DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR) - INTERVAL ? DAY
        GROUP BY u.role ORDER BY value DESC, u.role ASC`,
       [daysAgo]
     ),
     db.query(
-      `SELECT DATE_FORMAT(effective_at, '%Y-%m') AS label,
+      `SELECT DATE_FORMAT(DATE_ADD(effective_at, INTERVAL 8 HOUR), '%Y-%m') AS label,
               COALESCE(SUM(CASE WHEN kind IN ('payment','legacy_credit','reversal') THEN -amount ELSE 0 END), 0) AS settled_amount
        FROM fine_ledger_entries WHERE kind IN ('payment','legacy_credit','reversal')
-         AND effective_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
-       GROUP BY DATE_FORMAT(effective_at, '%Y-%m') ORDER BY label ASC`
+         AND effective_at >= DATE_FORMAT(DATE_SUB(DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR), INTERVAL 5 MONTH), '%Y-%m-01')
+       GROUP BY DATE_FORMAT(DATE_ADD(effective_at, INTERVAL 8 HOUR), '%Y-%m') ORDER BY label ASC`
     ),
     db.query(
       `SELECT occurred_at, activity_type, description
@@ -313,8 +308,8 @@ async function getDashboardOverviewData(daysAgo: number) {
 async function getReportRangeBounds() {
   const [[row]] = await db.query(
     `SELECT
-       DATE_FORMAT(COALESCE(MIN(event_date), CURDATE()), '%Y-%m-%d') AS dateFrom,
-       DATE_FORMAT(CURDATE(), '%Y-%m-%d') AS dateTo
+       DATE_FORMAT(COALESCE(MIN(event_date), DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)), '%Y-%m-%d') AS dateFrom,
+       DATE_FORMAT(DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR), '%Y-%m-%d') AS dateTo
      FROM (
        SELECT MIN(borrowed_at) AS event_date FROM borrowings
        UNION ALL SELECT MIN(returned_at) FROM borrowings WHERE returned_at IS NOT NULL
@@ -421,14 +416,14 @@ async function getAiReportQueryData({ range, previousRange, startAt, endExclusiv
          SUM(unique_library_visitors) AS unique_library_visitors, SUM(borrowing_scans) AS borrowing_scans,
          SUM(unique_visitors) AS unique_visitors, SUM(page_hits) AS page_hits
        FROM (
-         SELECT DATE_FORMAT(borrowed_at, '%Y-%m-%d') AS day, COUNT(*) AS borrowed, 0 AS returned, 0 AS entry_exit_scans, 0 AS library_entries, 0 AS unique_library_visitors, 0 AS borrowing_scans, 0 AS unique_visitors, 0 AS page_hits
-         FROM borrowings WHERE borrowed_at >= ? AND borrowed_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(borrowed_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(borrowed_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS day, COUNT(*) AS borrowed, 0 AS returned, 0 AS entry_exit_scans, 0 AS library_entries, 0 AS unique_library_visitors, 0 AS borrowing_scans, 0 AS unique_visitors, 0 AS page_hits
+         FROM borrowings WHERE borrowed_at >= ? AND borrowed_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(borrowed_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(returned_at, '%Y-%m-%d'), 0, COUNT(*), 0, 0, 0, 0, 0, 0
-         FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= ? AND returned_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(returned_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d'), 0, COUNT(*), 0, 0, 0, 0, 0, 0
+         FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= ? AND returned_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
-         SELECT DATE_FORMAT(created_at, '%Y-%m-%d'), 0, 0, SUM(purpose = 'entry_exit'), SUM(purpose = 'entry_exit' AND type = 'check_in'), COUNT(DISTINCT CASE WHEN purpose = 'entry_exit' AND type = 'check_in' THEN user_id END), SUM(purpose = 'borrowing'), 0, 0
-         FROM attendance_logs WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+         SELECT DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d'), 0, 0, SUM(purpose = 'entry_exit'), SUM(purpose = 'entry_exit' AND type = 'check_in'), COUNT(DISTINCT CASE WHEN purpose = 'entry_exit' AND type = 'check_in' THEN user_id END), SUM(purpose = 'borrowing'), 0, 0
+         FROM attendance_logs WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
          SELECT DATE_FORMAT(visit_date, '%Y-%m-%d'), 0, 0, 0, 0, 0, 0, COUNT(DISTINCT visitor_id), COALESCE(SUM(hit_count), 0)
          FROM site_daily_visits WHERE visit_date >= ? AND visit_date <= ? GROUP BY DATE_FORMAT(visit_date, '%Y-%m-%d')

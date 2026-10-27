@@ -5,6 +5,7 @@ import clearance = require("../clearance/clearance.service");
 import loanDuration = require("./loan-duration");
 import undoTokens = require("./borrowing.undo-token");
 import fineLedger = require("./fine-ledger.service");
+import { formatLibraryDeadline } from "../time/library-time";
 
 const repository = require("./borrowing.repository");
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit") as {
@@ -193,7 +194,7 @@ const borrowBook = async (
     await notifications.enqueueNotification(conn, {
       type: "borrowing_created", sourceType: "borrowing", sourceId: borrowingId, emailDueDate: new Date(dueDate).toISOString(),
       title: "Book borrowed successfully",
-      body: `You borrowed "${copy.title}". Please return it on or before ${new Date(dueDate).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}.`,
+      body: `You borrowed "${copy.title}". Please return it on or before ${formatLibraryDeadline(dueDate)}.`,
       href: "/my-library",
       audienceType: "user",
       audienceUserId: userId,

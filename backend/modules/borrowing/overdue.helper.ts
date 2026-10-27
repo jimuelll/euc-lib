@@ -3,6 +3,7 @@ import repository = require("./borrowing.repository");
 import notifications = require("../notifications/notifications.service");
 import librarySettings = require("../library-settings/library-settings.service");
 import fine = require("./fine-calculation");
+import { addLibraryCalendarDays, libraryDateKey } from "../time/library-time";
 
 interface BorrowingRow extends RowDataPacket {
   id: number;
@@ -55,21 +56,13 @@ const ensureBorrowingPaymentColumns = async (): Promise<void> => {
   ensuredBorrowingPaymentColumns = true;
 };
 
-const toHolidayKey = (value: Date | string | number): string => {
-  const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
 const calculateDueDateWithHolidays = async (borrowedAt: Date | string | number, daysAllowed: number, conn?: PoolConnection): Promise<Date> => {
   const holidayDateSet = await librarySettings.getHolidayDateSet(conn);
-  const dueDate = new Date(borrowedAt);
+  let dueDate = new Date(borrowedAt);
   let countedDays = 0;
   while (countedDays < daysAllowed) {
-    dueDate.setDate(dueDate.getDate() + 1);
-    if (holidayDateSet.has(toHolidayKey(dueDate))) continue;
+    dueDate = addLibraryCalendarDays(dueDate, 1);
+    if (holidayDateSet.has(libraryDateKey(dueDate))) continue;
     countedDays += 1;
   }
   return dueDate;

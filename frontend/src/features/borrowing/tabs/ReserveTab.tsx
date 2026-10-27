@@ -7,6 +7,7 @@ import { Clock, CheckCircle2, Loader2 } from "@/components/ui/library-glyphs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { formatLibraryDateTime } from "@/utils/libraryTime";
 import type { CatalogBook, ActiveReservation } from "../types";
 import { cancelReservation, reserveBook } from "../api";
 import ReservationPagination from "../components/ReservationPagination";
@@ -25,7 +26,7 @@ function expiryLabel(value: string | null, now: number) {
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return null;
   const minutes = Math.floor((timestamp - now) / 60000);
-  return { date: new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }), remaining: minutes <= 0 ? "Expired" : minutes >= 1440 ? `in ${Math.floor(minutes / 1440)} d ${Math.floor(minutes % 1440 / 60)} h` : `in ${Math.floor(minutes / 60)} h ${minutes % 60} m` };
+  return { date: formatLibraryDateTime(value), remaining: minutes <= 0 ? "Expired" : minutes >= 1440 ? `in ${Math.floor(minutes / 1440)} d ${Math.floor(minutes % 1440 / 60)} h` : `in ${Math.floor(minutes / 60)} h ${minutes % 60} m` };
 }
 export default function ReserveTab(props: ReserveTabProps) {
   const { catalog, activeReservations, catalogLoading, dataLoading, hasSearched, pagination, onPageChange, onReserveSuccess, onCancelSuccess } = props;

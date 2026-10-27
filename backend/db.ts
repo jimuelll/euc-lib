@@ -21,6 +21,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
+  timezone: "Z",
   ...(ssl ? { ssl } : {}),
   connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS || 30000),
   waitForConnections: true,

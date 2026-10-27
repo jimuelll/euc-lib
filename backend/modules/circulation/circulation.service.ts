@@ -10,6 +10,7 @@ const { calculateLoanDueDate } = require("../borrowing/loan-duration") as {
   calculateLoanDueDate: (from: Date, duration: { minutes: number; unit: string }, connection: PoolConnection) => Promise<Date | string>;
 };
 const fineLedger = require("../borrowing/fine-ledger.service");
+import { formatLibraryDeadline } from "../time/library-time";
 const notificationsService = require("../notifications/notifications.service");
 const { getClearanceProfile } = require("../clearance/clearance.service") as { getClearanceProfile: (studentEmployeeId: string) => Promise<unknown> };
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit") as {
@@ -112,7 +113,7 @@ const processRenew = async ({ borrowingId, renewedBy = null }: ProcessRenewInput
     if (changed !== 1) throw createServiceError("This loan changed while renewal was being processed. Reload and try again.", 409);
     await notificationsService.enqueueNotification(connection, {
       type: "borrowing_renewed", sourceType: "borrowing", sourceId: borrowingId, emailDueDate: new Date(dueDate).toISOString(), title: "Book renewal recorded",
-      body: `Your borrowing for "${row.title}" has been renewed. New due date: ${new Date(dueDate).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}.`,
+      body: `Your borrowing for "${row.title}" has been renewed. New due date: ${formatLibraryDeadline(dueDate)}.`,
       href: "/my-library", audienceType: "user", audienceUserId: row.user_id, createdBy: renewedBy,
     });
     const [savedRows] = await connection.query<Array<RowDataPacket & { id: number; status: string; due_date: Date | string }>>(

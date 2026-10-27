@@ -12,6 +12,7 @@ import { fetchAcademicPrograms } from "@/features/library-settings";
 import { useUnsavedChanges, AdminDateTime } from "@/features/admin";
 import { toast } from "@/components/ui/sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
+import { formatLibraryDate } from "@/utils/libraryTime";
 import { fetchBookHoldings, fetchHoldingOptions, saveCopyHolding, voidCopyAccession, updateCatalogCopyCondition, type CatalogHolding } from "../catalog.api";
 import { catalogKeys } from "../../catalog.keys";
 import { librarySettingsKeys } from "@/features/library-settings/library-settings.keys";
@@ -219,7 +220,7 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
         <div className="flex min-w-0 flex-wrap items-center gap-2"><Barcode className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="shrink-0 text-xs font-medium text-foreground">{copyLabel(current)}</span><span className="break-all font-mono text-xs text-muted-foreground">{current.barcode}</span><span className="text-xs text-muted-foreground">{current.accession_number ? `Accession ${current.accession_number}` : "No accession number"}</span></div>
         <span className={`text-xs font-medium ${current.borrow_eligible ? "text-success" : "text-muted-foreground"}`}>{lendingStatus(current)} · {current.condition}</span>
       </div>
-      <div className="mt-3 border border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">Loan policy: <span className="font-medium text-foreground">{current.book_type || "Not assigned"}</span>{current.borrower_name ? ` · Borrowed by ${current.borrower_name}` : ""}{current.due_date ? ` · Due ${new Date(current.due_date).toLocaleDateString()}` : ""}</div></>}
+      <div className="mt-3 border border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">Loan policy: <span className="font-medium text-foreground">{current.book_type || "Not assigned"}</span>{current.borrower_name ? ` · Borrowed by ${current.borrower_name}` : ""}{current.due_date ? ` · Due ${formatLibraryDate(current.due_date)}` : ""}</div></>}
 
       {!current.is_active && !current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired and has no accession yet. Restore it from Copies before assigning one.</p>}
       {!current.is_active && current.accession_number && <p role="status" className="mt-4 border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-foreground">This copy is retired. Its accession is permanent; you can update its other holding details here.</p>}

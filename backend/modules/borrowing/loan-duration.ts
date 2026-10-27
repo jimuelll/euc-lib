@@ -1,5 +1,6 @@
 import type { PoolConnection } from "mysql2/promise";
 import librarySettings = require("../library-settings/library-settings.service");
+import { addLibraryCalendarDays, libraryDateKey } from "../time/library-time";
 
 type LoanDurationUnit = "day" | "hour";
 interface LoanDuration {
@@ -18,14 +19,13 @@ function validateLoanDuration({ minutes, unit }: LoanDuration): { minutes: numbe
 
 async function calculateLoanDueDate(borrowedAt: Date | string | number, policy: LoanDuration, conn?: PoolConnection): Promise<Date> {
   const { minutes, unit } = validateLoanDuration(policy);
-  const due = new Date(borrowedAt);
+  let due = new Date(borrowedAt);
   if (unit === "hour") return new Date(due.getTime() + minutes * 60000);
   const holidays = await librarySettings.getHolidayDateSet(conn);
   let remainingDays = minutes / 1440;
   while (remainingDays > 0) {
-    due.setDate(due.getDate() + 1);
-    const key = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`;
-    if (!holidays.has(key)) remainingDays -= 1;
+    due = addLibraryCalendarDays(due, 1);
+    if (!holidays.has(libraryDateKey(due))) remainingDays -= 1;
   }
   return due;
 }
