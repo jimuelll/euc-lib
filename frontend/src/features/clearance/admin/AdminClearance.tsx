@@ -15,7 +15,7 @@ import { adjustClearanceFine, fetchClearanceProfile, fetchClearanceQueue, record
 import "@/features/admin/compact-admin.css";
 import "./clearance.css";
 
-const day = (value?: string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Ulaanbaatar" }) : "Date not recorded";
+const day = (value?: string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }) : "Date not recorded";
 const days = (value?: string | null) => value ? Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000)) : undefined;
 export function clearanceChecklist(profile: ClearanceProfile) {
   const parts = [profile.overdueItems.length ? `${profile.overdueItems.length} ${profile.overdueItems.length === 1 ? "item is" : "items are"} returned` : "", profile.outstandingAmount > 0 ? `${formatPeso(profile.outstandingAmount)} is paid` : ""].filter(Boolean);

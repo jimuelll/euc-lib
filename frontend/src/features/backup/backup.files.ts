@@ -17,6 +17,6 @@ export async function readBackup(file:File,maxBytes:number,password=''):Promise<
  }
  if(value.format!=='euc-library-backup')throw new Error('Choose an EUC Library backup file.');if(new TextEncoder().encode(text).length>maxBytes)throw new Error('The expanded backup exceeds the import limit.');return value;
 }
-export const backupDate=(value:string)=>new Date(value).toLocaleString('en-PH',{timeZone:'Asia/Ulaanbaatar',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+export const backupDate=(value:string)=>new Date(value).toLocaleString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 export const backupAge=(value:string)=>{const hours=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/3600000));return hours<1?'Less than an hour ago':hours<24?`${hours} ${hours===1?'hour':'hours'} ago`:`${Math.floor(hours/24)} days ago`;};
 export const backupSize=(value:number)=>value<1048576?`${(value/1024).toFixed(1)} KB`:`${(value/1048576).toFixed(1)} MB`;

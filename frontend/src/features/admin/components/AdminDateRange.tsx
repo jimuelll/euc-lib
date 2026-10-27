@@ -14,7 +14,7 @@ export default function AdminDateRange({ from, to, onChange, presetMode = 'visit
     labelOverride?: ReactNode;
  footer?: ReactNode;
  extraPresets?: Array<{label:string;from:string;to:string}>;
-}) { const [open, setOpen] = useState(false), [draft, setDraft] = useState<DateRange | undefined>(); const preset = (kind: string) => { const parts = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ulaanbaatar',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()); const today=['year','month','day'].map(key=>parts.find(part=>part.type===key)?.value).join('-'); const end = new Date(today+'T12:00:00'), start = new Date(end); if (kind === 'week')
+}) { const [open, setOpen] = useState(false), [draft, setDraft] = useState<DateRange | undefined>(); const preset = (kind: string) => { const parts = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()); const today=['year','month','day'].map(key=>parts.find(part=>part.type===key)?.value).join('-'); const end = new Date(today+'T12:00:00'), start = new Date(end); if (kind === 'week')
     start.setDate(start.getDate() - (start.getDay() + 6) % 7); if (kind === '7d')
     start.setDate(start.getDate() - 6); if (kind === '30d')
     start.setDate(start.getDate() - 29); if (kind === 'month')

@@ -12,10 +12,10 @@ import { AdminDateRange, AdminPageHeader, AdminPageTabs, AdminSummaryTile, Admin
 import { attendanceKeys } from "./attendance.keys";
 import { fetchAttendanceVisits, recordManualAttendance, timeOutAttendance, type AttendanceVisit } from "./attendance.api";
 import "./attendance.css";
-export const attendanceDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ulaanbaatar", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+export const attendanceDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 export const visitDuration = (minutes: number | null) => minutes === null ? "—" : `${Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)}h ` : ""}${minutes % 60}m`;
-const dateText = (value: string) => new Date(value).toLocaleDateString("en-PH", { timeZone: "Asia/Ulaanbaatar", month: "short", day: "numeric", year: "numeric" });
-const timeText = (value: string) => new Date(value).toLocaleTimeString("en-PH", { timeZone: "Asia/Ulaanbaatar", hour: "numeric", minute: "2-digit" });
+const dateText = (value: string) => new Date(value).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" });
+const timeText = (value: string) => new Date(value).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
 function Choice({ label, value, onChange, items }: { label:string; value:string; onChange:(value:string)=>void; items:string[][] }) { return <Select value={value} onValueChange={onChange}><SelectTrigger aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{items.map(([key,text])=><SelectItem value={key} key={key}>{text}</SelectItem>)}</SelectContent></Select>; }
 export default function AdminAttendanceLogs() {
  const [params, patch] = useAdminUrlState(); const client = useQueryClient(); const {confirm,confirmDialog} = useAdminConfirmDialog();

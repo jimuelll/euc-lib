@@ -7,10 +7,10 @@ export const valueText=(value:unknown)=>value===null||value===undefined?'Not set
 export type Change={field:string;before?:unknown;after?:unknown;value?:unknown;current_name?:boolean};
 export function changesOf(item:AuditItem):Change[]{const value=item.display_changes||parsedMetadata(item.metadata).changes;return Array.isArray(value)?value.filter(c=>c&&typeof c==='object'&&typeof c.field==='string'):[];}
 export const instant=adminInstant;
-export const dayKey=(value:string)=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ulaanbaatar',year:'numeric',month:'2-digit',day:'2-digit'}).format(instant(value));
-export const eventTime=(value:string)=>instant(value).toLocaleTimeString('en-PH',{timeZone:'Asia/Ulaanbaatar',hour:'numeric',minute:'2-digit'});
-export const exactTime=(value:string)=>instant(value).toLocaleString('en-PH',{timeZone:'Asia/Ulaanbaatar',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})+' · UTC+08:00';
-export function dayTitle(value:string){const key=dayKey(value),today=dayKey(new Date().toISOString()),yesterday=dayKey(new Date(Date.now()-86400000).toISOString()),date=instant(value).toLocaleDateString('en-PH',{timeZone:'Asia/Ulaanbaatar',weekday:'short',month:'short',day:'numeric',year:'numeric'});return `${key===today?'Today · ':key===yesterday?'Yesterday · ':''}${date}`;}
+export const dayKey=(value:string)=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(instant(value));
+export const eventTime=(value:string)=>instant(value).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'numeric',minute:'2-digit'});
+export const exactTime=(value:string)=>instant(value).toLocaleString('en-PH',{timeZone:'Asia/Manila',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',second:'2-digit'})+' · UTC+08:00';
+export function dayTitle(value:string){const key=dayKey(value),today=dayKey(new Date().toISOString()),yesterday=dayKey(new Date(Date.now()-86400000).toISOString()),date=instant(value).toLocaleDateString('en-PH',{timeZone:'Asia/Manila',weekday:'short',month:'short',day:'numeric',year:'numeric'});return `${key===today?'Today · ':key===yesterday?'Yesterday · ':''}${date}`;}
 export const hasAuditDetails=(item:AuditItem)=>Boolean(item.significant||changesOf(item).length||item.related_ids?.length||item.restore_status==='reversed'||Object.keys(parsedMetadata(item.metadata)).some(key=>!['detail_status','changes'].includes(key)));
 export const eventCount=(n:number)=>`${n} ${n===1?'event':'events'}`;
 export const hiddenValue=(value:unknown)=>value==='Redacted (sensitive)';

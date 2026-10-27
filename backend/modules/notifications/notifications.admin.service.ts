@@ -110,7 +110,7 @@ export async function action(key: string, action: string, actor: number, input: 
     fail('Open the compose form to resend with fresh recipient confirmation.',409);
 }
 export async function details(key: string) { const record = await repository.get(key); if (!record)
-    fail('Notification not found.', 404); const day = new Date(record.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Ulaanbaatar' });
+    fail('Notification not found.', 404); const day = new Date(record.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
     const rows=record.origin === 'automatic' ? await repository.group(record.type, day, record.delivery_status) : [record];
     return Promise.all(rows.map(async row=>({...row,email_requested:Boolean(Number(row.email_requested)),email_summary:row.email_batch_id ? await emailRepository.summary(row.id,row.email_batch_id) : null})));
 }

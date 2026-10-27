@@ -1,4 +1,4 @@
-export const REPORT_TIME_ZONE = 'Asia/Ulaanbaatar';
+export const REPORT_TIME_ZONE = 'Asia/Manila';
 /** SQL calendar dates must never pass through UTC instant serialization. */
 export function calendarDate(value: string | Date = new Date()): string {
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;

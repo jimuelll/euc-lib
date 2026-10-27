@@ -14,7 +14,7 @@ export type { AnalyticsRange, DashboardResponse, DashboardStats, NamedValue, Tre
 import { analyticsRows, downloadAnalyticsCsv, printAnalytics } from '../analytics.export';
 import './analytics.css';
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-const defaultDates = (range: string) => { const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ulaanbaatar',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()); const today=['year','month','day'].map(key=>parts.find(part=>part.type===key)?.value).join('-'); const end = new Date(today+'T12:00:00'), start = new Date(end); if (range === 'month')
+const defaultDates = (range: string) => { const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()); const today=['year','month','day'].map(key=>parts.find(part=>part.type===key)?.value).join('-'); const end = new Date(today+'T12:00:00'), start = new Date(end); if (range === 'month')
     start.setDate(1);
 else if (range === 'year')
     start.setMonth(0, 1);

@@ -115,7 +115,7 @@ export default function AcademicSettings() {
     };
     if (await run(operation, `${labels[kind][0].toUpperCase()+labels[kind].slice(1)} ${item ? "updated" : "added"}`, undo)) { unsaved.markSaved(); setEditor(null); }
   };
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ulaanbaatar", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const termOrder = (term: api.AcademicTerm) => term.is_current ? 0 : day(term.starts_on) >= today ? 1 : 2;
   const allItems = collections[tab];
   const visible = allItems.filter(item => (tab === "terms" || (statuses[tab] === "active" ? active(item) : !active(item))) && item.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
@@ -137,7 +137,7 @@ export default function AcademicSettings() {
     if (await run(() => api.importLibraryHolidays(nationalHolidays2026.filter(holiday => selectedDates.includes(holiday.holiday_date))), `${selectedDates.length} holidays imported`, async result => { for (const holiday of (result as { holidays: api.LibraryHoliday[] }).holidays) await api.deleteLibraryHoliday(holiday.id); })) { importGuard.markSaved(); setImportOpen(false); }
   };
   return <div className="academic-settings admin-desk-workspace">
-    <AdminPageHeader title="Academic Settings" actions={<span className="admin-desk-secondary">{query.dataUpdatedAt ? <>Updated <time dateTime={new Date(query.dataUpdatedAt).toISOString()}>{new Date(query.dataUpdatedAt).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Ulaanbaatar" })}</time></> : "Loading settings…"}</span>} />
+    <AdminPageHeader title="Academic Settings" actions={<span className="admin-desk-secondary">{query.dataUpdatedAt ? <>Updated <time dateTime={new Date(query.dataUpdatedAt).toISOString()}>{new Date(query.dataUpdatedAt).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}</time></> : "Loading settings…"}</span>} />
     <AdminPageTabs label="Academic Settings sections" value={tab} onChange={value => { setSearch(""); patchParams({ tab: value }); }} items={([
       ["terms", "Academic terms", "academic"], ["programs", "Programs / Courses", "catalog"], ["holidays", "Holidays", "reservations"], ["departments", "Departments", "users"],
     ] as const).map(([value, label, icon]) => ({ value, label, icon, badge: queries[value].isSuccess ? collections[value].length : undefined, descriptionId: `academic-${value}-count`, badgeDescription: "configured entries", unsaved: unsaved.dirty && editor?.kind === value }))}>
