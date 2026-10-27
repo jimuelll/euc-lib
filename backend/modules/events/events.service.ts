@@ -1,4 +1,5 @@
 import repository = require("./events.repository");
+import {publishWithNotice} from "../notifications/publication-notification.service";
 import type { CreateEventInput } from "./events.types";
 
 function toSqlDateTime(value: unknown): string | null {
@@ -12,7 +13,7 @@ async function listUpcomingEvents() {
   return repository.listUpcomingEvents();
 }
 
-async function createEvent({ title, startsAt, endsAt, createdBy }: CreateEventInput) {
+async function createEvent({ title, startsAt, endsAt, createdBy, notifyUsers }: CreateEventInput) {
   const normalizedTitle = title?.trim();
   const normalizedStart = toSqlDateTime(startsAt);
   const normalizedEnd = endsAt === undefined || endsAt === null || endsAt === ""
@@ -29,14 +30,9 @@ async function createEvent({ title, startsAt, endsAt, createdBy }: CreateEventIn
     throw Object.assign(new Error("End time must be after the start time"), { status: 400 });
   }
 
-  return {
-    id: await repository.createEvent({
-      title: normalizedTitle,
-      startsAt: normalizedStart,
-      endsAt: normalizedEnd,
-      createdBy,
-    }),
-  };
+  const record={title:normalizedTitle,startsAt:normalizedStart,endsAt:normalizedEnd,createdBy};
+  if(notifyUsers){const date=(value:string)=>new Date(value.replace(" ","T")+"Z").toLocaleString("en-PH",{timeZone:"Asia/Manila",dateStyle:"medium",timeStyle:"short"});return publishWithNotice("events",createdBy,notifyUsers,normalizedTitle,`Event starts ${date(normalizedStart)}${normalizedEnd?` and ends ${date(normalizedEnd)}`:""}.`,{},conn=>repository.createEvent(record,conn));}
+  return {id:await repository.createEvent(record)};
 }
 
 async function deleteEvent(id: string | string[] | number): Promise<void> {

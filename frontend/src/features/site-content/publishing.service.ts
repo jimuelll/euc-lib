@@ -21,8 +21,8 @@ export interface PublishingDocument extends PublishingMeta {
 export const publishingKeys = { all: ["publishing"] as const, summary: ["publishing", "summary"] as const, document: (section: ContentSection) => ["publishing", section] as const };
 export const getPublishingSummary = async (signal?: AbortSignal) => (await axios.get<PublishingMeta[]>("/api/admin/publishing", { signal })).data;
 export const getPublishingDocument = async (section: ContentSection, signal?: AbortSignal) => (await axios.get<PublishingDocument>(`/api/admin/publishing/${section}`, { signal })).data;
-export const savePublishingDocument = async (section: ContentSection, action: "draft" | "publish" | "discard", document: PublishingDocument, payload: ContentPayload,itemKey?:string) => {
-    const body = { revision: document.revision, baseVersion: document.baseVersion, payload,itemKey };
+export const savePublishingDocument = async (section: ContentSection, action: "draft" | "publish" | "discard", document: PublishingDocument, payload: ContentPayload,itemKey?:string,notifyUsers?:{total:number;email:number}) => {
+    const body = { revision: document.revision, baseVersion: document.baseVersion, payload,itemKey,notifyUsers };
     const url = `/api/admin/publishing/${section}/${action === "publish" ? "publish" : "draft"}`;
     return (action === "discard" ? await axios.delete<PublishingDocument>(url, { data: body }) : action === "publish" ? await axios.post<PublishingDocument>(url, body) : await axios.put<PublishingDocument>(url, body)).data;
 };

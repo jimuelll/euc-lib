@@ -108,6 +108,7 @@ const processRenew = async ({ borrowingId, renewedBy = null }: ProcessRenewInput
       minutes: Number(row.loan_duration_minutes),
       unit: row.loan_duration_unit || "",
     }, connection);
+    await fineLedger.assessBorrowing(row, connection);
     await fineLedger.beginRenewalCycle(borrowingId, connection);
     const changed = await repository.renewBorrowing(borrowingId, dueDate, connection);
     if (changed !== 1) throw createServiceError("This loan changed while renewal was being processed. Reload and try again.", 409);

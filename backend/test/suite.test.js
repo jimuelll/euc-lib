@@ -30,6 +30,7 @@ require("./catalog.isbn-lookup.test");
 require("./catalog.public-search.test");
 require("./delivery.outbox.test");
 require("./fine-calculation.test");
+require("./fine-ledger.prospective.test");
 require("./clearance.desk.test");
 require("./desk.permissions.test");
 require("./staff.desk.integration.test");

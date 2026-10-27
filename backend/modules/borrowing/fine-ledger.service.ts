@@ -16,6 +16,11 @@ interface BorrowingFineRow extends RowDataPacket {
 interface FineAccountRow extends RowDataPacket {
   charged_amount: number | string;
   cycle_base_amount: number | string;
+  policy_due_date: Date | string | null;
+  policy_rate: number | string | null;
+  policy_interval: string | null;
+  policy_initial: number | string | null;
+  policy_baseline: number | string | null;
 }
 interface FineBalanceRow extends RowDataPacket {
   borrowing_id: number;
@@ -65,7 +70,11 @@ async function withTransaction<T>(work: (connection: QueryConnection) => Promise
 async function assessBorrowing(row: BorrowingFineRow, connection: PoolConnection | null = null, assessedAt = new Date()): Promise<FineCalculationResult> {
   return withTransaction(async (conn) => {
     await conn.query("INSERT IGNORE INTO fine_accounts (borrowing_id) VALUES (?)", [row.id]);
-    const [[account]] = await conn.query<FineAccountRow[]>("SELECT charged_amount, cycle_base_amount FROM fine_accounts WHERE borrowing_id = ? FOR UPDATE", [row.id]);
+    const [[account]] = await conn.query<FineAccountRow[]>("SELECT charged_amount, cycle_base_amount, policy_due_date, policy_rate, policy_interval, policy_initial, policy_baseline FROM fine_accounts WHERE borrowing_id = ? FOR UPDATE", [row.id]);
+    if (row.fine_per_hour == null) {
+      const [[settings]] = await conn.query<Array<RowDataPacket & { overdue_fine_per_hour: number | string }>>("SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1");
+      row = { ...row, fine_per_hour: settings?.overdue_fine_per_hour ?? 1 };
+    }
     const { fineAmount, isOverdue, hoursOverdue } = fine.calculateFine({
       dueDate: row.due_date,
       finePerHour: row.fine_per_hour,
@@ -74,13 +83,34 @@ async function assessBorrowing(row: BorrowingFineRow, connection: PoolConnection
       now: assessedAt,
       returnedAt: row.returned_at,
     });
-    const cumulativeFine = fine.roundCurrency(Number(account.cycle_base_amount) + fineAmount);
+    const rate = Number(row.fine_per_hour || 0);
+    const interval = row.fine_interval || "hour";
+    const initial = Number(row.initial_fine || 0);
+    const dateValue = (value: Date | string | null) => value == null ? null : new Date(value).getTime();
+    const hasPolicy = account.policy_baseline != null;
+    const changed = hasPolicy && (dateValue(account.policy_due_date) !== dateValue(row.due_date)
+      || Number(account.policy_rate) !== rate || account.policy_interval !== interval
+      || Number(account.policy_initial) !== initial);
+    let base = Number(account.cycle_base_amount);
+    let baseline = Number(account.policy_baseline || 0);
+    if (changed) {
+      // Preserve charges already posted and start measuring the new policy now.
+      base = Number(account.charged_amount);
+      baseline = fineAmount;
+    } else if (!hasPolicy && base + fineAmount < Number(account.charged_amount)) {
+      // Older ledgers may already contain charges calculated under other terms.
+      base = Number(account.charged_amount);
+      baseline = fineAmount;
+    }
+    const cumulativeFine = fine.roundCurrency(Math.max(Number(account.charged_amount), base + fineAmount - baseline));
     const difference = fine.roundCurrency(cumulativeFine - Number(account.charged_amount));
-    if (difference < 0) throw Object.assign(new Error("A recorded fine exceeds the loan's current policy amount. Review this account before continuing."), { status: 409 });
     if (difference > 0) {
       await conn.query("INSERT INTO fine_ledger_entries (borrowing_id, kind, amount, effective_at) VALUES (?, 'charge', ?, ?)", [row.id, difference, assessedAt]);
-      await conn.query("UPDATE fine_accounts SET charged_amount = ?, assessed_through_at = ? WHERE borrowing_id = ?", [cumulativeFine, assessedAt, row.id]);
     }
+    await conn.query(
+      "UPDATE fine_accounts SET charged_amount = ?, cycle_base_amount = ?, assessed_through_at = ?, policy_due_date = ?, policy_rate = ?, policy_interval = ?, policy_initial = ?, policy_baseline = ? WHERE borrowing_id = ?",
+      [cumulativeFine, base, assessedAt, row.due_date, rate, interval, initial, baseline, row.id],
+    );
     return { fineAmount: cumulativeFine, isOverdue, hoursOverdue };
   }, connection);
 }
@@ -91,7 +121,7 @@ async function beginRenewalCycle(borrowingId: number, conn: PoolConnection): Pro
     [borrowingId],
   );
   if (!account) throw new Error(`Fine ledger is missing loan #${borrowingId}.`);
-  await conn.query("UPDATE fine_accounts SET cycle_base_amount = ? WHERE borrowing_id = ?", [account.charged_amount, borrowingId]);
+  await conn.query("UPDATE fine_accounts SET cycle_base_amount = ?, policy_baseline = NULL WHERE borrowing_id = ?", [account.charged_amount, borrowingId]);
 }
 
 async function balancesForBorrowings(borrowingIds: number[], conn: QueryConnection = db): Promise<Map<number, FineBalance>> {

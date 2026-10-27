@@ -83,7 +83,7 @@ const markReturned = async (borrowingId: number, conn: PoolConnection): Promise<
 
 const getBorrowingForRenewal = async (borrowingId: number, conn: PoolConnection): Promise<RenewalBorrowing | null> => {
   const [rows] = await conn.query<RenewalBorrowing[]>(
-    `SELECT b.id, b.user_id, b.status, b.due_date, b.loan_duration_minutes,
+    `SELECT b.id, b.user_id, b.status, b.due_date, b.returned_at, b.fine_per_hour, b.fine_interval, b.initial_fine, b.loan_duration_minutes,
             b.loan_duration_unit, bk.title, (bt.id IS NOT NULL) AS has_active_policy
        FROM borrowings b
        JOIN books bk ON bk.id = b.book_id

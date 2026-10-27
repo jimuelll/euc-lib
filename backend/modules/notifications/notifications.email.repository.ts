@@ -34,15 +34,22 @@ export async function publish(input: ManualPublication, confirmed?: { total: num
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+    const result = await publishInTransaction(conn, input, confirmed);
+    await conn.commit();
+    return result;
+  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+}
+
+export async function publishInTransaction(conn: PoolConnection, input: ManualPublication, confirmed?: { total: number; email: number }) {
     const deliveryKey = input.deliveryKey || `manual:${randomUUID()}`;
     const [[existing]] = await conn.query<RowDataPacket[]>('SELECT * FROM notifications WHERE delivery_key=? FOR UPDATE',[deliveryKey]);
-    if (existing) { await conn.commit(); return { record:existing,created:false }; }
+    if (existing) return { record:existing,created:false };
     const batch = input.sendEmail ? randomUUID() : null;
     const emailExpiry = input.expiresAt ? new Date(input.expiresAt).toISOString().slice(0,19).replace('T',' ') : null;
     const [insert] = await conn.query<ResultSetHeader>(`INSERT INTO notifications
-      (type,title,body,href,audience_type,audience_user_id,audience_role,expires_at,created_by,delivery_key,image_url,image_public_id,image_alt,email_requested,email_batch_id,email_expires_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,IF(?=1,LEAST(COALESCE(?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),NULL))
-      `, [input.type,input.title,input.body,input.href || null,input.audienceType || 'all',input.audienceUserId || null,input.audienceRole || null,input.expiresAt || null,input.createdBy || null,deliveryKey,input.imageUrl||null,input.imagePublicId||null,input.imageAlt||null,input.sendEmail?1:0,batch,input.sendEmail?1:0,emailExpiry]);
+      (type,title,body,href,audience_type,audience_user_id,audience_role,expires_at,created_by,delivery_key,image_url,image_public_id,image_alt,email_requested,email_batch_id,email_expires_at,source_type,source_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,IF(?=1,LEAST(COALESCE(?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),DATE_ADD(UTC_TIMESTAMP(),INTERVAL 7 DAY)),NULL),?,?)
+      `, [input.type,input.title,input.body,input.href || null,input.audienceType || 'all',input.audienceUserId || null,input.audienceRole || null,input.expiresAt || null,input.createdBy || null,deliveryKey,input.imageUrl||null,input.imagePublicId||null,input.imageAlt||null,input.sendEmail?1:0,batch,input.sendEmail?1:0,emailExpiry,input.sourceType||null,input.sourceId||null]);
     const [[record]] = await conn.query<RowDataPacket[]>('SELECT * FROM notifications WHERE id=? FOR UPDATE', [insert.insertId]);
     const audience = audienceWhere(input);
     if (input.audienceType === 'users') {
@@ -68,9 +75,7 @@ export async function publish(input: ManualPublication, confirmed?: { total: num
         SELECT d.id,'email',JSON_OBJECT('deliveryId',d.id) FROM email_deliveries d
         WHERE d.notification_id=? AND JSON_UNQUOTE(JSON_EXTRACT(d.context_json,'$.manualBatch'))=?`, [record.id,batch]);
     }
-    await conn.commit();
     return { record, created: true };
-  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
 }
 export async function summary(notificationId: number, batch: string) {
   const [rows] = await db.query<RowDataPacket[]>(`SELECT status,COUNT(*) AS total FROM email_deliveries WHERE notification_id=?

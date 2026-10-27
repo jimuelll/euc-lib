@@ -81,10 +81,10 @@ async function eligible(row: Delivery, conn: Connection): Promise<EmailMessage |
     }
     if (!notice || (notice.audience_type==='role' && notice.audience_role!==user.role) || (notice.audience_type==='user' && Number(notice.audience_user_id)!==Number(user.id))) return null;
     const destinations=['/my-library','/bulletin','/services/borrowing','/catalogue'];
-    if (notice.href && !destinations.includes(notice.href)) throw new SendFailure('permanent','Invalid notification email destination');
+    if (notice.href && !destinations.includes(notice.href) && notice.href !== '/bulletin#upcoming-events' && !/^\/bulletin\?post=[1-9][0-9]*$/.test(notice.href)) throw new SendFailure('permanent','Invalid notification email destination');
     return {recipient:row.recipient,name:user.name,subject:notice.title,message:notice.body,
-      ...(context.notificationDetail ? {action_url:new URL(`/my-library?view=updates&notification=${row.notification_id}`,config().url).href,action_label:'View notification'} : notice.href ? {action_url:new URL(notice.href,config().url).href,action_label:'Open library'} : {}),
-      ...(notice.image_url?{image_url:notice.image_url,image_public_id:notice.image_public_id,image_alt:notice.image_alt}:{})};
+      ...(notice.href && (notice.href.startsWith('/bulletin?post=') || notice.href==='/bulletin#upcoming-events') ? {action_url:new URL(notice.href,config().url).href,action_label:'Open bulletin'} : context.notificationDetail ? {action_url:new URL(`/my-library?view=updates&notification=${row.notification_id}`,config().url).href,action_label:'View notification'} : notice.href ? {action_url:new URL(notice.href,config().url).href,action_label:'Open library'} : {}),
+      ...(notice.image_url?{image_url:notice.image_url,image_public_id:notice.image_public_id,image_alt:notice.image_alt, bulletin_image: /^\/bulletin\?post=[1-9][0-9]*$/.test(notice.href || '')}:{})};
   }
   if (!row.priority && context.sourceId) {
     if (context.sourceType === 'reservation') {

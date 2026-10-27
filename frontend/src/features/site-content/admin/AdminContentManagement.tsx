@@ -1,10 +1,12 @@
 import {useCallback,useEffect,useState} from "react";
-import {useQueries,useQueryClient} from "@tanstack/react-query";
+import {useQueries,useQuery,useQueryClient} from "@tanstack/react-query";
 import {Link,useSearchParams} from "react-router-dom";
 import {Button} from "@/components/ui/button";
 import {TabsContent} from "@/components/ui/tabs";
 import {AdminIcon,AdminPageHeader,AdminPageTabs,AdminDetailDrawer,useUnsavedChanges,useAdminConfirmDialog,type AdminIconName} from "@/features/admin";
 import {getPublishingDocument,savePublishingDocument,publishAllDocuments,publishingKeys,type ContentSection,type ContentPayload,type PublishingDocument} from "../publishing.service";
+import {PublicationNotificationOption} from "@/features/notifications/PublicationNotificationOption";
+import {previewNotificationEmail} from "@/features/notifications/admin/api";
 import {HomepageEditor,AboutEditor} from "./PublishingPages";
 import {EventsEditor,SubscriptionsEditor,BulletinEditor,GuideEditor,RecordFields,recordKey} from "./PublishingCollections";
 import {UploadActivityContext} from "./PublishingFields";
@@ -32,6 +34,7 @@ export default function AdminContentManagement(){
  const [sessions,setSessions]=useState<Partial<Record<ContentSection,Session>>>({});const session=sessions[tab];
  useEffect(()=>{setSessions(previous=>{let next=previous;documents.forEach((query,index)=>{const kind=sections[index];if(query.data&&!previous[kind])next={...next,[kind]:{server:query.data,working:structuredClone(query.data.payload)}};});return next;});},[documents.map(query=>query.dataUpdatedAt).join(",")]);
  const [pending,setPending]=useState(""),[feedback,setFeedback]=useState<{section:ContentSection;key?:string;text:string;error:boolean}|null>(null);
+ const [notifyUsers,setNotifyUsers]=useState(false);
  const [drawerKey,setDrawerKey]=useState<string|null>(null),[guideKey,setGuideKey]=useState<string|null>(null),[preview,setPreview]=useState(false),[role,setRole]=useState("all"),[aboutSection,setAboutSection]=useState("identity");
  const [uploads,setUploads]=useState<Set<string>>(()=>new Set());const reportUpload=useCallback((id:string,active:boolean)=>setUploads(previous=>{if(previous.has(id)===active)return previous;const next=new Set(previous);if(active)next.add(id);else next.delete(id);return next;}),[]);
  const anyDirty=Object.values(sessions).some(dirty),guard=useUnsavedChanges(sessions,true,"website-content",anyDirty);const {confirm,confirmDialog}=useAdminConfirmDialog();const busy=pending||(uploads.size?"upload":"");
@@ -39,6 +42,8 @@ export default function AdminContentManagement(){
  const updateItem=(item:ContentPayload)=>setSessions(previous=>{const state=previous[tab];return state?{...previous,[tab]:{...state,working:{...state.working,items:state.working.items.map((row:ContentPayload)=>recordKey(row)===recordKey(item)?item:row)}}}:previous;});
  const items:ContentPayload[]=(session?.working.items||[]).filter((item:ContentPayload)=>!item.deleted);
  const selected=items.find(item=>recordKey(item)===drawerKey);
+ useEffect(()=>{setNotifyUsers(false);},[drawerKey,tab]);
+ const notifyPreview=useQuery({queryKey:["publishing-notification-preview"],queryFn:({signal})=>previewNotificationEmail({audienceType:"all",audienceRole:null,audienceUserId:null},signal),enabled:notifyUsers&&Boolean(selected&&!selected.id&&(tab==="bulletin"||tab==="events")),staleTime:0});
  const guideItems=[...items].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).filter(item=>role==="all"||item.audience_roles?.includes(role));const guideItem=guideItems.find(item=>recordKey(item)===guideKey)||guideItems[0];
  const editingItem=tab==="guide"?guideItem:selected;const editingKey=editingItem?recordKey(editingItem):undefined;const isForm=tab==="homepage"||tab==="about";
  const accept=(result:PublishingDocument,key?:string)=>{setSessions(previous=>{const state=previous[result.section];const working=structuredClone(result.payload);if(key&&state?.working.items){const unsaved=state.working.items.filter((item:ContentPayload)=>recordKey(item)!==key&&!equal(item,state.server.payload.items?.find((old:ContentPayload)=>recordKey(old)===recordKey(item))));for(const item of unsaved){working.items=working.items.filter((row:ContentPayload)=>recordKey(row)!==recordKey(item));working.items.push(item);}}return {...previous,[result.section]:{server:result,working}};});client.setQueryData(publishingKeys.document(result.section),result);};
@@ -46,8 +51,15 @@ export default function AdminContentManagement(){
   if(!session||busy||!payload)return;
   const name=key?(payload.items||[]).find((item:ContentPayload)=>recordKey(item)===key)?.title||"Untitled item":current.label;
   if(action==="discard"&&!payload._confirmedDiscard&&!await confirm({title:`Discard changes to ${name}?`,description:"Only this editor’s unpublished changes will be removed.",actionLabel:"Discard changes",cancelLabel:"Keep editing",tone:"danger"}))return;
+  let notificationCounts:{total:number;email:number}|undefined;
+  if(action==="publish"&&key&&notifyUsers&&selected&&!selected.id&&(tab==="bulletin"||tab==="events")){
+   try{const preview=await previewNotificationEmail({audienceType:"all",audienceRole:null,audienceUserId:null});if(!preview.enabled||!preview.emailCount||!preview.inAppCount)throw new Error(preview.reason||"No eligible recipients are available.");
+    if(!await confirm({title:"Publish and notify users?",description:`${preview.inAppCount.toLocaleString()} in-app recipients; ${preview.emailCount.toLocaleString()} by email and ${preview.skippedCount.toLocaleString()} in-app only. Emails are queued for delivery.`,actionLabel:"Publish and notify",cancelLabel:"Keep editing"}))return;
+    notificationCounts={total:preview.inAppCount,email:preview.emailCount};
+   }catch(error:any){setFeedback({section:tab,key,text:error.message||"Could not check recipients.",error:true});return;}
+  }
   setPending(action);setFeedback(null);
-  try{const result=await savePublishingDocument(tab,action,session.server,payload,key);accept(result,key);if(action==="publish")void client.invalidateQueries({predicate:query=>query.queryKey[0]!=="publishing"});if(key){if(tab==="guide")setGuideKey(result.resolvedKey||key);else setDrawerKey(result.resolvedKey||key);}setFeedback({section:tab,key:result.resolvedKey||key,text:action==="draft"?"Draft saved":action==="publish"?"Published":"Draft discarded",error:false});}
+  try{const result=await savePublishingDocument(tab,action,session.server,payload,key,notificationCounts);accept(result,key);if(action==="publish")void client.invalidateQueries({predicate:query=>query.queryKey[0]!=="publishing"});if(key){if(tab==="guide")setGuideKey(result.resolvedKey||key);else setDrawerKey(result.resolvedKey||key);}setFeedback({section:tab,key:result.resolvedKey||key,text:action==="draft"?"Draft saved":action==="publish"?"Published":"Draft discarded",error:false});}
   catch(error:any){setFeedback({section:tab,key,text:error.response?.data?.message||"Could not save. Your edits are retained; try again.",error:true});}finally{setPending("");}
  };
  const add=()=>{if(!session||busy)return;if(tab==="homepage"){update({...session.working,hours:[...(session.working.hours||[]),{day:"",time:"",open:true}]});requestAnimationFrame(()=>document.querySelector<HTMLInputElement>(".content-hours-row:last-child input")?.focus());return;}if(tab==="about"){update({...session.working,staff:[...(session.working.staff||[]),{name:"",role:"",image_url:null,image_alt:""}]});return;}
@@ -72,7 +84,7 @@ export default function AdminContentManagement(){
  </fieldset>}</div></TabsContent></AdminPageTabs>
  {footerProps.error&&<div className="content-notice" role="alert">{footerProps.message}<Button variant="outline" disabled={Boolean(busy)} onClick={()=>void reload()}>Reload latest</Button></div>}
  {isForm&&<PublishingFooter {...footerProps}/>}
- <AdminDetailDrawer className="publishing-record-drawer" open={Boolean(selected)} onClose={()=>{if(!busy)setDrawerKey(null);}} title={selected?.title||current.add} description={`Save and publish this ${tab==="events"?"event":tab==="bulletin"?"post":"resource"}. Other drafts are kept.`} headerActions={<><Button variant="outline" onClick={()=>setPreview(true)}><AdminIcon name="eye"/>Preview</Button>{footerProps.error&&<Button variant="outline" disabled={Boolean(busy)} onClick={()=>void reload()}>Reload latest</Button>}</>} footer={selected?<PublishingFooter {...footerProps}/>:undefined}>{selected&&<fieldset disabled={Boolean(busy)} className="publishing-editor-fields"><RecordFields section={tab} value={selected} onChange={item=>{updateItem(item);setFeedback(null);}}/></fieldset>}</AdminDetailDrawer>
+ <AdminDetailDrawer className="publishing-record-drawer" open={Boolean(selected)} onClose={()=>{if(!busy)setDrawerKey(null);}} title={selected?.title||current.add} description={`Save and publish this ${tab==="events"?"event":tab==="bulletin"?"post":"resource"}. Other drafts are kept.`} headerActions={<><Button variant="outline" onClick={()=>setPreview(true)}><AdminIcon name="eye"/>Preview</Button>{footerProps.error&&<Button variant="outline" disabled={Boolean(busy)} onClick={()=>void reload()}>Reload latest</Button>}</>} footer={selected?<PublishingFooter {...footerProps}/>:undefined}>{selected&&<fieldset disabled={Boolean(busy)} className="publishing-editor-fields"><RecordFields section={tab} value={selected} onChange={item=>{updateItem(item);setFeedback(null);}}/>{!selected.id&&(tab==="bulletin"||tab==="events")&&<PublicationNotificationOption checked={notifyUsers} onChange={setNotifyUsers} preview={notifyPreview.data} loading={notifyPreview.isPending} error={notifyPreview.isError} onRetry={()=>void notifyPreview.refetch()} draft/>}</fieldset>}</AdminDetailDrawer>
  {session&&<PublishingPreview open={preview} onClose={()=>setPreview(false)} section={tab} value={session.working} documents={Object.fromEntries(Object.entries(sessions).map(([kind,state])=>[kind,state.working]))} role={role} onRoleChange={setRole}/>}{confirmDialog}{guard.discardDialog}
  </div></UploadActivityContext.Provider>;
 }

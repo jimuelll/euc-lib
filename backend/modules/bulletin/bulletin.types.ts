@@ -61,10 +61,12 @@ export interface BulletinFilters {
 }
 
 export interface CreateBulletinPostInput {
+  notifyUsers?: import("../notifications/publication-notification.service").PublicationNotice;
   title?: string | null;
   content?: string | null;
   image_url?: string | null;
   image_public_id?: string | null;
+  image_alt?: string | null;
   is_pinned: boolean;
   post_type?: string;
   event_starts_at?: unknown;
@@ -79,6 +81,7 @@ export interface CreatePostRepositoryInput {
   content: string;
   imageUrl: string | null;
   imagePublicId: string | null;
+  imageAlt?: string | null;
   authorId: number;
   pinned: boolean;
   postType: string;

@@ -6,6 +6,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {createTestQueryClient,createTestQueryClientWrapper} from '@/test-utils/query-client';
 import NotificationComposeDrawer from './NotificationComposeDrawer';
 import * as api from './api';
+import {fetchBulletinPosts} from '@/features/bulletin/api';
+vi.mock('@/features/bulletin/api',()=>({fetchBulletinPosts:vi.fn()}));
 vi.mock('./api',()=>({countNotificationRecipients:vi.fn(),previewNotificationEmail:vi.fn(),searchNotificationRecipients:vi.fn(),createAdminNotification:vi.fn(),uploadNotificationImage:vi.fn()}));
 const close=vi.fn(),sent=vi.fn();
 const person=(id:number,name:string):api.NotificationRecipient=>({id,name,role:'student',student_employee_id:`P-${id}`,username:null,library_card_number:null,student_number:null,employee_number:null});
@@ -34,4 +36,16 @@ it('keeps email opt-out available when email sending is paused',async()=>{
  vi.mocked(api.previewNotificationEmail).mockResolvedValue({...preview,enabled:false,reason:'Email delivery is paused.'});mount();fill();
  const send=await screen.findByRole('button',{name:'Send to 9 patrons'});fireEvent.click(screen.getByRole('checkbox',{name:'Also send by email'}));
  await screen.findByText(/Email delivery is paused/);expect(send).toBeDisabled();fireEvent.click(screen.getByRole('checkbox',{name:'Also send by email'}));expect(send).toBeEnabled();
+});
+
+it('shows a persistent linked-post confirmation and lets the user remove it',async()=>{
+ vi.mocked(fetchBulletinPosts).mockResolvedValue({data:[{id:42,title:'Library update',image_url:'https://example.test/post.jpg',image_alt:'Poster'} as any],total:1,page:1,totalPages:1});
+ mount({href:'/bulletin'} as api.AdminNotification);
+ fireEvent.click(await screen.findByRole('button',{name:'Library update'}));
+ const status=screen.getByText('Post linked').closest('[role=status]') as HTMLElement;
+ expect(within(status).getByText('Library update')).toBeInTheDocument();
+ expect(within(status).getByText('Primary image included')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Library update'})).toHaveAttribute('aria-pressed','true');
+ fireEvent.click(within(status).getByRole('button',{name:'Remove link'}));
+ expect(screen.queryByText('Post linked')).not.toBeInTheDocument();
 });

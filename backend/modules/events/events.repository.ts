@@ -1,4 +1,4 @@
-import type { Pool, ResultSetHeader } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader } from "mysql2/promise";
 import type { CreateEventInput, EventWrite, LibraryEvent } from "./events.types";
 
 const db = require("../../db") as Pool;
@@ -11,8 +11,8 @@ async function listUpcomingEvents(limit = 8): Promise<LibraryEvent[]> {
   return rows;
 }
 
-async function createEvent({ title, startsAt, endsAt, createdBy }: EventWrite): Promise<number> {
-  const [result] = await db.query<ResultSetHeader>(
+async function createEvent({ title, startsAt, endsAt, createdBy }: EventWrite, conn: Pool | PoolConnection = db): Promise<number> {
+  const [result] = await conn.query<ResultSetHeader>(
     "INSERT INTO library_events (title,starts_at,ends_at,created_by) VALUES (?,?,?,?)",
     [title, startsAt, endsAt, createdBy],
   );

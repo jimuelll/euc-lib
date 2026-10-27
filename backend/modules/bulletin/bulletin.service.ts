@@ -1,4 +1,5 @@
 import repository = require("./bulletin.repository");
+import {publishWithNotice} from "../notifications/publication-notification.service";
 import type {
   BulletinFilters,
   BulletinPostRow,
@@ -30,8 +31,10 @@ const getPostById = async (postId: number, userId: number | null) => {
 const createPost = async (author: BulletinUser, {
   title,
   content,
+  notifyUsers,
   image_url,
   image_public_id,
+  image_alt,
   is_pinned,
   post_type,
   event_starts_at,
@@ -47,12 +50,14 @@ const createPost = async (author: BulletinUser, {
   }
   const postType: string = "announcement";
   const sqlDate = (value: unknown): string | null => value ? String(value).replace("T", " ") : null;
-  return repository.createPost({
+  if(notifyUsers && !ADMIN_ROLES.includes(author.role)) throw Object.assign(new Error("Forbidden"),{status:403});
+  const record = {
     title: title.trim(),
     excerpt: content.trim().replace(/\s+/g, " ").slice(0, 500),
     content: content.trim(),
     imageUrl: image_url?.trim() ?? null,
     imagePublicId: image_public_id?.trim() ?? null,
+    imageAlt: typeof image_alt === "string" ? image_alt.trim().slice(0,500) || null : null,
     authorId: author.id,
     pinned: is_pinned,
     postType,
@@ -60,7 +65,9 @@ const createPost = async (author: BulletinUser, {
     eventEndsAt: postType === "event" ? sqlDate(event_ends_at) : null,
     eventLocation: postType === "event" ? (event_location?.trim() || null) : null,
     eventRegistrationUrl: postType === "event" ? (event_registration_url?.trim() || null) : null,
-  });
+  };
+  if(notifyUsers)return publishWithNotice("bulletin",author.id,notifyUsers,record.title,record.excerpt,{url:record.imageUrl,publicId:record.imagePublicId,alt:record.imageAlt},async conn=>(await repository.createPost(record,conn)).id);
+  return repository.createPost(record);
 };
 
 const deletePost = async (postId: number, requestingUser: BulletinUser): Promise<void> => {

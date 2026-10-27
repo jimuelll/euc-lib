@@ -3,7 +3,7 @@ import type { ApiComment, ApiPost } from "./types";
 
 export interface BulletinPostRecord extends ApiPost { deleted_at?: string | null; }
 export interface BulletinListResponse { data: BulletinPostRecord[]; total: number; page: number; totalPages: number; months?: string[]; }
-export interface BulletinDetailResponse { comments: ApiComment[]; }
+export interface BulletinDetailResponse extends ApiPost { comments: ApiComment[]; }
 export interface BulletinLikeResponse { liked: boolean; total: number; }
 export interface BulletinLiker { id: number; name: string; role: string; created_at: string; }
 export interface BulletinEvent { id: number; title: string; starts_at: string; ends_at?: string | null; }
@@ -19,7 +19,7 @@ export const setBulletinPinned = async (postId: number, pinned: boolean): Promis
 };
 export const archiveBulletinPost = async (postId: number): Promise<void> => { await axiosInstance.delete(`/api/bulletin/${postId}`); };
 export const restoreBulletinPost = async (postId: number): Promise<void> => { await axiosInstance.patch(`/api/bulletin/${postId}/restore`); };
-export const createBulletinPost = async (payload: { title: string; content: string; is_pinned: boolean; image_url: string | null; image_public_id: string | null }) =>
+export const createBulletinPost = async (payload: { title: string; content: string; is_pinned: boolean; image_url: string | null; image_public_id: string | null; image_alt?: string | null; notifyUsers?: {total:number;email:number;requestId:string} }) =>
   (await axiosInstance.post<{ id: number }>("/api/bulletin", payload)).data;
 export const createBulletinComment = async (postId: number, text: string): Promise<ApiComment> =>
   (await axiosInstance.post<ApiComment>(`/api/bulletin/${postId}/comments`, { text })).data;

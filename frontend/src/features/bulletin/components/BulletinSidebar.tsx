@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminDateTime } from "@/features/admin";
 import type { UpcomingEvent } from "../types";
 import { createEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
+import {PublicationNotificationOption} from "@/features/notifications/PublicationNotificationOption";
+import {usePublicationNotice} from "@/features/notifications/usePublicationNotice";
 import { siteContentKeys } from "@/features/site-content";
 
 export function BulletinSidebar() {
@@ -25,6 +27,7 @@ export function BulletinSidebar() {
       date: `${start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}${end && start.toDateString() !== end.toDateString() ? ` – ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : ""}`,
     };
   }) : [];
+  const notice=usePublicationNotice();
   const [showAll, setShowAll] = useState(false);
   const [nextEvent, ...remainingEvents] = events;
   const visibleEvents = showAll ? remainingEvents : remainingEvents.slice(0, 3);
@@ -33,21 +36,24 @@ export function BulletinSidebar() {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [saveError, setSaveError] = useState("");
+  const saveLock=useRef(false);
   const save = async () => {
-    if (!title.trim() || !startsAt || createMutation.isPending) return;
+    if (!title.trim() || !startsAt || createMutation.isPending || saveLock.current) return;
     if (endsAt && endsAt < startsAt) { setSaveError("End date must be on or after the start date."); return; }
-    setSaveError("");
+    setSaveError("");saveLock.current=true;
     try {
+      const notifyUsers=await notice.prepare();if(notifyUsers===null)return;
       await createMutation.mutateAsync({
         title: title.trim(),
         starts_at: new Date(`${startsAt}T00:00:00`).toISOString(),
         ends_at: new Date(`${endsAt || startsAt}T23:59:59`).toISOString(),
+        notifyUsers,
       });
-      setTitle(""); setStartsAt(""); setEndsAt(""); setOpen(false);
-    } catch { setSaveError("The event could not be added. Please try again."); }
+      setTitle(""); setStartsAt(""); setEndsAt(""); notice.reset(); setOpen(false);
+    } catch (error:any) { setSaveError(error.response?.data?.message||error.message||"The event could not be added. Please try again."); } finally {saveLock.current=false;}
   };
   return (
-    <aside className="bulletin-agenda" aria-labelledby="bulletin-agenda-heading">
+    <aside id="upcoming-events" className="bulletin-agenda" aria-labelledby="bulletin-agenda-heading">
       <div className="bulletin-agenda-heading"><h2 id="bulletin-agenda-heading">Coming up</h2><span>{events.length} event{events.length === 1 ? "" : "s"}</span></div>
       {eventsQuery.isPending && <p role="status" className="bulletin-agenda-status">Loading upcoming events…</p>}
       {eventsQuery.isError && <div role="alert" className="bulletin-agenda-status"><p>Upcoming events could not be loaded.</p><button className="bulletin-text-button" onClick={() => void eventsQuery.refetch()}>Try again</button></div>}
@@ -64,8 +70,8 @@ export function BulletinSidebar() {
         {events.length > 4 && <button className="bulletin-text-button" onClick={() => setShowAll((value) => !value)} aria-expanded={showAll}>{showAll ? "Show fewer" : `Show all ${events.length} events`}</button>}
         {canManage && <button className="bulletin-text-button" onClick={() => setOpen(true)}>Update</button>}
       </div>}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={open} onOpenChange={value=>{setOpen(value);if(!value)notice.reset();}}>
+        <DialogContent className="max-w-sm max-h-[90dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>Update upcoming events</DialogTitle></DialogHeader>
           <form className="bulletin-event-form space-y-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <label className="block text-sm font-medium" htmlFor="bulletin-event-title">Event title</label>
@@ -73,11 +79,12 @@ export function BulletinSidebar() {
             <AdminDateTime label="Start date" value={startsAt} onChange={setStartsAt} dateOnly />
             <AdminDateTime label="End date (optional)" value={endsAt} onChange={setEndsAt} dateOnly optional />
             <p className="text-xs text-muted-foreground">Leave the end blank for a single-date event.</p>
+            <PublicationNotificationOption checked={notice.checked} onChange={notice.setChecked} preview={notice.preview.data} loading={notice.preview.isPending} error={notice.preview.isError} onRetry={()=>void notice.preview.refetch()}/>
             {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
             <button type="submit" disabled={!title.trim() || !startsAt || createMutation.isPending} className="w-full bg-primary py-2 text-xs font-bold uppercase text-primary-foreground disabled:opacity-50">{createMutation.isPending ? "Adding event…" : "Add event"}</button>
           </form>
         </DialogContent>
-      </Dialog>
+      </Dialog>{notice.confirmDialog}
 
     </aside>
   );

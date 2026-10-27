@@ -10,6 +10,8 @@ import { ImagePlus, X, Loader2, AlertCircle, Pin } from "@/components/ui/library
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useAuth } from "@/context/AuthContext";
 import { createBulletinPost } from "../api";
+import {PublicationNotificationOption} from "@/features/notifications/PublicationNotificationOption";
+import {usePublicationNotice} from "@/features/notifications/usePublicationNotice";
 import { bulletinKeys } from "../bulletin.keys";
 
 interface CreatePostModalProps {
@@ -58,6 +60,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   });
   const { user } = useAuth();
   const canPin   = CAN_PIN_ROLES.includes(user?.role ?? "");
+  const notice=usePublicationNotice();
 
   const [form, setForm]               = useState<FormState>({ title: "", content: "", is_pinned: false });
   const [submitting, setSubmitting]   = useState(false);
@@ -65,6 +68,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [imageAlt,setImageAlt]=useState("");
   const [imageFile, setImageFile]   = useState<File | Blob | null>(null);
 
   const { upload, uploading, progress, error: uploadError, reset: resetUpload } = useCloudinaryUpload();
@@ -105,6 +109,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const clearImage = useCallback(() => {
     setPreviewSrc((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     setImageFile(null);
+    setImageAlt("");
     resetUpload();
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [resetUpload]);
@@ -113,6 +118,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
     setForm({ title: "", content: "", is_pinned: false });
     clearImage();
     setSubmitError(null);
+    notice.reset();
     onClose();
   }, [clearImage, onClose]);
 
@@ -127,7 +133,11 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
       setSubmitError("Title and content are required.");
       return;
     }
+    if(submitting)return;
     setSubmitting(true);
+    let notifyUsers: Awaited<ReturnType<typeof notice.prepare>>;
+    try { notifyUsers=canPin?await notice.prepare():undefined; if(notifyUsers===null){setSubmitting(false);return;} }
+    catch (failure:any) {setSubmitError(failure.response?.data?.message||failure.message||"Could not check recipients.");setSubmitting(false);return;}
 
     let image_url: string | null = null;
     let image_public_id: string | null = null;
@@ -144,6 +154,8 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
         ...form,
         image_url,
         image_public_id,
+        image_alt:image_url?imageAlt.trim()||null:null,
+        notifyUsers,
       });
       onCreated(data.id);
       handleClose();
@@ -158,7 +170,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
   const error  = submitError ?? uploadError;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <><Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         hideClose
         className="w-[calc(100vw-2rem)] max-w-lg max-h-[92dvh] overflow-y-auto p-0 gap-0 border-border shadow-2xl"
@@ -333,6 +345,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
               </button>
             )}
 
+            {previewSrc&&<div className="mt-3"><label htmlFor="bulletin-image-alt" className="block text-sm font-medium">Image description (optional)</label><input id="bulletin-image-alt" className={`${inputBase} h-10 mt-2`} value={imageAlt} maxLength={500} onChange={event=>setImageAlt(event.target.value)} placeholder="Describe what the image shows"/></div>}
             <input
               ref={fileInputRef}
               type="file"
@@ -342,6 +355,7 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
             />
           </div>
 
+          {canPin&&<div className="px-5 py-4"><PublicationNotificationOption checked={notice.checked} onChange={notice.setChecked} preview={notice.preview.data} loading={notice.preview.isPending} error={notice.preview.isError} onRetry={()=>void notice.preview.refetch()}/></div>}
           {/* Error */}
           {error && (
             <div className="px-5 py-3 flex items-start gap-2.5 bg-destructive/[0.04] border-t border-destructive/20">
@@ -373,6 +387,6 @@ export function CreatePostModal({ open, onClose, onCreated }: CreatePostModalPro
         </div>
 
       </DialogContent>
-    </Dialog>
+    </Dialog>{notice.confirmDialog}</>
   );
 }

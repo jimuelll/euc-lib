@@ -1,4 +1,4 @@
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   BulletinCommentRow,
   BulletinCountRow,
@@ -111,13 +111,13 @@ const findComments = async (postId: number): Promise<BulletinCommentRow[]> => {
   return comments;
 };
 
-const createPost = async ({ title, excerpt, content, imageUrl, imagePublicId, authorId, pinned, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl }: CreatePostRepositoryInput): Promise<{ id: number }> => {
-  if (pinned) await db.query("UPDATE bulletin_posts SET is_pinned = 0 WHERE is_pinned = 1 AND deleted_at IS NULL");
-  const [result] = await db.query<ResultSetHeader>(
+const createPost = async ({ title, excerpt, content, imageUrl, imagePublicId, imageAlt, authorId, pinned, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl }: CreatePostRepositoryInput, conn: Pool | PoolConnection = db): Promise<{ id: number }> => {
+  if (pinned) await conn.query("UPDATE bulletin_posts SET is_pinned = 0 WHERE is_pinned = 1 AND deleted_at IS NULL");
+  const [result] = await conn.query<ResultSetHeader>(
     `INSERT INTO bulletin_posts
-       (title, excerpt, content, image_url, image_public_id, author_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [title, excerpt, content, imageUrl, imagePublicId, authorId, pinned ? 1 : 0, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl],
+       (title, excerpt, content, image_url, image_public_id, image_alt, author_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [title, excerpt, content, imageUrl, imagePublicId, imageAlt || null, authorId, pinned ? 1 : 0, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl],
   );
   return { id: result.insertId };
 };

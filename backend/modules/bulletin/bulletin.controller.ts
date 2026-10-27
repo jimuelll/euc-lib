@@ -69,8 +69,10 @@ const createPost: RequestHandler = async (req, res) => {
     const result = await service.createPost((req as AuthenticatedRequest).user, {
       title,
       content,
+      notifyUsers:req.body.notifyUsers,
       image_url,
       image_public_id,
+      image_alt:req.body.image_alt,
       is_pinned: Boolean(is_pinned),
       post_type,
       event_starts_at,

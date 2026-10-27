@@ -5,6 +5,7 @@ import hub = require('../../realtime/notificationHub');
 import * as email from './notifications.email.service';
 import * as emailRepository from './notifications.email.repository';
 const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
+const db = require('../../db');
 const roles = ['student', 'alumni', 'employee', 'scanner', 'staff', 'admin', 'super_admin'];
 const destinations = ['/my-library', '/bulletin', '/services/borrowing', '/catalogue'];
 export function validate(input: any, now = new Date()) {
@@ -21,7 +22,7 @@ export function validate(input: any, now = new Date()) {
         fail('Choose a valid audience role.');
     if (input.audienceType === 'user' && (!Number.isSafeInteger(Number(input.audienceUserId)) || Number(input.audienceUserId) < 1))
         fail('Select an active patron.');
-    if (input.href && !destinations.includes(input.href))
+    if (input.href && !destinations.includes(input.href) && !/^\/bulletin\?post=[1-9][0-9]*$/.test(input.href))
         fail('Choose a destination from the list.');
     const scheduled = input.scheduledAt ? new Date(input.scheduledAt) : null;
     if (scheduled && (!Number.isFinite(scheduled.getTime()) || scheduled <= now))
@@ -49,7 +50,13 @@ export async function emailPreview(input: any) {
     return email.preview({...input, ...(input.audienceType === 'users' ? {audienceUserIds:selectedUserIds(input)} : {})});
 }
 export async function create(input: any, actor: number) {
-    const value = validate(input);
+    const postMatch = typeof input.href === 'string' && /^\/bulletin\?post=([1-9][0-9]*)$/.exec(input.href);
+    const value = validate(postMatch ? {...input,imageUrl:null,imagePublicId:null,imageAlt:null} : input);
+    if (postMatch) {
+        const [[post]] = await db.query('SELECT image_url,image_public_id,image_alt FROM bulletin_posts WHERE id=? AND deleted_at IS NULL',[Number(postMatch[1])]);
+        if (!post) fail('The selected bulletin post is no longer available.',409);
+        value.imageUrl=post.image_url; value.imagePublicId=post.image_public_id; value.imageAlt=post.image_alt;
+    }
     const recipients = await count(value);
     if (!recipients)
         fail('This audience has no active recipients.');

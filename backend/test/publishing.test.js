@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const repository = require("../modules/publishing/publishing.repository");
 const audit = require("../modules/analytics/transactional-audit");
 const service = require("../modules/publishing/publishing.service");
+const notificationEmail = require("../modules/notifications/notifications.email.service");
+const notificationRepository = require("../modules/notifications/notifications.email.repository");
 const { digest, validateDraft, validatePublished } = require("../modules/publishing/publishing.validation");
 if (require.main === module) test.after(async () => require("../db").end());
 
@@ -18,6 +20,7 @@ test("drafts allow incomplete records; publication validates dates, IDs, and saf
 test("individual publication retains other saved drafts; publish all rolls back every section on failure",async()=>{
   const keys=["getConnection","lockDraft","readLive","writeDraft","writeLive","markPublished","writeItemMeta"];
   const originals=Object.fromEntries(keys.map(key=>[key,repository[key]]));const originalAudit=audit.enqueueTransactionalAudit;
+  const originalPreview=notificationEmail.preview,originalPublish=notificationRepository.publishInTransaction;
   let lives={events:{items:[{id:1,title:"First",starts_at:"2027-01-01T09:00:00"},{id:2,title:"Second",starts_at:"2027-01-02T09:00:00"}]},subscriptions:{items:[{id:3,title:"Resource",url:"https://example.test"}]}};
   let rows=Object.fromEntries(Object.keys(lives).map(section=>[section,{section,revision:0,draft_json:null,base_json:null,item_meta_json:null,saved_at:null,published_at:null}]));let snapshot;
   repository.getConnection=async()=>({beginTransaction:async()=>{snapshot=structuredClone({lives,rows});},commit:async()=>{},rollback:async()=>{lives=snapshot.lives;rows=snapshot.rows;},release:()=>{}});
@@ -39,8 +42,18 @@ test("individual publication retains other saved drafts; publish all rolls back 
     assert.deepEqual(lives,before,"first section publication rolled back when second failed");
     const results=await service.publishAll({documents:[{...doc,section:"events"},{...sub,section:"subscriptions"}]},1);assert.equal(results.length,2);assert.equal(lives.events.items.find(item=>item.id===2).title,"Second draft");
     let fresh=await service.read("events");const added={items:[...fresh.payload.items,{_key:"new",title:"New",starts_at:"2027-02-01T09:00:00"}]};
-    const created=await service.mutate("events","publish",{...fresh,payload:added,itemKey:"new"},1);assert.equal(created.resolvedKey,"99");
-  }finally{Object.assign(repository,originals);audit.enqueueTransactionalAudit=originalAudit;}
+    notificationEmail.preview=async()=>({enabled:true,inAppCount:4,emailCount:3});
+    let delivery;notificationRepository.publishInTransaction=async(_conn,input,counts)=>{delivery={input,counts};};
+    await assert.rejects(service.mutate("events","publish",{...fresh,payload:added,itemKey:"new",notifyUsers:{total:4,email:2}},1),/recipient counts changed/);
+    assert.equal(lives.events.items.length,2);
+    notificationRepository.publishInTransaction=async()=>{throw new Error("queue failed");};
+    await assert.rejects(service.mutate("events","publish",{...fresh,payload:added,itemKey:"new",notifyUsers:{total:4,email:3}},1),/queue failed/);
+    assert.equal(lives.events.items.length,2,"queue failure rolls back publication");
+    notificationRepository.publishInTransaction=async(_conn,input,counts)=>{delivery={input,counts};};
+    const created=await service.mutate("events","publish",{...fresh,payload:added,itemKey:"new",notifyUsers:{total:4,email:3}},1);assert.equal(created.resolvedKey,"99");
+    assert.equal(delivery.input.href,"/bulletin#upcoming-events");assert.equal(delivery.input.deliveryKey,"publication:events:99");assert.deepEqual(delivery.counts,{total:4,email:3});
+    await assert.rejects(service.mutate("events","publish",{...created,payload:created.payload,itemKey:"99",notifyUsers:{total:4,email:3}},1),/only be sent/);
+  }finally{Object.assign(repository,originals);audit.enqueueTransactionalAudit=originalAudit;notificationEmail.preview=originalPreview;notificationRepository.publishInTransaction=originalPublish;}
 });
 
 test("published guide addresses cannot be changed",()=>{

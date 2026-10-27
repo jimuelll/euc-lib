@@ -16,6 +16,7 @@ const createEvent: RequestHandler = async (req, res) => {
   try {
     res.status(201).json(await service.createEvent({
       title: req.body?.title,
+      notifyUsers: req.body?.notifyUsers,
       startsAt: req.body?.starts_at,
       endsAt: req.body?.ends_at,
       createdBy: (req as AuthenticatedRequest).user.id,

@@ -9,6 +9,8 @@ test('notification scheduling validates dates, destinations, lengths and roles',
  assert.throws(()=>service.validate({...base,scheduledAt:'2026-10-07T00:00:00Z'},now),/future/);
  assert.throws(()=>service.validate({...base,scheduledAt:'2026-10-09T00:00:00Z',expiresAt:'2026-10-08T05:00:00Z'},now),/after the send/);
  assert.throws(()=>service.validate({...base,href:'javascript:alert(1)'},now),/destination/);
+ assert.equal(service.validate({...base,href:'/bulletin?post=42'},now).href,'/bulletin?post=42');
+ for(const href of ['/bulletin?post=0','/bulletin?post=1&next=https://example.com','/bulletin?post=1#x']) assert.throws(()=>service.validate({...base,href},now),/destination/);
  assert.throws(()=>service.validate({...base,title:'x'.repeat(201)},now),/200 characters/);
  assert.throws(()=>service.validate({...base,audienceType:'role',audienceRole:'unknown'},now),/role/);
  assert.equal(service.validate({...base,scheduledAt:'2026-10-09T00:00:00Z'},now).scheduledAt.toISOString(),'2026-10-09T00:00:00.000Z');

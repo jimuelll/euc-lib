@@ -2,7 +2,7 @@ import {notificationImage} from '../notifications/notifications.image.service';
 import { config } from './email.config';
 import { brandedEmail } from './email.template';
 
-export interface EmailMessage { recipient: string; name: string; subject: string; message: string; image_url?:string; image_public_id?:string; image_alt?:string; action_url?: string; action_label?: string; code?: string; login_identifier?: string; loans?: { title: string; due: string; balance: string }[]; as_of?: string }
+export interface EmailMessage { recipient: string; name: string; subject: string; message: string; image_url?:string; image_public_id?:string; image_alt?:string; bulletin_image?:boolean; action_url?: string; action_label?: string; code?: string; login_identifier?: string; loans?: { title: string; due: string; balance: string }[]; as_of?: string }
 export interface EmailProvider { send(message: EmailMessage, account: boolean): Promise<string | void> }
 export class SendFailure extends Error {
   constructor(public kind: 'permanent' | 'retry' | 'unknown', public safeMessage: string, public retryAfterSeconds = 0) { super(safeMessage); }
@@ -12,7 +12,7 @@ export const capturedEmails: EmailMessage[] = [];
 // Render locally so deployment needs no provider-hosted templates. Escape every value.
 export function renderEmail(message: EmailMessage, account: boolean) {
   if(!account && message.image_url) {
-    try{notificationImage({imageUrl:message.image_url,imagePublicId:message.image_public_id,imageAlt:message.image_alt});}catch{throw new SendFailure('permanent','Invalid notification email image');}
+    try{if(message.bulletin_image){const url=new URL(message.image_url);if(url.protocol!=='https:' || url.username || url.password)throw new Error('Invalid image');}else notificationImage({imageUrl:message.image_url,imagePublicId:message.image_public_id,imageAlt:message.image_alt});}catch{throw new SendFailure('permanent','Invalid notification email image');}
   }
   const text = [message.subject, `Hello ${message.name},`, message.message];
   const paragraph = (value: string) => { text.push(value); };

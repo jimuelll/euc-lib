@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "@/components/ui/library-glyphs";
@@ -12,6 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { fetchBulletinPost } from "./api";
+import { toPost } from "./utils";
 import { PostCard } from "./components/PostCard";
 import { PostModal } from "./components/PostModal";
 import { CreatePostModal } from "./components/CreatePostModal";
@@ -56,7 +58,13 @@ export function BulletinPage() {
     removePost,
   } = useBulletinPosts({ limit: POSTS_PER_PAGE });
 
+  const [params,setParams]=useSearchParams();
+  const location=useLocation();
+  useEffect(()=>{if(!loading&&location.hash==="#upcoming-events")document.getElementById("upcoming-events")?.scrollIntoView?.();},[loading,location.hash]);
+  const [linkedError,setLinkedError]=useState(false);
   const [selectedPost, setSelectedPost] = useState<BulletinPost | null>(null);
+  const linkedPost=params.get("post");
+  useEffect(()=>{if(!linkedPost)return;let active=true;setLinkedError(false);if(!/^[1-9][0-9]*$/.test(linkedPost)){setLinkedError(true);return;}fetchBulletinPost(Number(linkedPost)).then(post=>{if(active)setSelectedPost(toPost(post));}).catch(()=>{if(active)setLinkedError(true);});return()=>{active=false;};},[linkedPost]);
   const [showCreate, setShowCreate] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
@@ -121,6 +129,7 @@ export function BulletinPage() {
               {canPost && <button type="button" className="bulletin-new-post" onClick={() => setShowCreate(true)}><Plus aria-hidden="true" />New post</button>}
             </div>
           </header>
+          {linkedError&&<div className="bulletin-empty" role="alert">This bulletin post is unavailable or has been archived.</div>}
           <div className="bulletin-wall" aria-busy={loading}>
             {loading && <BulletinListSkeleton rows={POSTS_PER_PAGE} />}
             {error && !loading && <div className="bulletin-empty" role="alert"><p>{error}</p><button className="bulletin-outline-button" onClick={() => void fetchPosts(currentPage, debouncedSearch)}>Retry</button></div>}
@@ -152,7 +161,7 @@ export function BulletinPage() {
 
       <PostModal
         post={selectedPost}
-        onClose={() => setSelectedPost(null)}
+        onClose={() => {setSelectedPost(null);if(linkedPost)setParams(previous=>{const next=new URLSearchParams(previous);next.delete("post");return next;});}}
         onLikeToggle={handleLikeToggle}
         onCommentAdded={handleCommentAdded}
         onPinToggle={handlePinToggle}

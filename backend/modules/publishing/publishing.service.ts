@@ -4,6 +4,9 @@ import { sections, type Section, type Payload, type DraftRow } from "./publishin
 import home = require("../site-content/site-content.service");
 import guide = require("../user-guide/user-guide.service");
 import audit = require("../analytics/transactional-audit");
+import * as notificationEmail from "../notifications/notifications.email.service";
+import hub = require("../../realtime/notificationHub");
+import * as notificationRepository from "../notifications/notifications.email.repository";
 const parse = (value:string|null|undefined)=>value?JSON.parse(value):null;
 export const itemKey=(item:any)=>String(item.id||item._key);
 const changedCount=(payload:Payload,base:Payload)=>payload.items?payload.items.filter((item:any)=>!item.id||canonical(item)!==canonical((base.items||[]).find((row:any)=>row.id===item.id))).length:canonical(payload)!==canonical(base)?1:0;
@@ -31,11 +34,24 @@ async function applyMutation(conn:Awaited<ReturnType<typeof repository.getConnec
  const meta=parse(row.item_meta_json)||{};let resolvedKey=key;
  if(action==="publish"){
   if(digest(base)!==digest(live))fail("Published content changed since this draft was started. Reload and review before publishing.",409);
+  const notify=input.notifyUsers;
+  if(notify && (!key || !["bulletin","events"].includes(kind) || sourceItem?.id || sourceItem?.deleted)) fail("Notifications can only be sent when publishing a new post or event.");
+  if(notify){
+   const preview=await notificationEmail.preview({type:"announcement",title:"",body:"",audienceType:"all"});
+   if(!preview.enabled || !preview.emailCount || !preview.inAppCount)fail(preview.reason||"No eligible recipients are available.",409);
+   if(Number(notify.total)!==preview.inAppCount || Number(notify.email)!==preview.emailCount)fail("The recipient counts changed. Review and confirm again.",409);
+  }
   const publication=key?replaceItem(live,key,sourceItem):input.payload;
   validatePublished(kind,publication,live);
   await repository.writeLive(conn,kind,publication,live,actor,key);
   const published=await repository.readLive(conn,kind);
   if(key&&!sourceItem.id&&!sourceItem.deleted)resolvedKey=itemKey((published.items||[]).find((item:any)=>!(live.items||[]).some((old:any)=>old.id===item.id)));
+  if(notify){
+   const item=(published.items||[]).find((entry:any)=>itemKey(entry)===resolvedKey);
+   if(!item)fail("Published item could not be found.",409);
+   const body=kind==="bulletin"?String(item.content||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,500):`Event starts ${new Date(item.starts_at).toLocaleString("en-PH",{timeZone:"Asia/Manila",dateStyle:"medium",timeStyle:"short"})}${item.ends_at?` and ends ${new Date(item.ends_at).toLocaleString("en-PH",{timeZone:"Asia/Manila",dateStyle:"medium",timeStyle:"short"})}`:""}.`;
+   await notificationRepository.publishInTransaction(conn,{type:"announcement",title:String(item.title).slice(0,200),body:body||"Open the bulletin for details.",href:kind==="bulletin"?`/bulletin?post=${item.id}`:"/bulletin#upcoming-events",audienceType:"all",createdBy:actor,sendEmail:true,deliveryKey:`publication:${kind}:${item.id}`,imageUrl:kind==="bulletin"?item.image_url:null,imagePublicId:kind==="bulletin"?item.image_public_id:null,imageAlt:kind==="bulletin"?item.image_alt:null},{total:Number(notify.total),email:Number(notify.email)});
+  }
   await repository.markPublished(conn,kind,actor);
   if(key){const actual=(published.items||[]).find((item:any)=>itemKey(item)===resolvedKey);const retained=replaceItem(saved,key,actual||null);if(changedCount(retained,published)>0)await repository.writeDraft(conn,kind,retained,published,actor);}
   if(key){delete meta[key];meta[resolvedKey!]={lastPublished:new Date().toISOString()};await repository.writeItemMeta(conn,kind,meta);}
@@ -51,7 +67,7 @@ async function applyMutation(conn:Awaited<ReturnType<typeof repository.getConnec
  }
  return {...serialize(await repository.lockDraft(conn,kind),await repository.readLive(conn,kind)),resolvedKey};
 }
-export async function mutate(value:unknown,action:"draft"|"publish"|"discard",input:any,actor:number){const kind=section(value);await prepare(kind);return withConnection(conn=>applyMutation(conn,kind,action,input,actor));}
+export async function mutate(value:unknown,action:"draft"|"publish"|"discard",input:any,actor:number){const kind=section(value);await prepare(kind);const result=await withConnection(conn=>applyMutation(conn,kind,action,input,actor));if(action==="publish"&&input?.notifyUsers){try{hub.pushAudienceChanged({audienceType:"all",audienceRole:null});}catch{console.error("[publishing] Notification saved; realtime refresh failed.");}}return result;}
 export async function publishAll(input:any,actor:number){
  if(!Array.isArray(input?.documents)||!input.documents.length)fail("Choose content to publish.");
  const entries=new Map<Section,any>();for(const entry of input.documents){const kind=section(entry.section);if(entries.has(kind))fail("Duplicate publishing section.");entries.set(kind,entry);}

@@ -70,6 +70,17 @@ const updateSettings = async ({ overdueFinePerHour }: { overdueFinePerHour: unkn
     await repository.getSettings(connection);
     const [beforeRows] = await connection.query<RowDataPacket[]>("SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1 FOR UPDATE");
     const [before] = beforeRows;
+    if (Number(before?.overdue_fine_per_hour) !== Number(numericRate.toFixed(2))) {
+      const [loans] = await connection.query<Array<RowDataPacket & { id: number; due_date: Date | string | null; returned_at: Date | string | null; fine_interval: string; initial_fine: number }>>(
+        "SELECT id, due_date, returned_at, fine_interval, initial_fine FROM borrowings WHERE deleted_at IS NULL AND status IN ('borrowed','overdue') AND fine_per_hour IS NULL ORDER BY id FOR UPDATE",
+      );
+      const ledger = require("../borrowing/fine-ledger.service") as typeof import("../borrowing/fine-ledger.service");
+      const at = new Date();
+      for (const loan of loans) {
+        await ledger.assessBorrowing({ ...loan, fine_per_hour: Number(before?.overdue_fine_per_hour ?? DEFAULT_SETTINGS.overdue_fine_per_hour) }, connection, at);
+        await ledger.assessBorrowing({ ...loan, fine_per_hour: Number(numericRate.toFixed(2)) }, connection, at);
+      }
+    }
     await repository.updateSettings(numericRate.toFixed(2), updatedBy, connection);
     const [afterRows] = await connection.query<RowDataPacket[]>("SELECT overdue_fine_per_hour FROM library_circulation_settings WHERE id = 1");
     const [after] = afterRows;

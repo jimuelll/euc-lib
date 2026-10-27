@@ -8,6 +8,7 @@ export interface LibraryEvent extends RowDataPacket {
 }
 
 export interface CreateEventInput {
+  notifyUsers?: import("../notifications/publication-notification.service").PublicationNotice;
   title?: string | null;
   startsAt?: unknown;
   endsAt?: unknown;
