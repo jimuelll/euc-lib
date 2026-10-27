@@ -6,7 +6,7 @@ import {TabsContent} from "@/components/ui/tabs";
 import {AdminIcon,AdminPageHeader,AdminPageTabs,AdminDetailDrawer,useUnsavedChanges,useAdminConfirmDialog,type AdminIconName} from "@/features/admin";
 import {getPublishingDocument,savePublishingDocument,publishAllDocuments,publishingKeys,type ContentSection,type ContentPayload,type PublishingDocument} from "../publishing.service";
 import {PublicationNotificationOption} from "@/features/notifications/PublicationNotificationOption";
-import {previewNotificationEmail} from "@/features/notifications/admin/api";
+import {previewNotificationEmail} from "@/features/notifications";
 import {HomepageEditor,AboutEditor} from "./PublishingPages";
 import {EventsEditor,SubscriptionsEditor,BulletinEditor,GuideEditor,RecordFields,recordKey} from "./PublishingCollections";
 import {UploadActivityContext} from "./PublishingFields";

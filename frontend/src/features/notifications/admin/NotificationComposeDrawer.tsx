@@ -8,7 +8,7 @@ import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/compo
 import {AdminDetailDrawer,AdminDateTime,AdminIcon,formatAdminDate,useAdminConfirmDialog,useUnsavedChanges} from '@/features/admin';
 import {useDebounce} from '@/hooks/use-debounce';
 import {getApiErrorMessage} from '@/utils/apiError';
-import {fetchBulletinPosts} from '@/features/bulletin/api';
+import {fetchBulletinPosts} from '@/features/bulletin';
 import {notificationKeys} from '../notifications.keys';
 import NotificationMessage from '../NotificationMessage';
 import NotificationImageUpload from './NotificationImageUpload';

@@ -1,5 +1,7 @@
 import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type { Section, Payload, DraftRow } from "./publishing.types";
+import audit = require("../analytics/transactional-audit");
+import {contentChanged} from "../bulletin/bulletin.content";
 import { canonical } from "./publishing.validation";
 import guide = require("../user-guide/user-guide.service");
 import about = require("../about/about.repository");
@@ -27,7 +29,7 @@ export async function readLive(conn: PoolConnection, kind: Section, lock = false
     const sql = {
         events: "SELECT id,title,starts_at,ends_at FROM library_events ORDER BY id",
         subscriptions: "SELECT id,title,url,description,category,image_url,image_alt,image_public_id,is_active,sort_order FROM academic_subscriptions WHERE deleted_at IS NULL ORDER BY id",
-        bulletin: "SELECT id,title,content,image_url,image_alt,gallery,image_public_id,post_type,event_starts_at,event_ends_at,event_location,event_registration_url,is_pinned,created_at,deleted_at FROM bulletin_posts ORDER BY id",
+        bulletin: "SELECT id,title,content,edited_at,content_revision,image_url,image_alt,gallery,image_public_id,post_type,event_starts_at,event_ends_at,event_location,event_registration_url,is_pinned,created_at,deleted_at FROM bulletin_posts ORDER BY id",
         guide: "SELECT id,sort_order,draft_content,published_content,is_published,published_at FROM user_guide_modules WHERE deleted_at IS NULL ORDER BY id",
     };
     const [rows] = await conn.query<RowDataPacket[]>(sql[kind] + suffix);
@@ -99,6 +101,7 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
             }
         }
         if (item.id) {
+            if(kind==='bulletin' && original && contentChanged(original,item)){fields.push('edited_at','content_revision');values.push(new Date(),Number(original.content_revision||1)+1);await audit.enqueueTransactionalAudit(conn,{actorId:actor,route:`/api/bulletin/${item.id}`,category:'content',description:`Edited bulletin post ${item.id} through Website Content`,before:original,after:{...item,content_revision:Number(original.content_revision||1)+1}});}
             await conn.query(`UPDATE ${table} SET ${fields.map(field => field + "=?").join(",")} WHERE id=?`, [...values, item.id]);
         }
         else {

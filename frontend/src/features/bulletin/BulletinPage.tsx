@@ -161,7 +161,7 @@ export function BulletinPage() {
 
       <PostModal
         post={selectedPost}
-        onClose={() => {setSelectedPost(null);if(linkedPost)setParams(previous=>{const next=new URLSearchParams(previous);next.delete("post");return next;});}}
+        onClose={() => {setSelectedPost(null);if(linkedPost)setParams(previous=>{const next=new URLSearchParams(previous);next.delete("post");next.delete("comment");return next;});}}
         onLikeToggle={handleLikeToggle}
         onCommentAdded={handleCommentAdded}
         onPinToggle={handlePinToggle}

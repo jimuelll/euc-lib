@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, BookCopy, ArrowLeftRight, DatabaseBackup, FileBarChart, ClipboardCheck, CalendarDays, FileText, CalendarOff, Clock, BellRing, ScrollText, Settings2, BookOpenCheck, FilePenLine, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users, BookCopy, ArrowLeftRight, DatabaseBackup, FileBarChart, ClipboardCheck, CalendarDays, FileText, CalendarOff, Clock, BellRing, ScrollText, Settings2, BookOpenCheck, FilePenLine, Sparkles, ShieldAlert } from "lucide-react";
 import type { SidebarItem, SidebarSection } from "./AdminLayout.types";
 
 const administrators = ["admin", "super_admin"];
@@ -13,6 +13,9 @@ export const sidebarSections: SidebarSection[] = [
     { title: "Users", url: "/admin/manage", icon: Users, aliases: ["patron", "student", "employee", "restrictions", "accounts"] },
     { title: "Catalog", url: "/admin/catalog", icon: BookCopy, aliases: ["books", "copies", "thesis", "catalogue"] },
     { title: "Attendance", url: "/admin/attendance-logs", icon: Clock, roles: administrators },
+  ] },
+  { label: "Community", alwaysOpen: true, items: [
+    { title: "Moderation", url: "/admin/moderation", icon: ShieldAlert, roles: administrators, aliases: ["reported comments", "safety", "review", "held comments"] },
   ] },
   { label: "Publishing", items: [
     { title: "Website Content", url: "/admin/content", icon: FileText, roles: administrators, aliases: ["homepage", "about", "bulletin", "events", "subscriptions", "edit guide"] },

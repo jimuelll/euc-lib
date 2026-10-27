@@ -4,10 +4,12 @@ import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-li
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {createTestQueryClientWrapper} from "@/test-utils/query-client";
 import { AdminSidebar } from "../layout/components/AdminSidebar";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { dashboardItem, visibleSidebarSections } from "../layout/AdminLayoutData";
 
+vi.mock("@/features/moderation/api",()=>({fetchModerationStats:vi.fn(async()=>({pending:0,urgent:0,oldest:null}))}));
 const auth = vi.hoisted(() => ({ role: "super_admin", logout: vi.fn() }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { name: "Library Administrator", role: auth.role }, logout: auth.logout }) }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -16,7 +18,7 @@ function mount(role = "super_admin", route = "/admin", width = 1024) {
   auth.role = role;
   window.innerWidth = width;
   window.matchMedia = vi.fn().mockImplementation(() => ({ matches: width < 768, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-  return render(<ThemeProvider><MemoryRouter initialEntries={[route]}><SidebarProvider><SidebarTrigger aria-label="Toggle navigation" /><AdminSidebar /><LocationProbe /></SidebarProvider></MemoryRouter></ThemeProvider>);
+  return render(<ThemeProvider><MemoryRouter initialEntries={[route]}><SidebarProvider><SidebarTrigger aria-label="Toggle navigation" /><AdminSidebar /><LocationProbe /></SidebarProvider></MemoryRouter></ThemeProvider>,{wrapper:createTestQueryClientWrapper()});
 }
 describe("admin sidebar", () => {
   it.each(["staff", "admin", "super_admin"])("shows exactly the permitted tools for %s without expanding groups", role => {

@@ -186,7 +186,7 @@ test('snapshot upgrade preserves legacy access and excludes live challenges/quot
  const payload={format:'euc-library-backup',version:17,tables:{users:[{id:7,email:'member@example.edu',password_hash:'keep',must_change_password:1}]}};
  payload.integrity={algorithm:'sha256',checksum:snapshots.payloadChecksum(payload)};
  const upgraded=snapshots.upgradeBackup(payload),user=upgraded.tables.users[0];
- assert.equal(upgraded.version,21);assert.equal(user.password_hash,'keep');assert.equal(user.setup_pending,0);assert.equal(user.email_verified_at,null);assert.equal(user.session_version,0);assert.equal(user.must_change_password,1);
+ assert.equal(upgraded.version,25);assert.equal(user.password_hash,'keep');assert.equal(user.setup_pending,0);assert.equal(user.email_verified_at,null);assert.equal(user.session_version,0);assert.equal(user.must_change_password,1);
  for(const name of ['account_challenges','email_deliveries','email_quota_usage','email_request_limits','email_dispatch_state','email_address_claims']){assert.ok(registry.SYSTEM_TABLES.includes(name));assert.ok(!registry.APPLICATION_TABLES.includes(name));}
 });
 

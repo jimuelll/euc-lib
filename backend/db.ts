@@ -29,4 +29,14 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
+// mysql2's timezone controls JavaScript parsing, not the MySQL session.
+// Match both so TIMESTAMP reads aren't mislabeled as UTC on local-time servers.
+pool.on("connection", (connection) => {
+  // PromisePool forwards this event from its underlying callback-based pool.
+  const rawConnection = connection as unknown as import("mysql2").PoolConnection;
+  rawConnection.query("SET time_zone = '+00:00'", (error) => {
+    if (error) rawConnection.destroy();
+  });
+});
+
 export = pool;

@@ -1,3 +1,4 @@
+import {ModerationAttention} from "@/features/moderation";
 import { AdminPageHeader, AdminSummaryTile } from "../components/AdminDeskSystem";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -25,13 +26,14 @@ export default function Dashboard() {
     { href: "/admin/reservations", label: "Reservations", icon: "reservations" as const },
     { href: "/admin/query", label: "Reports", icon: "reports" as const },
   ].filter(link => {
-    const item = allSidebarItems.find(item => item.url === link.href);
+    const item = allSidebarItems.find(item => item.url === link.href.split("?")[0]);
     return item && canAccessItem(item, user?.role);
   });
 
   return <div className="admin-dashboard">
     <AdminPageHeader title="Dashboard" subtitle={<time dateTime={new Date().toISOString()}>{shortDate.format(new Date())}</time>} updatedAt={query.dataUpdatedAt} loading={query.isFetching} onRefresh={refresh} />
 
+    <ModerationAttention/>
     <nav aria-label="Circulation actions" className="admin-dashboard-actions">
       <CompactAction href="/admin/circulation?tab=transaction&mode=borrow" icon="borrow" primary>Borrow a copy</CompactAction>
       <CompactAction href="/admin/circulation?tab=transaction&mode=return" icon="return">Return a copy</CompactAction>

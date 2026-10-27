@@ -4,7 +4,7 @@ import type { SnapshotPayload, SnapshotRow } from "./snapshot.types";
 
 const { APPLICATION_TABLES } = registry;
 
-const SNAPSHOT_VERSION = 21;
+const SNAPSHOT_VERSION = 25;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -392,6 +392,38 @@ function upgradeV20ToV21(backup: SnapshotPayload): SnapshotPayload {
   backup.tableManifest = Object.keys(backup.tables).sort();
   backup.version=21;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
 }
+function upgradeV21ToV22(backup: SnapshotPayload): SnapshotPayload {
+ assertSnapshotIntegrity(backup);
+ for(const row of backup.tables.bulletin_posts||[]){row.edited_at??=null;row.content_revision??=1;}
+ for(const row of backup.tables.bulletin_comments||[])row.parent_id??=null;
+ const seen=new Set<string>();backup.tables.bulletin_reactions=(backup.tables.bulletin_likes||[]).filter(row=>{const key=`${row.post_id}:${row.user_id}`;if(seen.has(key))return false;seen.add(key);return true;}).map(row=>({post_id:row.post_id,user_id:row.user_id,reaction:'like',created_at:row.created_at}));
+ backup.tableManifest=Object.keys(backup.tables).sort();backup.version=22;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
+}
+function upgradeV22ToV23(backup: SnapshotPayload): SnapshotPayload {
+ assertSnapshotIntegrity(backup);
+ for(const row of backup.tables.bulletin_posts||[])row.comments_locked??=0;
+ for(const row of backup.tables.bulletin_comments||[])for(const field of ['hidden_at','hidden_by','pinned_at','pinned_by','client_request_id'])row[field]??=null;
+ backup.tables.bulletin_comment_helpful??=[];
+ backup.tableManifest=Object.keys(backup.tables).sort();backup.version=23;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
+}
+function upgradeV23ToV24(backup: SnapshotPayload): SnapshotPayload {
+ assertSnapshotIntegrity(backup);
+ backup.tables.bulletin_helpful??=[];backup.tables.bulletin_saves??=[];backup.tables.bulletin_event_interest??=[];
+ const eventIds=new Set((backup.tables.bulletin_posts||[]).filter(row=>row.post_type==='event').map(row=>String(row.id)));
+ for(const row of backup.tables.bulletin_reactions||[]){
+  if(row.consolidated_at)continue;
+  const target=row.reaction==='interested'&&eventIds.has(String(row.post_id))?backup.tables.bulletin_event_interest:backup.tables.bulletin_helpful;
+  if(!target.some(item=>String(item.post_id)===String(row.post_id)&&String(item.user_id)===String(row.user_id)))target.push({post_id:row.post_id,user_id:row.user_id,created_at:row.created_at});
+  row.consolidated_at=row.created_at||'1970-01-01 00:00:00';
+ }
+ backup.tableManifest=Object.keys(backup.tables).sort();backup.version=24;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
+}
+function upgradeV24ToV25(backup: SnapshotPayload): SnapshotPayload {
+ assertSnapshotIntegrity(backup);
+ for(const row of backup.tables.bulletin_comments||[]){row.moderation_status??='published';row.moderation_reason??=null;}
+ for(const table of ['bulletin_moderation_cases','bulletin_comment_reports','bulletin_moderation_actions'])backup.tables[table]??=[];
+ backup.tableManifest=Object.keys(backup.tables).sort();backup.version=25;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
+}
 const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => SnapshotPayload>([
   [3, upgradeV3ToV4],
   [4, upgradeV4ToV5],
@@ -411,6 +443,10 @@ const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => Snaps
   [18, upgradeV18ToV19],
   [19, upgradeV19ToV20],
   [20, upgradeV20ToV21],
+  [21, upgradeV21ToV22],
+  [22, upgradeV22ToV23],
+  [23, upgradeV23ToV24],
+  [24, upgradeV24ToV25],
 ]);
 
 function upgradeBackup(backup: SnapshotPayload): SnapshotPayload {

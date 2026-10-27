@@ -5,6 +5,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, Sid
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {useModerationStats} from "@/features/moderation";
 import { useAuth } from "@/context/AuthContext";
 import { dashboardItem, visibleSidebarSections, resolveCurrentItem, getInitials } from "../AdminLayoutData";
 import type { SidebarItem } from "../AdminLayout.types";
@@ -27,6 +28,7 @@ export function AdminSidebar() {
   const compact = state === "collapsed" && !isMobile;
   const { pathname, search } = useLocation();
   const { user, logout } = useAuth();
+  const reviewStats=useModerationStats();
   const navigationRef = useRef<HTMLDivElement>(null);
   const [moreBelow, setMoreBelow] = useState(false);
   useEffect(() => {
@@ -46,8 +48,8 @@ export function AdminSidebar() {
   const close = () => setOpenMobile(false);
   const renderItem = (item: SidebarItem) => <SidebarMenuItem key={item.url}>
     <SidebarMenuButton asChild tooltip={item.title} isActive={current?.url === item.url} className="admin-nav-link">
-      <Link to={item.url} aria-label={item.title} aria-current={current?.url === item.url ? "page" : undefined} onClick={close}>
-        <AdminSidebarIcon name={adminSidebarIconByUrl[item.url]} /><span className="admin-nav-label">{item.title}</span>
+      <Link to={item.url} aria-label={item.url==="/admin/moderation"&&reviewStats.data?.pending?`Moderation, ${reviewStats.data.pending} awaiting review`:item.title} aria-current={current?.url === item.url ? "page" : undefined} onClick={close}>
+        <AdminSidebarIcon name={adminSidebarIconByUrl[item.url]} /><span className="admin-nav-label">{item.title}</span>{item.url==="/admin/moderation"&&Boolean(reviewStats.data?.pending)&&<span aria-hidden="true" className="admin-moderation-badge" data-urgent={Boolean(reviewStats.data?.urgent)}>{reviewStats.data!.pending>99?"99+":reviewStats.data!.pending}</span>}
       </Link>
     </SidebarMenuButton>
   </SidebarMenuItem>;

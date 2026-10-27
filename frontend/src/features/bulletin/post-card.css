@@ -1,0 +1,4 @@
+.bulletin-like-stat .library-icon [data-library-accent]{display:none}
+.bulletin-like-stat[data-liked=true]{color:#7a0000}
+.dark .bulletin-like-stat[data-liked=true]{color:hsl(var(--action))}
+.bulletin-like-stat[data-liked=true] .library-icon>path:not([data-library-accent]){fill:currentColor}

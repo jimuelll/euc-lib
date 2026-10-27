@@ -27,7 +27,7 @@ test('notification email images are escaped hosted content and account emails re
  assert.doesNotMatch(templates.renderEmail(message,true).htmlContent,/<img /);assert.throws(()=>templates.renderEmail({...message,image_url:'javascript:alert(1)'},false),e=>e.kind==='permanent');
 }));
 test('version 19 backups upgrade to text-only defaults without queuing retrospective emails',()=>{
- const backup={version:19,tables:{notifications:[{id:1,title:'Existing',email_requested:0}]},integrity:{algorithm:'sha256',checksum:''}};backup.integrity.checksum=transforms.payloadChecksum(backup);const upgraded=transforms.upgradeBackup(backup);assert.equal(upgraded.version,21);assert.equal(upgraded.tables.notifications[0].image_url,null);assert.equal(upgraded.tables.notifications[0].image_alt,null);assert.equal(upgraded.tables.notifications[0].email_requested,0);
+ const backup={version:19,tables:{notifications:[{id:1,title:'Existing',email_requested:0}]},integrity:{algorithm:'sha256',checksum:''}};backup.integrity.checksum=transforms.payloadChecksum(backup);const upgraded=transforms.upgradeBackup(backup);assert.equal(upgraded.version,25);assert.equal(upgraded.tables.notifications[0].image_url,null);assert.equal(upgraded.tables.notifications[0].image_alt,null);assert.equal(upgraded.tables.notifications[0].email_requested,0);
 });
 
 test('notification image endpoint enforces roles and accepts real multipart uploads',()=>env(async()=>{

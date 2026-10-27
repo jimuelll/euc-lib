@@ -1,4 +1,6 @@
 import repository = require("./bulletin.repository");
+import * as social from "./bulletin.social.repository";
+import {normalizePostContent,validateImageDescriptions} from "./bulletin.content";
 import {publishWithNotice} from "../notifications/publication-notification.service";
 import type {
   BulletinFilters,
@@ -25,7 +27,8 @@ const getPosts = async (
 const getPostById = async (postId: number, userId: number | null) => {
   const post: BulletinPostRow | null = await repository.findPost(postId, userId);
   if (!post) throw Object.assign(new Error("Post not found"), { status: 404 });
-  return { ...post, comments: await repository.findComments(postId) };
+  const discussion=await social.comments(postId,null,1,userId);
+  return { ...post, ...(await social.postReactionSummary(postId,userId)), comments:discussion.data,comments_has_more:discussion.hasMore };
 };
 
 const createPost = async (author: BulletinUser, {
@@ -35,6 +38,7 @@ const createPost = async (author: BulletinUser, {
   image_url,
   image_public_id,
   image_alt,
+  gallery,
   is_pinned,
   post_type,
   event_starts_at,
@@ -45,9 +49,11 @@ const createPost = async (author: BulletinUser, {
   if (!CAN_POST_ROLES.includes(author.role) || (is_pinned && !ADMIN_ROLES.includes(author.role))) {
     throw Object.assign(new Error("Forbidden"), { status: 403 });
   }
-  if (!title?.trim() || !content?.trim()) {
+  if (typeof title!=='string'||typeof content!=='string'||!title.trim()||!content.trim()) {
     throw Object.assign(new Error("title and content are required"), { status: 400 });
   }
+  const normalized=normalizePostContent({title,content,image_url,image_public_id,image_alt,gallery});
+  validateImageDescriptions(normalized);
   const postType: string = "announcement";
   const sqlDate = (value: unknown): string | null => value ? String(value).replace("T", " ") : null;
   if(notifyUsers && !ADMIN_ROLES.includes(author.role)) throw Object.assign(new Error("Forbidden"),{status:403});
@@ -55,9 +61,10 @@ const createPost = async (author: BulletinUser, {
     title: title.trim(),
     excerpt: content.trim().replace(/\s+/g, " ").slice(0, 500),
     content: content.trim(),
-    imageUrl: image_url?.trim() ?? null,
-    imagePublicId: image_public_id?.trim() ?? null,
-    imageAlt: typeof image_alt === "string" ? image_alt.trim().slice(0,500) || null : null,
+    imageUrl: normalized.image_url,
+    imagePublicId: normalized.image_public_id,
+    imageAlt: normalized.image_alt,
+    gallery:normalized.gallery,
     authorId: author.id,
     pinned: is_pinned,
     postType,
@@ -97,27 +104,16 @@ const pinPost = async (postId: number, pinned: boolean, requestingUser: Bulletin
   return { pinned };
 };
 
-const toggleLike = (postId: number, userId: number): Promise<ToggleLikeResult> => repository.toggleLike(postId, userId);
-
-const getLikes = async (postId: number) => {
-  const likes = await repository.getLikes(postId);
-  if (!likes) throw Object.assign(new Error("Post not found"), { status: 404 });
-  return { data: likes };
+const toggleLike = async (postId:number,userId:number):Promise<ToggleLikeResult>=>{const result=await social.setReaction(postId,userId,'like',true);return {liked:result.liked_by_me,total:result.likes};};
+const getLikes = async (postId:number) => {const result=await social.readers(postId,'like',1);return {data:result.data};};
+const addComment = async (postId:number,userId:number,text:string,parentId?:unknown,requestId?:string) => {
+ const parent=parentId==null?null:Number(parentId);if(parent!==null&&(!Number.isSafeInteger(parent)||parent<1))throw Object.assign(new Error('Invalid parent comment'),{status:400});
+ return social.addReply(postId,userId,text,parent,requestId);
 };
-
-const addComment = async (postId: number, userId: number, text: string) => {
-  if (!text?.trim()) throw Object.assign(new Error("Comment text is required"), { status: 400 });
-  if (text.trim().length > 1000) throw Object.assign(new Error("Comment must be 1000 characters or fewer"), { status: 400 });
-  return repository.addComment(postId, userId, text.trim());
-};
-
-const deleteComment = async (commentId: number, requestingUser: BulletinUser): Promise<void> => {
-  const comment = await repository.findComment(commentId);
-  if (!comment) throw Object.assign(new Error("Comment not found"), { status: 404 });
-  const isOwner = comment.user_id === requestingUser.id;
-  const isAdmin = ["admin", "super_admin"].includes(requestingUser.role);
-  if (!isOwner && !isAdmin) throw Object.assign(new Error("Forbidden"), { status: 403 });
-  await repository.deleteComment(commentId, requestingUser.id);
+const deleteComment = async (commentId:number,actor:BulletinUser,postId?:number) => {
+ if(postId===undefined){const comment=await repository.findComment(commentId);if(!comment)throw Object.assign(new Error('Comment not found'),{status:404});postId=Number(comment.post_id);}
+ if(!Number.isSafeInteger(postId)||postId<1)throw Object.assign(new Error('Invalid post ID'),{status:400});
+ return social.removeComment(postId,commentId,actor);
 };
 
 export = {

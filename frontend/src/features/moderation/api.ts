@@ -1,0 +1,8 @@
+import axios from '@/utils/AxiosInstance';
+export interface ModerationStats {pending:number;urgent:number;oldest:string|null;}
+export interface ReviewCase {id:number;comment_id:number;post_id:number;status:'open'|'resolved'|'dismissed'|'withdrawn';priority:'normal'|'urgent';source:string;snapshot_text:string;screening_reason:string|null;resolution_reason:string|null;revision:number;created_at:string;opened_at:string;resolved_at:string|null;post_title:string;author_name:string;report_count:number;}
+export interface ReviewDetail extends ReviewCase {can_review?:boolean;author_id:number;parent_id:number|null;deleted_at:string|null;hidden_at:string|null;post_archived_at:string|null;moderation_status:string;moderation_reason:string|null;reports:{id:number;reporter_name:string;reason:string;details:string|null;created_at:string}[];actions:{id:number;actor_name:string|null;action:string;reason:string;created_at:string}[];context:{id:number;parent_id:number|null;text:string;author_name:string;created_at:string;deleted_at:string|null;hidden_at:string|null}[];context_has_more:boolean;}
+export const fetchModerationStats=async(signal?:AbortSignal):Promise<ModerationStats>=>(await axios.get('/api/bulletin/moderation/stats',{signal})).data;
+export const fetchReviewCases=async(status:string,page:number,signal?:AbortSignal):Promise<{data:ReviewCase[];page:number;hasMore:boolean}>=>(await axios.get('/api/bulletin/moderation',{params:{status,page},signal})).data;
+export const fetchReviewCase=async(id:number,signal?:AbortSignal):Promise<ReviewDetail>=>(await axios.get(`/api/bulletin/moderation/${id}`,{signal})).data;
+export const reviewComment=async(id:number,input:{action:string;reason:string;revision:number})=>axios.patch(`/api/bulletin/moderation/${id}`,input);

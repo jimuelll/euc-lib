@@ -4,7 +4,6 @@
 .catalogue-page[data-library-design][data-library-design] .catalogue-heading h1 { margin: 0 0 8px; font: 700 clamp(38px, 5.5vw, 58px)/1 "Fraunces", Georgia, serif; letter-spacing: -.02em; text-wrap: wrap; }
 .catalogue-heading > p { margin: 0 0 20px; color: hsl(var(--muted-foreground)); }
 .catalogue-page[data-library-design][data-library-design] .catalogue-search { display: flex; border: 2px solid hsl(var(--foreground)); background: hsl(var(--card)); }
-.catalogue-page[data-library-design][data-library-design] .catalogue-search:focus-within { border-color: var(--library-gold); }
 .catalogue-search input { flex: 1; min-width: 0; min-height: 54px; padding: 0 18px; border: 0; background: none; color: inherit; font-size: 17px; outline: 0; }
 .catalogue-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 1px solid var(--library-maroon); background: var(--library-maroon); color: #fff; font-size: 14px; font-weight: 700; }
 .catalogue-primary:hover { background: none; color: hsl(var(--action)); }
@@ -49,7 +48,6 @@
 .catalogue-page[data-library-design][data-library-design] .catalogue-available-toggle i { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border: 1px solid hsl(var(--foreground)); background: transparent; color: #fff; }
 .catalogue-available-toggle i svg { width: 16px; height: 16px; stroke-width: 2.4; }
 .catalogue-page[data-library-design][data-library-design] .catalogue-available-toggle input:checked + i { border-color: var(--library-maroon); background: var(--library-maroon); }
-.catalogue-available-toggle input:focus-visible + i { outline: 2px solid var(--library-gold); outline-offset: 2px; }
 .catalogue-results-bar select { min-height: 44px; max-width: 100%; padding: 0 10px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: inherit; font-size: 14px; }
 .catalogue-view-toggle { display: inline-flex; border: 1px solid hsl(var(--border)); }
 .catalogue-view-toggle button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: hsl(var(--card)); color: inherit; }

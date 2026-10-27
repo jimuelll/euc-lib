@@ -12,3 +12,8 @@ export type { BulletinPost, BulletinComment, ApiPost, ApiComment } from "./types
 
 // ── Default export keeps the /bulletin route working without touching App.tsx routing ──
 export { BulletinPage as default } from "./BulletinPage";
+
+export {fetchBulletinPosts} from './api';
+
+export {fetchSavedBulletinPosts,setPostSaved} from './api';
+export type {SavedBulletinPost} from './api';

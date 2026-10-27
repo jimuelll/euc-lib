@@ -1,27 +1,10 @@
-import { Archive, Loader2, Pin, PinOff, X } from "@/components/ui/library-glyphs";
-
+import {ChevronDown, Pencil, Archive, Pin, PinOff, X, Link, Lock, Unlock, MoreHorizontal} from 'lucide-react';
+import {DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator} from '@/components/ui/dropdown-menu';
 type Props = {
-  canPin: boolean;
-  pinned: boolean;
-  pinBusy: boolean;
-  handlePin: () => void;
-  canArchive: boolean;
-  archiveBusy: boolean;
-  archiveConfirm: boolean;
-  handleArchive: () => void;
-  onClose: () => void;
+  canEdit?:boolean; onEdit?:()=>void; canPin:boolean; pinned:boolean; pinBusy:boolean;
+  handlePin:()=>void; canArchive:boolean; archiveBusy:boolean; handleArchive:()=>void;
+  onClose:()=>void;onCopy:()=>void;canLock?:boolean;locked?:boolean;lockBusy?:boolean;onLock:()=>void;
 };
-
-const PostModalActions = ({ canPin, pinned, pinBusy, handlePin, canArchive, archiveBusy, archiveConfirm, handleArchive, onClose }: Props) => (
-  <div className="post-drawer-actions">
-    {canPin && <button type="button" onClick={handlePin} disabled={pinBusy} aria-label={pinned ? "Unpin post" : "Pin post"}>
-      {pinBusy ? <Loader2 aria-hidden="true" className="animate-spin" /> : pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}{pinned ? "Unpin" : "Pin"}
-    </button>}
-    {canArchive && <button type="button" onClick={handleArchive} disabled={archiveBusy} className={archiveConfirm ? "is-danger" : undefined} aria-label={archiveConfirm ? "Confirm archive post" : "Archive post"}>
-      {archiveBusy ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Archive aria-hidden="true" />}{archiveConfirm ? "Confirm archive?" : "Archive"}
-    </button>}
-    <button type="button" onClick={onClose} aria-label="Close post"><X aria-hidden="true" />Close</button>
-  </div>
-);
-
-export default PostModalActions;
+export default function PostModalActions({canEdit,onEdit,canPin,pinned,pinBusy,handlePin,canArchive,archiveBusy,handleArchive,onClose,onCopy,canLock,locked,lockBusy,onLock}:Props) {
+ return <div className="post-drawer-actions">{(canEdit||canPin||canArchive||canLock)&&<DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="post-manage-trigger" aria-label="Manage post"><span className="post-manage-label">Manage</span><ChevronDown className="post-manage-chevron" aria-hidden="true"/><MoreHorizontal className="post-manage-mobile" aria-hidden="true"/></button></DropdownMenuTrigger><DropdownMenuContent align="end" className="post-action-menu"><DropdownMenuItem className="post-mobile-share-action" onSelect={onCopy}><Link/>Copy post link</DropdownMenuItem>{canEdit&&<DropdownMenuItem onSelect={onEdit}><Pencil/>Edit post</DropdownMenuItem>}{canPin&&<DropdownMenuItem disabled={pinBusy} onSelect={handlePin}>{pinned?<PinOff/>:<Pin/>}{pinned?'Unpin post':'Pin post'}</DropdownMenuItem>}{canLock&&<DropdownMenuItem disabled={lockBusy} onSelect={onLock}>{locked?<Unlock/>:<Lock/>}{locked?'Unlock comments':'Lock comments'}</DropdownMenuItem>}{canArchive&&<><DropdownMenuSeparator/><DropdownMenuItem className="post-destructive-action" disabled={archiveBusy} onSelect={handleArchive}><Archive/>Archive post</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>}<button type="button" className={`post-share-button${canEdit||canPin||canArchive||canLock?' post-share-managed':''}`} onClick={onCopy} aria-label="Copy post link" title="Copy post link"><Link aria-hidden="true"/></button><button type="button" className="post-close-button" onClick={onClose} aria-label="Close post"><X aria-hidden="true"/></button></div>;
+}

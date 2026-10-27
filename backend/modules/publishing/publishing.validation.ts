@@ -1,3 +1,4 @@
+import {normalizePostContent,validateImageDescriptions} from "../bulletin/bulletin.content";
 import { createHash } from "node:crypto";
 import { sections, type Section, type Payload } from "./publishing.types";
 import guide = require("../user-guide/user-guide.service");
@@ -85,6 +86,7 @@ export function validatePublished(kind: Section, payload: Payload, base: Payload
             safeUrl(item.image_url, "resource image", true);
         }
         if (kind === "bulletin") {
+            validateImageDescriptions(normalizePostContent(item),(base.items||[]).find((row:any)=>Number(row.id)===Number(item.id)));
             required(item.content, "post content"); if(item.gallery&&!Array.isArray(item.gallery))fail("Invalid post gallery.");if((item.gallery||[]).length>8)fail("A gallery supports up to eight images.");for(const image of item.gallery||[]){safeUrl(image.url,"gallery image");if(typeof image.alt!=="string"||image.alt.length>500)fail("Invalid gallery image description.");}
             safeUrl(item.image_url, "post image", true);
             if (!["announcement", "event"].includes(item.post_type))

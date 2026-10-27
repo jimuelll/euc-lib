@@ -1,6 +1,9 @@
+import {LibraryIcon} from "@/components/ui/library-icon";
+import PostTimestamp from "./PostTimestamp";
+import "../post-card.css";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, Pin, Archive, Loader2 } from "@/components/ui/library-glyphs";
+import { MessageCircle, Pin, Archive, Loader2 } from "@/components/ui/library-glyphs";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import type { BulletinPost } from "../types";
@@ -26,6 +29,9 @@ export const cardVariants = {
 const ADMIN_ROLES = ["admin", "super_admin"];
 
 export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCardProps) {
+  const isLiked = Boolean(Number(post.helpful_by_me ?? post.liked_by_me));
+  const likeCount = Number(post.helpful_count ?? post.reaction_total ?? post.likes);
+  const likeLabel = `${likeCount} ${likeCount === 1 ? "like" : "likes"}${isLiked ? ", including you" : ""}`;
   const isList = variant === "list";
   const isFeatured = variant === "featured";
   const isHomepage = variant === "homepage";
@@ -69,13 +75,13 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           <div className="bulletin-slip-copy">
             <div className="bulletin-byline">
               <span className="bulletin-avatar" aria-hidden="true">{getInitials(post.author_name)}</span>
-              <div className="bulletin-author"><b title={post.author_name}>{post.author_name}</b><span>{post.date}</span></div>
+              <div className="bulletin-author"><b title={post.author_name}>{post.author_name}</b><span><PostTimestamp interactive={false} value={post.created_at||post.date} editedAt={post.edited_at}/></span></div>
             </div>
             {featured ? <h2>{post.title}</h2> : <h3>{post.title}</h3>}
             {!featured && hasImage && <img className="bulletin-slip-image" src={post.image_url} alt={post.image_alt ?? post.title} loading="lazy" />}
             {hasExcerpt && <p className="bulletin-excerpt">{excerpt}</p>}
             <div className="bulletin-slip-meta">
-              <span><Heart aria-hidden="true" className={post.liked_by_me ? "fill-current" : ""} />{post.likes}<span className="sr-only"> likes</span></span>
+              <span className="bulletin-like-stat" data-liked={isLiked}><LibraryIcon name="like"/>{likeCount}<span className="sr-only"> {likeCount===1?"like":"likes"}{isLiked?", including you":""}</span></span>
               <span><MessageCircle aria-hidden="true" />{post.comment_count}<span className="sr-only"> comments</span></span>
               <span className="bulletin-read">Read post</span>
             </div>
@@ -156,7 +162,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
               >
                 {post.author_name}
               </span>
-              <span className="text-xs text-muted-foreground shrink-0">{post.date}</span>
+              <span className="text-xs text-muted-foreground shrink-0"><PostTimestamp interactive={false} value={post.created_at||post.date} editedAt={post.edited_at}/></span>
             </div>
           </div>
 
@@ -183,13 +189,12 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           {/* Footer — stats */}
           <div className={`library-post-footer mt-auto flex items-center gap-4 border-t border-border/70 ${isHomepage ? "pt-2.5" : "pt-3"}`}>
             <span
-              className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
-                post.liked_by_me ? "text-primary" : "text-muted-foreground"
-              }`}
+              className="bulletin-like-stat flex items-center gap-1.5 text-xs font-bold transition-colors text-muted-foreground"
+              data-liked={isLiked}
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              <Heart aria-label={`${post.likes} likes${post.liked_by_me ? ", liked by you" : ""}`} role="img" className={`h-3 w-3 transition-all duration-150 ${post.liked_by_me ? "fill-current text-primary" : ""}`} />
-              {post.likes}
+              <LibraryIcon name="like" aria-label={likeLabel} role="img" className="h-3 w-3"/>
+              {likeCount}
             </span>
 
             <span

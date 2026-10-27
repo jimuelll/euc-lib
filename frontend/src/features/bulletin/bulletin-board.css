@@ -19,7 +19,6 @@
 .bulletin-new-post svg { width: 18px; height: 18px; }
 .bulletin-new-post:hover { background: none; color: hsl(var(--action)); }
 .bulletin-search { display: flex; align-items: center; gap: 10px; min-height: 44px; width: 280px; padding: 0 4px; border-bottom: 2px solid hsl(var(--foreground)); }
-.bulletin-search:focus-within { border-color: var(--bulletin-gold); }
 .bulletin-search svg { width: 18px; height: 18px; flex: none; }
 .bulletin-search input { width: 100%; min-width: 0; padding: 0; border: 0; background: none; outline: 0; color: inherit; font: inherit; }
 .bulletin-search input::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
@@ -100,7 +99,6 @@
 .bulletin-board[data-library-design][data-library-design] .bulletin-search,
 .bulletin-board[data-library-design][data-library-design] .bulletin-outline-button,
 .bulletin-board[data-library-design][data-library-design] .bulletin-pagination button { border-color: hsl(var(--foreground)); }
-.bulletin-board[data-library-design][data-library-design] .bulletin-search:focus-within { border-color: var(--bulletin-gold); }
 .bulletin-board[data-library-design][data-library-design] .bulletin-next-date { border-color: #fff6; }
 .bulletin-board[data-library-design][data-library-design] :is(.bulletin-slip h2, .bulletin-slip h3, .bulletin-month, .bulletin-agenda-heading h2) { letter-spacing: normal; text-wrap: wrap; }
 @media (max-width: 1000px) {

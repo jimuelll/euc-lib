@@ -1,6 +1,7 @@
 const { after } = require("node:test");
 const db = require("../db");
 
+require("./db.timezone.test");
 require("./analytics.helpers.test");
 require("./analytics.period.test");
 require("./attendance.visits.test");
@@ -16,6 +17,8 @@ require("./backup.restore.test");
 require("./backup.accession.restore.test");
 require("./backup.transforms.test");
 require("./publishing.test");
+require("./bulletin.social.test");
+require("./bulletin.social.database.integration.test");
 require("./notifications.admin.test");
 require("./notifications.recipients.test");
 require("./borrowing.helpers.test");
@@ -71,3 +74,6 @@ require("./production-readiness.auth.test");
 require("./production-readiness.database.integration.test");
 
 require("./site-content.contacts.test");
+
+require('./bulletin.moderation.test');
+require('./bulletin.moderation.database.integration.test');

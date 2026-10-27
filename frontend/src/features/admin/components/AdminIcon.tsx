@@ -47,6 +47,7 @@ const drawings = {
   moon: <path d="M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z" />,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5" /></>,
   plus: <path d="M12 4v16M4 12h16" />,
+  moderation: <><path d="M12 2 21 6v6c0 5-4 8-9 10-5-2-9-5-9-10V6zM12 7v6"/><path d="M11 16h2v2h-2z" /></>,
   copy: <><path d="M8 3h13v15H8zM3 7v14h13M11 7h7M11 11h7" /></>,
   image: <><path d="M3 3h18v18H3zM3 17l6-6 4 4 3-3 5 5" /><circle cx="15" cy="7" r="2" /></>,
   close: <path d="m6 6 12 12M18 6 6 18" />,
@@ -61,7 +62,7 @@ export const adminIconByUrl: Record<string, AdminIconName> = {
   "/admin/user-guide": "help", "/admin": "dashboard", "/admin/circulation": "circulation", "/admin/reservations": "reservations",
   "/admin/clearance": "clearance", "/admin/manage": "users", "/admin/catalog": "catalog",
   "/admin/attendance-logs": "attendance", "/admin/content": "content", "/admin/notifications": "notifications",
-  "/admin/analytics": "analytics", "/admin/query": "reports", "/admin/holidays": "academic",
+  "/admin/moderation": "moderation", "/admin/analytics": "analytics", "/admin/query": "reports", "/admin/holidays": "academic",
   "/admin/book-types": "policies", "/admin/catalog?tab=builder": "configuration",
   "/admin/catalog?tab=ai": "recommendations", "/admin/audit-logs": "audit", "/admin/backup": "backup",
 };

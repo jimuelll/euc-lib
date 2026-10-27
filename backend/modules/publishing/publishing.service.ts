@@ -7,7 +7,7 @@ import audit = require("../analytics/transactional-audit");
 import * as notificationEmail from "../notifications/notifications.email.service";
 import hub = require("../../realtime/notificationHub");
 import * as notificationRepository from "../notifications/notifications.email.repository";
-const parse = (value:string|null|undefined)=>value?JSON.parse(value):null;
+const parse = (value:string|null|undefined)=>{if(!value)return null;const parsed=JSON.parse(value);if(Array.isArray(parsed?.items))for(const item of parsed.items)if(item.id&&typeof item.content==='string'){item.content_revision??=1;item.edited_at??=null;}return parsed;};
 export const itemKey=(item:any)=>String(item.id||item._key);
 const changedCount=(payload:Payload,base:Payload)=>payload.items?payload.items.filter((item:any)=>!item.id||canonical(item)!==canonical((base.items||[]).find((row:any)=>row.id===item.id))).length:canonical(payload)!==canonical(base)?1:0;
 const serialize=(row:DraftRow,live:Payload)=>{

@@ -506,3 +506,11 @@
   .homepage-hero-description { margin-top: 0.75rem; }
   .homepage-hero-search { margin-top: 1rem; }
 }
+
+/* Remove the visible focus highlight used across the site. */
+:focus,
+:focus-visible,
+:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}

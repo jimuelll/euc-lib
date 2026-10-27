@@ -1,27 +1,68 @@
-import { Loader2, Trash2 } from "@/components/ui/library-glyphs";
-import { getInitials } from "../utils";
-import type { BulletinComment } from "../types";
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {ArrowLeft,ArrowDown,Lock,Send,X} from 'lucide-react';
+import {useAdminConfirmDialog} from '@/features/admin';
+import {useAuth} from '@/context/AuthContext';
+import {createBulletinComment,deleteBulletinComment,setCommentHelpful,moderateComment,fetchCommentContext,fetchDiscussionUpdates,fetchCommentSnapshots} from '../api';
+import type {ApiComment,CommentSort} from '../types';
+import {bulletinKeys} from '../bulletin.keys';
+import {bulletinDisplayName,copyBulletinLink} from '../utils';
+import {BulletinAvatar} from './CommentIdentity';
+import {useBulletinAnnouncement} from './useBulletinAnnouncement';
+import {CommentContent,CommentList,type ThreadActions} from './CommentThread';
+import {CommentReportDialog,CommentLikersDialog,MyCommentReviews} from './CommentReviewTools';
 
-type Props = {
-  comments: BulletinComment[];
-  commentsLoading: boolean;
-  canDeleteComment: (comment: BulletinComment) => boolean;
-  handleDeleteComment: (commentId: number) => void;
-};
-
-const PostComments = ({ comments, commentsLoading, canDeleteComment, handleDeleteComment }: Props) => (
-  <section className="post-drawer-comments" aria-label="Comments">
-    {commentsLoading && <p className="post-drawer-comment-status" role="status"><Loader2 aria-hidden="true" className="animate-spin" />Loading comments…</p>}
-    {!commentsLoading && !comments.length && <p className="post-drawer-comment-status">No comments yet. Be the first to leave one.</p>}
-    {!commentsLoading && comments.map((comment) => <div key={comment.id} className="post-drawer-comment">
-      <span className="post-drawer-avatar" aria-hidden="true">{getInitials(comment.author)}</span>
-      <div className="post-drawer-comment-copy">
-        <div className="post-drawer-byline"><b>{comment.author}</b><span>{comment.date}</span></div>
-        <p>{comment.text}</p>
-      </div>
-      {canDeleteComment(comment) && <button type="button" className="post-drawer-delete-comment" aria-label={`Delete comment by ${comment.author}`} onClick={() => void handleDeleteComment(comment.id)}><Trash2 aria-hidden="true" /></button>}
-    </div>)}
-  </section>
-);
-
-export default PostComments;
+type Props={postId:number;postAuthorId?:number;commentCount?:number;locked?:boolean;linkedCommentId?:number;onChanged:()=>void;onRequireLogin?:()=>void};
+export default function PostComments({postId,postAuthorId,commentCount=0,locked=false,linkedCommentId,onChanged,onRequireLogin}:Props){
+ const {user}=useAuth(),client=useQueryClient(),{confirm,confirmDialog}=useAdminConfirmDialog();
+ const [text,setText]=useState(''),[replyTo,setReplyTo]=useState<ApiComment|null>(null),[path,setPath]=useState<ApiComment[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[expanded,setExpanded]=useState(false),[locals,setLocals]=useState<ApiComment[]>([]),[sort,setSort]=useState<CommentSort>('helpful'),[seen,setSeen]=useState<number|null>(null),[target,setTarget]=useState<ApiComment|null>(null),[highlightId,setHighlightId]=useState<number|null>(null);
+ const [announcement,setAnnouncement]=useBulletinAnnouncement();
+ const [reportTarget,setReportTarget]=useState<ApiComment|null>(null),[likesTarget,setLikesTarget]=useState<ApiComment|null>(null);
+ useEffect(()=>{if(!user){setReportTarget(null);setLikesTarget(null);}},[user]);
+ const input=useRef<HTMLTextAreaElement>(null),heading=useRef<HTMLHeadingElement>(null),submitLock=useRef(false),reactionLocks=useRef(new Set<number>());
+ const focused=path[path.length-1],admin=['admin','super_admin'].includes(user?.role||''),moderator=['staff','admin','super_admin'].includes(user?.role||''),displayName=bulletinDisplayName(user?.name||'Reader',user?.role);
+ const updates=useQuery({queryKey:['bulletin-discussion-updates',postId,seen],queryFn:async({signal})=>{const status=await fetchDiscussionUpdates(postId,seen||0,signal);const cached=client.getQueriesData<any>({queryKey:['bulletin-discussion',postId]}).flatMap(([,data])=>data?.pages?.flatMap((page:any)=>page.data)||[]);const ids=[...new Set([...cached,...locals,...path,...(target?[target]:[])].map((row:ApiComment)=>row.id).filter(id=>id>0))];return {...status,snapshots:ids.length?await fetchCommentSnapshots(postId,ids,signal):[]};},enabled:seen!==null,refetchInterval:20000,refetchOnWindowFocus:false});
+ useEffect(()=>{
+  const data=updates.data;if(!data)return;
+  if(typeof data.comment_count==='number'&&Number.isFinite(data.comment_count)){client.setQueryData(bulletinKeys.post(postId),(old:any)=>old?{...old,comment_count:data.comment_count}:old);client.setQueriesData<any>({queryKey:bulletinKeys.lists()},(old:any)=>Array.isArray(old?.data)?{...old,data:old.data.map((post:any)=>Number(post.id)===postId?{...post,comment_count:data.comment_count}:post)}:old);}
+  if(!data.snapshots?.length)return;const byId=new Map(data.snapshots.map(row=>[row.id,row.comment]));
+  const sync=(rows:ApiComment[])=>rows.flatMap(row=>byId.has(row.id)?(byId.get(row.id)?[byId.get(row.id)!]:[]):[row]);
+  client.setQueriesData<any>({queryKey:['bulletin-discussion',postId]},(old:any)=>old?{...old,pages:old.pages.map((page:any)=>({...page,data:sync(page.data)}))}:old);
+  if(likesTarget&&byId.has(likesTarget.id)){const fresh=byId.get(likesTarget.id);if(!fresh||fresh.deleted_at||fresh.hidden_at)setLikesTarget(null);}
+  setLocals(sync);setPath(sync);setTarget(old=>old&&byId.has(old.id)?byId.get(old.id)||null:old);
+  if(replyTo&&byId.has(replyTo.id)){const fresh=byId.get(replyTo.id);if(!fresh||fresh.deleted_at||fresh.hidden_at){const mention=`@${replyTo.author} `;setText(old=>old.startsWith(mention)?old.slice(mention.length):old);setReplyTo(null);setError('The comment you were replying to is no longer available. Your draft is kept.');}}
+ },[updates.data,client,postId]);
+ const commentsLocked=updates.data?.comments_locked??locked;
+ const newCommentCount=Number(updates.data?.new_count??0);
+ const refresh=async()=>{await Promise.all([client.invalidateQueries({queryKey:['bulletin-discussion',postId]}),client.invalidateQueries({queryKey:bulletinKeys.post(postId)}),client.invalidateQueries({queryKey:bulletinKeys.lists()}),client.invalidateQueries({queryKey:['bulletin-my-reviews',postId,user?.id]})]);onChanged();};
+ const loaded=useCallback((latest:number)=>setSeen(old=>old===null?latest:old),[]);
+ const openComment=async(id:number,signal?:AbortSignal)=>{const context=await fetchCommentContext(postId,id,signal);if(signal?.aborted)return;setPath(context.ancestors);setTarget(context.comment);setHighlightId(context.comment.id);};
+ const linked=useQuery({queryKey:['bulletin-comment-context',postId,linkedCommentId],queryFn:({signal})=>fetchCommentContext(postId,linkedCommentId!,signal),enabled:Boolean(linkedCommentId),retry:false});
+ useEffect(()=>{if(linked.data){setPath(linked.data.ancestors);setTarget(linked.data.comment);setHighlightId(linked.data.comment.id);}},[linked.data]);
+ const focus=(comment:ApiComment)=>{setPath(old=>[...old,comment]);setReplyTo(null);setTarget(null);heading.current?.scrollIntoView?.({block:'start'});heading.current?.focus();};
+ const reply=(comment:ApiComment,thread=false)=>{if(!user){onRequireLogin?.();return;}if(commentsLocked)return;if(thread)focus(comment);const previous=replyTo?`@${replyTo.author} `:'';setText(old=>!old.trim()?`@${comment.author} `:previous&&old.startsWith(previous)?`@${comment.author} ${old.slice(previous.length)}`:old);setReplyTo(comment);setExpanded(true);setError('');input.current?.focus();};
+ const cancelReply=()=>{if(replyTo){const mention=`@${replyTo.author} `;setText(old=>old.startsWith(mention)?old.slice(mention.length):old);}setReplyTo(null);input.current?.focus();};
+ const remove=async(comment:ApiComment)=>{if(!await confirm({title:'Delete comment?',description:'The comment will be removed. Its replies will remain visible.',actionLabel:'Delete comment',cancelLabel:'Keep comment',tone:'danger'}))return;try{await deleteBulletinComment(postId,comment.id);void client.invalidateQueries({queryKey:['moderation-stats']});void client.invalidateQueries({queryKey:['moderation-cases']});void client.invalidateQueries({queryKey:['moderation-case']});const removed={...comment,deleted_at:new Date().toISOString(),author:'',text:''};setPath(old=>comment.reply_count?old.map(c=>c.id===comment.id?removed:c):[]);setTarget(old=>old?.id===comment.id?(comment.reply_count?removed:null):old);setLocals(old=>old.filter(c=>c.id!==comment.id));if(replyTo?.id===comment.id)cancelReply();await refresh();setAnnouncement(comment.reply_count?'Comment removed. Its replies are still available.':'Comment deleted.');}catch{setError('Could not delete the comment. Try again.');}};
+ const report=(comment:ApiComment)=>{if(!user){onRequireLogin?.();return;}setReportTarget(comment);};
+ const helpful=async(comment:ApiComment)=>{if(!user){onRequireLogin?.();return;}if(reactionLocks.current.has(comment.id))return;reactionLocks.current.add(comment.id);try{await setCommentHelpful(postId,comment.id,!Number(comment.helpful_by_me));await refresh();{const fresh=await fetchCommentContext(postId,comment.id);setLocals(old=>old.map(c=>c.id===comment.id?fresh.comment:c));setTarget(old=>old?.id===comment.id?fresh.comment:old);setPath(old=>old.map(c=>c.id===comment.id?fresh.comment:c));}}catch{setError('Could not save your like. Try again.');}finally{reactionLocks.current.delete(comment.id);}};
+ const moderate=async(comment:ApiComment,action:'hidden'|'pinned')=>{const value=action==='hidden'?!comment.hidden_at:!comment.pinned_at;if(action==='hidden'&&value&&!await confirm({title:'Hide comment?',description:'The comment will be hidden. A placeholder remains only when replies need it for context.',actionLabel:'Hide comment',cancelLabel:'Cancel'}))return;try{await moderateComment(postId,comment.id,action,value);await refresh();const context=action==='hidden'&&value&&!comment.reply_count?null:await fetchCommentContext(postId,comment.id);if(!context){setLocals(old=>old.filter(c=>c.id!==comment.id));setPath([]);setTarget(null);}else {setLocals(old=>old.map(c=>c.id===comment.id?context.comment:c));setPath(old=>old.map(c=>c.id===comment.id?context.comment:c));setTarget(old=>old?.id===comment.id?context.comment:old);}if(value&&action==='hidden'&&replyTo?.id===comment.id)cancelReply();setAnnouncement(action==='hidden'?(value?'Comment hidden.':'Comment visible again.'):(value?'Comment pinned.':'Comment unpinned.'));}catch{setError('Could not update the comment. Try again.');}};
+ const copy=async(comment:ApiComment)=>{try{await copyBulletinLink(postId,comment.id);setAnnouncement('Comment link copied.');}catch{setError('Could not copy the link. Try again.');}};
+ const send=async(retry?:ApiComment)=>{
+  if(!user){onRequireLogin?.();return;}if(commentsLocked||submitLock.current)return;
+  const body=retry?.text||text.trim();if(!body||(!retry&&replyTo&&body===`@${replyTo.author}`))return;
+  const parentId=retry?(retry.parent_id??null):(replyTo?.id??null);
+  const attempt=retry||locals.find(c=>c.failed&&c.text===body&&(c.parent_id??null)===parentId);
+  const requestId=attempt?.client_request_id||crypto.randomUUID();
+  const optimistic:ApiComment={id:attempt?.id||-Date.now(),parent_id:parentId,author:displayName,author_id:user.id,author_role:user.role,text:body,created_at:attempt?.created_at||new Date().toISOString(),client_request_id:requestId,pending:true,reply_count:0};
+  setLocals(old=>[...old.filter(c=>c.client_request_id!==requestId),optimistic]);if(!parentId)setPath([]);
+  submitLock.current=true;setBusy(true);setError('');setAnnouncement('');
+  try{const saved=await createBulletinComment(postId,body,parentId||undefined,requestId);setLocals(old=>saved.moderation_status==='pending'?old.filter(c=>c.client_request_id!==requestId):old.map(c=>c.client_request_id===requestId?{...saved,client_request_id:requestId}:c));if(!retry||text.trim()===body){setText('');setReplyTo(null);setExpanded(false);}setAnnouncement(saved.moderation_status==='pending'?'Your comment is awaiting review.':parentId?'Reply posted.':'Comment posted.');await refresh();}
+  catch(failure:any){setLocals(old=>failure.response?.data?.code==='COMMENT_REVISION_REQUIRED'?old.filter(c=>c.client_request_id!==requestId):old.map(c=>c.client_request_id===requestId?{...c,pending:false,failed:true}:c));setError(failure.response?.data?.message||'Could not post your comment. Your text is kept; try again.');}
+  finally{submitLock.current=false;setBusy(false);}
+ };
+ const actions:ThreadActions={postId,postAuthorId,userId:user?.id,admin,moderator,locked:commentsLocked,locals,target,highlightId,sort,onReply:reply,onFocus:focus,onDelete:c=>void remove(c),onReport:c=>void report(c),onHelpful:c=>void helpful(c),onViewLikes:c=>{if(!user)onRequireLogin?.();else setLikesTarget(c);},onModerate:(c,a)=>void moderate(c,a),onCopy:c=>void copy(c),onRetry:c=>void send(c),onLoaded:loaded};
+ const isExpanded=expanded||Boolean(text)||Boolean(replyTo),hasBody=Boolean(text.trim())&&(!replyTo||text.trim()!==`@${replyTo.author}`);
+ const loadNew=async()=>{try{const latest=updates.data?.latest_id||seen||0;await refresh();setSeen(latest);const id=(updates.data as any)?.newest_other_id||latest;if(id)await openComment(id);}catch{setError('Could not load the new comments. Try again.');}};
+ return <><section className="post-discussion" data-focused={Boolean(focused)} aria-label="Discussion"><header className="post-discussion-heading"><h3 ref={heading} tabIndex={-1}>{focused?'Thread':'Discussion'}</h3>{focused?<button type="button" onClick={()=>{setPath(old=>old.slice(0,-1));setTarget(null);setReplyTo(null);heading.current?.focus();}}><ArrowLeft/>{path.length>1?'Back to previous thread':'All comments'}</button>:commentCount>5&&<label className="post-comment-sort"><span className="sr-only">Sort comments</span><select aria-label="Sort comments" value={sort} onChange={event=>{setSort(event.target.value as CommentSort);setTarget(null);}}><option value="helpful">Top</option><option value="oldest">Oldest</option><option value="newest">Newest</option></select></label>}</header>{linked.isFetching&&linkedCommentId&&<p role="status">Opening linked comment…</p>}{linked.isError&&<p role="alert">This comment is unavailable. <button type="button" onClick={()=>void linked.refetch()}>Try again</button></p>}{newCommentCount>0&&<button type="button" className="post-new-comments" aria-live="polite" onClick={()=>void loadNew()}>{newCommentCount} new {newCommentCount===1?'comment':'comments'}<ArrowDown/></button>}{focused&&<div className="post-focused-comment"><span className="post-thread-root-label">Original comment</span><div className="post-focused-root"><BulletinAvatar name={focused.author} removed={Boolean(focused.deleted_at||focused.hidden_at)}/><CommentContent comment={focused} {...actions}/></div></div>}<MyCommentReviews postId={postId} userId={user?.id} onReviewed={()=>{void client.invalidateQueries({queryKey:['bulletin-discussion',postId]});void client.invalidateQueries({queryKey:bulletinKeys.post(postId)});}} onDelete={comment=>void remove({...comment,author:displayName,author_id:user!.id,reply_count:0})}/><CommentList key={focused?.id||'all'} parentId={focused?.id||null} depth={focused?1:0} {...actions} replyingTo={focused?.author||(focused?'a removed comment':undefined)}/></section>
+ <div className="post-discussion-composer" data-expanded={isExpanded} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setExpanded(false);}}>{error&&<p role="alert">{error}</p>}<p className={announcement?'post-feedback-toast':'sr-only'} role="status" aria-live="polite" aria-atomic="true">{announcement}</p>{commentsLocked?<p className="post-comments-locked"><Lock/>Comments are locked. You can still read this discussion.</p>:<div className="post-composer-layout"><BulletinAvatar name={displayName}/><div className="post-composer-fields">{replyTo&&!replyTo.deleted_at&&!replyTo.hidden_at&&<div className="post-reply-target"><span>Replying to <strong>{replyTo.author}</strong></span><button type="button" onClick={cancelReply} aria-label="Cancel reply"><X/></button></div>}<form onSubmit={event=>{event.preventDefault();void send();}}><label className="sr-only" htmlFor={`post-comment-${postId}`}>{replyTo?'Write a reply':'Write a comment'}</label><textarea ref={input} id={`post-comment-${postId}`} value={text} rows={isExpanded?3:1} maxLength={1000} readOnly={!user} disabled={busy} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing&&window.matchMedia?.('(hover: hover) and (pointer: fine)').matches){event.preventDefault();void send();}}} onFocus={()=>{if(!user)onRequireLogin?.();else setExpanded(true);}} onChange={event=>{setText(event.target.value);setAnnouncement('');}} placeholder={user?replyTo?'Write a reply…':'Join the discussion…':'Sign in to join the discussion'}/><button type="submit" disabled={busy||!hasBody} aria-label={replyTo?'Post reply':'Post comment'}><Send/>{busy?'Posting…':'Send'}</button></form>{isExpanded&&<small>Keep discussion respectful and relevant to the library.</small>}</div></div>}</div><CommentReportDialog postId={postId} comment={reportTarget} onClose={()=>setReportTarget(null)} onReported={()=>setAnnouncement('Comment reported to library administrators.')}/><CommentLikersDialog postId={postId} comment={likesTarget} userId={user?.id} onClose={()=>setLikesTarget(null)}/>{confirmDialog}</>;
+}

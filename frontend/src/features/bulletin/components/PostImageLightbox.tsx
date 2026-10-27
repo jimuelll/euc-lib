@@ -1,89 +1,19 @@
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Download, X, ZoomIn, ZoomOut } from "@/components/ui/library-glyphs";
-import type { RefObject } from "react";
-import type { BulletinPost } from "../types";
-
-type Props = {
-  post: BulletinPost;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  imgRef: RefObject<HTMLImageElement>;
-  zoom: number;
-  origin: { x: number; y: number };
-  handleImageClick: (event: React.MouseEvent<HTMLImageElement>) => void;
-  toggleZoom: () => void;
-  handleDownload: () => void;
-  downloadError: string | null;
-};
-
-const PostImageLightbox = ({ post, open, onOpenChange, imgRef, zoom, origin, handleImageClick, toggleZoom, handleDownload, downloadError }: Props) => (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent
-            hideClose
-            className="fixed inset-0 left-0 top-0 z-[200] flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 items-center justify-center border-0 bg-black/95 p-0 shadow-none sm:rounded-none"
-          >
-            <DialogTitle className="sr-only">{post.title} image viewer</DialogTitle>
-          <img
-            ref={imgRef}
-            src={post.image_url}
-            alt={post.image_alt??post.title}
-            onClick={handleImageClick}
-            className="max-h-[90dvh] max-w-[92vw] object-contain select-none"
-            style={{
-              cursor: zoom > 1 ? "zoom-out" : "zoom-in",
-              transform: `scale(${zoom})`,
-              transformOrigin: `${origin.x}% ${origin.y}%`,
-              transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-            draggable={false}
-          />
-          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleZoom();
-              }}
-              className="flex min-h-10 items-center gap-2 bg-white/10 px-4 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-              aria-label={zoom > 1 ? "Zoom out" : "Zoom in"}
-            >
-              {zoom > 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-              {zoom > 1 ? "Zoom out" : "Zoom in"}
-            </button>
-            <span
-              className="hidden bg-black/45 px-3 py-2 text-xs text-white/75 sm:block"
-              style={{ fontFamily: "var(--font-heading)", letterSpacing: "0.1em" }}
-            >
-              Click image to {zoom > 1 ? "reset" : "zoom"}
-            </span>
-          </div>
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenChange(false);
-            }}
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              handleDownload();
-            }}
-            className="absolute right-4 top-14 flex h-8 w-8 items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-colors z-10"
-            title="Download original image"
-            aria-label="Download original image"
-          >
-            <Download className="h-4 w-4" />
-          </button>
-          {downloadError && (
-            <p className="absolute inset-x-4 bottom-20 z-10 mx-auto max-w-md bg-destructive px-4 py-3 text-center text-sm text-destructive-foreground" role="alert">
-              {downloadError}
-            </p>
-          )}
-          </DialogContent>
-        </Dialog>
-);
-
-export default PostImageLightbox;
+import {useEffect,useRef,useState} from 'react';
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
+import {ChevronLeft,ChevronRight,Download,X,ZoomIn,ZoomOut} from 'lucide-react';
+import type {PostImage} from '../types';
+export default function PostImageLightbox({images,title,index,onIndexChange,onClose,onRestoreFocus}:{images:PostImage[];title:string;index:number|null;onIndexChange:(index:number)=>void;onClose:()=>void;onRestoreFocus:()=>void}){
+ const [zoom,setZoom]=useState(false),[failed,setFailed]=useState(false),[loaded,setLoaded]=useState(false);
+ const start=useRef<{x:number;y:number}|null>(null);
+ useEffect(()=>{setZoom(false);setFailed(false);setLoaded(false);},[index]);
+ const current=index===null?null:images[index];
+ const move=(delta:number)=>{if(index!==null)onIndexChange((index+delta+images.length)%images.length);};
+ return <Dialog open={index!==null} onOpenChange={open=>{if(!open)onClose();}}><DialogContent hideClose className="post-image-viewer" onCloseAutoFocus={event=>{event.preventDefault();onRestoreFocus();}} onKeyDown={event=>{if(event.target instanceof HTMLInputElement)return;if(event.key==='ArrowRight'){event.preventDefault();move(1);}if(event.key==='ArrowLeft'){event.preventDefault();move(-1);}}}>
+  <DialogTitle className="sr-only">{title} image viewer</DialogTitle><DialogDescription className="sr-only">Use the arrow keys or previous and next buttons to browse. Escape closes the viewer.</DialogDescription>
+  <header><span aria-live="polite">Image {(index??0)+1} of {images.length}</span><div><button type="button" disabled={failed} onClick={()=>setZoom(value=>!value)} aria-label={zoom?'Zoom out':'Zoom in'}>{zoom?<ZoomOut/>:<ZoomIn/>}<span>{zoom?'Fit image':'Zoom in'}</span></button>{current&&<a href={current.url.includes('/upload/')?current.url.replace('/upload/','/upload/fl_attachment/'):current.url} target="_blank" rel="noopener noreferrer" aria-label="Download selected image"><Download/><span>Download</span></a>}<button type="button" onClick={onClose} aria-label="Close image viewer"><X/></button></div></header>
+  <div className="post-viewer-stage" data-zoomed={zoom} onTouchStart={event=>{const t=event.touches[0];start.current={x:t.clientX,y:t.clientY};}} onTouchEnd={event=>{const t=event.changedTouches[0],origin=start.current;start.current=null;if(!zoom&&origin&&Math.abs(t.clientX-origin.x)>50&&Math.abs(t.clientY-origin.y)<60){event.preventDefault();move(t.clientX<origin.x?1:-1);}}}>
+   {current&&<><div className="post-viewer-image-scroll">{!loaded&&!failed&&<p role="status">Loading image…</p>}{failed?<div role="alert"><p>This image could not be loaded.</p><a href={current.url} target="_blank" rel="noopener noreferrer">Open original image</a></div>:<img key={current.url} src={current.url} alt={current.alt||`${title}, image ${(index??0)+1}`} data-zoomed={zoom} onLoad={()=>setLoaded(true)} onError={()=>setFailed(true)} onClick={()=>setZoom(value=>!value)} draggable={false}/>}</div>{images.length>1&&<><button className="post-viewer-prev" type="button" onClick={()=>move(-1)} aria-label="Previous image"><ChevronLeft/></button><button className="post-viewer-next" type="button" onClick={()=>move(1)} aria-label="Next image"><ChevronRight/></button></>}</>}
+  </div>
+  <footer>{current?.alt&&<p>{current.alt}</p>}<div className="post-viewer-thumbnails" aria-label="Choose image">{images.map((image,i)=><button type="button" key={i} onClick={()=>onIndexChange(i)} aria-label={`View image ${i+1}`} aria-pressed={index===i}><img src={image.url} alt=""/></button>)}</div></footer>
+ </DialogContent></Dialog>;
+}

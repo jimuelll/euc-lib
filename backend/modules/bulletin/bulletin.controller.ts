@@ -73,6 +73,7 @@ const createPost: RequestHandler = async (req, res) => {
       image_url,
       image_public_id,
       image_alt:req.body.image_alt,
+      gallery:req.body.gallery,
       is_pinned: Boolean(is_pinned),
       post_type,
       event_starts_at,
@@ -141,12 +142,12 @@ const addComment: RequestHandler = async (req, res) => {
   try {
     const postId = parseInt(String(req.params.postId), 10);
     if (isNaN(postId) || postId < 1) return res.status(400).json({ message: "Invalid post ID" });
-    const comment = await service.addComment(postId, (req as AuthenticatedRequest).user.id, req.body.text);
+    const comment = await service.addComment(postId, (req as AuthenticatedRequest).user.id, req.body.text, req.body.parent_id,req.body.client_request_id);
     res.status(201).json(comment);
   } catch (err) {
     logError("[bulletin] addComment:", err);
     const error = err as ControllerError;
-    res.status(error.status ?? 500).json({ message: error.message ?? "Failed to add comment" });
+    res.status(error.status ?? 500).json({ message: error.status?error.message:"Could not add the comment. Try again.",code:error.status?(error as any).code:undefined });
   }
 };
 
@@ -154,7 +155,7 @@ const deleteComment: RequestHandler = async (req, res) => {
   try {
     const commentId = parseInt(String(req.params.commentId), 10);
     if (isNaN(commentId) || commentId < 1) return res.status(400).json({ message: "Invalid comment ID" });
-    await service.deleteComment(commentId, (req as AuthenticatedRequest).user);
+    await service.deleteComment(commentId, (req as AuthenticatedRequest).user, Number(req.params.postId));
     res.json({ message: "Comment deleted successfully" });
   } catch (err) {
     logError("[bulletin] deleteComment:", err);

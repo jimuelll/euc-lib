@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import Dashboard from "../pages/AdminHome";
 import { fetchAdminDashboard, type DashboardResponse } from "../api";
 
+vi.mock("@/features/moderation/api",()=>({fetchModerationStats:vi.fn(async()=>({pending:0,urgent:0,oldest:null}))}));
 const auth = vi.hoisted(() => ({ role: "super_admin" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: auth.role } }) }));
 vi.mock("../api", () => ({ fetchAdminDashboard: vi.fn() }));
@@ -53,7 +54,7 @@ describe("compact admin dashboard", () => {
     mount();
     const links = within(await screen.findByRole("navigation", { name: "Quick links" }));
     expect(links.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/manage");
-    expect(links.getByRole("link", { name: "Catalog" })).toHaveAttribute("href", "/admin/catalog");
+    expect(links.getByRole("link", { name: "Needs holdings" })).toHaveAttribute("href", "/admin/catalog?filter=needs-holdings");
     expect(Boolean(links.queryByRole("link", { name: "Reports" }))).toBe(role !== "staff");
   });
 

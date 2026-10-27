@@ -17,12 +17,15 @@ describe("admin navigation", () => {
     expect(sections.some(group => group.label === "Collection")).toBe(false);
     expect(urls).not.toContain("/admin/backup");
     expect(urls).not.toContain("/admin/notifications");
+    expect(urls).not.toContain("/admin/moderation");
     expect(urls).not.toContain("/admin/catalog?tab=builder");
   });
   it("preserves the distinction between admin and super-admin tools", () => {
     const admin = visibleSidebarSections("admin").flatMap(group => group.items);
     const superAdmin = visibleSidebarSections("super_admin").flatMap(group => group.items);
     expect(admin.some(item => item.title === "Reports & Records")).toBe(true);
+    expect(admin.some(item => item.url === "/admin/moderation")).toBe(true);
+    expect(superAdmin.some(item => item.url === "/admin/moderation")).toBe(true);
     expect(admin.some(item => item.title === "AI Recommendations")).toBe(false);
     expect(superAdmin.some(item => item.title === "AI Recommendations")).toBe(true);
     const settings = visibleSidebarSections("super_admin").find(group => group.label === "Settings & System");

@@ -36,6 +36,7 @@ const ReportPreview = lazy(() => import("@/features/query/ReportPreview"));
 const AdminClearance = lazy(() => import("@/features/clearance/admin/AdminClearance"));
 const AdminClearanceReceipt = lazy(() => import("@/features/clearance/admin/AdminClearanceReceipt"));
 const AdminAttendanceLogs = lazy(() => import("@/features/attendance/admin/Index"));
+const AdminModeration = lazy(() => import("@/features/moderation/AdminModeration"));
 const AdminNotifications = lazy(() => import("@/features/notifications/admin/AdminNotifications"));
 const AdminHolidays = lazy(() => import("@/features/library-settings/admin/AdminHolidays"));
 const AdminAuditLogs = lazy(() => import("@/features/analytics/admin/pages/AdminAuditLogs"));
@@ -89,6 +90,7 @@ export const AppRoutes = () => {
         <Route path="reservations" element={<AdminReservations />} />
         <Route path="holidays" element={<AdminHolidays />} />
         <Route path="restrictions" element={<AdminManage />} />
+        <Route path="moderation" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminModeration /></ProtectedRoute>} />
         <Route path="content" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminContentManagement /></ProtectedRoute>} />
         <Route path="user-guide" element={<AdminUserGuide />} />
         <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />

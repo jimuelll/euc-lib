@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import {
   Bell,
+  Bookmark,
   BookOpen,
   History,
   LayoutDashboard,
@@ -32,6 +33,7 @@ import MyLibraryHistoryPanel, {
   type HistoryView,
 } from "./components/MyLibraryHistoryPanel";
 import MyLibraryUpdatesPanel from "./components/MyLibraryUpdatesPanel";
+import MyLibrarySavedPosts from "./components/MyLibrarySavedPosts";
 import MyLibraryBarcode from "./components/MyLibraryBarcode";
 import {
   EmptyPanel,
@@ -47,6 +49,7 @@ const sections = [
   { value: "overview", label: "Overview", Icon: LayoutDashboard },
   { value: "history", label: "History", Icon: History },
   { value: "updates", label: "Updates", Icon: Bell },
+  { value: "saved", label: "Saved", Icon: Bookmark },
   { value: "discover", label: "Discover", Icon: BookOpen },
 ] as const;
 
@@ -103,7 +106,7 @@ export default function MyLibrary() {
                 <span className="mx-2 text-border" aria-hidden="true">
                   /
                 </span>
-                Your loans, reservations, and library activity
+                Your loans, reservations, saved posts, and library activity
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -125,7 +128,7 @@ export default function MyLibrary() {
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-[184px_minmax(0,1fr)] lg:gap-8">
             <nav
               aria-label="My Library sections"
-              className="library-section-tabs grid grid-cols-4 gap-1 rounded-lg bg-muted/60 p-1 lg:sticky lg:top-24 lg:grid-cols-1 lg:gap-1 lg:bg-transparent lg:p-0"
+              className="library-section-tabs grid grid-cols-5 gap-1 rounded-lg bg-muted/60 p-1 lg:sticky lg:top-24 lg:grid-cols-1 lg:gap-1 lg:bg-transparent lg:p-0"
               onKeyDown={(event) => {
                 const links = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>("a"));
                 const index = links.indexOf(event.target as HTMLAnchorElement);
@@ -280,6 +283,7 @@ export default function MyLibrary() {
                   }}
                 />
               )}
+              {view === "saved" && enabled && <MyLibrarySavedPosts/>}
               {view === "discover" && (
                 <div className="my-library-discover space-y-6">
                   <div>

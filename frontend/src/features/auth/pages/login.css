@@ -26,7 +26,7 @@
 .login-shell .login-form{padding:24px 28px 28px 48px;position:relative;z-index:1}
 .login-shell .login-context{margin:0 0 18px;font:700 17px var(--ser)}.login-shell .login-context span{color:var(--em)}
 .login-shell label{display:block;font-weight:700;font-size:14px;margin:0 0 4px}
-.login-shell .login-field{margin-bottom:20px}.login-shell .login-input{display:flex;border:1px solid var(--ink);background:var(--sf)}.login-shell .login-input:focus-within{border-color:var(--gd);box-shadow:0 0 0 2px var(--gd)}
+.login-shell .login-field{margin-bottom:20px}.login-shell .login-input{display:flex;border:1px solid var(--ink);background:var(--sf)}
 .login-shell .login-input input{flex:1;border:0;background:none;min-height:50px;padding:0 14px;font:17px var(--mono);outline:0;min-width:0}
 .login-shell .login-input button{border:0;border-left:1px solid var(--ln);background:none;min-width:70px;font-weight:700;color:var(--em)}
 .login-shell .login-hint{font-size:13px;color:var(--mut);margin:5px 0 0}.login-shell .login-caps-lock{color:var(--err);font-weight:700;font-size:13px;margin:5px 0 0}

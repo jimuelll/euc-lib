@@ -38,6 +38,8 @@ const notices = vi.hoisted(() => ({
   markAllAsRead: vi.fn(),
   refresh: vi.fn(),
 }));
+const saved=vi.hoisted(()=>({fetchSavedBulletinPosts:vi.fn(),setPostSaved:vi.fn()}));
+vi.mock("@/features/bulletin",()=>saved);
 vi.mock("./api", () => api);
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({
@@ -332,4 +334,8 @@ describe("My Library workspace", () => {
     fireEvent.click(notice);
     expect(notices.openNotification).toHaveBeenCalledWith(42);
   });
+});
+
+it('opens the private Saved section from a direct My Library link',async()=>{
+ saved.fetchSavedBulletinPosts.mockResolvedValue({data:[],page:1,hasMore:false});renderLibrary('/my-library?view=saved');expect(await screen.findByRole('heading',{name:'Saved posts'})).toBeInTheDocument();expect(await screen.findByRole('link',{name:'Browse bulletin'})).toHaveAttribute('href','/bulletin');expect(screen.getByRole('link',{name:'Saved'})).toHaveAttribute('aria-current','page');
 });

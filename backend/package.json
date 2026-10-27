@@ -8,7 +8,8 @@
     "invite-super-admin": "node -r ts-node/register scripts/invite-super-admin.ts",
     "migrate-notification-recipients": "node -r ts-node/register scripts/migrate-notification-recipients.ts",
     "migrate-notification-images": "node -r ts-node/register scripts/migrate-notification-images.ts",
-    "migrate-manual-email": "node -r ts-node/register scripts/migrate-manual-email.ts"
+    "migrate-manual-email": "node -r ts-node/register scripts/migrate-manual-email.ts",
+    "migrate-bulletin-social": "node -r ts-node/register scripts/migrate-bulletin-social.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -1,3 +1,4 @@
+import {bulletinName} from './bulletin.identity';
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   BulletinCommentRow,
@@ -32,6 +33,7 @@ interface LikePersonRow extends RowDataPacket {
 
 interface CommentOwnerRow extends RowDataPacket {
   user_id: number;
+  post_id?:number;
 }
 
 const getPosts = async ({ userId, page, limit, archiveScope, search, month, postType, upcomingOnly }: BulletinFilters) => {
@@ -66,11 +68,12 @@ const getPosts = async ({ userId, page, limit, archiveScope, search, month, post
   const queryParams = userId ? [userId, ...filterParams, limit, offset] : [...filterParams, limit, offset];
   const [rows] = await db.query<BulletinPostRow[]>(
     `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.image_alt, bp.gallery, bp.post_type, bp.event_starts_at, bp.event_ends_at,
-       bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at, bp.deleted_at,
+       bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at,bp.comments_locked,bp.edited_at,bp.content_revision,bp.image_public_id, bp.deleted_at,
        u.id AS author_id, u.name AS author_name, u.role AS author_role,
-       (SELECT COUNT(*) FROM bulletin_likes WHERE post_id = bp.id) AS likes,
-       (SELECT COUNT(*) FROM bulletin_comments WHERE post_id = bp.id AND deleted_at IS NULL) AS comment_count,
-       ${userId ? "EXISTS(SELECT 1 FROM bulletin_likes WHERE post_id = bp.id AND user_id = ?)" : "FALSE"} AS liked_by_me
+       (SELECT COUNT(*) FROM bulletin_helpful WHERE post_id=bp.id) AS likes,
+       (SELECT COUNT(*) FROM bulletin_helpful WHERE post_id=bp.id) AS reaction_total,
+       (SELECT COUNT(*) FROM bulletin_comments WHERE post_id = bp.id AND deleted_at IS NULL AND hidden_at IS NULL) AS comment_count,
+       ${userId ? "EXISTS(SELECT 1 FROM bulletin_helpful WHERE post_id = bp.id AND user_id = ?)" : "FALSE"} AS liked_by_me
      FROM bulletin_posts bp JOIN users u ON u.id = bp.author_id
      WHERE ${deletedFilter} ${searchFilter} ${monthFilter} ${typeFilter} ${upcomingFilter}
      ORDER BY bp.is_pinned DESC, CASE WHEN bp.post_type = 'event' THEN bp.event_starts_at END ASC, bp.created_at DESC
@@ -78,7 +81,7 @@ const getPosts = async ({ userId, page, limit, archiveScope, search, month, post
     queryParams,
   );
   return {
-    data: rows,
+    data: rows.map(row=>({...row,author_name:bulletinName(row.author_name||'Reader',row.author_role||'')})),
     total,
     page,
     totalPages: Math.ceil(Number(total) / limit),
@@ -89,15 +92,17 @@ const getPosts = async ({ userId, page, limit, archiveScope, search, month, post
 const findPost = async (postId: number, userId: number | null, includeArchived = false): Promise<BulletinPostRow | null> => {
   const [[post]] = await db.query<BulletinPostRow[]>(
     `SELECT bp.id, bp.title, bp.content, bp.image_url, bp.image_alt, bp.gallery, bp.post_type, bp.event_starts_at, bp.event_ends_at,
-       bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at,
+       bp.event_location, bp.event_registration_url, bp.is_pinned, bp.created_at,bp.comments_locked,bp.edited_at,bp.content_revision,bp.image_public_id,
        u.id AS author_id, u.name AS author_name, u.role AS author_role,
-       (SELECT COUNT(*) FROM bulletin_likes WHERE post_id = bp.id) AS likes,
-       ${userId ? "EXISTS(SELECT 1 FROM bulletin_likes WHERE post_id = bp.id AND user_id = ?)" : "FALSE"} AS liked_by_me
+       (SELECT COUNT(*) FROM bulletin_helpful WHERE post_id=bp.id) AS likes,
+       (SELECT COUNT(*) FROM bulletin_helpful WHERE post_id=bp.id) AS reaction_total,
+       (SELECT COUNT(*) FROM bulletin_comments WHERE post_id=bp.id AND deleted_at IS NULL AND hidden_at IS NULL) AS comment_count,
+       ${userId ? "EXISTS(SELECT 1 FROM bulletin_helpful WHERE post_id = bp.id AND user_id = ?)" : "FALSE"} AS liked_by_me
      FROM bulletin_posts bp JOIN users u ON u.id = bp.author_id
      WHERE bp.id = ? ${includeArchived ? "" : "AND bp.deleted_at IS NULL"}`,
     userId ? [userId, postId] : [postId],
   );
-  return post || null;
+  return post?{...post,author_name:bulletinName(post.author_name||'Reader',post.author_role||'')}:null;
 };
 
 const findComments = async (postId: number): Promise<BulletinCommentRow[]> => {
@@ -111,13 +116,13 @@ const findComments = async (postId: number): Promise<BulletinCommentRow[]> => {
   return comments;
 };
 
-const createPost = async ({ title, excerpt, content, imageUrl, imagePublicId, imageAlt, authorId, pinned, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl }: CreatePostRepositoryInput, conn: Pool | PoolConnection = db): Promise<{ id: number }> => {
+const createPost = async ({ title, excerpt, content, imageUrl, imagePublicId, imageAlt, gallery, authorId, pinned, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl }: CreatePostRepositoryInput, conn: Pool | PoolConnection = db): Promise<{ id: number }> => {
   if (pinned) await conn.query("UPDATE bulletin_posts SET is_pinned = 0 WHERE is_pinned = 1 AND deleted_at IS NULL");
   const [result] = await conn.query<ResultSetHeader>(
     `INSERT INTO bulletin_posts
-       (title, excerpt, content, image_url, image_public_id, image_alt, author_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [title, excerpt, content, imageUrl, imagePublicId, imageAlt || null, authorId, pinned ? 1 : 0, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl],
+       (title, excerpt, content, image_url, image_public_id, image_alt, gallery, author_id, is_pinned, post_type, event_starts_at, event_ends_at, event_location, event_registration_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [title, excerpt, content, imageUrl, imagePublicId, imageAlt || null, JSON.stringify(gallery||[]), authorId, pinned ? 1 : 0, postType, eventStartsAt, eventEndsAt, eventLocation, eventRegistrationUrl],
   );
   return { id: result.insertId };
 };
@@ -194,7 +199,7 @@ const addComment = async (postId: number, userId: number, text: string): Promise
 };
 
 const findComment = async (commentId: number): Promise<CommentOwnerRow | null> => {
-  const [[comment]] = await db.query<CommentOwnerRow[]>("SELECT user_id FROM bulletin_comments WHERE id = ? AND deleted_at IS NULL", [commentId]);
+  const [[comment]] = await db.query<CommentOwnerRow[]>("SELECT user_id,post_id FROM bulletin_comments WHERE id = ? AND deleted_at IS NULL", [commentId]);
   return comment || null;
 };
 

@@ -28,7 +28,7 @@
 .library-about-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; gap: 56px; }
 .library-about-rail { position: sticky; top: 84px; display: flex; flex-direction: column; border-left: 2px solid hsl(var(--border)); }
 .library-about-rail a { margin-left: -2px; padding: 8px 16px; border-left: 2px solid transparent; font-size: 14px; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
-.library-about-rail a:hover, .library-about-rail a:focus-visible { border-color: var(--library-gold); color: hsl(var(--foreground)); }
+.library-about-rail a:hover { border-color: var(--library-gold); color: hsl(var(--foreground)); }
 .library-about-content { min-width: 0; }
 .library-about-chapter { padding: 0 0 56px; scroll-margin-top: 88px; }
 .library-about-chapter + .library-about-chapter { padding-top: 44px; border-top: 1px solid hsl(var(--border)); }
@@ -75,7 +75,7 @@
 .library-information-page[data-library-design][data-library-design] .library-information-button.is-outline { border-color: hsl(var(--foreground)); }
 .library-information-page[data-library-design][data-library-design] .library-about-details:first-of-type { border-top-color: hsl(var(--foreground)); }
 .library-information-page[data-library-design][data-library-design] .library-about-facility:hover { border-color: hsl(var(--foreground)); }
-.library-information-page[data-library-design][data-library-design] .library-about-rail a:is(:hover,:focus-visible) { border-color: var(--library-gold); }
+.library-information-page[data-library-design][data-library-design] .library-about-rail a:hover { border-color: var(--library-gold); }
 .library-information-page[data-library-design][data-library-design] :is(.library-service-row h2,.library-information-section-title) { letter-spacing: normal; text-wrap: wrap; }
 .library-information-page[data-library-design][data-library-design] .library-about-staff-group { font: 700 13px "DM Sans", system-ui, sans-serif; letter-spacing: .14em; text-wrap: wrap; }
 @media (max-width: 900px) {

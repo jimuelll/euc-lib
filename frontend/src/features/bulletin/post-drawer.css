@@ -59,8 +59,7 @@
 .post-drawer-composer small a { color: hsl(var(--action)); text-decoration: underline; }
 .post-drawer-error { margin: 8px 0; color: hsl(var(--destructive)); font-size: 13px; }
 .bulletin-post-drawer[data-library-design][data-library-design] .post-drawer-reactions { border-top-color: hsl(var(--foreground)); }
-.bulletin-post-drawer[data-library-design][data-library-design] .post-drawer-like[aria-pressed="true"],
-.bulletin-post-drawer[data-library-design][data-library-design] .post-drawer-composer form:focus-within { border-color: var(--post-gold); }
+.bulletin-post-drawer[data-library-design][data-library-design] .post-drawer-like[aria-pressed="true"] { border-color: var(--post-gold); }
 .bulletin-post-drawer :is(button,a):focus-visible { outline: 2px solid var(--post-gold); outline-offset: 3px; }
 @media (max-width: 720px) {
   .post-drawer-heading, .post-drawer-body, .post-drawer-gallery, .post-drawer-comments, .post-drawer-composer { padding-left: 20px; padding-right: 20px; }

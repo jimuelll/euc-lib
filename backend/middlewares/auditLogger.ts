@@ -38,7 +38,7 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/notifications", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/subscriptions", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/user-guide", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
-  { prefix: "/api/bulletin", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "state_transition", exclude: /\/(?:like|comments)(?:\/|$)/ },
+  { prefix: "/api/bulletin", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "state_transition", exclude: /\/(?:like|comments|comment-snapshots|reaction|helpful|interest|save)(?:\/|$)/ },
   { prefix: "/api/attendance/scan/time-out-all", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/attendance/scan", methods: ["POST"], type: "state_transition" },
   { prefix: "/api/admin/circulation", methods: ["POST"], type: "state_transition" },
@@ -136,6 +136,7 @@ function describeTarget(body: Record<string, any> = {}, path = "", snapshot: any
 }
 
 const fieldSets: Array<[string, Array<[string, string]>]> = [
+  ["/bulletin", [["title","Post title"],["content","Post content"],["image_url","Cover image"],["image_alt","Cover description"],["gallery","Gallery"],["post_type","Post type"],["event_starts_at","Event start"],["event_ends_at","Event end"],["event_location","Event location"],["event_registration_url","Registration link"],["is_pinned","Pinned"],["content_revision","Content revision"]]],
   ["catalog-schema", [["key", "Field key"], ["label", "Label"], ["type", "Field type"], ["options", "Options"], ["required", "Required"], ["locked", "Locked"], ["public", "Public"], ["order", "Display order"], ["scope", "Applies to"], ["archived", "Archived"]]],
   ["book-types", [["name", "Policy name"], ["default_borrow_days", "Borrow days"], ["loan_duration_minutes", "Loan duration"], ["loan_duration_unit", "Duration unit"], ["fine_per_hour", "Recurring fine (PHP)"], ["fine_interval", "Fine interval"], ["initial_fine", "Initial fine (PHP)"], ["is_active", "Active"]]],
   ["/books", [["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["material_type", "Material"], ["book_type_id", "Book type"], ["copies", "Copies"], ["metadata", "Catalogue details"], ["deleted_at", "Archived"]]],

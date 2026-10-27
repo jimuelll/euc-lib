@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import {
+  Bookmark as OriginalBookmark,
   BookOpen as OriginalBookOpen, BookMarked as OriginalBookMarked, CalendarDays as OriginalCalendarDays,
   Bell as OriginalBell, Search as OriginalSearch, Heart as OriginalHeart, MessageCircle as OriginalMessageCircle,
   Users as OriginalUsers, Database as OriginalDatabase, Archive as OriginalArchive,
@@ -24,6 +25,7 @@ function glyph(name: string, Original: LucideIcon) {
   Glyph.displayName = `Library${name}`;
   return Glyph;
 }
+export const Bookmark = glyph("save", OriginalBookmark);
 export const BookOpen = glyph("borrow", OriginalBookOpen);
 export const BookMarked = glyph("catalog", OriginalBookMarked);
 export const CalendarDays = glyph("academic", OriginalCalendarDays);

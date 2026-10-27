@@ -61,6 +61,14 @@ DROP TABLE IF EXISTS
   `auth_refresh_sessions`,
   `auth_audit_events`,
   `audit_events`,
+  `bulletin_moderation_actions`,
+  `bulletin_comment_reports`,
+  `bulletin_moderation_cases`,
+  `bulletin_reactions`,
+  `bulletin_comment_helpful`,
+  `bulletin_helpful`,
+  `bulletin_saves`,
+  `bulletin_event_interest`,
   `bulletin_comments`,
   `bulletin_likes`,
   `bulletin_posts`,
@@ -1350,7 +1358,6 @@ CREATE TABLE `fine_accounts` (
   `policy_initial` decimal(12,2) DEFAULT NULL,
   `policy_baseline` decimal(12,2) DEFAULT NULL,
   `assessed_through_at` datetime DEFAULT NULL,
-  `imported_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   CONSTRAINT `fk_fine_account_borrowing` FOREIGN KEY (`borrowing_id`) REFERENCES `borrowings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1363,7 +1370,6 @@ CREATE TABLE `fine_ledger_entries` (
   `effective_at` datetime NOT NULL,
   `recorded_at` datetime NOT NULL DEFAULT current_timestamp(),
   `transaction_item_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `source_note` varchar(160) DEFAULT NULL,
   KEY `idx_fine_entry_borrowing` (`borrowing_id`,`id`),
   KEY `idx_fine_entry_effective` (`kind`,`effective_at`),
   UNIQUE KEY `uq_fine_entry_transaction_item` (`transaction_item_id`),
@@ -1701,4 +1707,95 @@ CREATE TABLE IF NOT EXISTS notification_recipients (
   KEY idx_notification_recipients_user (user_id,notification_id),
   CONSTRAINT fk_notification_recipients_notice FOREIGN KEY (notification_id) REFERENCES notifications (id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_recipients_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Apply once before deploying the bulletin discussion and editing release.
+ALTER TABLE bulletin_posts
+  ADD COLUMN edited_at datetime(3) NULL,
+  ADD COLUMN content_revision int unsigned NOT NULL DEFAULT 1;
+ALTER TABLE bulletin_comments
+  ADD COLUMN parent_id int(11) NULL,
+  ADD KEY idx_bulletin_comment_thread (post_id,parent_id,created_at,id),
+  ADD CONSTRAINT fk_bulletin_comment_parent FOREIGN KEY (parent_id) REFERENCES bulletin_comments(id);
+CREATE TABLE bulletin_reactions (
+  post_id int(11) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  reaction enum('like','helpful','thanks','interested') NOT NULL,
+  created_at timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (post_id,user_id),
+  KEY idx_bulletin_reaction_kind (post_id,reaction,created_at),
+  CONSTRAINT fk_bulletin_reaction_post FOREIGN KEY (post_id) REFERENCES bulletin_posts(id),
+  CONSTRAINT fk_bulletin_reaction_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+INSERT INTO bulletin_reactions (post_id,user_id,reaction,created_at)
+SELECT post_id,user_id,'like',MIN(created_at) FROM bulletin_likes GROUP BY post_id,user_id;
+
+-- Bulletin discussion controls and idempotent comment submissions.
+ALTER TABLE bulletin_posts ADD COLUMN comments_locked tinyint(1) NOT NULL DEFAULT 0;
+ALTER TABLE bulletin_comments
+ ADD COLUMN hidden_at datetime(3) NULL, ADD COLUMN hidden_by bigint(20) unsigned NULL,
+ ADD COLUMN pinned_at datetime(3) NULL, ADD COLUMN pinned_by bigint(20) unsigned NULL,
+ ADD COLUMN client_request_id varchar(36) NULL,
+ ADD UNIQUE KEY uq_bulletin_comment_request (user_id,client_request_id);
+CREATE TABLE bulletin_comment_helpful (
+ comment_id int(11) NOT NULL,user_id bigint(20) unsigned NOT NULL,created_at timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY(comment_id,user_id),
+ CONSTRAINT fk_comment_helpful_comment FOREIGN KEY(comment_id) REFERENCES bulletin_comments(id),
+ CONSTRAINT fk_comment_helpful_user FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Separate public Helpful, private saves, and event planning interest.
+
+ALTER TABLE bulletin_reactions ADD COLUMN consolidated_at datetime(3) NULL;
+CREATE TABLE bulletin_helpful (
+ post_id int(11) NOT NULL,user_id bigint(20) unsigned NOT NULL,created_at timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY(post_id,user_id),KEY idx_bulletin_helpful_user(user_id,created_at,post_id),
+ CONSTRAINT fk_bulletin_helpful_post FOREIGN KEY(post_id) REFERENCES bulletin_posts(id),
+ CONSTRAINT fk_bulletin_helpful_user FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE bulletin_saves (
+ post_id int(11) NOT NULL,user_id bigint(20) unsigned NOT NULL,created_at timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY(post_id,user_id),KEY idx_bulletin_saves_user(user_id,created_at,post_id),
+ CONSTRAINT fk_bulletin_saves_post FOREIGN KEY(post_id) REFERENCES bulletin_posts(id),
+ CONSTRAINT fk_bulletin_saves_user FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE bulletin_event_interest (
+ post_id int(11) NOT NULL,user_id bigint(20) unsigned NOT NULL,created_at timestamp NOT NULL DEFAULT current_timestamp(),
+ PRIMARY KEY(post_id,user_id),KEY idx_bulletin_event_interest_user(user_id,created_at,post_id),
+ CONSTRAINT fk_bulletin_event_interest_post FOREIGN KEY(post_id) REFERENCES bulletin_posts(id),
+ CONSTRAINT fk_bulletin_event_interest_user FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+INSERT IGNORE INTO bulletin_helpful(post_id,user_id,created_at) SELECT r.post_id,r.user_id,r.created_at FROM bulletin_reactions r JOIN bulletin_posts p ON p.id=r.post_id WHERE r.consolidated_at IS NULL AND (r.reaction<>'interested' OR p.post_type<>'event');
+INSERT IGNORE INTO bulletin_event_interest(post_id,user_id,created_at) SELECT r.post_id,r.user_id,r.created_at FROM bulletin_reactions r JOIN bulletin_posts p ON p.id=r.post_id WHERE r.consolidated_at IS NULL AND r.reaction='interested' AND p.post_type='event';
+UPDATE bulletin_reactions SET consolidated_at=UTC_TIMESTAMP(3) WHERE consolidated_at IS NULL;
+
+-- Bulletin review workflow.
+ALTER TABLE bulletin_comments ADD COLUMN moderation_status varchar(20) NOT NULL DEFAULT 'published', ADD COLUMN moderation_reason varchar(1000) NULL;
+CREATE TABLE IF NOT EXISTS bulletin_moderation_cases (
+ id int(11) NOT NULL AUTO_INCREMENT, comment_id int(11) NOT NULL, post_id int(11) NOT NULL,
+ status varchar(20) NOT NULL DEFAULT 'open', priority varchar(20) NOT NULL DEFAULT 'normal',
+ source varchar(20) NOT NULL DEFAULT 'report', snapshot_text text NOT NULL, screening_reason varchar(500) NULL,
+ resolution_reason varchar(1000) NULL, revision int unsigned NOT NULL DEFAULT 1,
+ created_at datetime(3) NOT NULL DEFAULT current_timestamp(3), opened_at datetime(3) NOT NULL DEFAULT current_timestamp(3),
+ updated_at datetime(3) NOT NULL DEFAULT current_timestamp(3), resolved_at datetime(3) NULL, resolved_by bigint unsigned NULL,
+ appealed_at datetime(3) NULL,
+ PRIMARY KEY(id), UNIQUE KEY uq_moderation_comment(comment_id), KEY idx_moderation_queue(status,priority,opened_at,id),
+ CONSTRAINT fk_moderation_comment FOREIGN KEY(comment_id) REFERENCES bulletin_comments(id),
+ CONSTRAINT fk_moderation_post FOREIGN KEY(post_id) REFERENCES bulletin_posts(id),
+ CONSTRAINT fk_moderation_reviewer FOREIGN KEY(resolved_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS bulletin_comment_reports (
+ id bigint unsigned NOT NULL AUTO_INCREMENT, case_id int(11) NOT NULL, reporter_id bigint unsigned NOT NULL,
+ reason varchar(40) NOT NULL, details varchar(1000) NULL, created_at datetime(3) NOT NULL DEFAULT current_timestamp(3),
+ PRIMARY KEY(id), UNIQUE KEY uq_comment_reporter(case_id,reporter_id),
+ CONSTRAINT fk_report_case FOREIGN KEY(case_id) REFERENCES bulletin_moderation_cases(id),
+ CONSTRAINT fk_report_user FOREIGN KEY(reporter_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS bulletin_moderation_actions (
+ id bigint unsigned NOT NULL AUTO_INCREMENT, case_id int(11) NOT NULL, actor_id bigint unsigned NULL,
+ action varchar(40) NOT NULL, reason varchar(1000) NOT NULL, created_at datetime(3) NOT NULL DEFAULT current_timestamp(3),
+ PRIMARY KEY(id), KEY idx_case_actions(case_id,id),
+ CONSTRAINT fk_moderation_action_case FOREIGN KEY(case_id) REFERENCES bulletin_moderation_cases(id),
+ CONSTRAINT fk_moderation_action_user FOREIGN KEY(actor_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -17,6 +17,7 @@ export interface BulletinPostRow extends RowDataPacket {
   event_location: string | null;
   event_registration_url: string | null;
   is_pinned: boolean | number;
+  comments_locked?:boolean|number;
   created_at: Date | string;
   deleted_at?: Date | string | null;
   author_id: number;
@@ -67,6 +68,7 @@ export interface CreateBulletinPostInput {
   image_url?: string | null;
   image_public_id?: string | null;
   image_alt?: string | null;
+  gallery?: {url:string;alt:string;public_id?:string}[];
   is_pinned: boolean;
   post_type?: string;
   event_starts_at?: unknown;
@@ -82,6 +84,7 @@ export interface CreatePostRepositoryInput {
   imageUrl: string | null;
   imagePublicId: string | null;
   imageAlt?: string | null;
+  gallery?: {url:string;alt:string;public_id?:string}[];
   authorId: number;
   pinned: boolean;
   postType: string;

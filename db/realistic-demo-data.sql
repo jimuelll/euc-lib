@@ -249,8 +249,8 @@ SELECT b.id,
   JOIN books bk ON bk.id = b.book_id
  WHERE bk.created_by = 'DEMO-REAL';
 
-INSERT INTO fine_ledger_entries (borrowing_id, kind, amount, effective_at, source_note)
-SELECT fa.borrowing_id, 'charge', fa.charged_amount, fa.assessed_through_at, 'Demo seed assessed fine'
+INSERT INTO fine_ledger_entries (borrowing_id, kind, amount, effective_at)
+SELECT fa.borrowing_id, 'charge', fa.charged_amount, fa.assessed_through_at
   FROM fine_accounts fa
   JOIN borrowings b ON b.id = fa.borrowing_id
   JOIN books bk ON bk.id = b.book_id
