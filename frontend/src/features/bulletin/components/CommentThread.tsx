@@ -9,7 +9,7 @@ import {BulletinAvatar,RoleBadges} from './CommentIdentity';
 import PostTimestamp from './PostTimestamp';
 export type ThreadActions={
  replyingTo?:string;postId:number;postAuthorId?:number;userId?:number;admin:boolean;moderator:boolean;locked:boolean;
- locals:ApiComment[];target:ApiComment|null;highlightId:number|null;sort:CommentSort;
+ locals:ApiComment[];target:ApiComment|null;highlightId:number|null;sort:CommentSort;optimisticLikes?:Record<number,{selected:boolean;count:number}>;
  onReply:(comment:ApiComment,thread?:boolean)=>void;onFocus:(comment:ApiComment)=>void;
  onDelete:(comment:ApiComment)=>void;onReport:(comment:ApiComment)=>void;
  onViewLikes?:(comment:ApiComment)=>void;onHelpful:(comment:ApiComment)=>void;onModerate:(comment:ApiComment,action:'hidden'|'pinned')=>void;
@@ -23,8 +23,8 @@ export function CommentContent({comment,...a}:{comment:ApiComment}&ThreadActions
  const hideKey=`bulletin-hidden-comment:${a.userId||'visitor'}:${comment.id}`;
  const [hidden,setHidden]=useState(()=>{try{return localStorage.getItem(hideKey)==='1';}catch{return false;}});
  const hideForMe=(value:boolean)=>{setHidden(value);try{if(value)localStorage.setItem(hideKey,'1');else localStorage.removeItem(hideKey);}catch{/* The local view still works when browser storage is unavailable. */}};
- const unavailable=Boolean(comment.deleted_at||comment.hidden_at),pending=Boolean(comment.pending||comment.failed);
- const helpfulCount=Math.max(0,Number(comment.helpful_count)||0),helpfulSelected=Number(comment.helpful_by_me||0)>0;
+ const unavailable=Boolean(comment.deleted_at||comment.hidden_at),pending=Boolean(comment.pending||comment.failed),optimisticLike=a.optimisticLikes?.[comment.id];
+ const helpfulCount=Math.max(0,Number(optimisticLike?.count??comment.helpful_count)||0),helpfulSelected=optimisticLike?.selected??Boolean(Number(comment.helpful_by_me||0));
  if(hidden)return <p className="post-hidden-comment">Comment hidden for you. <button type="button" onClick={()=>hideForMe(false)}>Show comment</button></p>;
  return <div className="post-comment-content">{comment.pinned_at&&!unavailable&&<span className="post-comment-pin"><Pin aria-hidden="true"/>Pinned by staff</span>}<header><div className="post-comment-author-line"><strong title={comment.author}>{comment.deleted_at?'Comment removed':comment.hidden_at?'Comment hidden by staff':comment.author}</strong><PostTimestamp value={comment.created_at}/></div>{!unavailable&&<div className="post-comment-badges"><RoleBadges role={comment.author_role} author={comment.author_id===a.postAuthorId}/></div>}{!pending&&<CommentMenu comment={comment} onHide={()=>hideForMe(true)} {...a}/>}</header>{a.replyingTo&&!unavailable&&<span className="post-comment-recipient">Replying to {a.replyingTo}</span>}{!unavailable&&<p className="post-comment-text">{comment.text}</p>}{pending?<p className="post-pending-comment" role={comment.failed?undefined:'status'}>{comment.failed?'Not posted. Your text is kept.':'Posting…'}{comment.failed&&<button type="button" disabled={a.locked} onClick={()=>a.onRetry(comment)}>Retry</button>}</p>:<div className="post-comment-actions">{!unavailable&&<><button type="button" aria-pressed={helpfulSelected} className="post-like-control" aria-label={`${helpfulSelected?'Liked':'Like'} ${helpfulCount} on comment by ${comment.author}`} onClick={()=>a.onHelpful(comment)}><span>{helpfulSelected?'Liked':'Like'}</span><LibraryIcon name="like" className="post-social-glyph"/></button>{helpfulCount>0&&<button type="button" className="post-comment-like-count" aria-label={`View ${helpfulCount} ${helpfulCount===1?'like':'likes'} on comment by ${comment.author}`} onClick={()=>a.onViewLikes?.(comment)}>{helpfulCount}</button>}{!a.locked&&<button type="button" onClick={()=>a.onReply(comment)}>Reply</button>}</>}</div>}</div>;
 }
