@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Link, MemoryRouter } from "react-router-dom";
@@ -15,8 +15,11 @@ vi.mock("@/components/layout/Footer", () => ({ default: () => null }));
 vi.mock("@/features/recommendations", () => ({ RecommendationStrip: () => <div data-testid="related-recommendations" /> }));
 
 import Catalogue from "./Catalogue";
+configure({asyncUtilTimeout:10000});
 
-afterEach(cleanup);
+const authState = vi.hoisted(() => ({role: "guest"}));
+vi.mock("@/context/AuthContext", () => ({useAuth: () => ({user: authState.role === "guest" ? null : {role: authState.role}})}));
+afterEach(() => {cleanup();authState.role="guest";});
 beforeEach(() => {
   vi.clearAllMocks();
   fetchPublicCatalogSchema.mockResolvedValue([]);
@@ -142,4 +145,14 @@ describe("grid recommendation placement", () => {
     expect(screen.queryByRole("region", { name: "Similar books" })).not.toBeInTheDocument();
     expect(second).toHaveFocus();
   });
+});
+
+it('keeps OPAC search and similar books while removing reservation links from list and grid',async()=>{
+ authState.role='opac';renderCatalogue('book');
+ await screen.findByRole('button',{name:'Sample catalogue title'});
+ expect(screen.queryByRole('link',{name:/^Reserve/})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'View similar books for Sample catalogue title'}));
+ expect(await screen.findByTestId('related-recommendations')).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Grid view'}));
+ expect(screen.queryByRole('link',{name:/^Reserve/})).toBeNull();
 });

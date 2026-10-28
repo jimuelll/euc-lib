@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 const state = vi.hoisted(() => ({ data: undefined as undefined | { address: string; contact_email: string; contact_phone: string } }));
 vi.mock("@/features/site-content", () => ({ useSiteContent: () => state }));
+vi.mock("@/context/AuthContext", () => ({useAuth: () => ({user:null})}));
 import Footer from "./Footer";
 afterEach(cleanup);
 describe("configured footer contacts", () => {

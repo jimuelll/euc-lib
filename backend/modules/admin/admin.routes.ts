@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  handleResetOperationsPassword,
   handleAvailability,
   handleAccountEmailStatus,
   handleCreateUser,
@@ -14,6 +15,7 @@ const router = express.Router();
 const staffOrAbove = authMiddleware(["staff", "admin", "super_admin"]);
 router.post("/users/availability", staffOrAbove, handleAvailability);
 router.get("/users/:student_employee_id/account-email", staffOrAbove, handleAccountEmailStatus);
+router.post("/users/:student_employee_id/reset-password", authMiddleware(["admin", "super_admin"]), require("../../middlewares/rateLimiter").limiters.passwordChange, handleResetOperationsPassword);
 router.post("/users", staffOrAbove, handleCreateUser);
 router.delete("/users/:student_employee_id", staffOrAbove, handleDeleteUser);
 router.put("/users/:student_employee_id", staffOrAbove, handleUpdateUser);

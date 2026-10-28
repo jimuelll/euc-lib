@@ -1,6 +1,7 @@
 import { useAdminTheme } from "@/features/admin/hooks/useAdminTheme";
 import { lazy, Suspense } from "react";
 import { LibraryDesignProvider } from "@/components/ui/library-design";
+import OperationsRouteGate from "@/features/auth/components/OperationsRouteGate";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminUsersRedirect from "@/features/admin/manage/AdminUsersRedirect";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
@@ -53,7 +54,7 @@ const RouteFallback = () => (
 export const AppRoutes = () => {
   useAdminTheme();
   return (
-  <LibraryDesignProvider><Suspense fallback={<RouteFallback />}>
+  <OperationsRouteGate><LibraryDesignProvider><Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/about" element={<About />} />
@@ -66,7 +67,7 @@ export const AppRoutes = () => {
       <Route path="/forgot-password" element={<EmailAccess key="recovery" />} />
       <Route path="/set-password" element={<EmailAccess key="setup" />} />
       <Route path="/verify-email" element={<EmailAccess key="verify" />} />
-      <Route path="/scan-qr" element={<ScanQR />} />
+      <Route path="/scan-qr" element={<ProtectedRoute roles={["scanner", "staff", "admin", "super_admin"]}><ScanQR /></ProtectedRoute>} />
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/my-library" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
       <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
@@ -104,6 +105,6 @@ export const AppRoutes = () => {
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
-  </Suspense></LibraryDesignProvider>
+  </Suspense></LibraryDesignProvider></OperationsRouteGate>
 );
 };

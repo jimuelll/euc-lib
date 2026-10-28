@@ -44,8 +44,8 @@ const createUser = async ({ studentEmployeeId, libraryCardNumber, studentNumber,
   const [result] = await conn.query<ResultSetHeader>(
     `INSERT INTO users
       (student_employee_id, library_card_number, student_number, employee_number, username, email, name, password_hash, role, is_active, must_change_password, address, contact, program_id, academic_term_id, year_level, department_id, remarks)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?)`,
-    [studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email || null, name, passwordHash, role, address || "", contact || "", programId, academicTermId, yearLevel, departmentId, remarks],
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [studentEmployeeId, libraryCardNumber, studentNumber, employeeNumber, username, email || null, name, passwordHash, role, ["scanner", "opac"].includes(role) ? 0 : 1, address || "", contact || "", programId, academicTermId, yearLevel, departmentId, remarks],
   );
   const userId = result.insertId;
   const barcode = `LIB-USER-${String(userId).padStart(6, "0")}`;

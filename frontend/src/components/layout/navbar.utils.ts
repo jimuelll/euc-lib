@@ -1,6 +1,6 @@
 export type NavigationLink = { label: string; to: string; matchPrefix: boolean };
 
-const rolesWithMyLibrary = new Set(["student", "employee", "alumni", "scanner", "staff", "admin", "super_admin"]);
+const rolesWithMyLibrary = new Set(["student", "employee", "alumni", "staff", "admin", "super_admin"]);
 const rolesWithScanner = new Set(["scanner"]);
 const rolesWithAdminPanel = new Set(["admin", "super_admin", "staff"]);
 

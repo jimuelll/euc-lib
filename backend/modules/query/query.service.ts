@@ -35,7 +35,7 @@ const { availableToBorrow, hasAccession } = require("../catalog/copyEligibility"
 
 const PAGE_LIMIT = 25;
 const EXPORT_LIMIT = 10000;
-const ROLES = ["scanner", "employee", "alumni", "student", "staff", "admin", "super_admin"];
+const ROLES = ["scanner", "opac", "employee", "alumni", "student", "staff", "admin", "super_admin"];
 const BORROWING_STATUSES = ["borrowed", "overdue", "returned"];
 const RESERVATION_STATUSES = ["pending", "ready", "fulfilled", "cancelled", "expired"];
 

@@ -6,7 +6,7 @@ import * as email from './notifications.email.service';
 import * as emailRepository from './notifications.email.repository';
 const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
 const db = require('../../db');
-const roles = ['student', 'alumni', 'employee', 'scanner', 'staff', 'admin', 'super_admin'];
+const roles = ['student', 'alumni', 'employee', 'scanner', 'opac', 'staff', 'admin', 'super_admin'];
 const destinations = ['/my-library', '/bulletin', '/services/borrowing', '/catalogue'];
 export function validate(input: any, now = new Date()) {
     if (input.sendEmail !== undefined && typeof input.sendEmail !== 'boolean') fail('Choose whether to send email.');

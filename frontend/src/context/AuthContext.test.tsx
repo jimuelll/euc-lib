@@ -119,3 +119,11 @@ describe("authentication navigation", () => {
     await waitFor(() => expect(screen.getByLabelText("Current task").textContent).toBe(expected));
   });
 });
+
+it.each(['scanner','opac'])('ignores an incompatible login return destination for %s',async role=>{
+ post.mockResolvedValue({data:{accessToken:`header.${btoa(JSON.stringify({id:2,name:'Terminal',role,must_change_password:false}))}.signature`}});
+ mountDestination('/login');
+ await waitFor(()=>expect((screen.getByText('Resume task') as HTMLButtonElement).disabled).toBe(false));
+ fireEvent.click(screen.getByText('Resume task'));
+ await waitFor(()=>expect(screen.getByLabelText('Current task').textContent).toBe(role==='scanner'?'/scan-qr':'/catalogue'));
+});

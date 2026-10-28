@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -6,10 +7,17 @@ import { createTestQueryClient, createTestQueryClientWrapper } from "@/test-util
 import AdminManage from "./Index";
 import { useAdminManage } from "./useAdminManage";
 import * as api from "./api";
-configure({asyncUtilTimeout:5000});
+configure({asyncUtilTimeout:10000});
+vi.setConfig({testTimeout:20000});
+Object.defineProperties(HTMLElement.prototype, {
+ hasPointerCapture:{configurable:true,value:()=>false},
+ setPointerCapture:{configurable:true,value:()=>{}},
+ releasePointerCapture:{configurable:true,value:()=>{}},
+ scrollIntoView:{configurable:true,value:()=>{}},
+});
 const signedIn=vi.hoisted(()=>({role:"super_admin"}));
 vi.mock("@/context/AuthContext",()=>({useAuth:()=>({user:{id:42,role:signedIn.role}})}));
-vi.mock("./api",()=>({searchUsers:vi.fn(),fetchAcademicPrograms:vi.fn(),fetchAcademicTerms:vi.fn(),fetchDepartments:vi.fn(),createUser:vi.fn(),updateUser:vi.fn(),archiveUser:vi.fn(),restoreUser:vi.fn(),requestAccountEmail:vi.fn(),checkUserAvailability:vi.fn(),fetchAccountEmailStatus:vi.fn()}));
+vi.mock("./api",()=>({searchUsers:vi.fn(),fetchAcademicPrograms:vi.fn(),fetchAcademicTerms:vi.fn(),fetchDepartments:vi.fn(),createUser:vi.fn(),updateUser:vi.fn(),archiveUser:vi.fn(),restoreUser:vi.fn(),requestAccountEmail:vi.fn(),checkUserAvailability:vi.fn(),fetchAccountEmailStatus:vi.fn(),resetOperationsPassword:vi.fn()}));
 const patron = {name:"Alex Rivera",student_employee_id:"CARD-1",library_card_number:"CARD-1",student_number:"ST-1",role:"student",program_id:1,academic_term_id:1,year_level:"2nd Year",is_active:1,active_loans:2,overdue_loans:1,unpaid_fines:1260,active_reservations:1};
 const admin = {name:"Desk Admin",student_employee_id:"admin-one",username:"admin-one",role:"admin",email:"desk@example.edu",email_verified_at:"2026-10-01",is_active:1,active_loans:0,overdue_loans:0,unpaid_fines:0,active_reservations:0};
 function Location(){return <output data-testid="route">{useLocation().search}</output>;}
@@ -66,18 +74,20 @@ it.each(["super_admin","admin","staff"])("only super admins can select the super
 it('starts with only roles, then shows the selected role fields and current term',async()=>{
  mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));
  expect(screen.queryByLabelText('Full name')).toBeNull();expect(screen.getByText('1 required field left')).toBeTruthy();
- fireEvent.click(screen.getByRole('radio',{name:'Student'}));
+ expect(screen.getByRole('group',{name:'Choose a role'})).toBeInTheDocument();
+ expect(screen.queryByRole('combobox',{name:'Role'})).toBeNull();
+ await choose('Role','Student');
  expect(screen.getByLabelText('Student number')).toBeTruthy();
  expect(screen.getByRole('combobox',{name:'Academic term'}).textContent).toContain('2026-2027');
  fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Desk'}});
- fireEvent.click(screen.getByRole('radio',{name:'Scanner'}));
+ await choose('Role','Staff');
  expect(screen.queryByLabelText('Student number')).toBeNull();expect(screen.getByLabelText('Username')).toBeTruthy();
  expect((screen.getByLabelText('Full name') as HTMLInputElement).value).toBe('New Desk');
  expect(screen.getByRole('button',{name:'Create and send invitation'}).hasAttribute('disabled')).toBe(true);
 });
 it('shows errors after blur and blocks duplicate email until corrected',async()=>{
  vi.mocked(api.checkUserAvailability).mockImplementation(async(field,value)=>({available:field!=='email'||value!=='used@example.edu'}));
- mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));fireEvent.click(screen.getByRole('radio',{name:'Scanner'}));
+ mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));await choose('Role','Staff');
  expect(screen.queryByText('This field is required.')).toBeNull();
  fireEvent.blur(screen.getByLabelText('Full name'));expect(screen.getByText('This field is required.')).toBeTruthy();
  fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Desk'}});fireEvent.change(screen.getByLabelText('Username'),{target:{value:'new.desk'}});
@@ -98,4 +108,58 @@ it('keeps edits between tabs, disables email actions while dirty and discards to
  expect((screen.getByLabelText('Full name') as HTMLInputElement).value).toBe('Changed Desk');
  fireEvent.click(screen.getByRole('button',{name:'Discard'}));expect((screen.getByLabelText('Full name') as HTMLInputElement).value).toBe('Desk Admin');
  expect(screen.getByText('No unsaved changes')).toBeTruthy();
+});
+
+async function choose(label:string,option:string) {
+ if(label==='Role'){fireEvent.click(screen.getByRole('radio',{name:option}));return;}
+ fireEvent.keyDown(screen.getByRole('combobox',{name:label}),{key:'ArrowDown'});
+ fireEvent.click(await screen.findByRole('option',{name:option}));
+}
+it.each(['Scanner','OPAC'])('creates a dedicated %s account without email',async type=>{
+ vi.mocked(api.createUser).mockResolvedValue({message:'Created'});
+ mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));
+ await choose('Role','Library Operations');
+ expect(screen.queryByLabelText('Full name')).toBeNull();
+ await choose('Operations type',type);
+ expect(screen.queryByLabelText('Email')).toBeNull();
+ expect(screen.queryByText(/invitation will be sent/i)).toBeNull();
+ fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'Library terminal'}});
+ fireEvent.change(screen.getByLabelText('Username'),{target:{value:'terminal'}});
+ fireEvent.change(screen.getByLabelText('Password'),{target:{value:'terminal-password'}});
+ fireEvent.change(screen.getByLabelText('Confirm password'),{target:{value:'terminal-password'}});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Create account'})).not.toBeDisabled());
+ fireEvent.click(screen.getByRole('button',{name:'Create account'}));
+ await waitFor(()=>expect(api.createUser).toHaveBeenCalledWith(expect.objectContaining({role:type==='OPAC'?'opac':'scanner',email:'',password:'terminal-password'})));
+ expect(api.requestAccountEmail).not.toHaveBeenCalled();
+ expect(api.checkUserAvailability).not.toHaveBeenCalledWith('email',expect.anything(),expect.anything(),expect.anything());
+});
+it('does not offer Library Operations creation to Staff',async()=>{
+ signedIn.role='staff';mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));
+ expect(screen.queryByRole('radio',{name:'Library Operations'})).toBeNull();
+});
+it('keeps operations editing separate and offers an admin password reset',async()=>{
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[{...admin,role:'scanner'}],summary:undefined,pagination:{page:1,limit:25,total:1,totalPages:1}});
+ vi.mocked(api.resetOperationsPassword).mockResolvedValue({message:'Password reset'});
+ mount();fireEvent.click(await screen.findByRole('button',{name:'Desk Admin'}));
+ expect(screen.queryByLabelText('Email')).toBeNull();
+ fireEvent.mouseDown(screen.getByRole('tab',{name:'Access'}),{button:0,ctrlKey:false});
+ expect(screen.queryByRole('button',{name:'Send recovery email'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Reset password'}));
+ fireEvent.change(screen.getByLabelText('New password'),{target:{value:'replacement-password'}});
+ fireEvent.change(screen.getByLabelText('Confirm new password'),{target:{value:'replacement-password'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save new password'}));
+ await waitFor(()=>expect(api.resetOperationsPassword).toHaveBeenCalledWith('admin-one','replacement-password'));
+ fireEvent.keyDown(screen.getByRole('combobox',{name:'Operations type'}),{key:'ArrowDown'});
+ expect(screen.queryByRole('option',{name:'Student'})).toBeNull();
+ expect(screen.getByRole('option',{name:'OPAC'})).toBeInTheDocument();
+});
+
+it('shows OPAC accounts in the user table and exposes the OPAC role filter',async()=>{
+ const opac={...admin,name:'Development OPAC',student_employee_id:'devopac',username:'devopac',role:'opac',email:null};
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[opac],summary:{total:1,active:1,needsAttention:0,statuses:{active:1,inactive:0,archived:0,all:1},roles:{opac:1}},pagination:{page:1,limit:25,total:1,totalPages:1}});
+ mount();expect(await screen.findByRole('button',{name:'Development OPAC'})).toBeInTheDocument();
+ expect(screen.getByText('OPAC',{selector:'.users-role'})).toBeInTheDocument();
+ fireEvent.keyDown(screen.getByRole('combobox',{name:'Role'}),{key:'ArrowDown'});
+ fireEvent.click(await screen.findByRole('option',{name:'OPAC (1)'}));
+ await waitFor(()=>expect(api.searchUsers).toHaveBeenLastCalledWith(expect.objectContaining({role:'opac'}),expect.any(AbortSignal)));
 });

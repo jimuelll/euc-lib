@@ -1,3 +1,4 @@
+import { isOperationsRole } from "@/utils/operationsAccess";
 import {useLocation,useNavigate} from 'react-router-dom';
 import NotificationReader from '@/features/notifications/NotificationReader';
 import {LibraryDesignProvider} from '@/components/ui/library-design';
@@ -46,6 +47,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user, loading: authLoading, getToken } = useAuth();
+  const operations = isOperationsRole(user?.role);
   const location=useLocation(),navigate=useNavigate(),notificationOpener=useRef<HTMLElement|null>(null);
   const selected=Number(new URLSearchParams(location.search).get('notification'));
   const notificationId=Number.isSafeInteger(selected)&&selected>0?selected:null;
@@ -62,7 +64,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const refresh = useCallback(async () => {
     setError(null);
-    if (!user?.id) {
+    if (!user?.id || operations) {
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
@@ -82,7 +84,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, operations]);
 
   refreshRef.current = refresh;
 
@@ -93,7 +95,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [authLoading, refresh]);
 
   useEffect(() => {
-    if (authLoading || !user?.id) return;
+    if (authLoading || !user?.id || operations) return;
 
     let cancelled = false;
 
@@ -178,10 +180,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [authLoading, user?.id, getToken]);
+  }, [authLoading, user?.id, getToken, operations]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || operations) return;
 
     const syncNotifications = () => {
       void refreshRef.current();
@@ -202,7 +204,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       window.removeEventListener("online", syncNotifications);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [user?.id]);
+  }, [user?.id, operations]);
 
   const markAsRead = useCallback(async (notificationId: number) => {
     const result=await markNotificationRead(notificationId);
@@ -248,7 +250,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <NotificationsContext.Provider value={value}>
       {children}
-      <LibraryDesignProvider><NotificationReader key={notificationId || "closed"} id={notificationId} userId={user?.id || null} onClose={closeNotification} onMarkRead={markAsRead} onDestination={href=>navigate(href)} onAfterClose={()=>{const target=notificationOpener.current; if(target?.isConnected)target.focus();else {const fallback=Array.from(document.querySelectorAll<HTMLElement>('[aria-label*="notifications" i]')).find(element=>element.offsetParent!==null) || document.querySelector<HTMLElement>('#admin-main,main');if(fallback){if(!fallback.hasAttribute('tabindex')&&fallback.tagName==='MAIN')fallback.tabIndex=-1;fallback.focus();}}}}/></LibraryDesignProvider>
+      <LibraryDesignProvider><NotificationReader key={notificationId || "closed"} id={operations ? null : notificationId} userId={user?.id || null} onClose={closeNotification} onMarkRead={markAsRead} onDestination={href=>navigate(href)} onAfterClose={()=>{const target=notificationOpener.current; if(target?.isConnected)target.focus();else {const fallback=Array.from(document.querySelectorAll<HTMLElement>('[aria-label*="notifications" i]')).find(element=>element.offsetParent!==null) || document.querySelector<HTMLElement>('#admin-main,main');if(fallback){if(!fallback.hasAttribute('tabindex')&&fallback.tagName==='MAIN')fallback.tabIndex=-1;fallback.focus();}}}}/></LibraryDesignProvider>
     </NotificationsContext.Provider>
   );
 };

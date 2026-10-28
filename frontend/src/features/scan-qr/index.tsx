@@ -1,191 +1,86 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { QrCode } from "@/components/ui/library-glyphs";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-
-export { useZxingScanner } from "./hooks/useZxingScanner";
-
-import IdleView from "./components/IdleView";
+import { useAuth } from "@/context/AuthContext";
+import KioskHeader from "@/components/layout/KioskHeader";
+import KioskFooter from "@/components/layout/KioskFooter";
+import { getUserInitials } from "@/components/layout/navbar.utils";
 import ScanningView from "./components/ScanningView";
 import { SuccessView, NoticeView, ErrorView } from "./components/ResultView";
 import type { ScanMode, AttendanceType, AttendanceResult, AttendanceNotice } from "./types";
 import { postAttendanceScan, AttendanceScanError, AUTO_RESET_DELAY } from "./utils";
 import { invalidateServerState } from "@/app/server-state";
+import "./scanner-kiosk.css";
+export { useZxingScanner } from "./hooks/useZxingScanner";
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+export const ATTENDANCE_MODE_KEY = "euc-kiosk-attendance-mode";
+const initialType = ():AttendanceType => {try{return localStorage.getItem(ATTENDANCE_MODE_KEY)==="check_out"?"check_out":"check_in";}catch{return "check_in";}};
+export const scanTime=(date:Date)=>date.toLocaleTimeString("en-US",{timeZone:"Asia/Manila",hour:"numeric",minute:"2-digit",hour12:true});
 
-const ScanQR = () => {
-  const queryClient = useQueryClient();
-  const { mutateAsync: submitAttendanceScan } = useMutation({
-    mutationFn: ({ scannedId, type }: { scannedId: string; type: AttendanceType }) => postAttendanceScan(scannedId, type),
-    onSuccess: () => invalidateServerState(queryClient, "attendance"),
-  });
-  const [scanMode, setScanMode] = useState<ScanMode>("idle");
-  const [attendanceType, setAttendanceType] = useState<AttendanceType>("check_in");
-  const [result, setResult] = useState<AttendanceResult | null>(null);
-  const [notice, setNotice] = useState<AttendanceNotice | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  // Ref-based processing guard prevents rapid double-scans from slipping through
-  const isProcessingRef = useRef(false);
-  const autoResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-reset after success so operators don't have to click "Scan Again" each time
-  useEffect(() => {
-    if (scanMode === "success") {
-      autoResetTimerRef.current = setTimeout(reset, AUTO_RESET_DELAY);
-    }
-    return () => {
-      if (autoResetTimerRef.current) clearTimeout(autoResetTimerRef.current);
-    };
-  }, [scanMode]);
-
-  // ── Actions ─────────────────────────────────────────────────────────────────
-
-  const startScanning = (type: AttendanceType) => {
-    setAttendanceType(type);
-    setErrorMsg("");
-    setScanMode("scanning");
-  };
-
-  const reset = () => {
-    if (autoResetTimerRef.current) clearTimeout(autoResetTimerRef.current);
-    isProcessingRef.current = false;
-    setScanMode("idle");
-    setResult(null);
-    setNotice(null);
-    setErrorMsg("");
-  };
-
-  const handleScannedValue = useCallback(
-    async (scannedId: string) => {
-      if (isProcessingRef.current) return;
-      isProcessingRef.current = true;
-
-      setScanMode("processing");
-      setErrorMsg("");
-      setNotice(null);
-
-      try {
-        const data = await submitAttendanceScan({ scannedId: scannedId.trim(), type: attendanceType });
-        setResult({
-          type: data.type,
-          userName: data.user.name,
-          studentId: data.user.student_employee_id,
-          timestamp: new Date(),
-        });
-        setScanMode("success");
-      } catch (err: unknown) {
-        if (
-          err instanceof AttendanceScanError &&
-          (err.code === "ALREADY_TIMED_IN" || err.code === "ALREADY_TIMED_OUT") &&
-          err.user &&
-          err.type
-        ) {
-          setNotice({
-            type: err.type,
-            userName: err.user.name,
-            studentId: err.user.student_employee_id,
-            message: err.message,
-          });
-          setScanMode("notice");
-        } else {
-          setErrorMsg(err instanceof Error ? err.message : "An unexpected error occurred");
-          setScanMode("error");
-        }
-      } finally {
-        isProcessingRef.current = false;
-      }
-    },
-    [attendanceType, submitAttendanceScan]
-  );
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navbar />
-
-      {/* Page header */}
-      <div className="bg-primary border-b border-primary-foreground/10 relative overflow-hidden">
-        <div className="h-[3px] w-full bg-warning" />
-        <div
-          className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-          }}
-        />
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
-        <div className="container px-4 sm:px-6 py-10 relative z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-px w-6 bg-warning" />
-            <span
-              className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Scanner Tool
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <QrCode className="h-7 w-7 text-primary-foreground/60 shrink-0" />
-            <h1
-              className="text-2xl sm:text-3xl font-bold text-primary-foreground tracking-tight"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Attendance Scanner
-            </h1>
-          </div>
-          <p className="mt-2 text-sm text-primary-foreground/50 max-w-md leading-relaxed ml-11">
-            Scan your library ID barcode to log your attendance.
-          </p>
-        </div>
+function ScannerStation() {
+  const queryClient=useQueryClient();
+  const {mutateAsync:submitScan}=useMutation({mutationFn:({scannedId,type}:{scannedId:string;type:AttendanceType})=>postAttendanceScan(scannedId,type),onSuccess:()=>invalidateServerState(queryClient,"attendance")});
+  const [scanMode,setScanMode]=useState<ScanMode>("idle");
+  const [attendanceType,setAttendanceType]=useState<AttendanceType>(initialType);
+  const [cameraEnabled,setCameraEnabled]=useState(false);
+  const [result,setResult]=useState<AttendanceResult|null>(null);
+  const [notice,setNotice]=useState<AttendanceNotice|null>(null);
+  const [errorMsg,setErrorMsg]=useState("");
+  const [scannedValue,setScannedValue]=useState("");
+  const [remaining,setRemaining]=useState(AUTO_RESET_DELAY/1000);
+  const [now,setNow]=useState(()=>new Date());
+  const [session,setSession]=useState<{recent:AttendanceResult[];timeIns:number;timeOuts:number}>({recent:[],timeIns:0,timeOuts:0});
+  const processing=useRef(false),cameraRef=useRef(false),lastRead=useRef(Date.now()),epoch=useRef(0),alive=useRef(true);
+  const clearResult=useCallback(()=>{setResult(null);setNotice(null);setErrorMsg("");setScannedValue("");},[]);
+  const reset=useCallback(()=>{setScanMode(cameraRef.current?"scanning":"idle");clearResult();},[clearResult]);
+  const stop=useCallback(()=>{epoch.current++;cameraRef.current=false;setCameraEnabled(false);setScanMode("idle");clearResult();},[clearResult]);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;epoch.current++;};},[]);
+  useEffect(()=>{const timer=window.setInterval(()=>{setNow(new Date());if(cameraRef.current&&Date.now()-lastRead.current>=60000)stop();},1000);return()=>window.clearInterval(timer);},[stop]);
+  useEffect(()=>{const hide=()=>{if(document.visibilityState==="hidden")stop();};document.addEventListener("visibilitychange",hide);return()=>document.removeEventListener("visibilitychange",hide);},[stop]);
+  useEffect(()=>{
+    if(!["success","notice","error"].includes(scanMode))return;
+    const deadline=Date.now()+AUTO_RESET_DELAY;setRemaining(AUTO_RESET_DELAY/1000);
+    const timer=window.setInterval(()=>{const left=Math.max(0,Math.ceil((deadline-Date.now())/1000));setRemaining(left);if(!left)reset();},100);
+    return()=>window.clearInterval(timer);
+  },[scanMode,reset]);
+  const selectType=(type:AttendanceType)=>{lastRead.current=Date.now();setAttendanceType(type);try{localStorage.setItem(ATTENDANCE_MODE_KEY,type);}catch{/* The current mode still works when storage is unavailable. */}};
+  const start=(type:AttendanceType)=>{if(processing.current)return;selectType(type);cameraRef.current=true;setCameraEnabled(true);setScanMode("scanning");};
+  const handleScannedValue=useCallback(async(value:string)=>{
+    const scannedId=value.trim();if(processing.current||!scannedId)return;
+    const requestEpoch=epoch.current;lastRead.current=Date.now();processing.current=true;setScanMode("processing");setScannedValue(scannedId);setErrorMsg("");setNotice(null);
+    try {
+      const data=await submitScan({scannedId,type:attendanceType});
+      if(!alive.current)return;
+      const entry:AttendanceResult={type:data.type,userName:data.user.name,studentId:data.user.student_employee_id,timestamp:new Date()};
+      setResult(entry);setSession(current=>({recent:[entry,...current.recent].slice(0,5),timeIns:current.timeIns+(data.type==="check_in"?1:0),timeOuts:current.timeOuts+(data.type==="check_out"?1:0)}));if(requestEpoch===epoch.current)setScanMode("success");
+    } catch(error:unknown) {
+      if(!alive.current||requestEpoch!==epoch.current)return;
+      if(error instanceof AttendanceScanError && ["ALREADY_TIMED_IN","ALREADY_TIMED_OUT"].includes(error.code||"") && error.user && error.type){setNotice({type:error.type,userName:error.user.name,studentId:error.user.student_employee_id,message:error.message});setScanMode("notice");}
+      else{setErrorMsg(error instanceof Error?error.message:"An unexpected error occurred");setScanMode("error");}
+    } finally {processing.current=false;}
+  },[attendanceType,submitScan]);
+  const ready=scanMode==="idle"||scanMode==="scanning"||scanMode==="processing";
+  return <div className="scanner-kiosk-shell">
+    <KioskHeader station="scanner" />
+    <div data-library-design className="scanner-kiosk">
+    <main className="kiosk-scanner-main">
+      <div className="kiosk-title-row"><div className="kiosk-title-block"><p className="kiosk-eyebrow"><span aria-hidden="true" />Library attendance</p><h1>Attendance <em>Scanner</em></h1></div><time className="kiosk-clock" dateTime={now.toISOString()} aria-live="off"><strong>{now.toLocaleTimeString("en-US",{timeZone:"Asia/Manila",hour:"numeric",minute:"2-digit",second:"2-digit",hour12:true})}</strong><span>{now.toLocaleDateString("en-US",{timeZone:"Asia/Manila",weekday:"short",month:"short",day:"numeric"})}</span></time></div>
+      <div className="kiosk-workspace">
+        <section className={`kiosk-scan-card kiosk-scan-card--${scanMode}`} aria-label="Attendance scanner">
+          <ScanningView attendanceType={attendanceType} onSelect={selectType} onStart={start} onStop={stop} onScanned={handleScannedValue} scanMode={scanMode} cameraEnabled={cameraEnabled}/>
+          {!ready&&<div className="kiosk-result-region" aria-live="assertive" aria-atomic="true" data-scan-state={scanMode}>
+            {scanMode==="success"&&result&&<SuccessView result={result} remaining={remaining} cameraActive={cameraEnabled}/>}
+            {scanMode==="notice"&&notice&&<NoticeView notice={notice} remaining={remaining} cameraActive={cameraEnabled}/>}
+            {scanMode==="error"&&<ErrorView errorMsg={errorMsg} scannedValue={scannedValue} remaining={remaining} cameraActive={cameraEnabled}/>}
+          </div>}
+        </section>
+        <aside className="kiosk-recent-card" aria-label="Recent scans in this session"><div className="kiosk-panel-header"><span>Recent scans</span><small>Last 5</small></div>
+          {session.recent.length?<ol className="kiosk-recent-list">{session.recent.map((entry,index)=><li key={`${entry.timestamp.getTime()}-${index}`} className={index===0?"is-latest":""}><span className="kiosk-recent-avatar" aria-hidden="true">{getUserInitials(entry.userName)}</span><div className="kiosk-recent-person"><strong title={entry.userName}>{entry.userName}</strong><span>{entry.studentId}</span></div><div className="kiosk-recent-status"><span className={`kiosk-scan-badge ${entry.type==="check_in"?"is-in":"is-out"}`}>{entry.type==="check_in"?"IN":"OUT"}</span><time dateTime={entry.timestamp.toISOString()}>{scanTime(entry.timestamp)}</time></div></li>)}</ol>:<div className="kiosk-recent-empty"><h2>No scans yet</h2><p>Successful scans from this kiosk session will appear here.</p></div>}
+          <p className="kiosk-session-note">This kiosk session only</p>
+        </aside>
       </div>
-
-      {/* Main content */}
-      <main data-library-design className="flex-1 bg-background py-14">
-        <div className="container px-4 sm:px-6 flex justify-center">
-          <AnimatePresence mode="wait">
-            {scanMode === "idle" && (
-              <IdleView key="idle" onStart={startScanning} />
-            )}
-
-            {(scanMode === "scanning" || scanMode === "processing") && (
-              <ScanningView
-                key="scanning"
-                scanMode={scanMode}
-                attendanceType={attendanceType}
-                onScanned={handleScannedValue}
-                onCancel={reset}
-              />
-            )}
-
-            {scanMode === "success" && result && (
-              <SuccessView key="success" result={result} onReset={reset} />
-            )}
-
-            {scanMode === "notice" && notice && (
-              <NoticeView key="notice" notice={notice} onReset={reset} />
-            )}
-
-            {scanMode === "error" && (
-              <ErrorView
-                key="error"
-                errorMsg={errorMsg}
-                attendanceType={attendanceType}
-                onRetry={startScanning}
-                onBack={reset}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-      </main>
-
-      <Footer />
+    </main>
+    <KioskFooter counts={session}/>
     </div>
-  );
-};
-
-export default ScanQR;
+  </div>;
+}
+export default function ScanQR(){const {user}=useAuth();return <ScannerStation key={user?.id}/>;}

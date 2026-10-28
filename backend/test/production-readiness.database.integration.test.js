@@ -82,10 +82,10 @@ test('database: role changes atomically invalidate access and revoke persisted r
     const claims = {id: userId, session_version: 0, iat: Math.floor(Date.now() / 1000) + 60};
     await sessions.issueRefreshSession(userId, new Date(Date.now() + 60_000), false, 0);
     assert.equal(await sessions.isAccessTokenCurrent(claims), true);
-    await admin.updateUser(identifier, {role: 'scanner'}, 'admin', 1);
+    await admin.updateUser(identifier, {role: 'admin'}, 'super_admin', 1);
     assert.equal(await sessions.isAccessTokenCurrent(claims), false);
     const [[user]] = await db.query('SELECT role,session_version FROM users WHERE id=?', [userId]);
-    assert.equal(user.role, 'scanner'); assert.equal(user.session_version, 1);
+    assert.equal(user.role, 'admin'); assert.equal(user.session_version, 1);
     const [[sessionsRow]] = await db.query('SELECT COUNT(*) AS total FROM auth_refresh_sessions WHERE user_id=? AND revoked_at IS NULL', [userId]);
     assert.equal(Number(sessionsRow.total), 0);
   });

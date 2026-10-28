@@ -1,6 +1,0 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>EUC Library email preview frame</title><style>html,body{margin:0;padding:0;background:#f1ece3}iframe{display:block;border:0;width:680px;height:900px}</style></head><body><iframe title="Email design preview"></iframe><script>
-const choice=new URLSearchParams(location.search).get('template');
-const frame=document.querySelector('iframe');
-frame.src=(['verification','recovery','announcement'].includes(choice)?choice:'verification')+'.html';
-frame.addEventListener('load',()=>{frame.style.height=frame.contentDocument.documentElement.scrollHeight+'px';});
-</script></body></html>

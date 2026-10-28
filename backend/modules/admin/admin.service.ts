@@ -11,16 +11,17 @@ const fineLedger = require("../borrowing/fine-ledger.service");
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit") as {
   enqueueTransactionalAudit: (conn: PoolConnection, entry: Record<string, unknown>) => Promise<void>;
 };
+import { isOperationsRole } from "../auth/operations-access";
 const ACADEMIC_ROLES = ["student", "alumni"];
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy: Record<string, string[]> = {
-  super_admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
-  admin: ["staff", "scanner", "employee", "alumni", "student"],
-  staff: ["scanner", "employee", "alumni", "student"],
+  super_admin: ["admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
+  admin: ["staff", "scanner", "opac", "employee", "alumni", "student"],
+  staff: ["employee", "alumni", "student"],
 };
 const searchRoleHierarchy: Record<string, string[]> = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
-  admin: ["admin", "staff", "scanner", "employee", "alumni", "student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
+  admin: ["admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
   staff: ["employee", "alumni", "student"],
 };
 interface ServiceError extends Error {
@@ -77,11 +78,13 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
   const role = String(requestedRole || "");
   if (!(creatorRole === "super_admin" && role === "super_admin") && !roleHierarchy[creatorRole]?.includes(role)) throw forbidden("You are not allowed to create a user with this role");
   if (role === creatorRole && creatorRole !== "super_admin") throw new Error("You cannot create a user with your own role");
-  if (Object.prototype.hasOwnProperty.call(input,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
+  if (!isOperationsRole(role) && Object.prototype.hasOwnProperty.call(input,"password")) throw new Error("Staff cannot choose passwords. Use account email actions.");
   if (!String(name || "").trim()) throw new Error("Name is required");
-  const accountAddress = normalizeEmail(email);
+  const operations = isOperationsRole(role);
+  if (operations && email) throw new Error("Library Operations accounts do not use email");
+  const accountAddress = operations ? null : normalizeEmail(email);
   const identity = roleProfile(input, role);
-  const passwordHash = await bcrypt.hash(randomBytes(48).toString("base64url"), 12);
+  const passwordHash = await bcrypt.hash(operations ? accountEmail.validatePassword(input.password) : randomBytes(48).toString("base64url"), 12);
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
@@ -119,7 +122,10 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
          FROM users WHERE barcode = ? LIMIT 1`,
       [barcode],
     );
-    await accountEmail.invite(conn, createdRows[0]);
+    if (!createdRows[0] || createdRows[0].role !== role) {
+      throw Object.assign(new Error("The database did not save the requested account role. Apply the latest role migration before creating this account."), { status: 503 });
+    }
+    if (!operations) await accountEmail.invite(conn, createdRows[0]);
     await enqueueTransactionalAudit(conn, {
       actorId: creatorId,
       category: "users",
@@ -131,7 +137,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
       isCreation: true,
     });
     await conn.commit();
-    return { message: "Account created; invitation queued. Creation recorded in the audit log.", barcode };
+    return { message: operations ? "Library Operations account created. Ready to sign in." : "Account created; invitation queued. Creation recorded in the audit log.", barcode };
   } catch (error) {
     await conn.rollback();
     throw userFieldError(error, role);
@@ -225,6 +231,8 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     }
     const normalized: Record<string, unknown> = {};
     const nextRole = String(updates.role || existing.role);
+    if (isOperationsRole(existing.role) !== isOperationsRole(nextRole)) throw forbidden("Create a separate Library Operations account instead of converting a regular account");
+    if (isOperationsRole(nextRole) && updates.email) throw new Error("Library Operations accounts do not use email");
     if (updates.name) normalized.name = updates.name;
     if (updates.role && !isOwnSuperAdmin) {
       const role = String(updates.role);
@@ -241,7 +249,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       if (nextRole !== "student") normalized.academic_term_id = null;
       normalized.year_level = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? (updates.year_level ?? existing.year_level) : null;
     }
-    if (updates.email !== undefined && String(updates.email || "").trim().toLowerCase() !== String(existing.email || "").trim().toLowerCase()) {
+    if (!isOperationsRole(nextRole) && updates.email !== undefined && String(updates.email || "").trim().toLowerCase() !== String(existing.email || "").trim().toLowerCase()) {
       await accountEmail.stageAddress(conn, existing, updates.email);
     }
     if (updates.address !== undefined) normalized.address = updates.address;
@@ -289,6 +297,26 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
   }
   if (roleChangedUserId) require("../../realtime/notificationHub").closeUserConnections(roleChangedUserId);
   return { message: "User updated successfully" };
+};
+const resetOperationsPassword = async (identifier: string, password: unknown, actorRole: string, actorId: number) => {
+  if (!["admin", "super_admin"].includes(actorRole)) throw forbidden("Only administrators can reset Library Operations passwords");
+  const hash = await bcrypt.hash(accountEmail.validatePassword(password), 12);
+  const conn = await repository.getConnection();
+  let userId = 0;
+  try {
+    await conn.beginTransaction();
+    const user = await repository.findUserForUpdate(identifier, conn);
+    if (!user || !isOperationsRole(user.role)) throw forbidden("Choose a Library Operations account");
+    userId = user.id;
+    await conn.query("UPDATE users SET password_hash=?,setup_pending=0,must_change_password=0,session_version=session_version+1 WHERE id=?", [hash, userId]);
+    await conn.query("UPDATE auth_refresh_sessions SET revoked_at=UTC_TIMESTAMP() WHERE user_id=? AND revoked_at IS NULL", [userId]);
+    await accountEmail.invalidateChallenges(conn, userId);
+    await enqueueTransactionalAudit(conn, { actorId, category: "users", action: "password_reset", description: "Reset Library Operations account password", route: `/api/admin/users/${encodeURIComponent(identifier)}/reset-password`, extraMetadata: { target_user_id: userId } });
+    await conn.commit();
+  } catch (error) { await conn.rollback(); throw error; }
+  finally { conn.release(); }
+  require("../../realtime/notificationHub").closeUserConnections(userId);
+  return { message: "Password reset. Existing sessions have ended." };
 };
 const searchUsers = async (query: UserSearchQuery, requesterRole: string) => {
   const allowedRoles = searchRoleHierarchy[requesterRole];
@@ -363,6 +391,7 @@ const checkAvailability = async (input: UserInput, actorRole: string, actorId: n
 };
 const getAccountEmailStatus = async (identifier: string, actorRole: string, actorId: number) => {
   const account = await managedAccount(identifier,actorRole,actorId);
+  if (isOperationsRole(account.role)) throw forbidden("Library Operations accounts do not use email");
   return {deliveries:await accountRepository.accountEmailStatus(account.id)};
 };
-export = { checkAvailability, getAccountEmailStatus, createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };
+export = { resetOperationsPassword, checkAvailability, getAccountEmailStatus, createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };

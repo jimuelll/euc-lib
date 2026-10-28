@@ -1,3 +1,4 @@
+import { operationsHome } from "@/utils/operationsAccess";
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import axiosInstance, {
@@ -158,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.warning("Change your password to unlock library features.");
       }
 
-      navigate(authDestination(returnTo), { replace: true });
+      navigate(operationsHome(decodeAccessToken(token)?.role) || authDestination(returnTo), { replace: true });
     } catch (err: any) {
       throw new Error(err.response?.data?.message || "Login failed");
     }

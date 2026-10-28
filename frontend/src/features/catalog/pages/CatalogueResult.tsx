@@ -1,3 +1,5 @@
+import { useAuth } from "@/context/AuthContext";
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Sparkles, X } from "@/components/ui/library-glyphs";
@@ -36,6 +38,7 @@ export function CatalogueSimilarPanel({ book, onClose }: { book: Book; onClose: 
 }
 
 export default function CatalogueResult({ book, schema, expanded, onToggle, onClose, grid = false }: { book: Book; schema: PublicCatalogSchemaField[]; expanded: boolean; onToggle: (trigger: HTMLButtonElement) => void; onClose: () => void; grid?: boolean }) {
+  const { user } = useAuth();
   const reference = book.material_type === "thesis";
   const action = reference ? "View related theses" : "View similar books";
   const metadata = [book.isbn && "ISBN " + book.isbn, book.publisher, book.publication_year, book.edition && String(book.edition) + (/\bed\.?$/i.test(String(book.edition)) ? "" : " ed.")].filter(Boolean).map(String).join(" · ");
@@ -44,7 +47,7 @@ export default function CatalogueResult({ book, schema, expanded, onToggle, onCl
     return value == null || value === "" ? [] : [{ label: field.label, value: Array.isArray(value) ? value.join(", ") : String(value) }];
   });
   const control = { "aria-expanded": expanded, "aria-controls": `recommendations-${book.id}` };
-  const reserve = !reference && Number(book.canReserve) === 1 && Number(book.available) > 0 ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null;
+  const reserve = !isOperationsRole(user?.role) && !reference && Number(book.canReserve) === 1 && Number(book.available) > 0 ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null;
   if (grid) return <CatalogueCompactCard book={book} expanded={expanded} footerAction={reserve} coverAction={<button type="button" className="catalogue-cover-similar" aria-label={`View books similar to ${book.title}`} {...control} onClick={event => onToggle(event.currentTarget)}><Sparkles aria-hidden="true" /></button>} />;
   return <article className={"catalogue-record " + (expanded ? "is-expanded" : "")}>
     <CatalogueCover book={book} />

@@ -90,4 +90,12 @@ const handleAccountEmailStatus: RequestHandler = async (req,res) => {
   try { const actor=(req as AuthenticatedRequest).user; res.set('Cache-Control','no-store'); res.json(await service.getAccountEmailStatus(String(req.params.student_employee_id),actor.role,actor.id)); }
   catch(error) { sendMutationError(res,error); }
 };
-export = { handleAvailability, handleAccountEmailStatus, handleCreateUser, handleDeleteUser, handleRestoreUser, handleUpdateUser, handleSearchUsers, handleQueryToolsSearch, handleGetBarcodePng };
+const handleResetOperationsPassword: RequestHandler = async (req, res) => {
+  try {
+    const actor = (req as AuthenticatedRequest).user;
+    const result = await service.resetOperationsPassword(String(req.params.student_employee_id), req.body?.password, actor.role, actor.id);
+    res.locals.auditEnqueued = true;
+    res.set("Cache-Control", "no-store").json(result);
+  } catch (error) { sendMutationError(res, error); }
+};
+export = { handleResetOperationsPassword, handleAvailability, handleAccountEmailStatus, handleCreateUser, handleDeleteUser, handleRestoreUser, handleUpdateUser, handleSearchUsers, handleQueryToolsSearch, handleGetBarcodePng };

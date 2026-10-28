@@ -5,7 +5,6 @@ const { authMiddleware } = require("../auth/auth.middleware");
 const { limiters } = require("../../middlewares/rateLimiter");
 
 const staffOrAbove   = authMiddleware(["staff", "admin", "super_admin"]);
-const scannerOrAbove = authMiddleware(["scanner", "staff", "admin", "super_admin"]);
 const adminOnly      = authMiddleware(["admin", "super_admin"]);
 
 // All routes sit under /borrowing (mounted in app.js after authMiddleware)
@@ -20,14 +19,14 @@ router.post("/borrows/:bookId",               limiters.studentTransaction, contr
 router.post("/borrows/:borrowingId/return",   controller.returnBook);
 
 // ─── Barcode scan — book copy preview ────────────────────────────────────────
-router.get ("/scan/copy/:barcode",            scannerOrAbove, controller.getCopyByBarcode);
-router.get("/scan/user",                      scannerOrAbove, controller.lookupUser);
+router.get ("/scan/copy/:barcode",            staffOrAbove, controller.getCopyByBarcode);
+router.get("/scan/user",                      staffOrAbove, controller.lookupUser);
 
 // ─── Barcode scan — borrow / return at the desk ───────────────────────────────
-router.post("/scan/borrow",                   scannerOrAbove, limiters.deskTransaction, controller.scanBorrow);
-router.post("/scan/return",                   scannerOrAbove, limiters.deskTransaction, controller.scanReturn);
+router.post("/scan/borrow",                   staffOrAbove, limiters.deskTransaction, controller.scanBorrow);
+router.post("/scan/return",                   staffOrAbove, limiters.deskTransaction, controller.scanReturn);
 router.post("/scan/undo", staffOrAbove, limiters.deskTransaction, controller.undoDeskTransaction);
-router.get ("/scan/return-preview/:identifier", scannerOrAbove, controller.getReturnPreview);
+router.get ("/scan/return-preview/:identifier", staffOrAbove, controller.getReturnPreview);
 
 // ─── Admin borrowing management ───────────────────────────────────────────────
 router.get   ("/admin/borrows",                          staffOrAbove, controller.adminGetBorrowings);

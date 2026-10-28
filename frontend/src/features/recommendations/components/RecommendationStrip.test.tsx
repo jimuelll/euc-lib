@@ -14,7 +14,9 @@ vi.mock("../api", () => ({ fetchRecommendations, dismissRecommendation }));
 
 import { RecommendationStrip } from "./RecommendationStrip";
 
-afterEach(cleanup);
+const authState = vi.hoisted(() => ({role: "guest"}));
+vi.mock("@/context/AuthContext", () => ({useAuth: () => ({user: authState.role === "guest" ? null : {role: authState.role}})}));
+afterEach(() => {cleanup();authState.role="guest";});
 let QueryWrapper: ReturnType<typeof createTestQueryClientWrapper>;
 beforeEach(() => { vi.resetAllMocks(); dismissRecommendation.mockResolvedValue(undefined); QueryWrapper = createTestQueryClientWrapper(); });
 
@@ -167,4 +169,12 @@ it("omits generic compact reasons and AI marks when selections are rule-based", 
   expect(screen.getByText("Similar category: Fiction")).toBeInTheDocument();
   expect(screen.queryByLabelText("AI recommendation")).not.toBeInTheDocument();
   expect(screen.queryByText("Includes AI selections, ranked by relevance")).not.toBeInTheDocument();
+});
+
+it('removes reservation links from OPAC recommendation cards',async()=>{
+ authState.role='opac';
+ fetchRecommendations.mockResolvedValue({rows:[row({id:1,title:'Recommended book',canReserve:true})]});
+ render(<QueryWrapper><MemoryRouter><RecommendationStrip materialType="book" seedBookId={42} compact /></MemoryRouter></QueryWrapper>);
+ await screen.findByText('Recommended book');
+ expect(screen.queryByRole('link',{name:/^Reserve/})).toBeNull();
 });

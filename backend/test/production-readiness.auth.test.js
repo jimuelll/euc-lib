@@ -14,7 +14,7 @@ test('role changes revoke sessions atomically; unchanged roles and failed update
     after: repo.findUserByIdForAudit, enqueue: outbox.enqueue, query: db.query, close: hub.closeUserConnections};
   try {
     for (const scenario of ['change', 'unchanged', 'profile', 'audit-failure', 'update-failure']) {
-      const state = {id: 7, role: 'staff', username: 'operator', student_employee_id: 'operator', name: 'Operator', session_version: 3, revoked: false};
+      const state = {id: 7, role: 'scanner', username: 'operator', student_employee_id: 'operator', name: 'Operator', session_version: 3, revoked: false};
       const calls = [];
       let working, closed = 0;
       const conn = {
@@ -40,7 +40,7 @@ test('role changes revoke sessions atomically; unchanged roles and failed update
       };
       db.query = async sql => sql.includes('UNIX_TIMESTAMP') ? [[{invalidBeforeSeconds: null}]] : [[{session_version: state.session_version}]];
       hub.closeUserConnections = id => {assert.equal(id, 7); assert(calls.includes('commit')); closed++;};
-      const input = scenario === 'profile' ? {name: 'New name'} : {role: scenario === 'unchanged' ? 'staff' : 'scanner'};
+      const input = scenario === 'profile' ? {name: 'New name'} : {role: scenario === 'unchanged' ? 'scanner' : 'opac'};
       const update = admin.updateUser('operator', input, 'admin', 1);
       if (scenario.endsWith('failure')) await assert.rejects(update, /failed/);
       else await update;

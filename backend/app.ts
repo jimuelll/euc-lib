@@ -38,7 +38,8 @@ const maintenanceMode = require("./middlewares/maintenanceMode");
 const auditLogger = require("./middlewares/auditLogger");
 const { limiters, rateLimitExposedHeaders } = require("./middlewares/rateLimiter");
 
-const { authMiddleware } = require("./modules/auth/auth.middleware");
+const { authMiddleware, optionalAuthMiddleware } = require("./modules/auth/auth.middleware");
+const { operationsRequestAllowed } = require("./modules/auth/operations-access");
 const { forcePasswordChange } = require("./modules/auth/forcePasswordChange.middleware");
 
 const app = express();
@@ -81,6 +82,12 @@ app.use(express.urlencoded({ extended: true }));
 // route (including public routes) so a public visit, like, or comment cannot
 // be written into the state that is being replaced.
 app.use(maintenanceMode);
+// Check terminal-account permissions before public and individually authenticated routers.
+app.use(optionalAuthMiddleware());
+app.use((req: Request & { user?: { role: string } }, res: Response, next: express.NextFunction) => {
+  if (!operationsRequestAllowed(req.user?.role, req.method, req.originalUrl)) return void res.status(403).json({ message: "Forbidden" });
+  next();
+});
 app.use(auditLogger);
 
 // --- Public Routes ---

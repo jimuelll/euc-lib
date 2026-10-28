@@ -117,7 +117,7 @@ export async function complete(purpose:'setup'|'verify_email'|'reset',id:unknown
     if (!owner) throw fail();
     const [[user]]=await conn.query<RowDataPacket[]>('SELECT * FROM users WHERE id=? AND deleted_at IS NULL FOR UPDATE',[owner.user_id]);
     const [[row]]=await conn.query<RowDataPacket[]>('SELECT * FROM account_challenges WHERE id=? AND purpose=? AND consumed_at IS NULL AND expires_at>UTC_TIMESTAMP() FOR UPDATE',[id,purpose]);
-    if (!user || !user.is_active || !row || secretHash(purpose,`${id}:${token}`)!==row.secret_hash) throw fail();
+    if (!user || ["scanner", "opac"].includes(user.role) || !user.is_active || !row || secretHash(purpose,`${id}:${token}`)!==row.secret_hash) throw fail();
     completedUserId=Number(user.id);
     if (purpose==='setup' && (!user.setup_pending || normalizeEmail(user.email)!==row.email)) throw fail();
     if (purpose==='reset' && (user.setup_pending || !user.email_verified_at || normalizeEmail(user.email)!==row.email)) throw fail();
@@ -165,6 +165,7 @@ export async function adminAction(identifier:string,actorId:number,actorRole:str
     const roles:Record<string,string[]>={super_admin:['admin','staff','scanner','employee','alumni','student'],admin:['staff','scanner','employee','alumni','student'],staff:['scanner','employee','alumni','student']};
     const isOwnSuperAdmin=actorRole==='super_admin' && user?.role==='super_admin' && user.id===actorId;
     if(!user || (!isOwnSuperAdmin && !roles[actorRole]?.includes(user.role)))throw Object.assign(new Error('You cannot manage this account'),{status:403});
+    if (["scanner", "opac"].includes(user.role)) throw Object.assign(new Error("Library Operations accounts do not use email"),{status:403});
     if(!await throttle(conn,`admin-${action}:${user.id}`))throw Object.assign(new Error('Wait before requesting another email.'),{status:429});
     if(action==='invite'){if(!user.setup_pending)throw Object.assign(new Error('Account setup is already complete'),{status:409});await challenge(conn,user,'setup',normalizeEmail(user.email));}
     if(action==='verify'){if(user.email_verified_at && !user.pending_email)throw Object.assign(new Error('Email is already verified'),{status:409});const address=user.pending_email||user.email;if(!address)throw Object.assign(new Error('Add an email address first'),{status:400});await challenge(conn,user,'verify_email',normalizeEmail(address));}

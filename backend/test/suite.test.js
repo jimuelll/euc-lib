@@ -77,3 +77,5 @@ require("./site-content.contacts.test");
 
 require('./bulletin.moderation.test');
 require('./bulletin.moderation.database.integration.test');
+
+require("./operations-accounts.test");

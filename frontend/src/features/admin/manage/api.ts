@@ -16,11 +16,12 @@ export const searchUsers = async ({ query, role, status, archived, programId, de
   const response = await axiosInstance.get<UserSearchResponse>("/api/admin/users", { params: { programId, departmentId, termId, student_employee_id: query.trim() || undefined, name: query.trim() || undefined, role: role === "all" ? undefined : role, status: archived ? "archived" : status, archived: archived ? "true" : undefined, page, limit, access, sort }, signal });
   return normaliseUserSearch(response.data);
 };
-const userPayload = (form: UserFormState) => ({ name: form.fullName.trim(), role: form.role, address: form.address, contact: form.contact, email: form.email.trim(), remarks: form.remarks,
+import { isOperationsRole } from "@/utils/operationsAccess";
+const userPayload = (form: UserFormState) => ({ name: form.fullName.trim(), role: form.role, address: form.address, contact: form.contact, ...(!isOperationsRole(form.role) ? {email: form.email.trim()} : {}), remarks: form.remarks,
   ...(['student','alumni'].includes(form.role) ? {library_card_number:form.libraryCardNumber.trim()} : form.role === 'employee' ? {employee_number:form.employeeNumber.trim(),department_id:form.departmentId || null} : {username:form.username.trim()}),
   ...(form.role === 'student' ? {student_number:form.studentNumber.trim(),program_id:form.programId || null,academic_term_id:form.academicTermId || null,year_level:form.yearLevel} : {}),
 });
-export const createUser = async (form: UserFormState) => (await axiosInstance.post<{ message: string }>("/api/admin/users", userPayload(form))).data;
+export const createUser = async (form: UserFormState) => (await axiosInstance.post<{ message: string }>("/api/admin/users", {...userPayload(form), ...(isOperationsRole(form.role) ? {password:form.password} : {})})).data;
 export const updateUser = async (studentId: string, form: UserFormState) => (await axiosInstance.put<{ message: string }>(`/api/admin/users/${encodeURIComponent(studentId)}`, userPayload(form))).data;
 export const archiveUser = async (studentId: string, reason: string) => (await axiosInstance.delete<{ message?: string }>(`/api/admin/users/${encodeURIComponent(studentId)}`, {data:{reason}})).data;
 export const restoreUser = async (studentId: string) => (await axiosInstance.patch<{ message?: string }>(`/api/admin/users/${encodeURIComponent(studentId)}/restore`)).data;
@@ -28,3 +29,5 @@ export const requestAccountEmail = async (identifier: string, action: "invite" |
 export const checkUserAvailability = async (field:'email'|'username',value:string,excludeIdentifier?:string,signal?:AbortSignal) => (await axiosInstance.post<{available:boolean}>('/api/admin/users/availability',{field,value,excludeIdentifier},{signal})).data;
 export type AccountEmailDelivery = {purpose:'setup'|'verify_email'|'recovery';status:string;requested_at:string;accepted_at:string|null};
 export const fetchAccountEmailStatus = async (identifier:string,signal?:AbortSignal) => (await axiosInstance.get<{deliveries:AccountEmailDelivery[]}>(`/api/admin/users/${encodeURIComponent(identifier)}/account-email`,{signal})).data;
+
+export const resetOperationsPassword = async (identifier:string,password:string) => (await axiosInstance.post<{message:string}>(`/api/admin/users/${encodeURIComponent(identifier)}/reset-password`,{password})).data;

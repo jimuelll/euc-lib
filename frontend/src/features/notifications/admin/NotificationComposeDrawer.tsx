@@ -16,7 +16,7 @@ import {NotificationEmailOptions} from './NotificationEmailOptions';
 import {countNotificationRecipients,createAdminNotification,previewNotificationEmail,searchNotificationRecipients,type AdminNotification,type AudienceType,type NotificationRecipient} from './api';
 
 const types = [['announcement','Announcement'],['reminder','Reminder'],['reservation_ready','Reservation ready'],['reservation_cancelled','Reservation cancelled'],['overdue_fine','Overdue fine']];
-const roles = ['student','alumni','employee','scanner','staff','admin','super_admin'];
+const roles = ['student','alumni','employee','scanner','opac','staff','admin','super_admin'];
 const destinations = [['none','No link'],['/my-library','My Library'],['/bulletin','Bulletin'],['/services/borrowing','Borrowing services'],['/catalogue','Catalogue']];
 const sectionNames = ['Content','Audience','Delivery','Preview'];
 const label = (value:string) => value.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());

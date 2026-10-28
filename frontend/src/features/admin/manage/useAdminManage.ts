@@ -1,3 +1,4 @@
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { useAdminUrlState, queryPage } from "@/features/admin/hooks/useAdminUrlState";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -114,17 +115,17 @@ export const useAdminManage = (): UseAdminManageReturn => {
     setFieldErrors(validation);
     if(Object.keys(validation).length) return false;
     const { fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks } = form;
-    if (!fullName || !role || !email.trim()) {
+    if (!fullName || !role || !isOperationsRole(role) && !email.trim()) {
       toast.error("All required fields must be filled");
       return false;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Enter a valid email address"); return false; }
+    if (!isOperationsRole(role) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Enter a valid email address"); return false; }
     setLoading(true);
     try {
       const response = await createMutation.mutateAsync({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
       toast.success(response.message);
       const identifier = ["student","alumni"].includes(form.role) ? form.libraryCardNumber : form.role === "employee" ? form.employeeNumber : form.username;
-      setQrTarget({ studentId: identifier, name: fullName });
+      if (!isOperationsRole(role)) setQrTarget({ studentId: identifier, name: fullName });
       resetForm();
       return true;
     } catch (err: any) {

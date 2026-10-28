@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 
-export type AdminRole = "super_admin" | "admin" | "staff" | "scanner" | "employee" | "alumni" | "student";
+export type AdminRole = "super_admin" | "admin" | "staff" | "scanner" | "opac" | "employee" | "alumni" | "student";
 
 export interface UserProfile {
   studentEmployeeId: string;

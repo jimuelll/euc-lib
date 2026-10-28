@@ -3,9 +3,9 @@ import type { UserRole, UserFormState } from "./AdminManage.types";
 // ─── Role Hierarchy ───────────────────────────────────────────────────────────
 
 export const ROLE_HIERARCHY: Record<string, UserRole[]> = {
-  super_admin: ["super_admin", "admin", "staff", "scanner", "employee", "alumni", "student"],
-  admin:       ["admin", "staff", "scanner", "employee", "alumni", "student"],
-  staff:       ["staff", "scanner", "employee", "alumni", "student"],
+  super_admin: ["super_admin", "admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
+  admin:       ["admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
+  staff:       ["staff", "employee", "alumni", "student"],
 };
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────

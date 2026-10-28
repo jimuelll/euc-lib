@@ -1,7 +1,10 @@
+import KioskFooter from "./KioskFooter";
+import { useAuth } from "@/context/AuthContext";
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { Link } from "react-router-dom";
 import { useSiteContent } from "@/features/site-content";
 
-const Footer = () => {
+const PublicFooter = () => {
   const { data } = useSiteContent();
   const contacts = [data?.address, data?.contact_email, data?.contact_phone].filter(value => value?.trim());
   return (
@@ -134,4 +137,8 @@ const FooterSpan = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
+const Footer = () => {
+  const { user } = useAuth();
+  return isOperationsRole(user?.role) ? <KioskFooter/> : <PublicFooter />;
+};
 export default Footer;

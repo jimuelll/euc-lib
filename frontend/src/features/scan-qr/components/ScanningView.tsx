@@ -1,232 +1,37 @@
-import { useRef, useEffect, useState } from "react";
-import { Camera, Keyboard, Loader2, AlertTriangle } from "@/components/ui/library-glyphs";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Camera, Keyboard, Loader2, AlertTriangle, X } from "lucide-react";
 import { useZxingScanner } from "../hooks/useZxingScanner";
 import type { AttendanceType, ScanMode } from "../types";
-
-interface ScanningViewProps {
-  scanMode: ScanMode;
-  attendanceType: AttendanceType;
-  onScanned: (value: string) => void;
-  onCancel: () => void;
+import IdleView from "./IdleView";
+interface Props {attendanceType:AttendanceType;onSelect:(type:AttendanceType)=>void;onStart:(type:AttendanceType)=>void;onStop:()=>void;onScanned:(value:string)=>void;scanMode:ScanMode;cameraEnabled:boolean;}
+const interactive=(target:EventTarget|null)=>target instanceof Element&&Boolean(target.closest('button,a,input,select,textarea,[role="menuitem"],[role="menu"],[role="dialog"]'));
+export default function ScanningView({attendanceType,onSelect,onStart,onStop,onScanned,scanMode,cameraEnabled}:Props){
+ const [manual,setManual]=useState(false),[value,setValue]=useState("");const [facing,setFacing]=useState<"environment"|"user">("environment"),[videoReady,setVideoReady]=useState(false),[restartKey,setRestartKey]=useState(0);
+ const inputRef=useRef<HTMLInputElement>(null);const processing=scanMode==="processing",covered=["success","notice","error"].includes(scanMode);
+ const {videoRef,error:cameraError}=useZxingScanner({onResult:onScanned,active:cameraEnabled,continuous:true,paused:processing||covered,facingMode:facing,restartKey});
+ useEffect(()=>{setVideoReady(false);},[cameraEnabled,facing,restartKey]);
+ useEffect(()=>{if(!processing&&!covered)setValue("");},[scanMode,processing,covered]);
+ useEffect(()=>{
+  if(processing||covered)return;let timer:ReturnType<typeof setTimeout>|undefined;
+  const focus=()=>{if(document.visibilityState!=="hidden"&&!document.querySelector('[role="menu"][data-state="open"],[role="dialog"]'))inputRef.current?.focus({preventScroll:true});};
+  const wedge=(event:KeyboardEvent)=>{const target=event.target instanceof Element?event.target:null;if(!manual&&event.key.length===1&&event.key!==" "&&!event.ctrlKey&&!event.altKey&&!event.metaKey&&!target?.closest('input,textarea,[contenteditable="true"],[role="menu"],[role="menuitem"],[role="dialog"]')){event.preventDefault();setValue(current=>current+event.key);focus();}};
+  const pointer=(event:PointerEvent)=>{if(!interactive(event.target))timer=setTimeout(focus,0);};
+  focus();window.addEventListener("focus",focus);document.addEventListener("visibilitychange",focus);document.addEventListener("keydown",wedge);document.addEventListener("pointerup",pointer);
+  return()=>{window.removeEventListener("focus",focus);document.removeEventListener("visibilitychange",focus);document.removeEventListener("keydown",wedge);document.removeEventListener("pointerup",pointer);if(timer)clearTimeout(timer);};
+ },[processing,covered,attendanceType,manual]);
+ const submit=(event:FormEvent)=>{event.preventDefault();if(!processing&&!covered&&value.trim())onScanned(value.trim());};
+ const modeSwitch=<div className="kiosk-mode-switch" role="group" aria-label="Attendance mode">{([['check_in','Time in'],['check_out','Time out']] as const).map(([type,label])=><button type="button" key={type} disabled={processing} aria-pressed={attendanceType===type} onClick={()=>onSelect(type)}>{label}</button>)}</div>;
+ return <div className={`kiosk-scanning-layer ${covered?'is-covered':''}`} aria-hidden={covered||undefined}>
+  {cameraEnabled?<div className="kiosk-live-view">
+    <video ref={videoRef} autoPlay muted playsInline onPlaying={()=>setVideoReady(true)} aria-label="ID scanning camera" style={{transform:facing==="user"?"scaleX(-1)":undefined}}/>
+    <div className="kiosk-camera-toolbar">{modeSwitch}<div><span className={`kiosk-camera-status ${videoReady&&!cameraError?'is-live':''}`} aria-label={cameraError?'Camera unavailable':videoReady?'Camera live':'Camera starting'}><span aria-hidden="true"/><span className="kiosk-camera-status-full">{cameraError?'Unavailable':videoReady?'Camera live':'Starting…'}</span><span className="kiosk-camera-status-short">{cameraError?'Error':videoReady?'Live':'Starting'}</span></span><button type="button" className="kiosk-stop" onClick={()=>{setManual(false);onStop();}}><X size={16} aria-hidden="true"/>Stop</button></div></div>
+    {cameraError?<div className="kiosk-camera-error" role="alert"><AlertTriangle aria-hidden="true"/><h2>Camera unavailable</h2><p>{cameraError}. Allow camera access and try again. If it keeps happening, please see the librarian at the desk.</p><button type="button" onClick={()=>setRestartKey(current=>current+1)}>Try again</button></div>:<><div className="kiosk-camera-frame" aria-hidden="true"><i/><i/><i/><i/><span className="kiosk-scan-line"/></div>{!videoReady&&<div className="kiosk-camera-loading" role="status"><Loader2 className="animate-spin" aria-hidden="true"/>Starting camera…</div>}</>}
+    <div className="kiosk-camera-caption"><button type="button" aria-label="Switch camera" onClick={()=>setFacing(current=>current==="environment"?"user":"environment")}><Camera size={20} aria-hidden="true"/></button><div><strong>Hold your ID’s QR code inside the frame</strong><span>Scanning for {attendanceType==="check_in"?'TIME IN':'TIME OUT'}</span></div><button type="button" aria-label="Enter ID manually" onClick={()=>{onStop();setManual(true);}}><Keyboard size={20} aria-hidden="true"/></button></div>
+   </div>:manual?<div className="kiosk-manual-panel"><h2>Enter library ID</h2>{modeSwitch}</div>:<IdleView onStart={type=>{setManual(false);onStart(type);}} onManual={()=>setManual(true)} processing={processing}/>}
+  <form onSubmit={submit} className={manual?"kiosk-manual-form":"kiosk-wedge-form"}>
+    <label htmlFor="kiosk-scanned-id" className={manual?"":"sr-only"}>Scan library ID</label><input id="kiosk-scanned-id" name="scannedId" ref={inputRef} autoComplete="off" value={value} onChange={event=>setValue(event.target.value)} readOnly={processing||covered} tabIndex={manual?0:-1} className={manual?"":"kiosk-wedge-input"} placeholder="Library ID" onBlur={event=>{if(!processing&&!covered&&!interactive(event.relatedTarget))setTimeout(()=>{if(!interactive(document.activeElement))inputRef.current?.focus({preventScroll:true});},0);}}/>
+    {manual&&<div className="kiosk-manual-actions"><button type="submit" disabled={processing||!value.trim()}>Record attendance</button><button type="button" onClick={()=>setManual(false)}>Cancel</button></div>}
+  </form>
+  {processing&&<div className="kiosk-processing" role="status"><Loader2 size={40} className="animate-spin" aria-hidden="true"/><span>Recording attendance…</span></div>}
+ </div>;
 }
-
-const ScanningView = ({ scanMode, attendanceType, onScanned, onCancel }: ScanningViewProps) => {
-  const [manualMode, setManualMode] = useState(false);
-  const [cameraFacingMode, setCameraFacingMode] = useState<"environment" | "user">("environment");
-  const [manualInput, setManualInput] = useState("");
-  const [videoReady, setVideoReady] = useState(false); // <-- NEW
-  const manualInputRef = useRef<HTMLInputElement>(null);
-
-  const isProcessing = scanMode === "processing";
-
-  useEffect(() => {
-    if (manualMode) {
-      setTimeout(() => manualInputRef.current?.focus(), 100);
-    }
-  }, [manualMode]);
-
-  // Reset videoReady whenever camera mode is re-entered
-  useEffect(() => {
-    if (!manualMode && scanMode === "scanning") {
-      setVideoReady(false);
-    }
-  }, [cameraFacingMode, manualMode, scanMode]);
-
-  const { videoRef, error: cameraError } = useZxingScanner({
-    onResult: onScanned,
-    active: scanMode === "scanning" && !manualMode,
-    facingMode: cameraFacingMode,
-  });
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (manualInput.trim()) {
-      onScanned(manualInput.trim());
-    }
-  };
-
-  return (
-    <motion.div
-      key="scanning"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.35 }}
-      className="w-full max-w-sm"
-    >
-      {/* Top bar */}
-      <div className="flex items-center justify-between mb-3">
-        <span
-          className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {attendanceType === "check_in" ? "Time In" : "Time Out"}
-        </span>
-        <button
-          onClick={onCancel}
-          className="text-xs uppercase tracking-wider text-muted-foreground/60 hover:text-foreground transition-colors"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Cancel
-        </button>
-      </div>
-
-      {/* Viewfinder */}
-      <div className="relative border border-border bg-card aspect-square w-full overflow-hidden">
-        {/* Corner brackets */}
-        <span className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-primary z-10" />
-        <span className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-primary z-10" />
-        <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-primary z-10" />
-        <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-primary z-10" />
-
-        {/* Camera feed */}
-        {!manualMode && (
-          <>
-            {/* Placeholder shown while stream loads */}
-            {!videoReady && !cameraError && (
-              <div className="absolute inset-0 bg-background flex items-center justify-center z-10">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
-              </div>
-            )}
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              onPlaying={() => setVideoReady(true)} // <-- KEY FIX: only show once stream is live
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{
-                transform: cameraFacingMode === "user" ? "scaleX(-1)" : "none",
-                // Keep video in the DOM (for zxing to read) but invisible until ready
-                opacity: videoReady ? 1 : 0,
-                transition: "opacity 0.2s ease",
-              }}
-            />
-          </>
-        )}
-
-        {/* Scanning line */}
-        {scanMode === "scanning" && !manualMode && videoReady && (
-          <motion.div
-            className="absolute left-0 right-0 h-px bg-warning/70 z-10"
-            animate={{ top: ["12%", "88%", "12%"] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-          />
-        )}
-
-        {/* Processing overlay */}
-        {isProcessing && (
-          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center gap-3 z-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p
-              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Logging…
-            </p>
-          </div>
-        )}
-
-        {/* Camera error */}
-        {cameraError && !manualMode && scanMode === "scanning" && (
-          <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-3 px-6 z-20">
-            <AlertTriangle className="h-8 w-8 text-destructive/60" />
-            <p className="text-xs text-center text-muted-foreground">{cameraError}</p>
-            <button
-              onClick={() => setManualMode(true)}
-              className="text-xs uppercase tracking-wider text-primary hover:underline"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Enter ID manually
-            </button>
-          </div>
-        )}
-
-        {/* Manual input */}
-        {manualMode && !isProcessing && (
-          <div className="absolute inset-0 bg-background flex flex-col items-center justify-center gap-4 px-6">
-            <Camera className="h-8 w-8 text-muted-foreground/25" />
-            <p
-              className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/40 text-center"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Manual ID Entry
-            </p>
-            <form onSubmit={handleManualSubmit} className="w-full max-w-[220px]">
-              <input
-                ref={manualInputRef}
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                placeholder="e.g. A23-0121"
-                className="w-full border border-border bg-background px-3 py-2 text-sm text-center tracking-widest text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:border-primary"
-              />
-              <button
-                type="submit"
-                disabled={!manualInput.trim()}
-                className="mt-2 w-full border border-primary bg-primary text-primary-foreground py-2 text-xs font-bold uppercase tracking-[0.18em] hover:bg-primary/90 disabled:opacity-40 transition-colors"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Submit
-              </button>
-            </form>
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-warning/[0.02] pointer-events-none" />
-      </div>
-
-      {!manualMode && (
-        <div className="grid grid-cols-2 border-x border-border bg-background sm:hidden" role="group" aria-label="Camera selection">
-          {([
-            { label: "Back camera", value: "environment" },
-            { label: "Front camera", value: "user" },
-          ] as const).map(({ label, value }) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={cameraFacingMode === value}
-              disabled={isProcessing}
-              onClick={() => setCameraFacingMode(value)}
-              className={`min-h-11 border-b border-border px-3 text-xs font-semibold transition-colors disabled:opacity-40 ${
-                cameraFacingMode === value
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-muted/60"
-              } ${value === "environment" ? "border-r" : ""}`}
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Camera / Manual toggle */}
-      <div className="grid grid-cols-2 border-l border-b border-r border-border">
-        {[
-          { label: "Camera", icon: <Camera className="h-3.5 w-3.5" />, active: !manualMode, onClick: () => setManualMode(false) },
-          { label: "Manual", icon: <Keyboard className="h-3.5 w-3.5" />, active: manualMode, onClick: () => setManualMode(true) },
-        ].map(({ label, icon, active, onClick }, i) => (
-          <button
-            key={label}
-            onClick={onClick}
-            disabled={isProcessing}
-            className={`flex items-center justify-center gap-2 py-3.5 text-xs font-bold tracking-[0.18em] uppercase transition-colors duration-200 disabled:opacity-40 ${
-              i === 0 ? "border-r border-border" : ""
-            } ${
-              active
-                ? "bg-primary text-primary-foreground"
-                : "bg-background text-muted-foreground hover:bg-muted"
-            }`}
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            {icon}
-            {label}
-          </button>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
-
-export default ScanningView;

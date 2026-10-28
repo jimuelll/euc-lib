@@ -1,3 +1,6 @@
+import { HeaderBrand, HeaderAvatar } from "./HeaderIdentity";
+import KioskHeader from "./KioskHeader";
+import { operationsHome } from "@/utils/operationsAccess";
 import { LibraryDesignProvider } from "@/components/ui/library-design";
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -29,15 +32,6 @@ const AuthSkeleton = () => (
   <div className="h-8 w-8 bg-primary/20 animate-pulse" />
 );
 
-const UserAvatar = ({ initials }: { initials: string }) => (
-  <div
-    className="h-8 w-8 bg-primary-foreground/15 border border-primary-foreground/30 text-primary-foreground text-xs font-bold tracking-widest flex items-center justify-center"
-    style={{ fontFamily: "var(--font-heading)" }}
-  >
-    {initials}
-  </div>
-);
-
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLElement>(null);
@@ -47,6 +41,7 @@ const Navbar = () => {
   const { user, logout, loading } = useAuth();
   const { notifications, unreadCount, openNotification, markAllAsRead } = useNotifications();
 
+  const assignedPage = operationsHome(user?.role);
   const role       = user?.role ?? "guest";
   const isLoggedIn = !!user && !loading;
 
@@ -99,6 +94,7 @@ const Navbar = () => {
 
   const closeMobile = () => setMobileOpen(false);
 
+  if (assignedPage) return <KioskHeader station={role === "scanner" ? "scanner" : "opac"}/>;
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-primary-foreground/15 bg-primary">
@@ -108,24 +104,7 @@ const Navbar = () => {
         <div className="container flex h-14 items-center justify-between gap-2">
 
           {/* Logo */}
-          <Link to="/" className="flex shrink-0 items-center gap-3 group">
-            <img
-              src="/aa1.ico"
-              alt="Logo"
-              className="h-8 w-8 object-contain opacity-90 shrink-0"
-            />
-            <div className="flex flex-col leading-none">
-              <span
-                className="text-primary-foreground text-xs font-bold tracking-[0.1em] uppercase"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                EUC Library
-              </span>
-              <span className="text-primary-foreground/80 text-[11px] tracking-[0.16em] uppercase hidden sm:block">
-                Enverga-Candelaria Library
-              </span>
-            </div>
-          </Link>
+          <HeaderBrand />
 
           {/* Vertical separator */}
           <div className="hidden xl:block h-6 w-px bg-primary-foreground/15 mx-2 shrink-0" />
@@ -470,7 +449,7 @@ const UserDropdown = ({
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <button className="flex items-center gap-2 px-2 py-1.5 hover:bg-primary-foreground/10 transition-colors">
-        <UserAvatar initials={initials} />
+        <HeaderAvatar initials={initials} />
         <ChevronDown className="h-3 w-3 text-primary-foreground/40" />
       </button>
     </DropdownMenuTrigger>

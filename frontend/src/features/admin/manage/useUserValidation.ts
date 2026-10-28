@@ -1,3 +1,4 @@
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { useEffect, useRef, useState } from 'react';
 import { checkUserAvailability } from './api';
 import type { UserFormState } from './AdminManage.types';
@@ -14,7 +15,7 @@ export function useUserValidation(form: UserFormState, creating: boolean, enable
   const [blurVersion, setBlurVersion] = useState(0);
   const validation = validateUserForm(form, creating);
   const username = !['student','employee','alumni'].includes(form.role) && form.role ? form.username.trim() : '';
-  const email = form.email.trim();
+  const email = isOperationsRole(form.role) ? "" : form.email.trim();
   useEffect(() => { setTouched({}); setSubmitted(false); setServerErrors({}); setChecks({}); }, [enabled, creating, excludeIdentifier]);
   useEffect(() => {
     const previous = previousForm.current;

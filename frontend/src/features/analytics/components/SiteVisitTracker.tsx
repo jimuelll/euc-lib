@@ -1,3 +1,4 @@
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -17,7 +18,7 @@ const SiteVisitTracker = () => {
   });
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || isOperationsRole(user?.role)) return;
 
     const visitorState = user ? "auth" : "guest";
     const storageKey = `site-visit:${todayKey()}:${visitorState}`;

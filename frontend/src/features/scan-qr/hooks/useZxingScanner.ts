@@ -5,13 +5,19 @@ import type { Exception, Result } from "@zxing/library";
 interface Options {
   onResult: (text: string) => void;
   active: boolean;
+  continuous?: boolean;
+  paused?: boolean;
+  restartKey?: number;
   facingMode?: "environment" | "user";
 }
 
-export const useZxingScanner = ({ onResult, active, facingMode }: Options) => {
+export const useZxingScanner = ({ onResult, active, facingMode, continuous=false, paused=false, restartKey=0 }: Options) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
+  const pausedRef=useRef(paused);pausedRef.current=paused;
+  const handledRef=useRef(false);
+  useEffect(()=>{if(!paused)handledRef.current=false;},[paused]);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,16 +27,16 @@ export const useZxingScanner = ({ onResult, active, facingMode }: Options) => {
       return;
     }
 
-    let cancelled = false, handled = false;
+    let cancelled = false;handledRef.current=false;
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
     setError(null);
 
     const handleDecode = (result: Result, err?: Exception) => {
-      if (cancelled || handled) return;
+      if (cancelled || handledRef.current || pausedRef.current) return;
       if (result) {
-        handled = true;
-        reader.reset();
+        handledRef.current = true;
+        if(!continuous)reader.reset();
         onResultRef.current(result.getText());
         return;
       }
@@ -49,7 +55,7 @@ export const useZxingScanner = ({ onResult, active, facingMode }: Options) => {
       cancelled = true;
       reader.reset();
     };
-  }, [active, facingMode]);
+  }, [active, facingMode, continuous, restartKey]);
 
   return { videoRef, error };
 };

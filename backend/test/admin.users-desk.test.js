@@ -15,7 +15,7 @@ async function mutationFixture(work) {
  repo.findExistingUser=async()=>[];
  repo.findUserByIdForAudit=async()=>user;
  repo.updateUser=async(identifier,values)=>writes.push({identifier,values});
- repo.createUser=async values=>{writes.push(values);return "LIB-USER-000042";};
+ repo.createUser=async values=>{writes.push(values);user.role=values.role;return "LIB-USER-000042";};
  accounts.invite=async(conn,created)=>events.push({invited:created.id});
  outbox.enqueue=async(kind,event)=>events.push({kind,event});
  try{await work({user,writes,events,committed:()=>committed});}
@@ -114,3 +114,17 @@ test('archive records its reason transactionally and retains outstanding-loan ch
   assert.ok(f.events.some(event=>event.kind==='audit' && event.event.metadata.archive_reason==='Leaving institution'));
  } finally {ledger.assertNoOutstandingFines=originalFine;sessions.revokeAllRefreshSessionsForUser=originalSessions;}
 }));
+
+test('admins can list and filter OPAC accounts while Staff cannot list them',async()=>{
+ const search=repo.searchUsers,list=overdue.listUnsettledBorrowings;
+ const rows=[{user_id:11,name:'OPAC terminal',student_employee_id:'devopac',role:'opac',is_active:1},{user_id:10,name:'Scanner terminal',student_employee_id:'devscanner',role:'scanner',is_active:1}];
+ repo.searchUsers=async({allowedRoles})=>rows.filter(row=>allowedRoles.includes(row.role));
+ overdue.listUnsettledBorrowings=async()=>({rows:[]});
+ try {
+  for(const actor of ['admin','super_admin']) {
+   const all=await service.searchUsers({page:1,status:'all'},actor);assert.ok(all.rows.some(row=>row.role==='opac'));assert.equal(all.summary.roles.opac,1);
+   const filtered=await service.searchUsers({page:1,role:'opac',status:'active'},actor);assert.deepEqual(filtered.rows.map(row=>row.student_employee_id),['devopac']);
+  }
+  assert.deepEqual((await service.searchUsers({page:1,role:'opac'},'staff')).rows,[]);
+ } finally{repo.searchUsers=search;overdue.listUnsettledBorrowings=list;}
+});

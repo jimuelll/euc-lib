@@ -1,3 +1,5 @@
+import { useAuth } from "@/context/AuthContext";
+import { isOperationsRole } from "@/utils/operationsAccess";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -23,6 +25,7 @@ function RecommendationCover({ book }: { book: Recommendation }) {
   return <img src={src} alt={alt} onError={() => setFailedImageKey(imageKey)} className="h-20 w-14 shrink-0 border border-border bg-muted/20 object-contain" />;
 }
 export function RecommendationStrip({ materialType, seedBookId, personal = false, title, compact = false }: { materialType: "book" | "thesis"; seedBookId?: number | null; personal?: boolean; title?: string; compact?: boolean }) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [pageIndex, setPageIndex] = useState(0);
   const [cardsPerPage, setCardsPerPage] = useState(() => typeof window === "undefined" ? 1 : cardsPerPageForWidth(window.innerWidth));
@@ -102,7 +105,7 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
         titleHref={`/catalogue?q=${encodeURIComponent(book.title)}`}
         reason={specificRecommendationReason(book.reason)}
         coverBadge={book.source === "ai" ? <span className="catalogue-ai-marker" aria-label="AI recommendation" title="AI recommendation"><LibraryIcon name="ai" aria-hidden="true" /><span>AI</span></span> : undefined}
-        footerAction={book.canReserve && availabilityLabel(book) === "Available" ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null}
+        footerAction={!isOperationsRole(user?.role) && book.canReserve && availabilityLabel(book) === "Available" ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null}
       /> : <article key={book.id} className="group relative flex min-w-0 flex-col border border-border bg-card transition-colors hover:border-primary/50 hover:bg-muted/20">
         <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="flex min-w-0 flex-1 items-start gap-3 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           <RecommendationCover book={book} />

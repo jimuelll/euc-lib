@@ -22,6 +22,7 @@ const attachWebSocketServer = (server: Server) => {
       }
 
       const user = verifyAccessToken(token) as AuthenticatedUser;
+      if (["scanner", "opac"].includes(user.role)) { socket.close(4003, "Notifications unavailable for this account"); return; }
       const sessions = require("../modules/auth/authSession.service");
       if (!await sessions.isAccessTokenCurrent(user) || !await sessions.isUserAccessActive(user.id) || user.must_change_password) { socket.close(4002,"Session ended"); return; }
       const sessionCheck = setInterval(async () => {

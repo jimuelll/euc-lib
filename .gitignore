@@ -78,4 +78,5 @@ DESIGN.md
 # Local redesign screenshots and verification logs
 /frontend/tmp/library-redesign/
 
-/artifacts
+# Generated screenshots, previews, and verification logs
+/artifacts/

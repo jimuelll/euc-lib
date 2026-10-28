@@ -1,5 +1,6 @@
 import type { UserFormState } from './AdminManage.types';
 
+import { isOperationsRole, operationsPasswordError } from "@/utils/operationsAccess";
 export type UserFieldErrors = Partial<Record<keyof UserFormState, string>>;
 export const borrowingRoles = ['student', 'employee', 'alumni'];
 export const roleDescriptions: Record<string, string> = {
@@ -7,14 +8,15 @@ export const roleDescriptions: Record<string, string> = {
   alumni: 'Can borrow and reserve as an alumni patron.',
   employee: 'Can borrow and reserve as an employee patron.',
   scanner: 'Can scan library attendance only.',
+  opac: 'Can search the catalog and view book-related AI recommendations only.',
   staff: 'Can manage daily library operations and patron accounts.',
   admin: 'Can manage library operations, staff and settings.',
   super_admin: 'Can manage all library settings and administrator accounts.',
 };
 export function requiredUserFields(form: UserFormState, creating: boolean): (keyof UserFormState)[] {
-  if (!form.role) return ['role'];
+  if (!form.role || form.role === 'library_operations') return ['role'];
   const fields: (keyof UserFormState)[] = ['role', 'fullName'];
-  if (creating) fields.push('email');
+  if (creating) fields.push(...(isOperationsRole(form.role) ? ['password', 'rePassword'] as const : ['email'] as const));
   if (form.role === 'student') fields.push('libraryCardNumber', 'studentNumber', 'programId', 'yearLevel', 'academicTermId');
   else if (form.role === 'alumni') fields.push('libraryCardNumber');
   else if (form.role === 'employee') fields.push('employeeNumber', 'departmentId');
@@ -24,7 +26,13 @@ export function requiredUserFields(form: UserFormState, creating: boolean): (key
 export function validateUserForm(form: UserFormState, creating: boolean): UserFieldErrors {
   const errors: UserFieldErrors = {};
   for (const field of requiredUserFields(form, creating)) if (!form[field].trim()) errors[field] = 'This field is required.';
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+  if (form.role === 'library_operations') errors.role = 'Choose Scanner or OPAC.';
+  if (creating && isOperationsRole(form.role)) {
+    const error = operationsPasswordError(form.password);
+    if (error) errors.password = error;
+    if (form.rePassword !== form.password) errors.rePassword = 'Passwords must match.';
+  }
+  if (!isOperationsRole(form.role) && form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.';
   if (form.username.length > 64 && !borrowingRoles.includes(form.role)) errors.username = 'Use 64 characters or fewer.';
   return errors;
 }

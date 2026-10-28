@@ -1,5 +1,6 @@
 import type { Request, RequestHandler } from "express";
 import auth = require("./jwt.util");
+import { operationsRequestAllowed } from "./operations-access";
 
 interface AuthTokenPayload {
   id: number;
@@ -38,7 +39,7 @@ function authMiddleware(roles: string[] = []): RequestHandler {
         return;
       }
 
-      if (roles.length && !roles.includes(payload.role)) {
+      if (!operationsRequestAllowed(payload.role, req.method, req.originalUrl) || roles.length && !roles.includes(payload.role)) {
         res.status(403).json({ message: "Forbidden" });
         return;
       }
