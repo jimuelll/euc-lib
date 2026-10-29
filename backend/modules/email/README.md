@@ -35,7 +35,7 @@ The added API is `GET /api/admin/notifications/email-preview` with the existing 
 
 ### Manual email verification
 
-Run `node -r ts-node/register test/notifications.email.test.js` through the normal backend suite. For real SQL checks, `node -r ts-node/register scripts/prepare-manual-email-test.ts` creates empty table copies in the fixed local `euc_manual_email_test` schema; run `test/notifications.email.database.integration.test.js` with `DB_NAME=euc_manual_email_test` and `RUN_DB_INTEGRATION=1`. Fixtures are removed after each test and provider delivery is captured. No library records are copied or modified. The frontend component tests cover opt-in, preview states and delivery results; `node scripts/verify-manual-email.mjs` checks the full desktop/mobile flow against a Vite server on port 4175, intercepting all API calls with synthetic responses.
+Run `node -r ts-node/register test/notifications.email.test.js` through the normal backend suite. For real SQL checks, `node -r ts-node/register scripts/prepare-manual-email-test.ts` creates empty table copies in the fixed local `euc_manual_email_test` schema; run `test/notifications.email.database.integration.test.js` with `DB_NAME=euc_manual_email_test` and `RUN_DB_INTEGRATION=1`. Fixtures are removed after each test and provider delivery is captured. No library records are copied or modified. The frontend component tests cover opt-in, preview states and delivery results. Run `npm run test:unit -- src/features/notifications/admin/NotificationEmailOptions.test.tsx src/features/notifications/admin/NotificationComposeDrawer.test.tsx` from `frontend` for the retained notification email and composer checks.
 
 ## Account behavior
 
@@ -61,7 +61,7 @@ No delivery webhooks or bulk-email controls are implemented. Delivery logs conta
 
 Run backend `npm test` / `npm run build`, and frontend `npm test` / `npm run build` / `npm run lint`. Optional database tests require `RUN_DB_INTEGRATION=1`, a dedicated database whose name ends in `_test`, and the current schema. Never point fixture tests at a live library database. Live Brevo tests require real credentials and consume quota.
 
-Email appearance is rendered locally by `renderEmail()` in `email.provider.ts`, using the shared cream, maroon and gold layout in `email.template.ts`. Account emails, recovery codes, manual notifications and loan summaries use real delivery data, escaped before insertion, with a plain-text alternative. No Brevo-hosted template setup is required. Rebuild and restart the backend (or deploy it) to apply template changes. Generate synthetic browser samples with `node artifacts/email-templates/build-previews.cjs` from the repository root; this does not send email.
+Email appearance is rendered locally by `renderEmail()` in `email.provider.ts`, using the shared cream, maroon and gold layout in `email.template.ts`. Account emails, recovery codes, manual notifications and loan summaries use real delivery data, escaped before insertion, with a plain-text alternative. No Brevo-hosted template setup is required. Rebuild and restart the backend (or deploy it) to apply template changes. To regenerate local sample HTML without sending email, run `node artifacts/email-templates/build-previews.cjs` from the repository root. Generated preview HTML and screenshots are temporary and are not retained.
 
 
 ### Delivery workspaces
@@ -88,4 +88,4 @@ Apply `npm run migrate-notification-images -- --apply` from the backend before d
 
 Email images are escaped HTTPS references, with descriptive alt text and a plain-text image link. Essential message text remains available when images are blocked. Images do not consume a separate email send. Quota, security reserve, recipient snapshots, cancellation/deadline behavior and deduplication remain in effect.
 
-The composer browser check is `node scripts/verify-notification-compose.mjs` from `frontend` with Vite running on port 8080. It opens an isolated harness, intercepts every API request with synthetic data, tests multi-patron confirmation/submission in both themes and viewport sizes, checks layout and placeholder contrast, and writes screenshots plus `layout-report.json` to `artifacts/notification-composer`. No real notification or email is sent.
+Composer regression coverage lives in `frontend/src/features/notifications/admin/NotificationComposeDrawer.test.tsx`, including multi-patron selection, confirmation, and submission. Run it through `npm run test:unit` from `frontend`; temporary browser harnesses and their generated screenshots are not retained.

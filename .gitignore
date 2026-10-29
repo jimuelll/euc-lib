@@ -80,3 +80,9 @@ DESIGN.md
 
 # Generated screenshots, previews, and verification logs
 /artifacts/
+
+# Temporary manual browser verification helpers; permanent tests belong in test suites
+/frontend/scripts/verify-*.mjs
+/frontend/scripts/*-qa.mjs
+/frontend/scripts/*-qa.html
+/frontend/scripts/*-qa.tsx
