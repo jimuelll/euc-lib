@@ -75,7 +75,7 @@ export default function AdminUsersWorkspace(props: ReturnType<typeof useAdminMan
  const footerStatus=readOnly?'Read-only record':mode==='create'?missing?`${missing} required ${missing===1?'field':'fields'} left`:validation.checking?'Checking availability…':!validation.valid?'Resolve the field errors':isOperationsRole(form.role)?'Ready to create account':'Ready to send invitation':dirty?`${changeCount} unsaved ${changeCount===1?'change':'changes'}`:'No unsaved changes';
  const operations = isOperationsRole(form.role);
  const operationsSelected = operations || form.role === "library_operations";
- const roleLocked=selectedUser?.user_id===user?.id || selectedUser?.role==='super_admin';
+ const roleLocked=selectedUser?.user_id===user?.id || (selectedUser?.role==='super_admin' && !canEdit(selectedUser));
  const patronRole=borrowingRoles.includes(form.role);
  useEffect(()=>{if(!patronRole && tab==='borrowing')setTab('profile');},[patronRole,tab]);
  const currentRoles = summary ? Object.keys(summary.roles) : allowedRoles;

@@ -8,7 +8,7 @@ const outbox=require("../modules/delivery-outbox/outbox.repository");
 
 async function mutationFixture(work) {
  const original={...repo},invite=accounts.invite,enqueue=outbox.enqueue;
- const user={id:42,name:"Super Admin",username:"super-one",student_employee_id:"super-one",role:"super_admin",is_active:1};
+ const user={id:42,name:"Super Admin",username:"super-one",student_employee_id:"super-one",role:"super_admin",is_active:1,email_verified_at:"2026-10-01"};
  const writes=[],events=[];let committed=0;
  repo.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>committed++,rollback:async()=>{},release(){},query:async()=>[[user]]});
  repo.findUserForUpdate=async()=>user;
@@ -45,12 +45,48 @@ test("super admins can update their own user record with an unchanged role",()=>
 
 test("self editing does not allow other super admin edits, self demotion or archival",()=>mutationFixture(async f=>{
  await assert.rejects(service.updateUser("super-one",{name:"Other"},"super_admin",99),{status:403});
+ await assert.rejects(service.updateUser("super-one",{role:"admin"},"super_admin",99),{status:403});
  await assert.rejects(service.updateUser("super-one",{name:"Other"},"admin",42),{status:403});
  await assert.rejects(service.updateUser("super-one",{role:"admin"},"super_admin",42),{status:403});
  await assert.rejects(service.updateUser("super-one",{is_active:0},"super_admin",42),{status:403});
  await assert.rejects(service.deleteUser("super-one","super_admin",42, "Test archive reason"),{status:403});
  assert.equal(f.writes.length,0);
 }));
+test("super admins can edit and demote an unverified super admin",()=>mutationFixture(async f=>{
+ f.user.email_verified_at=null;
+ await service.updateUser("super-one",{name:"Updated invite",role:"super_admin"},"super_admin",99);
+ assert.equal(f.writes[0].values.name,"Updated invite");
+ assert.equal(f.writes[0].values.role,undefined);
+ await service.updateUser("super-one",{role:"admin"},"super_admin",99);
+ assert.equal(f.writes[1].values.role,"admin");
+ assert.equal(f.committed(),2);
+ assert.ok(f.events.some(event=>event.kind==="audit"));
+}));
+test("unverified super admins remain protected from lower roles, self demotion and archival",()=>mutationFixture(async f=>{
+ f.user.email_verified_at=null;
+ for(const actor of ["admin","staff"]) {
+  await assert.rejects(service.updateUser("super-one",{name:"Changed"},actor,99),{status:403});
+  await assert.rejects(service.updateUser("super-one",{role:"admin"},actor,99),{status:403});
+ }
+ await assert.rejects(service.updateUser("super-one",{role:"admin"},"super_admin",42),{status:403});
+ await assert.rejects(service.deleteUser("super-one","super_admin",99,"Archive invite"),{status:403});
+ assert.equal(f.writes.length,0);
+}));
+test("availability and email history allow only super admins to manage unverified peers",async()=>{
+ const original={...accountRepo};
+ const account={id:77,role:'super_admin',email_verified_at:null};
+ accountRepo.accountByIdentifier=async()=>account;
+ accountRepo.available=async()=>true;
+ accountRepo.accountEmailStatus=async()=>[];
+ try {
+  assert.deepEqual(await service.checkAvailability({field:'username',value:'new-super',excludeIdentifier:'super-one'},'super_admin',42),{available:true});
+  assert.deepEqual(await service.getAccountEmailStatus('super-one','super_admin',42),{deliveries:[]});
+  for(const actor of ['admin','staff']) await assert.rejects(service.getAccountEmailStatus('super-one',actor,42),{status:403});
+  account.email_verified_at='2026-10-01';
+  await assert.rejects(service.checkAvailability({field:'username',value:'new-super',excludeIdentifier:'super-one'},'super_admin',42),{status:403});
+  await assert.rejects(service.getAccountEmailStatus('super-one','super_admin',42),{status:403});
+ } finally {Object.assign(accountRepo,original);}
+});
 async function fixture(work){const search=repo.searchUsers,list=overdue.listUnsettledBorrowings;let options;repo.searchUsers=async value=>{options=value;return [{user_id:1,name:"Alex",student_employee_id:"CARD-1",role:"student",is_active:1,active_loans:2,overdue_loans:1},{user_id:2,name:"Jamie",student_employee_id:"CARD-2",role:"student",is_active:0,active_loans:0,overdue_loans:0},{user_id:3,name:"Pat",student_employee_id:"admin-one",role:"admin",is_active:1,active_loans:0,overdue_loans:0},{user_id:4,name:"Taylor",student_employee_id:"CARD-3",role:"student",is_active:0,deleted_at:"2026-10-01",active_loans:0,overdue_loans:0}];};overdue.listUnsettledBorrowings=async()=>({rows:[{user_id:1,unsettled_amount:1260},{user_id:2,unsettled_amount:25}]});try{await work(()=>options);}finally{repo.searchUsers=search;overdue.listUnsettledBorrowings=list;}}
 test("users desk counts statuses across pages and adds authoritative borrowing balances",()=>fixture(async getOptions=>{const result=await service.searchUsers({page:1,limit:1,status:"active"},"super_admin");assert.equal(result.rows.length,1);assert.equal(result.rows[0].unpaid_fines,1260);assert.equal(result.summary.total,4);assert.equal(result.summary.active,2);assert.equal(result.summary.needsAttention,2);assert.deepEqual(result.summary.statuses,{active:2,inactive:1,archived:1,all:4});assert.ok(getOptions().allowedRoles.includes("super_admin"));assert.equal(result.pagination.total,2);}));
 test("users desk filters attention before pagination and retains role counts",()=>fixture(async()=>{const result=await service.searchUsers({page:1,status:"all",role:"student",access:"attention",sort:"attention"},"super_admin");assert.deepEqual(result.rows.map(row=>row.name),["Alex","Jamie"]);assert.equal(result.summary.roles.admin,1);assert.equal(result.summary.statuses.active,1);assert.equal(result.summary.statuses.all,3);}));

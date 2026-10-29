@@ -225,7 +225,8 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     if (!existing) throw Object.assign(new Error("User not found"), { status: 404 });
     if (existing.id === requesterId && updates.role !== undefined && updates.role !== existing.role) throw forbidden("You can’t change your own role.");
     const isOwnSuperAdmin = requesterRole === "super_admin" && existing.role === "super_admin" && existing.id === requesterId;
-    if (!isOwnSuperAdmin && !roleHierarchy[requesterRole]?.includes(existing.role)) throw forbidden("You are not allowed to update this user");
+    const isUnverifiedSuperAdmin = requesterRole === "super_admin" && existing.role === "super_admin" && !existing.email_verified_at;
+    if (!isOwnSuperAdmin && !isUnverifiedSuperAdmin && !roleHierarchy[requesterRole]?.includes(existing.role)) throw forbidden("You are not allowed to update this user");
     if (isOwnSuperAdmin && ((updates.role !== undefined && updates.role !== existing.role) || (updates.is_active !== undefined && updates.is_active !== 1 && updates.is_active !== true))) {
       throw forbidden("You cannot change your own super admin role or deactivate your own account");
     }
@@ -234,7 +235,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     if (isOperationsRole(existing.role) !== isOperationsRole(nextRole)) throw forbidden("Create a separate Library Operations account instead of converting a regular account");
     if (isOperationsRole(nextRole) && updates.email) throw new Error("Library Operations accounts do not use email");
     if (updates.name) normalized.name = updates.name;
-    if (updates.role && !isOwnSuperAdmin) {
+    if (updates.role && !isOwnSuperAdmin && !(isUnverifiedSuperAdmin && updates.role === existing.role)) {
       const role = String(updates.role);
       if (!roleHierarchy[requesterRole]?.includes(role)) throw forbidden("You are not allowed to assign this role");
       if (role === requesterRole) throw forbidden("You cannot assign a user with your own role");
@@ -377,7 +378,7 @@ function userFieldError(error: unknown, role: string) {
 }
 async function managedAccount(identifier: string, actorRole: string, actorId: number) {
   const account = await accountRepository.accountByIdentifier(identifier);
-  if (!account || !(account.id === actorId || roleHierarchy[actorRole]?.includes(account.role))) throw forbidden('You cannot manage this account');
+  if (!account || !(account.id === actorId || roleHierarchy[actorRole]?.includes(account.role) || (actorRole === 'super_admin' && account.role === 'super_admin' && !account.email_verified_at))) throw forbidden('You cannot manage this account');
   return account;
 }
 const checkAvailability = async (input: UserInput, actorRole: string, actorId: number) => {

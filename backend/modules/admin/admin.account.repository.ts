@@ -2,7 +2,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 const db = require('../../db') as Pool;
 
 export async function accountByIdentifier(identifier: string) {
-  const [rows] = await db.query<RowDataPacket[]>('SELECT id,role FROM users WHERE student_employee_id=? AND deleted_at IS NULL LIMIT 1', [identifier]);
+  const [rows] = await db.query<RowDataPacket[]>('SELECT id,role,email_verified_at FROM users WHERE student_employee_id=? AND deleted_at IS NULL LIMIT 1', [identifier]);
   return rows[0];
 }
 export async function available(field: 'email' | 'username', value: string, excludeId: number) {

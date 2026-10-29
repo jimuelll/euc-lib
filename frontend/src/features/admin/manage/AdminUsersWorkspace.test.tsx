@@ -64,6 +64,34 @@ it("keeps another super admin record read-only",async()=>{
  expect(screen.getByLabelText("Full name").hasAttribute("disabled")).toBe(true);
  expect(screen.queryByRole("button",{name:"Save changes"})).toBeNull();
 });
+it("allows editing and confirmed demotion of another unverified super admin",async()=>{
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[{...ownSuperAdmin,user_id:99,email_verified_at:null}],summary:undefined,pagination:{page:1,limit:25,total:1,totalPages:1}});
+ mount();fireEvent.click(await screen.findByRole("button",{name:"My Super Admin"}));
+ expect(screen.getByLabelText("Full name")).not.toBeDisabled();
+ fireEvent.change(screen.getByLabelText("Full name"),{target:{value:"Updated invitation"}});
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Save changes"})).not.toBeDisabled());
+ fireEvent.click(screen.getByRole("button",{name:"Save changes"}));
+ await waitFor(()=>expect(api.updateUser).toHaveBeenCalledWith("super-one",expect.objectContaining({fullName:"Updated invitation",role:"super_admin"})));
+ fireEvent.click(await screen.findByRole("button",{name:"My Super Admin"}));
+ fireEvent.mouseDown(screen.getByRole("tab",{name:"Access"}),{button:0,ctrlKey:false});
+ expect(screen.getByRole("combobox",{name:"Role"})).not.toBeDisabled();
+ expect(screen.queryByRole("button",{name:"Archive user"})).toBeNull();
+ fireEvent.keyDown(screen.getByRole("combobox",{name:"Role"}),{key:"ArrowDown"});
+ fireEvent.click(await screen.findByRole("option",{name:"Admin"}));
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Save changes"})).not.toBeDisabled());
+ fireEvent.click(screen.getByRole("button",{name:"Save changes"}));
+ await screen.findByRole("alertdialog");
+ expect(api.updateUser).toHaveBeenCalledTimes(1);
+ fireEvent.click(screen.getByRole("button",{name:"Confirm role change"}));
+ await waitFor(()=>expect(api.updateUser).toHaveBeenCalledWith("super-one",expect.objectContaining({role:"admin"})));
+});
+it.each(["admin","staff"])("keeps unverified super admins read-only for %s",async role=>{
+ signedIn.role=role;
+ vi.mocked(api.searchUsers).mockResolvedValue({rows:[{...ownSuperAdmin,user_id:99,email_verified_at:null}],summary:undefined,pagination:{page:1,limit:25,total:1,totalPages:1}});
+ mount();fireEvent.click(await screen.findByRole("button",{name:"My Super Admin"}));
+ expect(screen.getByLabelText("Full name")).toBeDisabled();
+ expect(screen.queryByRole("button",{name:"Save changes"})).toBeNull();
+});
 function RolesHarness(){const state=useAdminManage();return <output data-testid="allowed-roles">{state.allowedRoles.join(",")}</output>;}
 it.each(["super_admin","admin","staff"])("only super admins can select the super admin role for creation (%s)",role=>{
  signedIn.role=role;const Wrapper=createTestQueryClientWrapper(createTestQueryClient());
