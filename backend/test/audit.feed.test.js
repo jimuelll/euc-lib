@@ -52,3 +52,14 @@ test('a contradictory patron summary cannot link to an unrelated book type polic
  };
  try{const result=await require('../modules/analytics/audit.feed').getFeed();assert.equal(result.rows[0].target.kind,'Patron');assert.equal(result.rows[0].target.url,undefined);assert.equal(result.rows[0].target.unavailable,true);}finally{db.query=query;}
 });
+
+
+test('routine authentication is hidden consistently while security and patron activity remain queryable',()=>{
+ const defaults=helpers.filters({actor:'6'});
+ assert.match(defaults.sql,/NOT \(category='auth' AND action IN \('login','logout'\)\)/);
+ assert.match(defaults.sql,/actor_id = \?/);assert.deepEqual(defaults.params,[6]);
+ assert.doesNotMatch(helpers.filters({showRoutineAuth:'true'}).sql,/NOT \(category='auth'/);
+ assert.doesNotMatch(helpers.filters({showRoutineAuth:true,quick:'auth'}).sql,/NOT \(category='auth'/);
+ assert.match(helpers.filters({quick:'test'}).sql,/test\|development/);
+ assert.match(helpers.filters({security:'true'}).sql,/category='auth' OR/);
+});

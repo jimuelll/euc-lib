@@ -38,6 +38,7 @@ require("./clearance.desk.test");
 require("./desk.permissions.test");
 require("./staff.desk.integration.test");
 require("./admin.users-desk.test");
+require("./admin.borrowing.test");
 require("./holdings.accession.test");
 require("./catalog.bulk-accession.test");
 require("./catalog.isbn-check.test");

@@ -32,3 +32,6 @@ export type AccountEmailDelivery = {purpose:'setup'|'verify_email'|'recovery';st
 export const fetchAccountEmailStatus = async (identifier:string,signal?:AbortSignal) => (await axiosInstance.get<{deliveries:AccountEmailDelivery[]}>(`/api/admin/users/${encodeURIComponent(identifier)}/account-email`,{signal})).data;
 
 export const resetOperationsPassword = async (identifier:string,password:string) => (await axiosInstance.post<{message:string}>(`/api/admin/users/${encodeURIComponent(identifier)}/reset-password`,{password})).data;
+
+export const fetchUserBorrowing = async (identifier: string, signal?: AbortSignal): Promise<import('./UserBorrowingDetails').UserBorrowing> =>
+  (await axiosInstance.get(`/api/admin/users/${encodeURIComponent(identifier)}/borrowing`, {signal})).data;

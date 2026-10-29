@@ -40,6 +40,7 @@ export function impactReason(row:any){
 }
 export function filters(input:any={}){
  const terms=['occurred_at IS NOT NULL'],params:any[]=[];
+ if(input.showRoutineAuth!=='true'&&input.showRoutineAuth!==true)terms.push("NOT (category='auth' AND action IN ('login','logout'))");
  if(input.quick){if(input.quick==='mine'){if(!Number.isSafeInteger(Number(input.currentActorId))||Number(input.currentActorId)<1)throw Object.assign(new Error('Your account could not be identified.'),{status:400});terms.push('actor_id = ?');params.push(Number(input.currentActorId));}else if(quickSql[input.quick])terms.push(quickSql[input.quick]);else throw Object.assign(new Error('Choose a valid quick filter.'),{status:400});}
  if(input.event){if(!/^\d+$/.test(String(input.event)))throw Object.assign(new Error('Choose a valid event ID.'),{status:400});terms.push('id = ?');params.push(Number(input.event));}
  for(const key of ['category','action'])if(input[key]&&input[key]!=='all'){terms.push(`${key==='category'?`(${categorySql})`:key} = ?`);params.push(String(input[key]));}

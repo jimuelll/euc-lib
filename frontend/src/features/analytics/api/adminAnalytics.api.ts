@@ -79,7 +79,7 @@ export async function createAiAnalyticsReport(input: { dateFrom?: string; dateTo
   return (await axiosInstance.post<AiAnalyticsReportResponse>("/api/admin/dashboard/ai-report", input)).data;
 }
 
-export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string;actor?:string;record?:string;important?:string;security?:string;event?:string;quick?:string }, signal?: AbortSignal): Promise<AuditResponse> {
+export async function fetchAuditLogs(params: { page: number; limit: number; category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string;actor?:string;record?:string;important?:string;security?:string;event?:string;quick?:string;showRoutineAuth?:string }, signal?: AbortSignal): Promise<AuditResponse> {
   return (await axiosInstance.get<AuditResponse>("/api/admin/dashboard/audit", { params, signal })).data;
 }
 

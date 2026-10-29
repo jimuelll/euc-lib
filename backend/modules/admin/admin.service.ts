@@ -1,3 +1,4 @@
+import {getPatronBorrowing} from './admin.borrowing';
 import * as accountRepository from "./admin.account.repository";
 import bcrypt = require("bcryptjs");
 import { randomBytes } from "node:crypto";
@@ -401,4 +402,6 @@ const getAccountEmailStatus = async (identifier: string, actorRole: string, acto
   if (isOperationsRole(account.role)) throw forbidden("Library Operations accounts do not use email");
   return {deliveries:await accountRepository.accountEmailStatus(account.id)};
 };
-export = { resetOperationsPassword, checkAvailability, getAccountEmailStatus, createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };
+const getUserBorrowing = (identifier: string, role: string) => getPatronBorrowing(identifier, searchRoleHierarchy[role] || []);
+
+export = { getUserBorrowing, resetOperationsPassword, checkAvailability, getAccountEmailStatus, createUser, deleteUser, restoreUser, updateUser, searchUsers, queryToolsSearch };

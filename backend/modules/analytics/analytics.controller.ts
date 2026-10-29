@@ -83,7 +83,7 @@ async function handleGetAuditLog(req: AnalyticsRequest, res: Response) {
       action: req.query.action,
       query: req.query.query,
       dateFrom: req.query.dateFrom,
-      dateTo: req.query.dateTo,actor:req.query.actor,record:req.query.record,important:req.query.important,security:req.query.security,event:req.query.event,quick:req.query.quick,currentActorId:req.user?.id,
+      dateTo: req.query.dateTo,actor:req.query.actor,record:req.query.record,important:req.query.important,security:req.query.security,event:req.query.event,quick:req.query.quick,showRoutineAuth:req.query.showRoutineAuth,currentActorId:req.user?.id,
     });
     res.json(result);
   } catch (err: any) {

@@ -85,3 +85,27 @@
 .users-header-chip { display:inline-block; padding:2px 6px; border:1px solid currentColor; font-size:12px; margin-top:4px; }
 
 .dark .users-role-choice:has(input:checked) { border-color:#e4a6a6; outline-color:#e4a6a6; }
+
+.users-obligations { display:grid; gap:24px; padding-bottom:18px; min-width:0; }
+.users-obligation-section { min-width:0; }
+.users-obligation-section h3 { font:700 18px/1.4 var(--font-heading); margin-bottom:10px; }
+.users-obligation-section h3 span { font:400 14px var(--font-body); }
+.users-obligation-section ul { list-style:none; margin:0 0 10px; padding:0; }
+.users-obligation-section li { padding:12px 0; border-top:1px solid hsl(var(--border)); }
+.users-obligation-section h4 { font:600 16px/1.45 var(--font-heading); overflow-wrap:anywhere; }
+.users-obligation-section p { font-size:14px; line-height:1.6; }
+.users-obligation-section dl { display:grid; gap:6px; margin-top:8px; }
+.users-obligation-section dl>div { display:grid; grid-template-columns:90px minmax(0,1fr); gap:12px; }
+.users-obligation-section dt { color:hsl(var(--muted-foreground)); font-size:14px; }
+.users-obligation-section dd,.users-record-number { font:13px/1.6 ui-monospace,monospace; overflow-wrap:anywhere; }
+.users-obligation-section>a { display:inline-flex; align-items:center; min-height:44px; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
+
+/* Cover the scroll inset behind sticky tabs, including after scrolling. */
+[data-library-design][data-library-design].users-drawer .admin-desk-tabs {
+ top:calc(-1 * var(--library-drawer-inset,18px));
+ margin:calc(-1 * var(--library-drawer-inset,18px)) calc(-1 * var(--library-drawer-inset,18px)) 0;
+ padding:var(--library-drawer-inset,18px) var(--library-drawer-inset,18px) 0;
+}
+@media(max-width:767px) {
+ [data-library-design][data-library-design] .users-obligations .users-borrowing-summary>div a { padding:10px 12px; }
+}

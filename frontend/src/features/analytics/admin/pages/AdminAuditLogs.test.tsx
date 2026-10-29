@@ -60,3 +60,38 @@ it('shows readable schema changes with field keys and user agent in Details',asy
  expect(screen.getByText('Audit test browser')).toBeVisible();
  expect(screen.getByRole('link',{name:'physical_description'})).toHaveAttribute('href','/admin/catalog?tab=builder&fieldKey=physical_description');
 });
+
+
+it('moves test-only filtering into View and restores default authentication visibility on reset',async()=>{
+ mount('/admin/audit-logs?actor=6');await screen.findByRole('article',{name:/Event 12/});
+ expect(api.fetchAuditLogs).toHaveBeenCalledWith(expect.objectContaining({actor:'6',showRoutineAuth:''}),expect.anything());
+ expect(within(screen.getByRole('group',{name:'Quick audit filters'})).queryByRole('button',{name:/Test accounts/})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'View'}));
+ const auth=screen.getByRole('checkbox',{name:'Show sign-ins and sign-outs'});expect(auth).not.toBeChecked();
+ fireEvent.click(auth);expect(screen.getByTestId('url')).toHaveTextContent('showRoutineAuth=true');
+ fireEvent.click(screen.getByRole('checkbox',{name:'Test accounts only'}));expect(screen.getByTestId('url')).toHaveTextContent('quick=test');
+ fireEvent.click(screen.getByRole('button',{name:'Reset filters'}));expect(auth).not.toBeChecked();expect(screen.getByTestId('url')).not.toHaveTextContent('actor=6');
+});
+it('Auth explicitly includes routine events and supports old test quick links',async()=>{
+ mount('/admin/audit-logs?quick=test');await screen.findByRole('article',{name:/Event 12/});
+ fireEvent.click(screen.getByRole('button',{name:'View'}));expect(screen.getByRole('checkbox',{name:'Test accounts only'})).toBeChecked();
+ fireEvent.click(screen.getByRole('button',{name:/^Auth /}));expect(screen.getByTestId('url')).toHaveTextContent('quick=auth');expect(screen.getByTestId('url')).toHaveTextContent('showRoutineAuth=true');
+});
+
+
+it('groups View settings in layout, visibility and saved-view order without the routine-auth notice',async()=>{
+ mount();await screen.findByRole('article',{name:/Event 12/});
+ expect(screen.queryByText(/Routine sign-ins and sign-outs are hidden/)).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'View'}));
+ const settings=screen.getByRole('group',{name:'Audit view settings'});
+ expect(Array.from(settings.querySelectorAll('fieldset>legend')).map(el=>el.textContent)).toEqual(['Layout','Event visibility','Saved views']);
+ const controls=Array.from(settings.querySelectorAll('select,input,button'));
+ expect(controls.map(el=>el.getAttribute('aria-label')||el.closest('label')?.textContent||el.textContent)).toEqual(['Row density','Actor','Category','Time','Record','Show sign-ins and sign-outs','Test accounts only','Saved audit view','Saved view name','Save view']);
+});
+it('keeps a decorative marker next to time for significant and ordinary events',async()=>{
+ mount();const event=await screen.findByRole('article',{name:/Event 12/});
+ const gutter=event.querySelector('.audit-time-gutter')!;
+ expect(gutter.querySelector('.audit-event-marker')).toHaveAttribute('aria-hidden','true');expect(gutter.querySelector('time')).toBeInTheDocument();
+ fireEvent.click(within(event).getByRole('button',{name:/View details/}));
+ expect(event.querySelector('.audit-time-gutter')).toBe(gutter);
+});

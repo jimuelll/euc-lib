@@ -98,4 +98,8 @@ const handleResetOperationsPassword: RequestHandler = async (req, res) => {
     res.set("Cache-Control", "no-store").json(result);
   } catch (error) { sendMutationError(res, error); }
 };
-export = { handleResetOperationsPassword, handleAvailability, handleAccountEmailStatus, handleCreateUser, handleDeleteUser, handleRestoreUser, handleUpdateUser, handleSearchUsers, handleQueryToolsSearch, handleGetBarcodePng };
+const handleUserBorrowing: RequestHandler = async (req, res) => {
+  try { res.set('Cache-Control', 'no-store').json(await service.getUserBorrowing(String(req.params.student_employee_id), (req as AuthenticatedRequest).user.role)); }
+  catch (error) { const failure = error as AdminServiceError; res.status(failure.status || 500).json({message: failure.status ? failure.message : 'Borrowing details could not be loaded.'}); }
+};
+export = { handleUserBorrowing, handleResetOperationsPassword, handleAvailability, handleAccountEmailStatus, handleCreateUser, handleDeleteUser, handleRestoreUser, handleUpdateUser, handleSearchUsers, handleQueryToolsSearch, handleGetBarcodePng };
