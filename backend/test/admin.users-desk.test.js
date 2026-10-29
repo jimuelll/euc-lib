@@ -126,11 +126,11 @@ test('archive requires a nonempty reason',async()=>{
 });
 test('duplicate create identifiers return inline field errors',()=>mutationFixture(async f=>{
  repo.findExistingUser=async()=>[f.user];
- await assert.rejects(service.createUser({name:'Desk',role:'staff',username:'super-one',email:'desk@example.edu'},'super_admin',42),e=>e.status===409 && Boolean(e.fieldErrors.username));
+ await assert.rejects(service.createUser({name:'Desk',role:'admin',username:'super-one',email:'desk@example.edu'},'super_admin',42),e=>e.status===409 && Boolean(e.fieldErrors.username));
 }));
 test('email claims conflicting during create return inline email errors',()=>mutationFixture(async()=>{
  accounts.invite=async()=>{throw Object.assign(new Error('That email address is already in use'),{status:409});};
- await assert.rejects(service.createUser({name:'Desk',role:'staff',username:'new-desk',email:'desk@example.edu'},'super_admin',42),e=>e.status===409 && Boolean(e.fieldErrors.email));
+ await assert.rejects(service.createUser({name:'Desk',role:'admin',username:'new-desk',email:'desk@example.edu'},'super_admin',42),e=>e.status===409 && Boolean(e.fieldErrors.email));
 }));
 
 test('archive records its reason transactionally and retains outstanding-loan checks',()=>mutationFixture(async f=>{
@@ -163,4 +163,60 @@ test('admins can list and filter OPAC accounts while Staff cannot list them',asy
   }
   assert.deepEqual((await service.searchUsers({page:1,role:'opac'},'staff')).rows,[]);
  } finally{repo.searchUsers=search;overdue.listUnsettledBorrowings=list;}
+});
+
+const studentProfile={library_card_number:'CARD-1',student_number:'ST-1',program_id:1,year_level:'2nd Year',academic_term_id:1};
+function academicFixture(f){
+ repo.findActiveProgram=async()=>({id:1});
+ repo.findAcademicTerm=async()=>({id:1});
+ repo.findCurrentAcademicTerm=async()=>({id:1});
+ Object.assign(f.user,studentProfile,{student_employee_id:'CARD-1',role:'staff'});
+}
+test('staff creation stores a student profile and queues an invitation',()=>mutationFixture(async f=>{
+ academicFixture(f);
+ await service.createUser({...studentProfile,name:'Student staff',email:'staff@example.edu',role:'staff'},'admin',99);
+ const created=f.writes[0];
+ assert.equal(created.role,'staff');assert.equal(created.studentEmployeeId,'CARD-1');assert.equal(created.username,null);
+ assert.equal(created.studentNumber,'ST-1');assert.equal(created.programId,1);assert.equal(created.academicTermId,1);assert.equal(created.yearLevel,'2nd Year');
+ assert.ok(f.events.some(event=>event.invited===42));
+}));
+test('staff creation rejects missing student fields and maps duplicate cards',()=>mutationFixture(async f=>{
+ academicFixture(f);
+ const input={...studentProfile,name:'Staff',email:'staff@example.edu',role:'staff'};
+ for(const field of ['library_card_number','student_number','program_id','year_level']) await assert.rejects(service.createUser({...input,[field]:''},'admin',99));
+ repo.findCurrentAcademicTerm=async()=>null;
+ await assert.rejects(service.createUser({...input,academic_term_id:null},'admin',99),/academic term/);
+ repo.findExistingUser=async()=>[f.user];
+ await assert.rejects(service.createUser(input,'admin',99),error=>error.status===409 && !!error.fieldErrors.libraryCardNumber);
+ assert.equal(f.writes.length,0);
+}));
+for(const [before,after] of [['student','staff'],['staff','student']]) test(`${before} to ${after} retains academic profile`,()=>mutationFixture(async f=>{
+ academicFixture(f);f.user.role=before;
+ await service.updateUser('CARD-1',{role:after},'admin',99);
+ assert.equal(f.writes[0].values.role,after);assert.equal(f.writes[0].values.student_employee_id,'CARD-1');assert.equal(f.writes[0].values.student_number,'ST-1');assert.equal(f.writes[0].values.program_id,1);
+ assert.notEqual(f.writes[0].values.academic_term_id,null);
+}));
+test('staff edits retain legacy identifiers, store term changes and reject incomplete profiles',()=>mutationFixture(async f=>{
+ academicFixture(f);f.user.library_card_number=null;
+ await service.updateUser('CARD-1',{name:'Updated',academic_term_id:1},'admin',99);
+ assert.equal(f.writes[0].values.library_card_number,'CARD-1');assert.equal(f.writes[0].values.academic_term_id,1);
+ await assert.rejects(service.updateUser('CARD-1',{academic_term_id:null},'admin',99),/academic term/);
+ f.user.student_number=null;
+ await assert.rejects(service.updateUser('CARD-1',{name:'Incomplete'},'admin',99),/Student No/);
+}));
+
+test('staff edit duplicate card errors use the library card field even without a role update',()=>mutationFixture(async f=>{
+ academicFixture(f);repo.updateUser=async()=>{throw Object.assign(new Error('Duplicate identifier'),{code:'ER_DUP_ENTRY'});};
+ await assert.rejects(service.updateUser('CARD-1',{library_card_number:'CARD-2'},'admin',99),error=>error.status===409 && !!error.fieldErrors.libraryCardNumber);
+}));
+
+test('staff academic terms remain profile data while students retain term expiry',async()=>{
+ const auth=require('../modules/auth/auth.service');const authRepo=require('../modules/auth/auth.repository');
+ const lookup=authRepo.getAcademicTerm;let lookups=0;
+ authRepo.getAcademicTerm=async()=>{lookups++;return {name:'Expired term',ends_on:'2000-01-01'};};
+ try{
+  assert.deepEqual(await auth.getTermStatus({role:'staff',academic_term_id:1}),{term_status:'not_applicable',academic_term_name:null});
+  assert.equal(lookups,0);
+  assert.equal((await auth.getTermStatus({role:'student',academic_term_id:1})).term_status,'expired');
+ }finally{authRepo.getAcademicTerm=lookup;}
 });

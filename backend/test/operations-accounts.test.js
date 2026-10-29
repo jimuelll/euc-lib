@@ -69,7 +69,8 @@ test('operations creation validates passwords and rejects email and pseudo-roles
 }));
 test('regular account invitation behavior is preserved and direct passwords stay forbidden',()=>fixture(async f=>{
  f.user.role='staff';
- await service.createUser({role:'staff',name:'Staff',username:'staff-one',email:'staff@example.edu'},'admin',1);
+ repo.findActiveProgram=async()=>({id:1});repo.findAcademicTerm=async()=>({id:1});
+ await service.createUser({role:'staff',name:'Staff',library_card_number:'CARD-1',student_number:'ST-1',program_id:1,year_level:'2nd Year',academic_term_id:1,email:'staff@example.edu'},'admin',1);
  assert.equal(f.invitations(),1);assert.equal(f.writes[0].email,'staff@example.edu');
  await assert.rejects(service.createUser({role:'staff',password:'terminal-password'},'admin',1),/cannot choose passwords/);
 }));

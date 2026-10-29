@@ -1,3 +1,4 @@
+import { isStudentProfileRole } from './userForm';
 import { isOperationsRole } from "@/utils/operationsAccess";
 import OperationsPasswordReset from "./components/OperationsPasswordReset";
 import "./refined-drawers.css";
@@ -51,7 +52,7 @@ export default function AdminUsersWorkspace(props: ReturnType<typeof useAdminMan
  const baseline = useRef<UserFormState|null>(null);
  const validation = useUserValidation(form,mode === 'create',mode !== null && !(selectedUser && (!canEdit(selectedUser) || selectedUser.deleted_at)),selectedUser?.student_employee_id);
  useEffect(()=>{baseline.current={...form};setTab('profile');setArchiveReason('');},[mode,selectedUser?.student_employee_id]);
- useEffect(()=>{if(mode==='create' && form.role==='student' && !form.academicTermId){const current=terms.find(term=>term.is_current);if(current)setField('academicTermId',String(current.id));}},[mode,form.role,terms,form.academicTermId]);
+ useEffect(()=>{if(mode==='create' && isStudentProfileRole(form.role) && !form.academicTermId){const current=terms.find(term=>term.is_current);if(current)setField('academicTermId',String(current.id));}},[mode,form.role,terms,form.academicTermId]);
  useEffect(()=>{if(props.fieldErrors && Object.keys(props.fieldErrors).length)validation.setServerErrors(props.fieldErrors);},[props.fieldErrors]);
  const changeCount = baseline.current ? Object.keys(form).filter(key=>form[key as keyof UserFormState]!==baseline.current![key as keyof UserFormState]).length : 0;
  const discard = () => {if(baseline.current)for(const key of Object.keys(form) as (keyof UserFormState)[])setField(key,baseline.current[key]);};
@@ -80,7 +81,7 @@ export default function AdminUsersWorkspace(props: ReturnType<typeof useAdminMan
  useEffect(()=>{if(!patronRole && tab==='borrowing')setTab('profile');},[patronRole,tab]);
  const currentRoles = summary ? Object.keys(summary.roles) : allowedRoles;
  const count = (value?:number) => value === undefined ? "Unavailable" : value.toLocaleString("en-PH");
- const student = form.role === "student";
+ const student = isStudentProfileRole(form.role);
  const alumni = form.role === "alumni";
  const employee = form.role === "employee";
  return <div className="users-page">
@@ -108,7 +109,7 @@ export default function AdminUsersWorkspace(props: ReturnType<typeof useAdminMan
     <p className="users-secondary">Fields marked optional may be left blank.{readOnly && ' This record cannot be edited with your current permissions or archive state.'}</p>
     {mode==='edit' && selectedUser && <p className="users-secondary">Library identifier: {selectedUser.student_employee_id}</p>}
     <FormSection title="Identity">{field("fullName","Full name",true)}{student || alumni ? field("libraryCardNumber","Library card number",true):employee ? field("employeeNumber","Employee number",true):field("username","Username",true)}{student && field("studentNumber","Student number",true)}{form.role && !patronRole && suggestUsername(form.fullName) && !readOnly && <p className="users-hint users-wide">Suggested username: <button type="button" className="users-suggestion" disabled={loading} onClick={()=>setField('username',suggestUsername(form.fullName))}>{suggestUsername(form.fullName)}</button></p>}{(student || alumni) && <p className="users-hint">The library card number is the library sign-in and scanner ID.{student && " Student number is the separate university ID."}</p>}</FormSection>
-    {student && <FormSection title="Academic">{choice('yearLevel','Year level',[{value:'__none',label:'Choose year level'},...['1st Year','2nd Year','3rd Year','4th Year','Other'].map(value=>({value,label:value}))])}{choice('programId','Program / Course',[{value:'__none',label:'Choose program / course'},...programs.map(program=>({value:String(program.id),label:program.name}))])}{choice('academicTermId','Academic term',[{value:'__none',label:'Choose academic term'},...terms.map(term=>({value:String(term.id),label:term.name+(term.is_current?' (current)':'')}))])}<p className="users-hint">A current academic term is required for student access. <Link to="/admin/holidays?tab=terms">Manage academic terms</Link> · <Link to="/admin/holidays?tab=programs">Manage programs / courses</Link></p></FormSection>}
+    {student && <FormSection title="Academic">{choice('yearLevel','Year level',[{value:'__none',label:'Choose year level'},...['1st Year','2nd Year','3rd Year','4th Year','Other'].map(value=>({value,label:value}))])}{choice('programId','Program / Course',[{value:'__none',label:'Choose program / course'},...programs.map(program=>({value:String(program.id),label:program.name}))])}{choice('academicTermId','Academic term',[{value:'__none',label:'Choose academic term'},...terms.map(term=>({value:String(term.id),label:term.name+(term.is_current?' (current)':'')}))])}<p className="users-hint">Academic term is required for student and staff profiles. Student access depends on a current term. <Link to="/admin/holidays?tab=terms">Manage academic terms</Link> · <Link to="/admin/holidays?tab=programs">Manage programs / courses</Link></p></FormSection>}
     {employee && <FormSection title="Employment">{choice('departmentId','Department',[{value:'__none',label:'Choose department'},...departments.map(department=>({value:String(department.id),label:department.name}))])}<p className="users-hint"><Link to="/admin/holidays?tab=departments">Manage departments</Link></p></FormSection>}
     {operations && mode==='create' && <FormSection title="Account password">{field('password','Password',true,'password')}{field('rePassword','Confirm password',true,'password')}<p className="users-hint users-wide">Use at least 8 characters and no more than 72 UTF-8 bytes. This password works immediately; share it with the account operator.</p></FormSection>}
     <FormSection title="Contact">{!operations && field('email','Email',mode==='create','email')}{field('contact','Contact number')}{field('address','Address')}</FormSection>

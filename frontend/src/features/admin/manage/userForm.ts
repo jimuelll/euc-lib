@@ -2,14 +2,15 @@ import type { UserFormState } from './AdminManage.types';
 
 import { isOperationsRole, operationsPasswordError } from "@/utils/operationsAccess";
 export type UserFieldErrors = Partial<Record<keyof UserFormState, string>>;
-export const borrowingRoles = ['student', 'employee', 'alumni'];
+export const isStudentProfileRole = (role: string) => role === 'student' || role === 'staff';
+export const borrowingRoles = ['student', 'staff', 'employee', 'alumni'];
 export const roleDescriptions: Record<string, string> = {
   student: 'Can borrow and reserve during an assigned academic term.',
   alumni: 'Can borrow and reserve as an alumni patron.',
   employee: 'Can borrow and reserve as an employee patron.',
   scanner: 'Can scan library attendance only.',
   opac: 'Can search the catalog and view book-related AI recommendations only.',
-  staff: 'Can manage daily library operations and patron accounts.',
+  staff: 'A student with access to daily library operations and patron management.',
   admin: 'Can manage library operations, staff and settings.',
   super_admin: 'Can manage all library settings and administrator accounts.',
 };
@@ -17,7 +18,7 @@ export function requiredUserFields(form: UserFormState, creating: boolean): (key
   if (!form.role || form.role === 'library_operations') return ['role'];
   const fields: (keyof UserFormState)[] = ['role', 'fullName'];
   if (creating) fields.push(...(isOperationsRole(form.role) ? ['password', 'rePassword'] as const : ['email'] as const));
-  if (form.role === 'student') fields.push('libraryCardNumber', 'studentNumber', 'programId', 'yearLevel', 'academicTermId');
+  if (isStudentProfileRole(form.role)) fields.push('libraryCardNumber', 'studentNumber', 'programId', 'yearLevel', 'academicTermId');
   else if (form.role === 'alumni') fields.push('libraryCardNumber');
   else if (form.role === 'employee') fields.push('employeeNumber', 'departmentId');
   else if (form.role) fields.push('username');

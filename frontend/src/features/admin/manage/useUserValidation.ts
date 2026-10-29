@@ -14,7 +14,7 @@ export function useUserValidation(form: UserFormState, creating: boolean, enable
   const lastBlur = useRef<{username:string;email:string}|null>(null);
   const [blurVersion, setBlurVersion] = useState(0);
   const validation = validateUserForm(form, creating);
-  const username = !['student','employee','alumni'].includes(form.role) && form.role ? form.username.trim() : '';
+  const username = !['student','staff','employee','alumni'].includes(form.role) && form.role ? form.username.trim() : '';
   const email = isOperationsRole(form.role) ? "" : form.email.trim();
   useEffect(() => { setTouched({}); setSubmitted(false); setServerErrors({}); setChecks({}); }, [enabled, creating, excludeIdentifier]);
   useEffect(() => {

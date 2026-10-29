@@ -1,3 +1,4 @@
+import { isStudentProfileRole } from './userForm';
 import { isOperationsRole } from "@/utils/operationsAccess";
 import { useAdminUrlState, queryPage } from "@/features/admin/hooks/useAdminUrlState";
 import { useRef, useState } from "react";
@@ -124,7 +125,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
     try {
       const response = await createMutation.mutateAsync({ fullName, id, role, password, rePassword, address, contact, programId, academicTermId, libraryCardNumber, studentNumber, employeeNumber, username, email, yearLevel, departmentId, remarks });
       toast.success(response.message);
-      const identifier = ["student","alumni"].includes(form.role) ? form.libraryCardNumber : form.role === "employee" ? form.employeeNumber : form.username;
+      const identifier = ["student","staff","alumni"].includes(form.role) ? form.libraryCardNumber : form.role === "employee" ? form.employeeNumber : form.username;
       if (!isOperationsRole(role)) setQrTarget({ studentId: identifier, name: fullName });
       resetForm();
       return true;
@@ -156,7 +157,7 @@ export const useAdminManage = (): UseAdminManageReturn => {
       contact:    u.contact  || "",
       programId:  u.program_id ? String(u.program_id) : "",
       academicTermId: u.academic_term_id ? String(u.academic_term_id) : "",
-      libraryCardNumber: u.library_card_number || "", studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || (!["student","alumni","employee"].includes(u.role) ? u.student_employee_id : ""), email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
+      libraryCardNumber: u.library_card_number || (isStudentProfileRole(u.role) ? u.student_employee_id : ""), studentNumber: u.student_number || "", employeeNumber: u.employee_number || "", username: u.username || (!["student","staff","alumni","employee"].includes(u.role) ? u.student_employee_id : ""), email: u.email || "", yearLevel: u.year_level || "", departmentId: u.department_id ? String(u.department_id) : "", remarks: u.remarks || "",
       role:       u.role,
       password:   "",
       rePassword: "",

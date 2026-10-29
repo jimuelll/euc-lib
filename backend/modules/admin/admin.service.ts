@@ -12,7 +12,8 @@ const { enqueueTransactionalAudit } = require("../analytics/transactional-audit"
   enqueueTransactionalAudit: (conn: PoolConnection, entry: Record<string, unknown>) => Promise<void>;
 };
 import { isOperationsRole } from "../auth/operations-access";
-const ACADEMIC_ROLES = ["student", "alumni"];
+const isStudentProfileRole = (role: string) => role === "student" || role === "staff";
+const ACADEMIC_ROLES = ["student", "staff", "alumni"];
 const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Other"];
 const roleHierarchy: Record<string, string[]> = {
   super_admin: ["admin", "staff", "scanner", "opac", "employee", "alumni", "student"],
@@ -57,7 +58,7 @@ const roleProfile = (input: UserInput, role: string): UserProfile => {
   const libraryCardNumber = value("library_card_number");
   const studentNumber = value("student_number");
   const employeeNumber = value("employee_number");
-  const username = value("username") || (role === "staff" ? value("library_card_number") : "");
+  const username = value("username");
   if (ACADEMIC_ROLES.includes(role)) {
     if (!libraryCardNumber) throw new Error("Library Card Number is required");
     if (role !== "alumni" && !studentNumber) throw new Error("Student No. is required");
@@ -88,11 +89,11 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
   const conn = await repository.getConnection();
   try {
     await conn.beginTransaction();
-    if ((await repository.findExistingUser(identity.studentEmployeeId, conn)).length) throw Object.assign(new Error("User already exists"), { status: 409, fieldErrors: { [role === "student" || role === "alumni" ? "libraryCardNumber" : role === "employee" ? "employeeNumber" : "username"]: "This identifier already belongs to another user." } });
+    if ((await repository.findExistingUser(identity.studentEmployeeId, conn)).length) throw Object.assign(new Error("User already exists"), { status: 409, fieldErrors: { [ACADEMIC_ROLES.includes(role) ? "libraryCardNumber" : role === "employee" ? "employeeNumber" : "username"]: "This identifier already belongs to another user." } });
     const programId = ACADEMIC_ROLES.includes(role) && role !== "alumni" ? await ensureProgramExists(program_id, conn) : null;
     const departmentId = role === "employee" ? await ensureDepartmentExists(department_id, conn) : null;
     let academicTermId: number | null = null;
-    if (role === "student") {
+    if (isStudentProfileRole(role)) {
       if (academic_term_id) {
         const term = await repository.findAcademicTerm(academic_term_id as string | number, conn);
         if (!term) throw new Error("Select a valid academic term");
@@ -101,7 +102,7 @@ const createUser = async (input: UserInput, creatorRole: string, creatorId: numb
         academicTermId = (await repository.findCurrentAcademicTerm(conn))?.id ?? null;
       }
     }
-    if (role === "student" && !academicTermId) throw Object.assign(new Error("Select an academic term"), {fieldErrors:{academicTermId:"Select an academic term."}});
+    if (isStudentProfileRole(role) && !academicTermId) throw Object.assign(new Error("Select an academic term"), {fieldErrors:{academicTermId:"Select an academic term."}});
     const barcode = await repository.createUser({
       ...identity,
       email: accountAddress,
@@ -219,6 +220,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
   const conn = await repository.getConnection();
   let deactivatedUserId: number | null = null;
   let roleChangedUserId: number | null = null;
+  let targetRole = String(updates.role || "");
   try {
     await conn.beginTransaction();
     const existing = await repository.findUserForUpdate(student_employee_id, conn);
@@ -232,6 +234,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     }
     const normalized: Record<string, unknown> = {};
     const nextRole = String(updates.role || existing.role);
+    targetRole = nextRole;
     if (isOperationsRole(existing.role) !== isOperationsRole(nextRole)) throw forbidden("Create a separate Library Operations account instead of converting a regular account");
     if (isOperationsRole(nextRole) && updates.email) throw new Error("Library Operations accounts do not use email");
     if (updates.name) normalized.name = updates.name;
@@ -242,12 +245,12 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       normalized.role = updates.role;
     }
     const identityKeys = ["library_card_number", "student_number", "employee_number", "username", "program_id", "department_id", "year_level"];
-    if (identityKeys.some((key) => updates[key] !== undefined) || updates.role) {
-      const profile = roleProfile({ ...existing, ...updates }, nextRole);
+    if (identityKeys.some((key) => updates[key] !== undefined) || updates.role || nextRole === "staff") {
+      const profile = roleProfile({ ...existing, library_card_number: existing.library_card_number || (isStudentProfileRole(existing.role) ? existing.student_employee_id : null), ...updates }, nextRole);
       Object.assign(normalized, { student_employee_id: profile.studentEmployeeId, library_card_number: profile.libraryCardNumber, student_number: profile.studentNumber, employee_number: profile.employeeNumber, username: profile.username });
       normalized.program_id = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? await ensureProgramExists(updates.program_id ?? existing.program_id, conn) : null;
       normalized.department_id = nextRole === "employee" ? await ensureDepartmentExists(updates.department_id ?? existing.department_id, conn) : null;
-      if (nextRole !== "student") normalized.academic_term_id = null;
+      if (!isStudentProfileRole(nextRole)) normalized.academic_term_id = null;
       normalized.year_level = ACADEMIC_ROLES.includes(nextRole) && nextRole !== "alumni" ? (updates.year_level ?? existing.year_level) : null;
     }
     if (!isOperationsRole(nextRole) && updates.email !== undefined && String(updates.email || "").trim().toLowerCase() !== String(existing.email || "").trim().toLowerCase()) {
@@ -260,6 +263,9 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
       const term = updates.academic_term_id ? await repository.findAcademicTerm(updates.academic_term_id as number | string, conn) : null;
       if (updates.academic_term_id && !term) throw new Error("Select a valid academic term");
       normalized.academic_term_id = term?.id ?? null;
+    }
+    if (nextRole === "staff" && !(updates.academic_term_id !== undefined ? normalized.academic_term_id : existing.academic_term_id)) {
+      throw Object.assign(new Error("Select an academic term"), {fieldErrors:{academicTermId:"Select an academic term."}});
     }
     if (updates.is_active !== undefined) normalized.is_active = updates.is_active ? 1 : 0;
     if (!Object.keys(normalized).length && updates.email === undefined) throw new Error("No valid fields to update");
@@ -290,7 +296,7 @@ const updateUser = async (student_employee_id: string, updates: UserInput, reque
     await conn.commit();
   } catch (error) {
     await conn.rollback();
-    throw userFieldError(error, String(updates.role || ""));
+    throw userFieldError(error, targetRole);
   } finally { conn.release(); }
   if (deactivatedUserId) {
     try { await revokeAllRefreshSessionsForUser(deactivatedUserId); }
@@ -371,7 +377,7 @@ function userFieldError(error: unknown, role: string) {
   if (e.fieldErrors) return e;
   const email = /email|address/i.test(e.message || '');
   if (hasDuplicateKeyError(error) || e.status === 409 && email) {
-    const field = email ? 'email' : ['student','alumni'].includes(role) ? 'libraryCardNumber' : role === 'employee' ? 'employeeNumber' : 'username';
+    const field = email ? 'email' : ['student','staff','alumni'].includes(role) ? 'libraryCardNumber' : role === 'employee' ? 'employeeNumber' : 'username';
     return Object.assign(new Error(email ? 'This email already belongs to another user.' : 'This identifier already belongs to another user.'), {status:409, fieldErrors:{[field]:email ? 'This email already belongs to another user.' : 'This identifier already belongs to another user.'}});
   }
   return error;

@@ -1,3 +1,4 @@
+import { isStudentProfileRole } from './userForm';
 import axiosInstance from "@/utils/AxiosInstance";
 import type { User, UserFormState, UsersSummary } from "./AdminManage.types";
 export type AcademicProgram = { id: number; name: string };
@@ -18,8 +19,8 @@ export const searchUsers = async ({ query, role, status, archived, programId, de
 };
 import { isOperationsRole } from "@/utils/operationsAccess";
 const userPayload = (form: UserFormState) => ({ name: form.fullName.trim(), role: form.role, address: form.address, contact: form.contact, ...(!isOperationsRole(form.role) ? {email: form.email.trim()} : {}), remarks: form.remarks,
-  ...(['student','alumni'].includes(form.role) ? {library_card_number:form.libraryCardNumber.trim()} : form.role === 'employee' ? {employee_number:form.employeeNumber.trim(),department_id:form.departmentId || null} : {username:form.username.trim()}),
-  ...(form.role === 'student' ? {student_number:form.studentNumber.trim(),program_id:form.programId || null,academic_term_id:form.academicTermId || null,year_level:form.yearLevel} : {}),
+  ...(['student','staff','alumni'].includes(form.role) ? {library_card_number:form.libraryCardNumber.trim()} : form.role === 'employee' ? {employee_number:form.employeeNumber.trim(),department_id:form.departmentId || null} : {username:form.username.trim()}),
+  ...(isStudentProfileRole(form.role) ? {student_number:form.studentNumber.trim(),program_id:form.programId || null,academic_term_id:form.academicTermId || null,year_level:form.yearLevel} : {}),
 });
 export const createUser = async (form: UserFormState) => (await axiosInstance.post<{ message: string }>("/api/admin/users", {...userPayload(form), ...(isOperationsRole(form.role) ? {password:form.password} : {})})).data;
 export const updateUser = async (studentId: string, form: UserFormState) => (await axiosInstance.put<{ message: string }>(`/api/admin/users/${encodeURIComponent(studentId)}`, userPayload(form))).data;

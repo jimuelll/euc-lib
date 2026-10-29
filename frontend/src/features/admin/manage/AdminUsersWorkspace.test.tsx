@@ -31,7 +31,7 @@ it("prompts before discarding changes and preserves the draft on cancel",async()
 it("requests a recovery email without accepting staff passwords",async()=>{vi.mocked(api.requestAccountEmail).mockResolvedValue({message:"Account email queued if eligible."});mount();fireEvent.click(await screen.findByRole("button",{name:"Desk Admin"}));expect(screen.queryByLabelText("New password")).toBeNull();fireEvent.mouseDown(screen.getByRole("tab",{name:"Access"}),{button:0,ctrlKey:false});fireEvent.click(screen.getByRole("button",{name:"Send recovery email"}));await waitFor(()=>expect(api.requestAccountEmail).toHaveBeenCalledWith("admin-one","recovery"));expect(api.updateUser).not.toHaveBeenCalled();});
 it("shows unavailable totals and retry on initial failure",async()=>{vi.mocked(api.searchUsers).mockRejectedValue(new Error("Offline"));mount();await screen.findByRole("alert");expect(screen.queryByRole("button",{name:"All 0"})).toBeNull();expect(screen.getByRole("button",{name:"Retry"})).toBeTruthy();});
 
-function RoleChangeHarness(){const state=useAdminManage();return <>{state.confirmDialog}<button onClick={()=>{state.selectUserForEdit(admin);state.setField("role","staff");}}>Stage role</button><button onClick={()=>void state.handleUpdateUser()}>Save role</button></>;}
+function RoleChangeHarness(){const state=useAdminManage();return <>{state.confirmDialog}<button onClick={()=>{state.selectUserForEdit(admin);state.setField("role","staff");state.setField("libraryCardNumber","CARD-2");state.setField("studentNumber","ST-2");state.setField("programId","1");state.setField("yearLevel","2nd Year");state.setField("academicTermId","1");}}>Stage role</button><button onClick={()=>void state.handleUpdateUser()}>Save role</button></>;}
 it("requires explicit confirmation before a permitted role change reaches the API",async()=>{const Wrapper=createTestQueryClientWrapper(createTestQueryClient());render(<Wrapper><MemoryRouter><RoleChangeHarness/></MemoryRouter></Wrapper>);fireEvent.click(screen.getByRole("button",{name:"Stage role"}));fireEvent.click(screen.getByRole("button",{name:"Save role"}));await screen.findByRole("alertdialog");expect(api.updateUser).not.toHaveBeenCalled();fireEvent.click(screen.getByRole("button",{name:"Confirm role change"}));await waitFor(()=>expect(api.updateUser).toHaveBeenCalledWith("admin-one",expect.objectContaining({role:"staff"})));});
 
 it("opens a patron drawer from an attendance handoff",async()=>{mount("/admin/manage?q=CARD-1&status=all&patron=CARD-1");await screen.findByRole("dialog");expect(screen.getByRole("dialog").textContent).toContain("Alex Rivera");});
@@ -109,7 +109,7 @@ it('starts with only roles, then shows the selected role fields and current term
  expect(screen.getByRole('combobox',{name:'Academic term'}).textContent).toContain('2026-2027');
  fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Desk'}});
  await choose('Role','Staff');
- expect(screen.queryByLabelText('Student number')).toBeNull();expect(screen.getByLabelText('Username')).toBeTruthy();
+ expect(screen.getByLabelText('Student number')).toBeTruthy();expect(screen.queryByLabelText('Username')).toBeNull();
  expect((screen.getByLabelText('Full name') as HTMLInputElement).value).toBe('New Desk');
  expect(screen.getByRole('button',{name:'Create and send invitation'}).hasAttribute('disabled')).toBe(true);
 });
@@ -118,7 +118,8 @@ it('shows errors after blur and blocks duplicate email until corrected',async()=
  mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));await choose('Role','Staff');
  expect(screen.queryByText('This field is required.')).toBeNull();
  fireEvent.blur(screen.getByLabelText('Full name'));expect(screen.getByText('This field is required.')).toBeTruthy();
- fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Desk'}});fireEvent.change(screen.getByLabelText('Username'),{target:{value:'new.desk'}});
+ fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'New Desk'}});fireEvent.change(screen.getByLabelText('Library card number'),{target:{value:'CARD-9'}});fireEvent.change(screen.getByLabelText('Student number'),{target:{value:'ST-9'}});
+ await choose('Year level','2nd Year');await choose('Program / Course','Information Systems');
  fireEvent.change(screen.getByLabelText('Email'),{target:{value:'used@example.edu'}});fireEvent.blur(screen.getByLabelText('Email'));
  await screen.findByText('This email already belongs to another user.');
  expect(screen.getByRole('button',{name:'Create and send invitation'}).hasAttribute('disabled')).toBe(true);
@@ -190,4 +191,36 @@ it('shows OPAC accounts in the user table and exposes the OPAC role filter',asyn
  fireEvent.keyDown(screen.getByRole('combobox',{name:'Role'}),{key:'ArrowDown'});
  fireEvent.click(await screen.findByRole('option',{name:'OPAC (1)'}));
  await waitFor(()=>expect(api.searchUsers).toHaveBeenLastCalledWith(expect.objectContaining({role:'opac'}),expect.any(AbortSignal)));
+});
+
+ it.each(['student','staff'])('shows the same creation fields for %s',async role=>{
+  mount();fireEvent.click(await screen.findByRole('button',{name:'Create user'}));
+  fireEvent.click(screen.getByRole('radio',{name:role==='staff'?'Staff':'Student',exact:true}));
+  const drawer=within(screen.getByRole('dialog'));
+  for(const label of ['Full name','Library card number','Student number','Email']) expect(drawer.getByLabelText(label,{exact:true})).toBeRequired();
+  for(const label of ['Year level','Program / Course','Academic term']) expect(drawer.getByRole('combobox',{name:label})).toBeInTheDocument();
+  expect(drawer.queryByLabelText('Username')).toBeNull();
+  expect(drawer.getByRole('combobox',{name:'Academic term'})).toHaveTextContent('2026-2027');
+  expect(drawer.getByRole('button',{name:'Create and send invitation'})).toBeDisabled();
+ });
+ it('opens legacy staff with their existing identifier and blocks saving missing academic details',async()=>{
+  vi.mocked(api.searchUsers).mockResolvedValue({rows:[{...admin,role:'staff',library_card_number:null}],summary:undefined,pagination:{page:1,limit:25,total:1,totalPages:1}});
+  mount();fireEvent.click(await screen.findByRole('button',{name:'Desk Admin'}));
+  expect(screen.getByLabelText('Library card number')).toHaveValue('admin-one');
+  expect(screen.queryByLabelText('Username')).toBeNull();
+  expect(screen.getByRole('tab',{name:'Borrowing'})).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Full name'),{target:{value:'Updated staff'}});
+  expect(screen.getByRole('button',{name:'Save changes'})).toBeDisabled();
+ });
+
+function StaffCreateHarness(){
+ const state=useAdminManage();
+ return <><button onClick={()=>{for(const [key,value] of Object.entries({...patron,role:'staff',fullName:'Staff',libraryCardNumber:'CARD-9',studentNumber:'ST-9',programId:'1',yearLevel:'2nd Year',academicTermId:'1',email:'staff@example.edu'}))if(['role','fullName','libraryCardNumber','studentNumber','programId','yearLevel','academicTermId','email'].includes(key)) state.setField(key as keyof typeof state.form,String(value));}}>Fill staff</button><button onClick={()=>void state.handleCreateUser()}>Create staff</button><output data-testid="qr-id">{state.qrTarget?.studentId}</output></>;
+}
+it('uses the staff library card for the QR identity after creation',async()=>{
+ vi.mocked(api.createUser).mockResolvedValue({message:'Invitation queued'});
+ const Wrapper=createTestQueryClientWrapper(createTestQueryClient());render(<Wrapper><MemoryRouter><StaffCreateHarness/></MemoryRouter></Wrapper>);
+ fireEvent.click(screen.getByRole('button',{name:'Fill staff'}));fireEvent.click(screen.getByRole('button',{name:'Create staff'}));
+ await waitFor(()=>expect(screen.getByTestId('qr-id')).toHaveTextContent('CARD-9'));
+ expect(api.createUser).toHaveBeenCalledWith(expect.objectContaining({role:'staff',libraryCardNumber:'CARD-9'}));
 });
