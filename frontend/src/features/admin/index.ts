@@ -16,4 +16,3 @@ export { visibleSidebarSections } from "./layout/AdminLayoutData";
 export { default as AdminDateRange } from "./components/AdminDateRange";
 
 export {AdminDateTime,formatAdminDate} from "./components/AdminDateTime";
-export {AdminStatusChip} from './components/AdminStatusChip';

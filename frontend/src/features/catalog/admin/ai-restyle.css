@@ -28,12 +28,12 @@
 [data-library-design][data-library-design] .ai-list-filters label { flex:0 0 auto; min-width:0; }
 [data-library-design][data-library-design] .ai-list-filters select { width:200px; }
 [data-library-design][data-library-design] .ai-search-label { display:block; margin-bottom:6px; font:700 11px/1.4 var(--font-body); letter-spacing:.12em; text-transform:uppercase; color:hsl(var(--muted-foreground)); }
-[data-library-design][data-library-design] .ai-book-head { background:hsl(var(--background)); margin:0 -22px; padding:12px 22px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+[data-library-design][data-library-design] .ai-book-head { background:hsl(var(--background)); margin:0 -22px; padding:12px 22px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
 [data-library-design][data-library-design] .ai-book-row { padding:14px 22px; }
 [data-library-design][data-library-design] .ai-book-identity > img { border-radius:0; }
 [data-library-design][data-library-design] .ai-book-name button { font:600 16px/1.4 var(--font-body); }
-[data-library-design][data-library-design] .ai-book-row .admin-status-chip { border:0; background:transparent; padding:0; }
-[data-library-design][data-library-design] .ai-book-row .admin-status-chip :is(svg,span) { color:inherit; }
+[data-library-design][data-library-design] .ai-book-row .admin-desk-status { border:0; background:transparent; padding:0; }
+[data-library-design][data-library-design] .ai-book-row .admin-desk-status :is(svg,span) { color:inherit; }
 [data-library-design][data-library-design] .ai-workspace .ai-pagination { padding:14px 22px; font-size:12px; }
 @media(max-width:640px) {
   [data-library-design][data-library-design] .ai-workspace :is(.ai-backfill,.ai-coverage-heading,.ai-list-title) { padding:16px; }

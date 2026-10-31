@@ -105,7 +105,7 @@
 [data-library-design][data-library-design] :is(button,a,input,textarea,select) { text-underline-offset: .25em; }
 [data-library-design][data-library-design] :is(input,textarea,select,[role="combobox"]) { border-radius: 0; font-family: var(--font-body); }
 [data-library-design][data-library-design] :is(input,textarea)::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
-[data-library-design][data-library-design] :is([class*="rounded"],[class*="shadow"],.admin-compact-panel,.admin-desk-tile,.admin-desk-empty,.admin-status-chip,.admin-desk-status) { border-radius: 0 !important; box-shadow: none !important; }
+[data-library-design][data-library-design] :is([class*="rounded"],[class*="shadow"],.admin-compact-panel,.admin-desk-tile,.admin-desk-empty,.admin-desk-status) { border-radius: 0 !important; box-shadow: none !important; }
 [data-library-design][data-library-design] [role="radio"] { border-radius: 50% !important; }
 [data-library-design][data-library-design] :is(.admin-panel-surface,.admin-etched-border) { background-image: none; box-shadow: none; }
 [data-library-design][data-library-design] [class*="bg-gradient"] { background-image:none; }
@@ -189,8 +189,8 @@
 
 /* Ledger and slips retain each screen's actual columns and interactions. */
 [data-library-design][data-library-design] :is(.library-ledger,.users-records,.attendance-records,.audit-feed,.analytics-panel,.admin-panel,.admin-compact-panel,.circulation-history,.backup-panel,.records-panel,.content-panel,.academic-panel) { border-radius: 0; box-shadow: none; background: hsl(var(--card)); }
-[data-library-design][data-library-design] :is(.users-avatar,.users-role,.admin-status-chip,.admin-desk-status,.audit-category,.audit-significant) { border-radius: 0; }
-[data-library-design][data-library-design] :is(.admin-status-chip,.admin-desk-status,.audit-category) { background: transparent !important; border: 0; padding-inline: 0; gap: 6px; }
+[data-library-design][data-library-design] :is(.users-avatar,.users-role,.admin-desk-status,.audit-category,.audit-significant) { border-radius: 0; }
+[data-library-design][data-library-design] :is(.admin-desk-status,.audit-category) { background: transparent !important; border: 0; padding-inline: 0; gap: 6px; }
 [data-library-design][data-library-design] .admin-desk-status::before { content: ""; width: 6px; height: 6px; flex: 0 0 6px; border: 1px solid currentColor; }
 [data-library-design][data-library-design] .admin-desk-status[data-tone="red"]::before { background: currentColor; }
 [data-library-design][data-library-design] :is(.users-column-head,.audit-day-heading) { background: hsl(var(--background)); }
@@ -209,7 +209,6 @@
 [data-library-design][data-library-design] .users-borrowing-summary > div { gap: 0; border: 1px solid hsl(var(--border)); }
 [data-library-design][data-library-design] .users-borrowing-summary > div > div { border-radius: 0; border: 0; border-right: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
 [data-library-design][data-library-design] .users-borrowing-summary strong { font: 600 28px/1.2 var(--font-heading); }
-[data-library-design][data-library-design] .audit-event[data-impact="true"] { border-left: 0; background: transparent; }
 [data-library-design][data-library-design] .audit-event-top time { font-family: ui-monospace,monospace; }
 [data-library-design][data-library-design] .analytics-panel > header { padding-bottom: 12px; border-bottom: 1px solid hsl(var(--border)); }
 [data-library-design][data-library-design] .analytics-panel h2 { font: 600 20px/1.4 var(--font-heading); }
@@ -300,7 +299,6 @@
   .admin-desk-tile,
   .admin-desk-tile-icon,
   .admin-panel-surface,
-  .admin-status-chip,
   .ai-backfill,
   .ai-book-identity,
   .ai-book-list,
@@ -547,7 +545,7 @@
 [data-library-design][data-library-design] .audit-actor { overflow-wrap:anywhere; white-space:normal; }
 [data-library-design][data-library-design] .audit-summary-text { padding:0; font-size:14px; }
 [data-library-design][data-library-design] .audit-category { margin:0; padding:0; }
-[data-library-design][data-library-design] .audit-event-top .admin-status-chip { font-size:12px; }
+[data-library-design][data-library-design] .audit-event-top .admin-desk-status { font-size:12px; }
 [data-library-design][data-library-design] .audit-record-context:not([hidden]) { padding:6px 0 0 80px; }
 [data-library-design][data-library-design] .audit-record-context .audit-inline-id { float:none; display:flex; }
 [data-library-design][data-library-design] .audit-inline-id button { min-height:32px; height:32px; width:32px; }
