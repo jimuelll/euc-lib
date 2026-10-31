@@ -32,9 +32,9 @@ describe("admin sidebar", () => {
     expect(screen.getByRole("link", { name: "EUC Library dashboard" }).querySelector("img")).toHaveAttribute("src", "/aa1.ico");
   });
   it.each([
-    ["/admin/catalog", "Catalog"], ["/admin/catalog?tab=builder", "Catalog Configuration"],
-    ["/admin/catalog?tab=ai", "AI Recommendations"], ["/admin/clearance/receipt/TEST", "Clearance & Fines"],
-    ["/admin/restrictions", "Users"],
+    ["/admin/catalog", "Catalog"], ["/admin/catalog?tab=holdings", "Catalog"],
+    ["/admin/settings/catalog-fields", "Catalog Fields"], ["/admin/settings/ai", "AI Recommendations"],
+    ["/admin/clearance/receipt/TEST", "Clearance & Fines"], ["/admin/users?status=all", "Users"],
   ])("selects only the correct tool at %s", (route, title) => {
     mount("super_admin", route);
     const nav = screen.getByRole("navigation", { name: "Administration" });
@@ -47,7 +47,8 @@ describe("admin sidebar", () => {
     expect(document.querySelector(".admin-sidebar-design")).toHaveAttribute("data-compact", "true");
     expect(screen.getByRole("link", { name: "Backup & Restore" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Account menu for Library Administrator" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Account menu for Library Administrator" }), { button: 0 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Sign out" }));
     expect(auth.logout).toHaveBeenCalledOnce();
   });
   it("signals hidden navigation and clears the cue at the end of the list", () => {

@@ -1,157 +1,151 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { visibleSidebarSections } from "@/features/admin";
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, BookOpenCheck, CircleHelp, Search } from "@/components/ui/library-glyphs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AdminPage, AdminPanel } from "@/features/admin";
-import { getPublishedGuide, type GuideModule } from "@/features/user-guide/api/user-guide.service";
-import { userGuideKeys } from "../user-guide.keys";
+import { AdminIcon, AdminPage } from "@/features/admin";
+import { guideContent } from "../guide-content";
+import { canReadTopic, guideSections, guideTopicHref, guideTopics, topicRoles, type GuideTopicIndex } from "../guide-index";
+import { GuideScreenMap } from "../components/GuideScreenMap";
+import "../user-guide.css";
+
+const roleNames: Record<string, string> = { staff: "Staff", admin: "Administrators", super_admin: "Super administrators" };
+
+const describeRoles = (topic: GuideTopicIndex) => {
+  const roles = topicRoles(topic);
+  return roles ? `${roles.map(role => roleNames[role] ?? role).join(" and ")} only` : "Everyone with admin access";
+};
+
+const searchText = (topic: GuideTopicIndex) => {
+  const content = guideContent[topic.id];
+  return [
+    topic.title, topic.summary, ...topic.quickTips, content?.purpose,
+    ...(content?.tasks.flatMap(task => [task.title, task.when, ...task.steps, task.result]) ?? []),
+    ...(content?.terms?.flatMap(term => [term.term, term.meaning]) ?? []),
+    ...(content?.screens.flatMap(screen => screen.callouts.flatMap(callout => [callout.title, callout.body])) ?? []),
+  ].filter(Boolean).join(" ").toLowerCase();
+};
 
 export default function AdminUserGuide() {
   const { user } = useAuth();
-  const guideQuery = useQuery({ queryKey: userGuideKeys.published(), queryFn: ({ signal }) => getPublishedGuide(signal) });
-  const modules: GuideModule[] = guideQuery.data ?? [];
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("All topics");
-  const loading = guideQuery.isPending;
-  const error = guideQuery.isError ? "The user guide could not be loaded." : "";
-  const load = async () => { await guideQuery.refetch(); };
 
-  const categories = useMemo(
-    () => ["All topics", ...Array.from(new Set(modules.map((item) => item.category)))],
-    [modules],
-  );
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return modules.filter((item) => {
-      const categoryMatches = category === "All topics" || item.category === category;
-      const textMatches = !term || [item.title, item.summary, item.overview, item.category]
-        .some((value) => value.toLowerCase().includes(term));
-      return categoryMatches && textMatches;
+  const topics = useMemo(() => guideTopics.filter(topic => canReadTopic(topic, user?.role)), [user?.role]);
+  const requested = params.get("topic");
+  const topic = topics.find(item => item.id === requested) ?? topics[0];
+
+  const term = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!term) return topics.map(item => ({ topic: item, tasks: [] as { index: number; title: string }[] }));
+    return topics.flatMap(item => {
+      const tasks = (guideContent[item.id]?.tasks ?? []).flatMap((task, index) => task.title.toLowerCase().includes(term) ? [{ index, title: task.title }] : []);
+      return searchText(item).includes(term) ? [{ topic: item, tasks }] : [];
     });
-  }, [category, modules, query]);
+  }, [term, topics]);
 
-  return (
-    <AdminPage title="Help & user guide" description="Find instructions for the tools available to your role." contentWidth="wide">
-      <AdminPanel title="Find your way around"><p className="mb-4 text-sm leading-6 text-muted-foreground">Library desk tools stay visible in the sidebar. Expand a group for less frequent work, or use Find a tool (Ctrl K) to jump directly to a page. Borrow & Return separates desk transactions from history. Website Content is where administrators edit published help.</p><div className="grid gap-5 sm:grid-cols-2">{visibleSidebarSections(user?.role).map(group => <div key={group.label}><h2 className="mb-2 text-sm font-semibold">{group.label}</h2><ul className="space-y-2">{group.items.map(item => <li key={item.url}><Link className="text-sm text-action underline-offset-4 hover:underline" to={item.url}>{item.title}</Link></li>)}</ul></div>)}</div></AdminPanel>
-      <section className="grid gap-5 border-b border-border pb-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
-        <div className="max-w-2xl">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold  text-warning">
-            <BookOpenCheck className="h-4 w-4" /> Help for your role
-          </div>
-          <p className="text-base leading-7 text-muted-foreground">
-            Find plain-language instructions for the library tools available to your account. Open a topic to see each step.
-          </p>
-        </div>
-        <label className="relative block">
-          <span className="sr-only">Search the user guide</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Search the guide" />
+  useEffect(() => {
+    const target = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+    if (target) target.scrollIntoView({ block: "start" });
+    else window.scrollTo({ top: 0 });
+  }, [requested, location.hash]);
+
+  const position = topic ? topics.indexOf(topic) : -1;
+  const previous = position > 0 ? topics[position - 1] : undefined;
+  const next = position >= 0 && position < topics.length - 1 ? topics[position + 1] : undefined;
+
+  return <AdminPage title="Help & user guide" description="Walkthroughs for every tool you can open, with annotated screen maps.">
+    <div className="guide-layout">
+      <nav className="guide-nav" aria-label="Guide topics">
+        <label className="guide-search">
+          <span className="sr-only">Search the guide</span>
+          <AdminIcon name="search" />
+          <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search, e.g. “receipt” or “holiday”" />
         </label>
-      </section>
-
-      {!loading && !error && modules.length > 0 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Guide categories">
-          {categories.map((item) => (
-            <Button key={item} type="button" size="sm" variant={category === item ? "default" : "outline"} onClick={() => setCategory(item)}>
-              {item}
-            </Button>
-          ))}
+        <label className="guide-picker">
+          <span className="sr-only">Choose a topic</span>
+          <select value={topic?.id} onChange={event => navigate(guideTopicHref(event.target.value))}>
+            {guideSections.map(section => {
+              const inSection = matches.filter(match => match.topic.section === section);
+              return inSection.length ? <optgroup key={section} label={section}>{inSection.map(match => <option key={match.topic.id} value={match.topic.id}>{match.topic.title}</option>)}</optgroup> : null;
+            })}
+          </select>
+        </label>
+        <div className="guide-nav-list">
+          {guideSections.map(section => {
+            const inSection = matches.filter(match => match.topic.section === section);
+            if (!inSection.length) return null;
+            return <section key={section}>
+              <h2>{section}</h2>
+              <ul>{inSection.map(match => <li key={match.topic.id}>
+                <Link to={guideTopicHref(match.topic.id)} aria-current={topic?.id === match.topic.id ? "page" : undefined}>{match.topic.title}</Link>
+                {match.tasks.length > 0 && <ul className="guide-nav-tasks">{match.tasks.map(task => <li key={task.index}><Link to={`${guideTopicHref(match.topic.id)}#task-${task.index + 1}`}>{task.title}</Link></li>)}</ul>}
+              </li>)}</ul>
+            </section>;
+          })}
+          {term && !matches.length && <p className="guide-nav-empty">Nothing matches “{query.trim()}”. Try a shorter word.</p>}
         </div>
-      ) : null}
+      </nav>
 
-      {loading ? <AdminPanel><p className="py-10 text-center text-sm text-muted-foreground">Loading your guide…</p></AdminPanel> : null}
-      {error ? (
-        <AdminPanel>
-          <div className="flex flex-col items-center py-8 text-center">
-            <CircleHelp className="mb-3 h-8 w-8 text-muted-foreground" />
-            <p className="font-medium">We could not open the guide</p>
-            <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-            <Button className="mt-4" variant="outline" onClick={() => void load()}>Try again</Button>
-          </div>
-        </AdminPanel>
-      ) : null}
+      <div className="guide-main">
+        {topic && <GuideTopic topic={topic} />}
+        {topic && <nav className="guide-pager" aria-label="Previous and next topic">
+          {previous ? <Link to={guideTopicHref(previous.id)}><span>Previous</span>{previous.title}</Link> : <span />}
+          {next ? <Link to={guideTopicHref(next.id)} data-next><span>Next</span>{next.title}</Link> : <span />}
+        </nav>}
+      </div>
+    </div>
+  </AdminPage>;
+}
 
-      {!loading && !error && filtered.length === 0 ? (
-        <AdminPanel>
-          <div className="py-8 text-center">
-            <p className="font-medium">No matching guide topics</p>
-            <p className="mt-1 text-sm text-muted-foreground">Try a different word or choose All topics.</p>
-          </div>
-        </AdminPanel>
-      ) : null}
+function GuideTopic({ topic }: { topic: GuideTopicIndex }) {
+  const content = guideContent[topic.id];
+  return <article className="guide-article" aria-labelledby="guide-topic-title">
+    <header className="guide-article-header">
+      <p className="guide-eyebrow">{topic.section} · {describeRoles(topic)}</p>
+      <h2 id="guide-topic-title">{topic.title}</h2>
+      <p className="guide-lead">{content?.purpose ?? topic.summary}</p>
+      {topic.path && <Button asChild variant="outline"><Link to={topic.path}>Open {topic.title}<AdminIcon name="arrowRight" /></Link></Button>}
+    </header>
 
-      {!loading && !error && filtered.length > 0 ? (
-        <AdminPanel className="overflow-hidden" contentClassName="p-0">
-          <Accordion type="multiple" className="w-full">
-            {filtered.map((item) => (
-              <AccordionItem key={item.id} value={String(item.id)} className="px-5 last:border-b-0 sm:px-6">
-                <AccordionTrigger className="gap-5 py-5 text-left hover:no-underline">
-                  <span className="min-w-0">
-                    <span className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="text-base font-semibold text-foreground">{item.title}</span>
-                      <Badge variant="outline" className="rounded-sm font-normal text-muted-foreground">{item.category}</Badge>
-                    </span>
-                    <span className="block pr-3 text-sm font-normal leading-6 text-muted-foreground">{item.summary}</span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pb-7">
-                  <article className="max-w-3xl space-y-6 border-t border-border/70 pt-6">
-                    {item.image_url ? <img src={item.image_url} alt={item.image_alt??`Example screen for ${item.title}`} className="max-h-[26rem] w-full border border-border object-contain" /> : null}
-                    <p className="max-w-[70ch] text-sm leading-7 text-foreground/90">{item.overview}</p>
+    <section className="guide-keypoints" aria-labelledby="guide-keypoints">
+      <h3 id="guide-keypoints">Key points</h3>
+      <ul>{topic.quickTips.map(tip => <li key={tip}>{tip}</li>)}</ul>
+    </section>
 
-                    {item.before_you_begin.length > 0 ? (
-                      <section className="border-l-2 border-primary bg-primary/5 px-4 py-3">
-                        <h3 className="font-semibold">Before you begin</h3>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
-                          {item.before_you_begin.map((note, index) => <li key={index}>{note}</li>)}
-                        </ul>
-                      </section>
-                    ) : null}
+    {content?.screens.map((screen, index) => <section key={screen.title} className="guide-block" aria-label={`Screen map: ${screen.title}`}>
+      {index === 0 && <h3>Screen map</h3>}
+      <p className="guide-block-hint">Hover or tab through a callout to highlight that part of the screen.</p>
+      <GuideScreenMap screen={screen} />
+    </section>)}
 
-                    <section>
-                      <h3 className="mb-4 font-semibold">What to do</h3>
-                      <ol className="space-y-4">
-                        {item.steps.map((step, index) => (
-                          <li key={index} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
-                            <span className="flex h-8 w-8 items-center justify-center border border-warning/30 bg-warning/10 text-sm font-semibold text-warning">{index + 1}</span>
-                            <div><p className="font-medium text-foreground">{step.title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{step.body}</p></div>
-                          </li>
-                        ))}
-                      </ol>
-                    </section>
+    {content && content.tasks.length > 0 && <section className="guide-block" aria-labelledby="guide-tasks">
+      <h3 id="guide-tasks">How to…</h3>
+      <div className="guide-tasks">
+        {content.tasks.map((task, index) => <section key={task.title} id={`task-${index + 1}`} className="guide-task" aria-labelledby={`task-${index + 1}-title`}>
+          <h4 id={`task-${index + 1}-title`}>{task.title}</h4>
+          {task.when && <p className="guide-task-when">{task.when}</p>}
+          <ol>{task.steps.map((step, stepIndex) => <li key={step}><span aria-hidden="true">{stepIndex + 1}</span><p>{step}</p></li>)}</ol>
+          {task.result && <p className="guide-task-result"><AdminIcon name="clearance" /><span><strong>What happens next: </strong>{task.result}</span></p>}
+        </section>)}
+      </div>
+    </section>}
 
-                    {item.warnings.length > 0 ? (
-                      <section className="border border-warning/35 bg-warning/5 p-4">
-                        <h3 className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-warning" /> Important</h3>
-                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
-                          {item.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
-                        </ul>
-                      </section>
-                    ) : null}
+    {content?.terms && <section className="guide-block" aria-labelledby="guide-terms">
+      <h3 id="guide-terms">What the labels mean</h3>
+      <dl className="guide-terms">{content.terms.map(item => <div key={item.term}><dt>{item.term}</dt><dd>{item.meaning}</dd></div>)}</dl>
+    </section>}
 
-                    {item.troubleshooting.length > 0 ? (
-                      <section>
-                        <h3 className="mb-3 font-semibold">If something goes wrong</h3>
-                        <div className="divide-y divide-border border-y border-border">
-                          {item.troubleshooting.map((tip, index) => <div key={index} className="py-3"><p className="text-sm font-medium">{tip.problem}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{tip.solution}</p></div>)}
-                        </div>
-                      </section>
-                    ) : null}
+    {content?.cautions && <section className="guide-cautions" aria-labelledby="guide-cautions">
+      <h3 id="guide-cautions"><AdminIcon name="warning" />Before you rely on it</h3>
+      <ul>{content.cautions.map(caution => <li key={caution}>{caution}</li>)}</ul>
+    </section>}
 
-                    {item.target_path ? <Button asChild variant="outline"><Link to={item.target_path}>Open this module <ArrowRight className="ml-2 h-4 w-4" /></Link></Button> : null}
-                  </article>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </AdminPanel>
-      ) : null}
-    </AdminPage>
-  );
+    {content?.related && <section className="guide-related" aria-labelledby="guide-related">
+      <h3 id="guide-related">Related</h3>
+      <ul>{content.related.flatMap(id => guideTopics.find(item => item.id === id) ?? []).map(item => <li key={item.id}><Link to={guideTopicHref(item.id)}>{item.title}</Link></li>)}</ul>
+    </section>}
+  </article>;
 }

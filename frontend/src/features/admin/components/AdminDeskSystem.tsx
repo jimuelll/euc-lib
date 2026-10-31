@@ -1,16 +1,20 @@
-import type { ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { registerInlineConfirm, type ConfirmOptions } from "./useAdminConfirmDialog";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AdminIcon, type AdminIconName } from "./AdminIcon";
+import { AdminPageHelp } from "./AdminPageHelp";
 
 export type AdminTone = "red" | "amber" | "green" | "blue" | "neutral";
 const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", currencyDisplay: "narrowSymbol" });
 export const formatPeso = (value: number) => peso.format(value);
 export function AdminPageHeader({ title, subtitle, updatedAt, loading, onRefresh, actions }: { title: string; subtitle?: ReactNode; updatedAt?: number; loading?: boolean; onRefresh?: () => void; actions?: ReactNode }) {
-  return <header className="admin-desk-header"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><div className="admin-desk-header-actions">{onRefresh && <><span className="admin-desk-secondary">{updatedAt ? <>Updated <time dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}</time></> : "Not yet updated"}</span><Button variant="outline" className="admin-compact-button" disabled={loading} onClick={onRefresh}><AdminIcon name="refresh" className={loading ? "animate-spin motion-reduce:animate-none" : undefined} />Refresh</Button></>}{actions}</div></header>;
+  return <header className="admin-desk-header"><div><div className="admin-desk-title-row"><h1>{title}</h1><AdminPageHelp /></div>{subtitle && <p>{subtitle}</p>}</div><div className="admin-desk-header-actions">{onRefresh && <><span className="admin-desk-secondary">{updatedAt ? <>Updated <time dateTime={new Date(updatedAt).toISOString()}>{new Date(updatedAt).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })}</time></> : "Not yet updated"}</span><Button variant="outline" className="admin-compact-button" disabled={loading} onClick={onRefresh}><AdminIcon name="refresh" className={loading ? "animate-spin motion-reduce:animate-none" : undefined} />Refresh</Button></>}{actions}</div></header>;
 }
 export function AdminSummaryTile({ label, value, currency, icon, tone, hint, selected, onSelect, href, disabled, ariaLabel, heading, appearance = "shelf", className = "" }: { label: string; value?: number; currency?: boolean; icon: AdminIconName; tone: AdminTone; hint?: ReactNode; selected?: boolean; onSelect?: () => void; href?: string; disabled?: boolean; ariaLabel?: string; heading?: boolean; appearance?: "shelf" | "slip"; className?: string }) {
   const formatted = value === undefined ? "—" : currency ? formatPeso(value) : value.toLocaleString("en-PH");
@@ -32,4 +36,73 @@ export function AdminRowMenu({ label, items, disabled }: { label: string; disabl
 }
 export function AdminEmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) { return <div className="admin-desk-empty"><AdminIcon name="clearance" /><h2>{title}</h2><p className="admin-desk-secondary">{description}</p>{action}</div>; }
 export function AdminSelectionCheckbox({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) { return <label className="admin-desk-selection"><input type="checkbox" aria-label={label} checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} /></label>; }
-export function AdminDetailDrawer({ open, onClose, title, description, children, footer, headerActions, onAfterClose, className = "" }: { open: boolean; onClose: () => void; title: string; description: ReactNode; children: ReactNode; footer?: ReactNode; headerActions?: ReactNode; onAfterClose?: () => void; className?: string }) { return <Sheet open={open} onOpenChange={value => { if (!value) onClose(); }}><SheetContent className={`admin-desk-drawer w-full p-0 gap-0 sm:max-w-[640px] ${className}`} onCloseAutoFocus={onAfterClose ? event => { event.preventDefault(); onAfterClose(); } : undefined}><SheetHeader className="admin-record-header"><SheetTitle>{title}</SheetTitle><SheetDescription>{description}</SheetDescription>{headerActions && <div className="admin-record-header-actions">{headerActions}</div>}</SheetHeader><div className="admin-record-body">{children}</div>{footer && <footer className="admin-record-footer">{footer}</footer>}</SheetContent></Sheet>; }
+export type AdminDrawerVariant = "view" | "edit" | "new";
+export type AdminDrawerSize = "sm" | "md" | "lg";
+const drawerModeLabel: Record<AdminDrawerVariant, string | null> = { view: null, edit: "Editing", new: "New" };
+
+/** One record drawer: View reads a record, Edit changes it, New creates one. Sizes: sm 480, md 640, lg 880px. */
+export function AdminDetailDrawer({ open, onClose, title, description, children, footer, headerActions, onAfterClose, className = "", variant = "view", size = "md", dirty = false }: {
+  open: boolean; onClose: () => void; title: string; description: ReactNode; children: ReactNode; footer?: ReactNode; headerActions?: ReactNode;
+  onAfterClose?: () => void; className?: string; variant?: AdminDrawerVariant; size?: AdminDrawerSize; dirty?: boolean;
+}) {
+  const mode = drawerModeLabel[variant];
+  const confirmId = useId();
+  const [pending, setPending] = useState<{ options: Required<ConfirmOptions>; resolve: (value: boolean) => void } | null>(null);
+  // While open, confirmations (discard changes, archive, delete…) replace the footer instead of stacking a dialog.
+  useEffect(() => {
+    if (!open) return;
+    return registerInlineConfirm((options, resolve) => setPending(current => { current?.resolve(false); return { options, resolve }; }));
+  }, [open]);
+  useEffect(() => { if (!open) setPending(current => { current?.resolve(false); return null; }); }, [open]);
+  const settle = (value: boolean) => setPending(current => { current?.resolve(value); return null; });
+  return <Sheet open={open} onOpenChange={value => { if (value) return; if (pending) settle(false); else onClose(); }}>
+    <SheetContent data-variant={variant} data-size={size} className={`admin-desk-drawer w-full p-0 gap-0 ${className}`} onCloseAutoFocus={onAfterClose ? event => { event.preventDefault(); onAfterClose(); } : undefined}>
+      <SheetHeader className="admin-record-header">
+        {mode && <p className="admin-record-mode">{mode}{dirty && <span className="admin-record-dirty"><span aria-hidden="true" /> Unsaved</span>}</p>}
+        <SheetTitle>{title}</SheetTitle>
+        <SheetDescription>{description}</SheetDescription>
+        {headerActions && <div className="admin-record-header-actions">{headerActions}</div>}
+      </SheetHeader>
+      <div className="admin-record-body">{children}</div>
+      {pending ? <footer className="admin-record-footer admin-record-confirm" data-tone={pending.options.tone} role="alertdialog" aria-labelledby={`${confirmId}-title`} aria-describedby={`${confirmId}-description`}>
+        <div className="admin-record-confirm-copy"><strong id={`${confirmId}-title`}>{pending.options.title}</strong><p id={`${confirmId}-description`}>{pending.options.description}</p></div>
+        <div className="admin-record-confirm-actions">
+          <Button type="button" variant="outline" autoFocus onClick={() => settle(false)}>{pending.options.cancelLabel}</Button>
+          <Button type="button" variant={pending.options.tone === "danger" ? "destructive" : "default"} onClick={() => settle(true)}>{pending.options.actionLabel}</Button>
+        </div>
+      </footer> : footer && <footer className="admin-record-footer">{footer}</footer>}
+    </SheetContent>
+  </Sheet>;
+}
+
+/**
+ * The Records-page control row: counted filter chips, a live search and a Filters popover for secondary filters.
+ * It wraps on narrow screens, with search taking a full line.
+ */
+export function AdminControlRow({ chips, search, filters, activeFilters = 0, children }: {
+  chips?: ReactNode;
+  search?: { label: string; placeholder: string; value: string; onChange: (value: string) => void; id?: string };
+  filters?: ReactNode;
+  activeFilters?: number;
+  /** Extra controls such as a date range, placed after Filters. */
+  children?: ReactNode;
+}) {
+  return <div className="admin-control-row">
+    {chips}
+    {search && <label className="admin-control-search"><AdminIcon name="search" /><span className="sr-only">{search.label}</span>
+      <Input id={search.id} placeholder={search.placeholder} value={search.value} onChange={event => search.onChange(event.target.value)} />
+    </label>}
+    {filters && <Popover><PopoverTrigger asChild>
+      <Button variant="outline" className="admin-control-filters" aria-label={activeFilters ? `Filters, ${activeFilters} active` : "Filters"}>
+        <AdminIcon name="filter" />Filters{activeFilters > 0 && <span className="admin-control-count" aria-hidden="true">{activeFilters}</span>}
+      </Button>
+    </PopoverTrigger><PopoverContent align="end" className="admin-control-popover">{filters}</PopoverContent></Popover>}
+    {children}
+  </div>;
+}
+
+/** One-line, collapsed explanation for things staff need to read once, not on every visit. */
+export function AdminHelpNote({ summary, children }: { summary: string; children: ReactNode }) {
+  return <details className="admin-help-note"><summary><AdminIcon name="information" />{summary}</summary><div>{children}</div></details>;
+}
+

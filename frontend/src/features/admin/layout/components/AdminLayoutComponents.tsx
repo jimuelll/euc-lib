@@ -8,7 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AdminThemeToggle as ThemeToggle } from "../../components/AdminThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { formatNotificationTime } from "@/features/notifications/notification-time";
@@ -54,9 +53,6 @@ export function AdminTopbar({ pathname }: { pathname: string }) {
             </div>
             {canManageNotifications && <><DropdownMenuSeparator className="m-0"/><DropdownMenuItem onSelect={() => navigate("/admin/notifications")} className="min-h-11 rounded-none px-4 py-3 text-sm font-semibold text-action">Manage notifications</DropdownMenuItem></>}
           </DropdownMenuContent>
-        </DropdownMenu><span className="hidden md:inline-flex"><ThemeToggle /></span>
-        <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="hidden h-9 px-2 sm:px-3 md:inline-flex" aria-label="More options"><AdminIcon name="more" className="size-4 sm:mr-2" /><span className="hidden sm:inline">More</span></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end"><DropdownMenuLabel>More</DropdownMenuLabel><DropdownMenuItem asChild><Link to={helpItem.url}><AdminIcon name="help" className="mr-2 size-4" />{helpItem.title}</Link></DropdownMenuItem><DropdownMenuItem asChild><a href="/" target="_blank" rel="noreferrer"><AdminIcon name="external" className="mr-2 size-4" />View public website</a></DropdownMenuItem></DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>

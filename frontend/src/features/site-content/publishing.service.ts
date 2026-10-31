@@ -1,5 +1,5 @@
 import axios from "@/utils/AxiosInstance";
-export type ContentSection = "homepage" | "about" | "bulletin" | "events" | "subscriptions" | "guide";
+export type ContentSection = "homepage" | "about" | "bulletin" | "events" | "subscriptions";
 export type ContentPayload = Record<string, any>;
 export interface PublishingMeta {
     section: ContentSection;

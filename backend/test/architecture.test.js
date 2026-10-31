@@ -57,7 +57,6 @@ test("repository-backed services delegate persistence to repositories", () => {
     ["modules/library-settings/library-settings.service.ts", "modules/library-settings/library-settings.repository.ts"],
     ["modules/notifications/notifications.service.ts", "modules/notifications/notifications.repository.ts"],
     ["modules/reservation/reservation.service.ts", "modules/reservation/reservation.repository.ts"],
-    ["modules/user-guide/user-guide.service.ts", "modules/user-guide/user-guide.repository.ts"],
   ];
   const databaseImport = /(?:require\s*\(|from\s+)[^\n]*\bdb\b/;
 

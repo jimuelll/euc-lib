@@ -75,7 +75,7 @@ test('legacy backups acquire edited defaults, parent relationships, and Like rea
  const backup={format:'euc-library-backup',version:21,tables:{bulletin_posts:[{id:4}],bulletin_comments:[{id:8}],bulletin_likes:[{post_id:4,user_id:7,created_at:'2026-01-01'}]}};
  backup.integrity={algorithm:'sha256',checksum:snapshots.payloadChecksum(backup)};
  const upgraded=snapshots.upgradeBackup(backup);
- assert.equal(upgraded.version,25);assert.equal(upgraded.tables.bulletin_posts[0].edited_at,null);assert.equal(upgraded.tables.bulletin_posts[0].content_revision,1);assert.equal(upgraded.tables.bulletin_comments[0].parent_id,null);
+ assert.equal(upgraded.version,26);assert.equal(upgraded.tables.bulletin_posts[0].edited_at,null);assert.equal(upgraded.tables.bulletin_posts[0].content_revision,1);assert.equal(upgraded.tables.bulletin_comments[0].parent_id,null);
  assert.deepEqual(upgraded.tables.bulletin_reactions,[{post_id:4,user_id:7,reaction:'like',created_at:'2026-01-01',consolidated_at:'2026-01-01'}]);assert.equal(upgraded.integrity.checksum,snapshots.payloadChecksum(upgraded));
 });
 
@@ -136,7 +136,7 @@ test('bulletin student names use first name and surname initial while staff reta
 
 test('version 22 snapshots gain discussion defaults and retain current Helpful records',()=>{
  const backup={format:'euc-library-backup',version:22,tables:{bulletin_posts:[{id:4}],bulletin_comments:[{id:8}],bulletin_comment_helpful:[{comment_id:8,user_id:7}]}};backup.integrity={algorithm:'sha256',checksum:snapshots.payloadChecksum(backup)};
- const result=snapshots.upgradeBackup(backup);assert.equal(result.version,25);assert.equal(result.tables.bulletin_posts[0].comments_locked,0);assert.equal(result.tables.bulletin_comments[0].hidden_at,null);assert.equal(result.tables.bulletin_comments[0].client_request_id,null);assert.deepEqual(result.tables.bulletin_comment_helpful,[{comment_id:8,user_id:7}]);assert.equal(result.integrity.checksum,snapshots.payloadChecksum(result));
+ const result=snapshots.upgradeBackup(backup);assert.equal(result.version,26);assert.equal(result.tables.bulletin_posts[0].comments_locked,0);assert.equal(result.tables.bulletin_comments[0].hidden_at,null);assert.equal(result.tables.bulletin_comments[0].client_request_id,null);assert.deepEqual(result.tables.bulletin_comment_helpful,[{comment_id:8,user_id:7}]);assert.equal(result.integrity.checksum,snapshots.payloadChecksum(result));
 });
 
 test('comment Helpful metadata normalizes SQL text counts and selections',()=>{

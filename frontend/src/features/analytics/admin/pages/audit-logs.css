@@ -12,7 +12,7 @@
 [data-library-design][data-library-design] .audit-quick-filters button[data-filter=important] svg { color:hsl(var(--warning)); }
 [data-library-design][data-library-design] .audit-quick-filters button[data-filter=money] svg { color:hsl(var(--success)); }
 [data-library-design][data-library-design] .audit-quick-filters button:is([data-filter=identity],[data-filter=mine]) svg { color:hsl(var(--action)); }
-[data-library-design][data-library-design] .audit-quick-filters button[aria-pressed=true] { background:hsl(var(--action)); color:hsl(var(--primary-foreground)); border-color:hsl(var(--action)); }
+[data-library-design][data-library-design] .audit-quick-filters button[aria-pressed=true] { background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); border-color:hsl(var(--fill)); }
 [data-library-design][data-library-design] .audit-quick-filters button[aria-pressed=true] :is(svg,span) { color:inherit; }
 .dark [data-library-design][data-library-design] .audit-quick-filters button[aria-pressed=true] { color:hsl(var(--background)); }
 

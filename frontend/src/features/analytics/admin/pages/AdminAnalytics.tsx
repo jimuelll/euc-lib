@@ -99,6 +99,6 @@ export default function AdminAnalytics() {
     }
     catch {
         setError('Could not save on this device. Export a PDF instead.');
-    } }}>Save to reports</Button><Link to="/admin/query?tab=briefs">Saved briefs</Link></div><div className="analytics-verify"><Link to={verifyHref('circulation')}>Verify circulation figures</Link><Link to={verifyHref('visitors')}>Verify visitor figures</Link><Link to="/admin/clearance?tab=queue&filter=blocked">Review overdue loans</Link></div></div></Panel>}
+    } }}>Save to reports</Button><Link to="/admin/reports?tab=briefs">Saved briefs</Link></div><div className="analytics-verify"><Link to={verifyHref('circulation')}>Verify circulation figures</Link><Link to={verifyHref('visitors')}>Verify visitor figures</Link><Link to="/admin/clearance?tab=queue&filter=blocked">Review overdue loans</Link></div></div></Panel>}
  </TabsContent></AdminPageTabs></div>;
 }

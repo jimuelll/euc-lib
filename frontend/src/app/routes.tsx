@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { LibraryDesignProvider } from "@/components/ui/library-design";
 import OperationsRouteGate from "@/features/auth/components/OperationsRouteGate";
 import { Navigate, Route, Routes } from "react-router-dom";
-import AdminUsersRedirect from "@/features/admin/manage/AdminUsersRedirect";
+import AdminRedirect from "@/features/admin/components/AdminRedirect";
 import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 import Home from "@/features/home/pages/Index";
 import { loadAcademicSubscriptions, loadAdminCatalog, loadAdminContentManagement, loadAdminHome, loadAdminLayout, loadAdminManage, loadLibraryServices, loadStudentDashboard } from "./route-loaders";
@@ -75,33 +75,41 @@ export const AppRoutes = () => {
       <Route path="/admin/query/reports/preview" element={<ProtectedRoute roles={["admin", "super_admin"]}><ReportPreview /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute roles={["admin", "super_admin", "staff"]}><AdminLayout /></ProtectedRoute>}>
         <Route index element={<AdminHome />} />
-        <Route path="analytics" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAnalytics /></ProtectedRoute>} />
-        <Route path="manage" element={<AdminManage />} />
-        <Route path="users" element={<AdminUsersRedirect />} />
-        <Route path="catalog" element={<AdminCatalog />} />
-        <Route path="book-types" element={<ProtectedRoute roles={["super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
         <Route path="circulation" element={<AdminCirculation />} />
-        <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
-        <Route path="backup" element={<ProtectedRoute roles={["super_admin"]}><AdminBackup /></ProtectedRoute>} />
-        <Route path="query" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminReport /></ProtectedRoute>} />
-        <Route path="report" element={<Navigate to="/admin/query" replace />} />
-        <Route path="audit-logs" element={<ProtectedRoute roles={["super_admin"]}><AdminAuditLogs /></ProtectedRoute>} />
+        <Route path="reservations" element={<AdminReservations />} />
         <Route path="clearance" element={<AdminClearance />} />
         <Route path="clearance/receipt/:receiptNumber" element={<AdminClearanceReceipt />} />
-        <Route path="reservations" element={<AdminReservations />} />
-        <Route path="holidays" element={<AdminHolidays />} />
-        <Route path="restrictions" element={<AdminManage />} />
-        <Route path="moderation" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminModeration /></ProtectedRoute>} />
+        <Route path="attendance" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAttendanceLogs /></ProtectedRoute>} />
+        <Route path="users" element={<AdminManage />} />
+        <Route path="catalog" element={<AdminCatalog />} />
         <Route path="content" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminContentManagement /></ProtectedRoute>} />
+        <Route path="notifications" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminNotifications /></ProtectedRoute>} />
+        <Route path="library-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="library" page="library" /></ProtectedRoute>} />
+        <Route path="account-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="account" page="account" /></ProtectedRoute>} />
+        <Route path="moderation" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminModeration /></ProtectedRoute>} />
+        <Route path="analytics" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAnalytics /></ProtectedRoute>} />
+        <Route path="reports" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminReport /></ProtectedRoute>} />
+        <Route path="audit-logs" element={<ProtectedRoute roles={["super_admin"]}><AdminAuditLogs /></ProtectedRoute>} />
+        <Route path="settings/academic" element={<AdminHolidays />} />
+        <Route path="settings/loan-policies" element={<ProtectedRoute roles={["super_admin"]}><AdminBookTypes /></ProtectedRoute>} />
+        <Route path="settings/catalog-fields" element={<ProtectedRoute roles={["super_admin"]}><AdminCatalog mode="builder" /></ProtectedRoute>} />
+        <Route path="settings/ai" element={<ProtectedRoute roles={["super_admin"]}><AdminCatalog mode="ai" /></ProtectedRoute>} />
+        <Route path="settings/backup" element={<ProtectedRoute roles={["super_admin"]}><AdminBackup /></ProtectedRoute>} />
         <Route path="user-guide" element={<AdminUserGuide />} />
+        {/* Older URLs from bookmarks, audit records and sent notifications. */}
+        <Route path="manage" element={<AdminRedirect to="/admin/users" />} />
+        <Route path="restrictions" element={<AdminRedirect to="/admin/users" />} />
+        <Route path="attendance-logs" element={<AdminRedirect to="/admin/attendance" />} />
+        <Route path="query" element={<AdminRedirect to="/admin/reports" />} />
+        <Route path="report" element={<AdminRedirect to="/admin/reports" />} />
+        <Route path="holidays" element={<AdminRedirect to="/admin/settings/academic" />} />
+        <Route path="book-types" element={<AdminRedirect to="/admin/settings/loan-policies" />} />
+        <Route path="backup" element={<AdminRedirect to="/admin/settings/backup" />} />
+        <Route path="payment" element={<Navigate to="/admin/clearance" replace />} />
         <Route path="bulletin" element={<Navigate to="/admin/content?tab=bulletin" replace />} />
         <Route path="subscriptions" element={<Navigate to="/admin/content?tab=subscriptions" replace />} />
-        <Route path="email-deliveries" element={<ProtectedRoute roles={["super_admin"]}><Navigate to="/admin/library-emails?tab=manual" replace /></ProtectedRoute>} />
-        <Route path="account-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="account" page="account" /></ProtectedRoute>} />
-        <Route path="library-emails" element={<ProtectedRoute roles={["super_admin"]}><AdminEmailDeliveries key="library" page="library" /></ProtectedRoute>} />
-        <Route path="notifications" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminNotifications /></ProtectedRoute>} />
-        <Route path="attendance-logs" element={<ProtectedRoute roles={["admin", "super_admin"]}><AdminAttendanceLogs /></ProtectedRoute>} />
         <Route path="edit-about" element={<Navigate to="/admin/content?tab=about" replace />} />
+        <Route path="email-deliveries" element={<ProtectedRoute roles={["super_admin"]}><Navigate to="/admin/library-emails?tab=manual" replace /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

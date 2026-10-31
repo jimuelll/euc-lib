@@ -6,7 +6,7 @@ const effects = {
   reservation: ["borrowing", "my-library", "admin-reservations", "catalog", "recommendations", "admin-query"],
   circulation: ["circulation", "borrowing", "my-library", "admin-reservations", "catalog", "recommendations", "clearance", "analytics", "admin-query"],
   catalog: ["catalog", "borrowing", "recommendations", "my-library", "analytics", "admin-query"],
-  content: ["site-content", "bulletin", "user-guide", "analytics"],
+  content: ["site-content", "bulletin", "analytics"],
   user: ["admin-manage", "analytics", "my-library", "clearance", "circulation", "admin-query"],
   settings: ["library-settings", "admin-manage", "catalog", "circulation", "clearance", "analytics", "admin-query"],
   clearance: ["clearance", "my-library", "analytics", "circulation", "admin-query"],

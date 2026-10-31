@@ -1,4 +1,4 @@
-export const sections = ["homepage", "about", "bulletin", "events", "subscriptions", "guide"] as const;
+export const sections = ["homepage", "about", "bulletin", "events", "subscriptions"] as const;
 export type Section = typeof sections[number];
 export type Payload = Record<string, any>;
 export interface DraftRow {

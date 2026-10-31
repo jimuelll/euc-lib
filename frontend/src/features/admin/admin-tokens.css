@@ -1,0 +1,190 @@
+/* The admin's single token set (features/admin/DESIGN.md). It covers the shell and every content root and
+   portal inside it, so admin pages never depend on the public paper tokens in library-design.css. */
+body.admin-workspace,
+body.admin-workspace [data-library-design] {
+  --background: 42 31% 94%;
+  --foreground: 343 15% 9%;
+  --card: 43 100% 98.6%;
+  --card-foreground: 343 15% 9%;
+  --popover: 43 100% 98.6%;
+  --popover-foreground: 343 15% 9%;
+  --muted: 41 24% 90%;
+  --muted-foreground: 354 5% 40%;
+  --library-muted-foreground: 354 5% 40%;
+  --secondary: 41 24% 90%;
+  --secondary-foreground: 343 15% 9%;
+  --accent: 41 24% 90%;
+  --accent-foreground: 343 15% 9%;
+  --border: 39 20% 80%;
+  --input: 33 10% 50%;
+  --primary: 0 100% 24%;
+  --primary-foreground: 43 100% 99%;
+  --primary-hover: #930e0e;
+  --admin-primary-hover: #930e0e;
+  --action: 0 100% 24%;
+  --ring: 0 100% 24%;
+  --fill: 0 100% 24%;
+  --fill-foreground: 43 100% 99%;
+  --fill-hover: #930e0e;
+  --fill-hover-foreground: #fffdf8;
+  --focus-ring: hsl(var(--action));
+  --tab-active-line: hsl(var(--foreground));
+  --library-maroon: #7a0000;
+  --library-gold: #c9961f;
+  --destructive: 9 72% 35%;
+  --destructive-foreground: 43 100% 99%;
+  --warning: 42 74% 35%;
+  --warning-foreground: 343 15% 9%;
+  --success: 147 39% 30%;
+  --success-foreground: 43 100% 99%;
+  --info: 212 62% 34%;
+  --info-foreground: 43 100% 99%;
+  --radius: 0rem;
+  --admin-compact-radius: 0rem;
+  /* Component rules style headings with --font-heading; in the admin that is the interface face.
+     Fraunces is --font-display, used only where the rule below applies it. */
+  --font-heading: "DM Sans", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+
+  /* Status meanings: text, tinted surface and border per meaning. */
+  --admin-tone-red: 9 72% 35%;
+  --admin-tone-red-surface: 11 72% 95%;
+  --admin-tone-red-border: 11 49% 77%;
+  --admin-tone-amber: 38 79% 28%;
+  --admin-tone-amber-surface: 42 55% 94%;
+  --admin-tone-green: 147 39% 30%;
+  --admin-tone-green-surface: 143 28% 94%;
+  --admin-tone-green-border: 147 21% 72%;
+  --admin-tone-blue: 212 62% 34%;
+  --admin-tone-blue-surface: 212 50% 95%;
+  --admin-tone-purple: 268 30% 40%;
+  --admin-tone-purple-surface: 268 30% 95%;
+
+  /* The sidebar is the one large maroon surface. */
+  --sidebar-background: 0 100% 24%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-muted-foreground: 0 20% 88%;
+  --sidebar-accent: 0 100% 28%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-primary: 12 38% 88%;
+  --sidebar-primary-foreground: 0 100% 24%;
+  --sidebar-border: 0 45% 42%;
+  --sidebar-ring: 0 0% 100%;
+  --admin-sidebar-gold: hsl(42 78% 38%);
+}
+
+.dark body.admin-workspace,
+.dark body.admin-workspace [data-library-design] {
+  --background: 270 6% 7%;
+  --foreground: 36 35% 92%;
+  --card: 260 5% 11%;
+  --card-foreground: 36 35% 92%;
+  --popover: 260 5% 11%;
+  --popover-foreground: 36 35% 92%;
+  --muted: 15 5% 17%;
+  --muted-foreground: 6 5% 63%;
+  --library-muted-foreground: 6 5% 63%;
+  --secondary: 15 5% 17%;
+  --secondary-foreground: 36 35% 92%;
+  --accent: 15 5% 20%;
+  --accent-foreground: 36 35% 92%;
+  --border: 12 5% 19%;
+  --input: 15 6% 43%;
+  /* Salmon is for links, focus and the selected-tab line; fills stay maroon. */
+  --action: 9 79% 72%;
+  --ring: 9 79% 72%;
+  --fill: 0 100% 24%;
+  --fill-foreground: 36 35% 96%;
+  --fill-hover: #930e0e;
+  --fill-hover-foreground: #fffdf8;
+  --tab-active-line: hsl(var(--action));
+  --library-gold: #f0c060;
+  --destructive: 9 79% 72%;
+  --destructive-foreground: 270 6% 7%;
+  --warning: 40 83% 66%;
+  --warning-foreground: 270 6% 7%;
+  --success: 145 39% 64%;
+  --success-foreground: 270 6% 7%;
+  --info: 212 75% 74%;
+  --info-foreground: 270 6% 7%;
+
+  --admin-tone-red: 9 79% 72%;
+  --admin-tone-red-surface: 10 37% 12%;
+  --admin-tone-red-border: 9 47% 27%;
+  --admin-tone-amber: 40 83% 66%;
+  --admin-tone-amber-surface: 38 24% 13%;
+  --admin-tone-green: 145 39% 64%;
+  --admin-tone-green-surface: 145 23% 13%;
+  --admin-tone-green-border: 145 25% 27%;
+  --admin-tone-blue: 212 75% 74%;
+  --admin-tone-blue-surface: 212 25% 14%;
+  --admin-tone-purple: 268 45% 78%;
+  --admin-tone-purple-surface: 268 15% 14%;
+}
+
+/* Maroon fills need a lighter edge to read against charcoal. */
+.dark body.admin-workspace :is([data-library-ui="button"][data-variant="default"], button.bg-primary, a.bg-primary):not(:disabled) {
+  box-shadow: inset 0 0 0 1px #a83a3a;
+}
+
+/* Fraunces only for page titles, summary-tile numerals and drawer record titles. */
+body.admin-workspace [data-library-design] :is(h2, h3, h4, h5, h6) { letter-spacing: 0; }
+body.admin-workspace [data-library-design] :is(
+  h1,
+  .admin-record-header h2,
+  .admin-desk-tile-copy strong,
+  .admin-compact-metric-value,
+  .analytics-kpis > button > strong,
+  .ai-coverage-card strong
+) {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+body.admin-workspace ::selection,
+body.admin-workspace [data-library-design] ::selection { background: hsl(var(--fill)); color: hsl(var(--fill-foreground)); }
+
+/* Monospace is for identifiers only (card numbers, ISBNs, accession and event IDs, field keys).
+   Hints, times, counts and amounts use the interface face with tabular figures. */
+body.admin-workspace [data-library-design] :is(
+  .library-shelf-footer,
+  .admin-dashboard-transactions time,
+  .audit-event-top time,
+  .audit-time-gutter > time,
+  .library-slip .admin-desk-status,
+  .library-filter-count,
+  .library-term-timeline,
+  .admin-desk-filter-chips span,
+  .admin-desk-tab-badge,
+  [data-library-tab-count],
+  .academic-audit,
+  .library-record-summary-heading,
+  .policy-duration b,
+  .policy-fine-terms b,
+  .circulation-detail-fields dd,
+  .reservation-request-history time,
+  .reservation-request-history li > span,
+  .clearance-preview-drawer .clearance-drawer-body > ul > li time,
+  .library-search-help,
+  .notification-meta time,
+  .clearance-amount,
+  .clearance-payment-review dd,
+  .records-export-summary,
+  .records-results > footer,
+  .records-table .records-number,
+  .analytics-snapshot-row strong,
+  .analytics-distribution strong,
+  .backup-impact strong,
+  .backup-impact span,
+  .ai-last-run,
+  .ai-coverage-card strong small,
+  .users-obligation-section dd
+) {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+/* Admin tabs mark the active tab with the underline and weight only; the gold bookmark notch stays on public pages. */
+body.admin-workspace [data-library-design] [role="tablist"] [role="tab"]::before { display: none; }
+

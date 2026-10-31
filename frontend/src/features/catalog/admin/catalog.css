@@ -147,3 +147,13 @@
 .catalog-record-drawer .catalog-holding-save-buttons button:disabled { background:transparent; border:1px solid var(--catalog-control-border); color:hsl(var(--muted-foreground)); }
 .catalog-record-drawer .publishing-unsaved-dot { display:inline-block; width:7px; height:7px; flex:none; border-radius:50%; background:var(--library-gold,#c9961f); }
 .catalog-stat-link::before { display:inline-block; width:7px; height:12px; margin-right:6px; background:var(--library-gold,#c9961f); content:""; vertical-align:middle; }
+
+/* Phone rows: title, then identifier and availability on one line, then the action across the row. */
+@media(max-width:640px) {
+  .catalog-row { grid-template-columns:24px minmax(0,1fr) auto; gap:6px 12px; padding:12px; }
+  .catalog-record-identity { grid-column:2/4; grid-row:1; }
+  .catalog-identifier { grid-column:2; grid-row:2; align-self:center; }
+  .catalog-record-status { grid-column:3; grid-row:2; justify-self:end; }
+  .catalog-row-actions { grid-column:2/4; grid-row:3; justify-content:space-between; }
+  .catalog-row-actions > button:first-child, .catalog-row-actions > a:first-child { flex:1; min-width:0; }
+}

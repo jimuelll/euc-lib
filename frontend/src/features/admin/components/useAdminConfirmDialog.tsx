@@ -12,12 +12,14 @@ import {
 
 type ConfirmTone = "default" | "danger";
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
   title: string;
   description: string;
   actionLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  /** "dialog" always uses the modal, even while a drawer is open. */
+  placement?: "auto" | "dialog";
 }
 
 const INITIAL_OPTIONS: Required<ConfirmOptions> = {
@@ -26,7 +28,20 @@ const INITIAL_OPTIONS: Required<ConfirmOptions> = {
   actionLabel: "Confirm",
   cancelLabel: "Cancel",
   tone: "default",
+  placement: "auto",
 };
+
+export type InlineConfirmTarget = (options: Required<ConfirmOptions>, resolve: (value: boolean) => void) => void;
+const inlineTargets: InlineConfirmTarget[] = [];
+
+/** An open record drawer registers here so confirmations appear in its footer instead of a dialog on top of it. */
+export function registerInlineConfirm(target: InlineConfirmTarget) {
+  inlineTargets.push(target);
+  return () => {
+    const index = inlineTargets.lastIndexOf(target);
+    if (index >= 0) inlineTargets.splice(index, 1);
+  };
+}
 
 export const useAdminConfirmDialog = () => {
   const resolverRef = useRef<((value: boolean) => void) | null>(null);
@@ -40,6 +55,8 @@ export const useAdminConfirmDialog = () => {
   }, []);
 
   const confirm = useCallback((nextOptions: ConfirmOptions) => {
+    const drawer = nextOptions.placement === "dialog" ? undefined : inlineTargets.at(-1);
+    if (drawer) return new Promise<boolean>((resolve) => drawer({ ...INITIAL_OPTIONS, ...nextOptions }, resolve));
     setOptions({
       ...INITIAL_OPTIONS,
       ...nextOptions,

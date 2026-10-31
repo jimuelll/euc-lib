@@ -16,6 +16,13 @@
   --primary: 0 100% 24%;
   --primary-foreground: 43 100% 99%;
   --primary-hover: #930e0e;
+  /* Primary and selected fills; admin overrides these in admin-tokens.css. */
+  --fill: 0 100% 24%;
+  --fill-foreground: 43 100% 99%;
+  --fill-hover: #930e0e;
+  --fill-hover-foreground: #fffdf8;
+  --focus-ring: var(--library-gold);
+  --tab-active-line: hsl(var(--foreground));
   --admin-primary-hover: #930e0e;
   --action: 0 100% 24%;
   --warning: 42 74% 35%;
@@ -72,6 +79,10 @@
   --accent: 15 5% 20%;
   --accent-foreground: 36 35% 92%;
   --action: 9.391 79.310% 71.569%;
+  --fill: 9.391 79.310% 71.569%;
+  --fill-foreground: 270 6% 7%;
+  --fill-hover: #f6b4a6;
+  --fill-hover-foreground: #1b1416;
   --warning: 40 83% 66%;
   --library-gold: #f0c060;
   --library-danger-surface: #2a1613;
@@ -98,7 +109,7 @@
 }
 [data-library-design][data-library-design] *, [data-library-design][data-library-design] *::before, [data-library-design][data-library-design] *::after { border-color: hsl(var(--border)); }
 [data-library-design][data-library-design] ::selection { background: var(--library-gold); color: #1b1416; }
-[data-library-design][data-library-design] :focus-visible { outline: 2px solid var(--library-gold); outline-offset: 3px; }
+[data-library-design][data-library-design] :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 [data-library-design][data-library-design] :is(h1,h2,h3,h4,h5,h6) { font-family: var(--font-heading); letter-spacing: -.025em; text-wrap: balance; }
 [data-library-design][data-library-design] :is(label,th,button,[class*="uppercase"],[role="tab"]) { font-family: var(--font-body); }
 [data-library-design][data-library-design] :is(h1,h2,h3,h4,h5,h6,p,dd,strong) { overflow-wrap: anywhere; }
@@ -111,11 +122,9 @@
 [data-library-design][data-library-design] [class*="bg-gradient"] { background-image:none; }
 [data-library-design][data-library-design] :is(button,[role="button"]):disabled { cursor: not-allowed; }
 [data-library-design][data-library-design] [data-library-ui="button"] { min-height: 40px; border-radius: 0; font-weight: 600; }
-[data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.dark [data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"] { background: hsl(var(--action)); color: hsl(var(--background)); }
+[data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"] { background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); }
 [data-library-design][data-library-design] [data-library-ui="button"][data-variant="outline"] { background: hsl(var(--card)); border-color: hsl(var(--input)); }
-[data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"]:hover { background: var(--primary-hover); color: #fffdf8; }
-.dark [data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"]:hover { background: #f6b4a6; color: #1b1416; }
+[data-library-design][data-library-design] [data-library-ui="button"][data-variant="default"]:hover { background: var(--fill-hover); color: var(--fill-hover-foreground); }
 [data-library-design][data-library-design] [data-library-ui="card"] { border: 1px solid hsl(var(--border)); border-radius: 0; background: hsl(var(--card)); box-shadow: none; }
 
 /* One active-tab construction throughout the content, including record portals. */
@@ -140,7 +149,7 @@
 }
 [data-library-design][data-library-design] [role="tablist"] [role="tab"]:hover::before { height: 6px; }
 [data-library-design][data-library-design] [role="tablist"] [role="tab"]:is([data-state="active"],[aria-selected="true"]) {
-  color: hsl(var(--foreground)) !important; font-weight: 700; border-bottom-color: hsl(var(--foreground)) !important;
+  color: hsl(var(--foreground)) !important; font-weight: 700; border-bottom-color: var(--tab-active-line) !important;
 }
 [data-library-design][data-library-design] [role="tablist"] [role="tab"]:is([data-state="active"],[aria-selected="true"])::before { height: 15px; }
 [data-library-design][data-library-design] [role="tablist"] [role="tab"]:focus-visible { outline-offset: -3px; }
@@ -198,11 +207,8 @@
 [data-library-design][data-library-design] :is(.admin-dashboard-transactions li,.admin-dashboard-quick-links > a) { min-height:44px; padding:9px 14px; gap:10px; }
 [data-library-design][data-library-design] .admin-dashboard-transactions time { font: 12px/1.6 ui-monospace,monospace; }
 [data-library-design][data-library-design] :is(.admin-record-header,.admin-record-footer,.publishing-footer) { background: hsl(var(--card)); border-color: hsl(var(--border)); box-shadow: none; }
-[data-library-design][data-library-design] .admin-record-header { border-top: 3px double hsl(var(--foreground)); }
-[data-library-design][data-library-design] .admin-record-header { color:hsl(var(--foreground)); }
 [data-library-design][data-library-design] .admin-record-header p { color:hsl(var(--muted-foreground)); }
 [data-library-design][data-library-design] .admin-record-header-actions button { color:hsl(var(--foreground)); border-color:hsl(var(--input)); }
-[data-library-design][data-library-design].admin-desk-drawer > button { color:hsl(var(--foreground)); }
 [data-library-design][data-library-design] .admin-desk-tile[data-library-long-value] .admin-desk-tile-copy { grid-column:1/-1; }
 [data-library-design][data-library-design] .admin-desk-tile[data-library-long-value] .admin-desk-tile-copy > :first-child { padding-right:72px; min-height:64px; }
 [data-library-design][data-library-design] .admin-desk-tile[data-library-long-value] .admin-desk-tile-copy strong { font-size:clamp(28px,2.6vw,36px); }
@@ -476,7 +482,7 @@
 [data-library-design][data-library-design] [data-sonner-toast] { border-radius:0;box-shadow:none;font-family:var(--font-body); }
 .dark [data-library-design][data-library-design] :is(.text-primary,[class*="hover:text-primary"]:hover),
 .dark [data-library-design][data-library-design] .group:hover .group-hover\:text-primary { color:hsl(var(--action)); }
-.dark [data-library-design][data-library-design] :is(button.bg-primary,a.bg-primary) { background:hsl(var(--action)); color:hsl(var(--background)); }
+.dark [data-library-design][data-library-design] :is(button.bg-primary,a.bg-primary) { background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); }
 [data-library-design][data-library-design].admin-desk-drawer { max-height:100dvh; }
 [data-library-design][data-library-design] .library-section-tabs { gap:0; padding:8px 0 0; background:transparent; overflow-x:auto; }
 [data-library-design][data-library-design] .library-section-tabs > a { position:relative; border-bottom:3px solid transparent; border-radius:0; padding:14px 18px; min-height:48px; justify-content:flex-start; white-space:nowrap; }
@@ -507,7 +513,7 @@
 [data-library-design][data-library-design] .admin-desk-filter-chips > button[aria-pressed=true] { background:hsl(var(--primary)); color:#fffdf8; }
 [data-library-design][data-library-design] .admin-desk-filter-chips > button[data-tone=amber] { box-shadow:inset 0 -3px var(--library-gold); }
 [data-library-design][data-library-design] .admin-desk-filter-chips span { font:500 12px/1.5 ui-monospace,monospace; }
-.dark [data-library-design][data-library-design] .admin-desk-filter-chips > button[aria-pressed=true] { background:hsl(var(--action)); color:hsl(var(--background)); }
+.dark [data-library-design][data-library-design] .admin-desk-filter-chips > button[aria-pressed=true] { background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); }
 [data-library-design][data-library-design] :is(.reservation-title,.catalog-record-title,.circulation-book-title) { font:700 16px/1.4 var(--font-heading); white-space:normal; overflow-wrap:anywhere; }
 [data-library-design][data-library-design] :is(.academic-group > h2,.audit-day-heading,.users-column-head h3) { font:700 11px/1.5 var(--font-body); letter-spacing:.1em; text-transform:uppercase; }
 [data-library-design][data-library-design] .academic-panel { background:transparent; }

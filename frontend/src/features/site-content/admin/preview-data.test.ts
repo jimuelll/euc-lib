@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolvePreviewData, type PreviewSnapshot } from "./preview-data";
 
 const snapshot: PreviewSnapshot = {
-  section: "homepage", user: null, token: null, role: "staff", documents: {
+  section: "homepage", user: null, token: null, documents: {
     homepage: { hero_title: "Unsaved title" },
     subscriptions: { items: [
       { id: 1, title: "Hidden", is_active: false },
@@ -14,11 +14,6 @@ const snapshot: PreviewSnapshot = {
       { title: "Past", starts_at: "2000-01-01" },
       { title: "Later", starts_at: "2099-02-01" },
       { title: "Ongoing", starts_at: "2000-01-01", ends_at: "2099-01-01" },
-    ] },
-    guide: { items: [
-      { title: "Admin only", is_published: true, audience_roles: ["admin"] },
-      { title: "Unpublished", is_published: false, audience_roles: ["staff"] },
-      { title: "Staff topic", is_published: true, audience_roles: ["staff"], before_you_begin: ["Bring a card"] },
     ] },
     bulletin: { items: [
       { title: "Older", content: "Library", created_at: "2026-01-01" },
@@ -39,10 +34,6 @@ describe("draft data for production pages", () => {
   });
   it("includes ongoing events and excludes past events", () => {
     expect(resolvePreviewData(snapshot, "/api/events")).toMatchObject([{ title: "Ongoing" }, { title: "Later" }]);
-  });
-  it("matches guide visibility for the selected role and preserves prerequisites", () => {
-    expect(resolvePreviewData(snapshot, "/api/user-guide")).toMatchObject([{ title: "Staff topic", before_you_begin: ["Bring a card"] }]);
-    expect(resolvePreviewData({ ...snapshot, role: "admin" }, "/api/user-guide")).toMatchObject([{ title: "Admin only" }]);
   });
   it("matches bulletin pinning, date order, pagination and search", () => {
     expect(resolvePreviewData(snapshot, "/api/bulletin", { page: 1, limit: 2 })).toMatchObject({ data: [{ title: "Pinned" }, { title: "Newer" }], total: 3, totalPages: 2 });

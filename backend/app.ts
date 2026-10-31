@@ -30,7 +30,6 @@ const {
   backupRoutes,
   clearanceRoutes,
   siteContentRoutes,
-  userGuideRoutes,
   queryRoutes,
   publishingRoutes,
 } = require("./modules");
@@ -124,6 +123,5 @@ app.use("/api/admin", librarySettingsRoutes);
 app.use("/api/admin", backupRoutes);
 app.use("/api/admin", clearanceRoutes);
 app.use("/api/admin/publishing", publishingRoutes);
-app.use("/api", userGuideRoutes);
 
 export = app;

@@ -34,9 +34,9 @@ export default function PreviewApp() {
     return () => { window.removeEventListener("message", receive); document.removeEventListener("click", keepPreview, true); };
   }, [client]);
   if (!snapshot) return <p role="status">Loading draft…</p>;
-  const user = snapshot.user && { ...snapshot.user, ...(snapshot.section === "guide" ? { role: snapshot.role } : {}) };
+  const user = snapshot.user;
   return <QueryClientProvider client={client}><ThemeProvider><TooltipProvider>
-    <MemoryRouter key={`${snapshot.section}-${snapshot.role}`} initialEntries={[previewPaths[snapshot.section]]}>
+    <MemoryRouter key={snapshot.section} initialEntries={[previewPaths[snapshot.section]]}>
       <AuthContext.Provider value={{ user, isLoggedIn: Boolean(user), loading: false, mustChangePassword: false,
         login: noAction, logout: noAction, changePassword: noAction, getToken: () => null }}>
         <NotificationsProvider><AppRoutes /><Sonner /></NotificationsProvider>

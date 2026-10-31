@@ -8,7 +8,7 @@ import AdminAuditLogs from './AdminAuditLogs';
 import * as api from '../../api/adminAnalytics.api';
 import {changesOf,valueText,dayKey} from '../audit-log';
 vi.mock('../../api/adminAnalytics.api',()=>({fetchAuditLogs:vi.fn(),fetchAuditMeta:vi.fn(),exportAuditLogs:vi.fn()}));
-const row={id:12,occurred_at:'2026-10-09T02:00:00Z',category:'catalog',action:'updated',actor_name:'Library Staff',actor_role:'super_admin',description:'Updated Circulation policy',route:'/api/admin/book-types/1',metadata:{changes:[{field:'Fine',before:0,after:3},{field:'Policy name',before:'General',after:'Circulation'}]},restore_status:'retained' as const,reversed_at:null,target:{kind:'Policy',label:'Circulation',url:'/admin/book-types?policyId=1'}};
+const row={id:12,occurred_at:'2026-10-09T02:00:00Z',category:'catalog',action:'updated',actor_name:'Library Staff',actor_role:'super_admin',description:'Updated Circulation policy',route:'/api/admin/book-types/1',metadata:{changes:[{field:'Fine',before:0,after:3},{field:'Policy name',before:'General',after:'Circulation'}]},restore_status:'retained' as const,reversed_at:null,target:{kind:'Policy',label:'Circulation',url:'/admin/settings/loan-policies?policyId=1'}};
 function mount(url='/admin/audit-logs'){function Location(){return <output data-testid="url">{useLocation().search}</output>;}render(<MemoryRouter initialEntries={[url]}><AdminAuditLogs/><Location/></MemoryRouter>,{wrapper:createTestQueryClientWrapper()});}
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.fetchAuditLogs).mockResolvedValue({rows:[row],pagination:{page:1,limit:20,total:1,totalPages:1},filters:{category:'all',action:'',dateFrom:'',dateTo:''},unfilteredTotal:109,latestId:12});vi.mocked(api.fetchAuditMeta).mockResolvedValue({categories:['auth','catalog'],actions:['login','updated'],actionsByCategory:{catalog:['updated'],auth:['login']},actors:[{id:1,name:'Staff'}]});});afterEach(cleanup);
 it('expands compact changes and keeps IDs and routes behind Details',async()=>{
@@ -58,7 +58,7 @@ it('shows readable schema changes with field keys and user agent in Details',asy
  expect(screen.getByText('Audit test browser')).not.toBeVisible();
  fireEvent.click(screen.getByText('Details'));
  expect(screen.getByText('Audit test browser')).toBeVisible();
- expect(screen.getByRole('link',{name:'physical_description'})).toHaveAttribute('href','/admin/catalog?tab=builder&fieldKey=physical_description');
+ expect(screen.getByRole('link',{name:'physical_description'})).toHaveAttribute('href','/admin/settings/catalog-fields?fieldKey=physical_description');
 });
 
 

@@ -2,7 +2,6 @@ import * as repository from "./publishing.repository";
 import { section, digest, validateDraft, validatePublished, fail, canonical } from "./publishing.validation";
 import { sections, type Section, type Payload, type DraftRow } from "./publishing.types";
 import home = require("../site-content/site-content.service");
-import guide = require("../user-guide/user-guide.service");
 import audit = require("../analytics/transactional-audit");
 import * as notificationEmail from "../notifications/notifications.email.service";
 import hub = require("../../realtime/notificationHub");
@@ -11,10 +10,9 @@ const parse = (value:string|null|undefined)=>{if(!value)return null;const parsed
 export const itemKey=(item:any)=>String(item.id||item._key);
 const changedCount=(payload:Payload,base:Payload)=>payload.items?payload.items.filter((item:any)=>!item.id||canonical(item)!==canonical((base.items||[]).find((row:any)=>row.id===item.id))).length:canonical(payload)!==canonical(base)?1:0;
 const serialize=(row:DraftRow,live:Payload)=>{
- const legacyCount=row.section==="guide"?(live.items||[]).filter((item:any)=>item.is_published&&item.has_unpublished_changes).length:0;
- return {section:row.section,payload:parse(row.draft_json)||live,published:live,revision:Number(row.revision),baseVersion:digest(live),hasDraft:Boolean(row.draft_json)||legacyCount>0,draftCount:row.draft_json?changedCount(parse(row.draft_json),parse(row.base_json)||live):legacyCount,savedAt:row.saved_at,lastPublished:row.published_at,itemMeta:parse(row.item_meta_json)||{}};
+ return {section:row.section,payload:parse(row.draft_json)||live,published:live,revision:Number(row.revision),baseVersion:digest(live),hasDraft:Boolean(row.draft_json),draftCount:row.draft_json?changedCount(parse(row.draft_json),parse(row.base_json)||live):0,savedAt:row.saved_at,lastPublished:row.published_at,itemMeta:parse(row.item_meta_json)||{}};
 };
-async function prepare(kind:Section){if(kind==="homepage")await home.get();if(kind==="guide")await guide.listForAdmin();}
+async function prepare(kind:Section){if(kind==="homepage")await home.get();}
 async function withConnection<T>(work:(conn:Awaited<ReturnType<typeof repository.getConnection>>)=>Promise<T>):Promise<T>{const conn=await repository.getConnection();try{await conn.beginTransaction();const result=await work(conn);await conn.commit();return result;}catch(error){await conn.rollback();throw error;}finally{conn.release();}}
 export async function read(value:unknown){const kind=section(value);await prepare(kind);return withConnection(async conn=>serialize(await repository.lockDraft(conn,kind),await repository.readLive(conn,kind)));}
 export async function list(){const records=[];for(const kind of sections)records.push(await read(kind));return records.map(({payload,published,...meta})=>({...meta,upcoming:meta.section==="events"?(payload.items||[]).filter((item:any)=>!item.deleted&&new Date(item.ends_at||item.starts_at).getTime()>=Date.now()).length:0,hidden:meta.section==="subscriptions"?(payload.items||[]).filter((item:any)=>!item.deleted&&!item.is_active).length:0}));}
@@ -26,7 +24,7 @@ async function applyMutation(conn:Awaited<ReturnType<typeof repository.getConnec
  if(Number(row.revision)!==input.revision)fail("Another administrator saved this section. Your edits are retained; reload the latest version before saving.",409);
  const live=await repository.readLive(conn,kind,true);const base=parse(row.base_json)||live;const saved=parse(row.draft_json)||live;
  const key=input.itemKey===undefined?undefined:String(input.itemKey);
- if(key&&!["bulletin","events","subscriptions","guide"].includes(kind))fail("This section has no individual records.");
+ if(key&&!["bulletin","events","subscriptions"].includes(kind))fail("This section has no individual records.");
  const sourceItem=key?(input.payload?.items||saved.items||[]).find((item:any)=>itemKey(item)===key):null;
  if(key&&action!=="discard"&&!sourceItem)fail("The selected record is missing.");
  if(sourceItem?.id&&!(live.items||[]).some((item:any)=>item.id===sourceItem.id))fail("This record changed. Reload before saving.",409);
@@ -59,8 +57,7 @@ async function applyMutation(conn:Awaited<ReturnType<typeof repository.getConnec
   await audit.enqueueTransactionalAudit(conn,{actorId:actor,route:`/api/admin/publishing/${kind}/publish`,category:"content",action:"updated",description:`Published ${kind}${key?` record ${resolvedKey}`:" content"}`,before:live,after:publication});
  }else{
   let payload=action==="draft"?(key?replaceItem(saved,key,sourceItem):input.payload):null;
-  if(action==="discard"&&key){if(kind==="guide"&&Number(key))await repository.discardLegacyGuideDraft(conn,actor,Number(key));const current=await repository.readLive(conn,kind);payload=replaceItem(saved,key,(current.items||[]).find((item:any)=>itemKey(item)===key)||null);if(changedCount(payload,current)===0)payload=null;}
-  if(!key&&kind==="guide"&&action==="discard")await repository.discardLegacyGuideDraft(conn,actor);
+  if(action==="discard"&&key){const current=await repository.readLive(conn,kind);payload=replaceItem(saved,key,(current.items||[]).find((item:any)=>itemKey(item)===key)||null);if(changedCount(payload,current)===0)payload=null;}
   await repository.writeDraft(conn,kind,payload,payload?base:null,actor);
   if(key){meta[key]={...meta[key],savedAt:action==="draft"?new Date().toISOString():null};await repository.writeItemMeta(conn,kind,meta);}
   await audit.enqueueTransactionalAudit(conn,{actorId:actor,route:`/api/admin/publishing/${kind}/draft`,category:"content",action:"updated",description:`${action==="draft"?"Saved":"Discarded"} ${kind}${key?` record ${key}`:" draft"}`,before:saved,after:payload||live});

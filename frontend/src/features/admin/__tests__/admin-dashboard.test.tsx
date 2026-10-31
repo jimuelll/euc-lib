@@ -35,7 +35,8 @@ describe("compact admin dashboard", () => {
     mount();
     expect(screen.getByRole("link", { name: "Borrow a copy" })).toHaveAttribute("href", "/admin/circulation?tab=transaction&mode=borrow");
     expect(screen.getByRole("link", { name: "Return a copy" })).toHaveAttribute("href", "/admin/circulation?tab=transaction&mode=return");
-    expect(screen.getByRole("link", { name: "Reservations" })).toHaveAttribute("href", "/admin/reservations");
+    // Reservations is reachable from the Ready tile and Quick links, so it is not repeated as a desk action.
+    expect(within(screen.getByRole("navigation", { name: "Circulation actions" })).getAllByRole("link")).toHaveLength(2);
     await screen.findByRole("heading", { name: "Today’s totals" });
     const transactions = screen.getByRole("region", { name: "Recent transactions" });
     expect(within(transactions).getByText(/Alex returned/)).toBeInTheDocument();
@@ -53,9 +54,10 @@ describe("compact admin dashboard", () => {
     auth.role = role;
     mount();
     const links = within(await screen.findByRole("navigation", { name: "Quick links" }));
-    expect(links.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/manage");
+    expect(links.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(links.getByRole("link", { name: "Needs holdings" })).toHaveAttribute("href", "/admin/catalog?filter=needs-holdings");
     expect(Boolean(links.queryByRole("link", { name: "Reports" }))).toBe(role !== "staff");
+    expect(Boolean(document.querySelector(".admin-dashboard-overview"))).toBe(role !== "staff");
   });
 
   it("shows valid zero values neutrally and an accurate empty feed", async () => {

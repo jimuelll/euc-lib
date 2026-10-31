@@ -56,30 +56,8 @@ test("individual publication retains other saved drafts; publish all rolls back 
   }finally{Object.assign(repository,originals);audit.enqueueTransactionalAudit=originalAudit;notificationEmail.preview=originalPreview;notificationRepository.publishInTransaction=originalPublish;}
 });
 
-test("published guide addresses cannot be changed",()=>{
-  const module={id:1,title:"Guide",slug:"old",published_slug:"old",summary:"Summary",overview:"Overview",audience_roles:["staff"],steps:[{title:"Step",body:"Do this"}]};
-  assert.throws(()=>validatePublished("guide",{items:[{...module,slug:"new"}]},{items:[module]}),/addresses are locked/);
-});
-
-test("discard also restores a previously saved legacy guide draft", async () => {
-  const guide=require("../modules/user-guide/user-guide.service");
-  const keys=["getConnection","lockDraft","readLive","writeDraft","discardLegacyGuideDraft"];
-  const originals=Object.fromEntries(keys.map(key=>[key,repository[key]]));
-  const originalPrepare=guide.listForAdmin,originalAudit=audit.enqueueTransactionalAudit;
-  let restored=false,revision=0;
-  guide.listForAdmin=async()=>[];
-  repository.getConnection=async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release:()=>{}});
-  repository.lockDraft=async()=>({section:"guide",revision,draft_json:null,base_json:null,saved_at:null,published_at:null});
-  repository.readLive=async()=>({items:[{id:1,title:restored?"Published module":"Old draft",is_published:true,has_unpublished_changes:!restored}]});
-  repository.writeDraft=async()=>{revision++;};
-  repository.discardLegacyGuideDraft=async()=>{restored=true;};
-  audit.enqueueTransactionalAudit=async()=>{};
-  try {
-    const initial=await service.read("guide");
-    assert.equal(initial.hasDraft,true);assert.equal(initial.draftCount,1);
-    const discarded=await service.mutate("guide","discard",initial,1);
-    assert.equal(discarded.hasDraft,false);assert.equal(discarded.payload.items[0].title,"Published module");
-  } finally {Object.assign(repository,originals);guide.listForAdmin=originalPrepare;audit.enqueueTransactionalAudit=originalAudit;}
+test("the retired guide section is no longer a publishing section", async () => {
+  await assert.rejects(service.read("guide"));
 });
 
 test("save, publish, conflicts, discard, and failed publication preserve transaction boundaries", async () => {

@@ -13,8 +13,8 @@ test("restore upgrades the previous snapshot version and adds newly registered t
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 25);
-  assert.deepEqual(upgraded.tables.user_guide_modules, []);
+  assert.equal(upgraded.version, 26);
+  assert.equal("user_guide_modules" in upgraded.tables, false);
   assert.deepEqual(upgraded.tables.departments, []);
   assert.deepEqual(upgraded.tables.fine_accounts, []);
   assert.deepEqual(upgraded.tables.fine_ledger_entries, []);
@@ -27,6 +27,26 @@ test("restore upgrades the previous snapshot version and adds newly registered t
   assert.equal(upgraded.integrity.algorithm, "sha256");
 });
 
+test("restore drops the retired user guide table and its publishing draft from v25 snapshots", () => {
+  const backup = {
+    format: "euc-library-backup",
+    version: 25,
+    tables: {
+      user_guide_modules: [{ id: 1, slug: "getting-started" }],
+      website_content_drafts: [{ section: "guide", revision: 3 }, { section: "events", revision: 1 }],
+    },
+    schema: { tables: {} },
+  };
+  backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
+  const upgraded = upgradeBackup(backup);
+  assert.equal(upgraded.version, 26);
+  assert.equal("user_guide_modules" in upgraded.tables, false);
+  assert.deepEqual(upgraded.tables.website_content_drafts, [{ section: "events", revision: 1 }]);
+  assert.equal(upgraded.tableManifest.includes("user_guide_modules"), false);
+  assert.equal(registry.APPLICATION_TABLES.includes("user_guide_modules"), false);
+  assert.equal(upgraded.integrity.checksum, payloadChecksum(upgraded));
+});
+
 test("restore upgrades v11 with holdings defaults and preserves tables that already exist", () => {
   const backup = {
     format: "euc-library-backup",
@@ -36,7 +56,7 @@ test("restore upgrades v11 with holdings defaults and preserves tables that alre
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 25);
+  assert.equal(upgraded.version, 26);
   assert.deepEqual(upgraded.tables.copy_holdings, []);
   assert.deepEqual(upgraded.tables.catalog_settings, [{ id: 1, show_unheld_in_opac: 1, updated_by: null }]);
   assert.deepEqual(upgraded.tables.delivery_outbox, []);
@@ -89,7 +109,7 @@ test("restore upgrades v12 loan provenance and preserves outbox, holdings, setti
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 25);
+  assert.equal(upgraded.version, 26);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_id_snapshot, null);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_name_snapshot, "Unknown historical policy");
   assert.deepEqual(upgraded.tables.delivery_outbox, backup.tables.delivery_outbox);

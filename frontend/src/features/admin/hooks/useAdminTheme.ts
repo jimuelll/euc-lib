@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 // Admin styles load only once an admin surface is active, keeping them out of the public bundle.
-export const loadAdminStyles = () => Promise.all([import("../admin-theme.css"), import("../admin-workspaces.css")]);
+export const loadAdminStyles = () => Promise.all([import("../admin-tokens.css"), import("../admin-theme.css"), import("../admin-workspaces.css")]);
 
 // The body scope also reaches Radix portals and standalone print previews.
 export function useAdminTheme() {

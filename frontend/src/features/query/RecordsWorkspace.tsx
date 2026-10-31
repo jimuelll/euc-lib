@@ -85,7 +85,7 @@ export default function RecordsWorkspace({ report = false, onUpdated, refreshTok
             if (!popup)
                 throw new Error('Allow the print preview window, then try again.');
             const params = new URLSearchParams({ ...Object.fromEntries(Object.entries(requestFilters).map(([k, v]) => [k, String(v)])), columns: columns.map(c => c.key).join(',') });
-            popup.location.href = '/admin/query' + (report ? '/reports' : '') + '/preview?' + params;
+            popup.location.href = '/admin/reports' + (report ? '/reports' : '') + '/preview?' + params;
         }
         else
             await exportRecords(report, requestFilters, columns.map(c => c.key), format);

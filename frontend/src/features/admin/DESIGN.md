@@ -30,7 +30,7 @@ One token set, defined once on the admin root and inherited by portals. Pages ne
 | `--border` | `hsl(39 20% 80%)` | Rules and control borders |
 | `--primary` / `--maroon` | `#7a0000` | Primary button, selected chip, sidebar |
 | `--primary-hover` | `#930e0e` | Primary hover |
-| `--gold` | `#c9961f` | Active-tab ribbon, required mark, sidebar icon accents |
+| `--gold` | `#c9961f` | Required mark, sidebar icon accents |
 | `--focus` | maroon, 2px ring, 2px offset | Keyboard focus |
 
 ### Dark
@@ -82,7 +82,7 @@ No uppercase letter-spaced labels except column headings.
 
 ## Shape and density
 
-- Corners: 2px on panels, controls, chips, drawers and dialogs. Tabs and table rows are square. Avatars and status dots are round.
+- Corners are square on panels, controls, chips, tabs, tables, drawers and dialogs (matching the paper system). Avatars and status dots are round; the sidebar keeps its soft 6px item corners.
 - One level of containment: a panel never holds a bordered card. Group inside a panel with rules and headings.
 - Borders are 1px `--border`. Shadows only on floating layers (drawers, dialogs, popovers, menus).
 - No gradients, glows or decorative textures on admin surfaces.
@@ -103,12 +103,12 @@ No uppercase letter-spaced labels except column headings.
 - Maroon surface — the only large maroon area in the admin. 240px expanded, 64px collapsed rail with tooltips.
 - Section labels are 12px gold-tinted text; items are 40px rows; the active item uses a soft warm tint, not white.
 - Navigation scrolls independently with a bottom fade only while more items remain below.
-- A fixed footer holds the account row (initials, truncated name with full name on hover), Theme, Help and a 44px Sign out.
+- The footer is a single row: the account button (initials, truncated name with full name on hover) and a theme button. The account menu holds My account, Change password, Help & user guide, View public website and Sign out (44px menu items on touch).
 
 ### Top bar
 
 - 56px paper bar with a bottom rule. Left: sidebar toggle and breadcrumb (omitted on the Dashboard). Right: tool search (Ctrl+K) and notifications.
-- Theme toggle, Help and "View site" move to the sidebar account footer. No "More" menu.
+- Theme, Help and View site live in the sidebar footer and account menu. No "More" menu.
 
 ### Navigation
 
@@ -122,7 +122,8 @@ No uppercase letter-spaced labels except column headings.
 | Records | Users | `/admin/users` | all |
 | Records | Catalog | `/admin/catalog` | all |
 | Publishing | Website Content | `/admin/content` | admin+ |
-| Publishing | Notifications | `/admin/notifications` (Email deliveries as a tab) | admin+ |
+| Publishing | Notifications | `/admin/notifications` | admin+ |
+| Publishing | Email Deliveries | `/admin/library-emails` (account emails at `/admin/account-emails`, linked from Users) | super admin |
 | Publishing | Moderation | `/admin/moderation` | admin+ |
 | Insights | Analytics | `/admin/analytics` | admin+ |
 | Insights | Reports | `/admin/reports` | admin+ |
@@ -136,7 +137,7 @@ No uppercase letter-spaced labels except column headings.
 Rules:
 - A sidebar item points to its own route, never to another page's `?tab=`.
 - Every page is reachable from the sidebar or as a tab of a sidebar page; no orphan routes.
-- Old routes (`/admin/manage`, `/admin/holidays`, `/admin/query`, `/admin/book-types`, `/admin/backup`, `/admin/attendance-logs`, `/admin/library-emails`, `/admin/account-emails`, `catalog?tab=builder|ai`) redirect to the new ones, keeping their query parameters.
+- Old routes (`/admin/manage`, `/admin/holidays`, `/admin/query`, `/admin/book-types`, `/admin/backup`, `/admin/attendance-logs`, `/admin/restrictions`, `catalog?tab=builder|ai`) redirect to the new ones, keeping their query parameters.
 - Tool-search aliases stay with their items.
 
 ## Page layouts
@@ -163,7 +164,7 @@ The page scrolls, not its panels. Wide tables scroll horizontally inside their o
 
 One tab style everywhere, including inside drawers:
 - Transparent tabs over a full-width 1px rule, left-aligned, optional icon and count badge.
-- Active: ink label at 600 weight, 2px ink underline (salmon in dark mode), and a small gold ribbon notch above the label.
+- Active: ink label at 600 weight and a 2px ink underline (salmon in dark mode). The gold bookmark notch is a public-page treatment and is not used in the admin.
 - Inactive: muted label, brightens on hover. Focus ring inside the tab.
 - Count badges are neutral by default; attention coral only for an actionable non-zero count. Zero counts are visually hidden but stay in the accessible name.
 - Narrow screens scroll the tab row horizontally.
@@ -179,7 +180,7 @@ One tab style everywhere, including inside drawers:
 
 - Only on the Dashboard and Queue pages, and only when the tile filters or navigates. A tile never repeats a chip count shown below it.
 - Each tile is one link or button: icon, label, Fraunces numeral, short hint, arrow. Selected tiles keep a visible semantic border, separate from the focus ring.
-- Zero values are neutral; non-zero values take their status color.
+- Tiles sit on the normal panel surface. Non-zero values color the numeral and the bottom rule; zero values stay neutral. No tinted tile backgrounds.
 
 ### Tables and lists
 
@@ -204,14 +205,14 @@ One `AdminDetailDrawer` shell with three explicit variants. A drawer never opens
 - **Body:** one 18px inset (14px on mobile), scrolls independently. Forms inside add no second padding layer. `lg` drawers get a sticky section index built once in the shared component.
 - **Shared inner pieces:** section heading, field grid, read-only field, status strip, danger zone. Pages compose these rather than adding drawer-specific CSS.
 - **Danger zone** sits at the end of the body, separated by a rule, with its blockers listed.
-- **Confirmations** happen inline in the footer (the footer swaps to the confirm message and buttons). QR codes, receipts and previews are steps inside the drawer.
+- **Confirmations** raised while a drawer is open (archive, delete) swap into the footer. The exception is "Discard unsaved changes?", which stays a modal because staff expect it to interrupt an accidental close.
 - **Dismissal:** Escape, backdrop and close share one handler; Edit and New prompt before discarding changes. Focus returns to the opener, or to a visible list control if the opener is gone.
 - **URL:** the open record is in the URL (`?record=<id>`, plus `&mode=edit` when editing) so Refresh, Back and shared links reopen it.
 - Filters never use a drawer; they use an inline bar or popover (phones may use a bottom sheet).
 
 ### Dialogs
 
-Only for destructive or irreversible actions that cannot be confirmed inline (restore a backup, permanent delete, bulk archive), and for tool search. Centered, paper, 2px corners, title + consequence first, destructive action on the right in coral. Never stacked on another dialog.
+Only for destructive or irreversible actions that cannot be confirmed inline (restore a backup, permanent delete, bulk archive), and for tool search. Centered, paper, square corners, title + consequence first, destructive action on the right in coral. Never stacked on another dialog.
 
 ### Feedback and states
 
@@ -243,7 +244,7 @@ Only for destructive or irreversible actions that cannot be confirmed inline (re
 |---|---|
 | 0 | This document and WORKFLOWS.md. |
 | 1 | One admin token file; delete the doubled-selector overrides, the `!important`s and `refined-drawers.css`; one tab style. |
-| 2 | New navigation and routes with redirects; distinct icons; Email deliveries as a Notifications tab. |
+| 2 | New navigation and routes with redirects; distinct icons; Email Deliveries in the sidebar. |
 | 3 | Shell: slim top bar, account controls in the sidebar footer. |
 | 3.5 | Drawers: View/Edit/New variants, three sizes, shared inner pieces, inline confirmations, URL state, named close slot. |
 | 4 | The five page layouts as shared components. |

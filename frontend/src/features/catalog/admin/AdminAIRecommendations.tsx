@@ -31,7 +31,7 @@ export default function AdminAIRecommendations(){
  const refresh=()=>{void status.refetch();if(last?.status==='running')void progress.refetch();void client.invalidateQueries({queryKey:[...catalogKeys.embeddings(),'books']});};
  const data=status.data,total=data?.total||0,completed=last?.completed||0,runTotal=last?.total||0;
  const auditUrl=last?.auditEventId?`/admin/audit-logs?event=${last.auditEventId}`:last?.runId?`/admin/audit-logs?query=${encodeURIComponent(last.runId)}`:'/admin/audit-logs?query=AI%20backfill';
- return <div className="ai-workspace"><AdminPageHeader title="AI Recommendations" subtitle="Maintain book details that help the AI recommend similar reading." updatedAt={status.dataUpdatedAt} loading={status.isFetching} onRefresh={refresh}/>
+ return <div className="ai-workspace"><AdminPageHeader title="AI Recommendations" subtitle="Keep book summaries up to date so reading suggestions stay relevant." updatedAt={status.dataUpdatedAt} loading={status.isFetching} onRefresh={refresh}/>
   {status.isError&&<p role="alert" className="ai-error">{getApiErrorMessage(status.error,'Readiness counts could not be loaded.')} <Button variant="outline" onClick={refresh}>Try again</Button></p>}
   {data?.providers&&!data.providers.gemini&&<p role="status" className="ai-error">Google Gemini needs setup. Online synopsis lookup can still run; AI matching updates need server configuration.</p>}
   <section className="ai-coverage" aria-label="Book data coverage"><div className="ai-coverage-heading"><h2>{status.isPending?'Checking book coverage…':`${total} active books`}</h2><p><strong>{data?.needsAttention??'—'} need attention</strong> · Choose a missing-data check below.</p></div><div className="ai-coverage-cards">{[

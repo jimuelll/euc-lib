@@ -20,11 +20,13 @@ export default function Dashboard() {
   const query = useQuery({ queryKey: ["analytics", "desk"], queryFn: ({ signal }) => fetchAdminDashboard(signal) });
   const updatedAt = query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null;
   const refresh = () => void query.refetch();
+  // Staff get the desk view; collection-wide reference figures are for administrators.
+  const isAdministrator = user?.role === "admin" || user?.role === "super_admin";
   const quickLinks = [
-    { href: "/admin/manage", label: "Users", icon: "users" as const },
+    { href: "/admin/users", label: "Users", icon: "users" as const },
     { href: "/admin/catalog?filter=needs-holdings", label: "Needs holdings", icon: "catalog" as const },
     { href: "/admin/reservations", label: "Reservations", icon: "reservations" as const },
-    { href: "/admin/query", label: "Reports", icon: "reports" as const },
+    { href: "/admin/reports", label: "Reports", icon: "reports" as const },
   ].filter(link => {
     const item = allSidebarItems.find(item => item.url === link.href.split("?")[0]);
     return item && canAccessItem(item, user?.role);
@@ -37,7 +39,6 @@ export default function Dashboard() {
     <nav aria-label="Circulation actions" className="admin-dashboard-actions">
       <CompactAction href="/admin/circulation?tab=transaction&mode=borrow" icon="borrow" primary>Borrow a copy</CompactAction>
       <CompactAction href="/admin/circulation?tab=transaction&mode=return" icon="return">Return a copy</CompactAction>
-      <CompactAction href="/admin/reservations" icon="reservations">Reservations</CompactAction>
     </nav>
     <div aria-live="polite" className="sr-only">{query.isFetching ? "Refreshing dashboard data." : updatedAt ? `Dashboard updated at ${shortTime.format(updatedAt)}.` : ""}</div>
 
@@ -65,7 +66,7 @@ export default function Dashboard() {
           </nav>
         </CompactPanel>
       </div>
-      <LibraryOverview stats={query.data.stats} />
+      {isAdministrator && <LibraryOverview stats={query.data.stats} />}
     </> : query.isPending ? <DashboardSkeleton /> : <section className="admin-compact-panel admin-dashboard-unavailable" aria-labelledby="unavailable-heading">
       <h2 id="unavailable-heading">Dashboard data unavailable</h2><p>Refresh to load library totals and transactions.</p>
     </section>}

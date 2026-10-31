@@ -37,7 +37,6 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/events", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/notifications", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/subscriptions", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
-  { prefix: "/api/admin/user-guide", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/bulletin", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "state_transition", exclude: /\/(?:like|comments|comment-snapshots|reaction|helpful|interest|save)(?:\/|$)/ },
   { prefix: "/api/attendance/scan/time-out-all", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/attendance/scan", methods: ["POST"], type: "state_transition" },
@@ -53,7 +52,6 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/recommendations/books", methods: ["PUT", "PATCH"], type: "field_changes" },
   { prefix: "/api/admin/recommendations/embeddings/backfill", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/admin/subscriptions/reorder", methods: ["PATCH"], type: "affected_records" },
-  { prefix: "/api/admin/user-guide/reorder", methods: ["PATCH"], type: "affected_records" },
   { prefix: "/api/borrowing/admin/payments/settle", methods: ["POST"], type: "affected_records" },
 ];
 
@@ -74,7 +72,6 @@ function getCategory(path: string): string {
   if (path.includes("/site-content") || path.includes("/about")) return "content";
   if (path.includes("/notifications")) return "notifications";
   if (path.includes("/subscriptions")) return "subscriptions";
-  if (path.includes("/user-guide")) return "content";
   if (path.includes("/backup")) return "backup";
   if (path.includes("/clearance")) return "clearance";
   if (path.includes("/attendance")) return "attendance";
@@ -156,7 +153,6 @@ const fieldSets: Array<[string, Array<[string, string]>]> = [
   ["/borrows", [["userBarcode", "Borrower"], ["bookBarcode", "Copy barcode"], ["dueDate", "Due date"], ["status", "Status"]]],
   ["/reservations", [["userBarcode", "Borrower"], ["bookId", "Book"], ["status", "Status"], ["notes", "Notes"]]],
  ["/subscriptions", [["title", "Title"], ["url", "URL"], ["description", "Description"], ["category", "Category"], ["image_url", "Image"], ["is_active", "Active"], ["sort_order", "Order"], ["deleted_at", "Archived"]]],
-  ["/user-guide", [["slug", "Address"], ["title", "Title"], ["category", "Category"], ["summary", "Summary"], ["overview", "Overview"], ["target_path", "Admin link"], ["audience_roles", "Audience"], ["before_you_begin", "Preparation"], ["steps", "Steps"], ["warnings", "Warnings"], ["troubleshooting", "Troubleshooting"], ["image_url", "Image"], ["is_published", "Published"], ["deleted_at", "Archived"]]],
  ["/site-content", [["hero_kicker", "Hero kicker"], ["hero_title", "Hero title"], ["hero_highlight", "Hero highlight"], ["hero_description", "Hero description"], ["hero_image_url", "Hero image"], ["hero_stats", "Hero statistics"], ["hours", "Library hours"], ["address", "Address"], ["contact_email", "Contact email"], ["contact_phone", "Contact phone"]]],
   ["/about", [["library_name", "Library name"], ["established", "Established"], ["mission_title", "Mission title"], ["mission_text", "Mission"], ["history_title", "History title"], ["history_text", "History"], ["policies", "Policies"], ["facilities", "Facilities"], ["staff", "Staff"], ["spaces", "Spaces"]]],
 ];
@@ -241,12 +237,6 @@ function snapshotChanges(path: string, before: any, after: any, body: any = {}):
       change("pageCount", "AI book page count", oldMetadata.pageCount, newMetadata.pageCount) || [],
       change("publishedDate", "AI book publication date", oldMetadata.publishedDate, newMetadata.publishedDate) || [],
     ].flat();
-  }
-  if (path.includes("/user-guide/")) {
-    const oldContent = parseJson(before?.draft_content, {});
-    const newContent = after ? parseJson(after.draft_content, {}) : body;
-    const fields = fieldsForPath(path);
-    return fields.flatMap(([key, label]) => change(key, label, oldContent?.[key] ?? before?.[key], newContent?.[key] ?? after?.[key]) || []);
   }
   if (path.includes("catalog-schema")) {
     const oldFields: Array<Record<string, any>> = Array.isArray(before) ? before : [];
@@ -430,7 +420,6 @@ async function readSnapshot(path: string, body: Record<string, any> = {}, detail
     ["/events/", "SELECT id, title, starts_at, ends_at FROM library_events WHERE id = ? LIMIT 1"],
     ["/notifications/", "SELECT id, title, type, audience_type, audience_role, expires_at FROM notifications WHERE id = ? LIMIT 1"],
     ["/subscriptions/", "SELECT id, title, url, description, category, image_url, is_active, sort_order, deleted_at FROM academic_subscriptions WHERE id = ? LIMIT 1"],
-    ["/user-guide/", "SELECT id, slug, sort_order, draft_content, published_content, is_published, deleted_at FROM user_guide_modules WHERE id = ? LIMIT 1"],
     ["/reservations/", "SELECT id, status, notes, user_id, book_id FROM reservations WHERE id = ? LIMIT 1"],
     ["/borrows/", "SELECT id, status, due_date, returned_at, deleted_at, user_id, book_id, copy_id FROM borrowings WHERE id = ? LIMIT 1"],
     ["/clearance/transactions/", "SELECT id, transaction_type, amount, receipt_number FROM clearance_transactions WHERE id = ? LIMIT 1"],
@@ -484,8 +473,7 @@ function getDescription(method: string, path: string, body: Record<string, any>,
                         : path.includes("/about") ? "about content"
                           : path.includes("/events") ? "event"
                             : path.includes("/notifications") ? "notification"
-                                : path.includes("/user-guide") ? "user guide"
-                                  : path.includes("/reservations") ? "reservation"
+                                : path.includes("/reservations") ? "reservation"
                                     : path.includes("/clearance") ? "clearance transaction"
                                       : path.includes("/borrows") || path.includes("/circulation") ? "circulation record"
                                         : path.includes("/subscriptions") ? "subscription"
@@ -521,7 +509,6 @@ function affectedRecordType(path: string): string {
   if (path.includes("/backup/snapshots")) return "backup snapshot";
   if (path.includes("/recommendations/embeddings/backfill")) return "book embeddings";
   if (path.includes("/subscriptions/reorder")) return "subscriptions";
-  if (path.includes("/user-guide/reorder")) return "user guide modules";
   if (path.includes("/payments/settle")) return "payments";
   return "records";
 }

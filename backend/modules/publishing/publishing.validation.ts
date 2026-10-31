@@ -1,7 +1,6 @@
 import {normalizePostContent,validateImageDescriptions} from "../bulletin/bulletin.content";
 import { createHash } from "node:crypto";
 import { sections, type Section, type Payload } from "./publishing.types";
-import guide = require("../user-guide/user-guide.service");
 export const fail = (message: string, status = 400): never => { throw Object.assign(new Error(message), { status }); };
 export function section(value: unknown): Section { if (!sections.includes(value as Section))
     fail("Unknown publishing section", 404); return value as Section; }
@@ -74,7 +73,7 @@ export function validatePublished(kind: Section, payload: Payload, base: Payload
         }
         if (item.deleted)
             continue;
-        required(item.title, kind === "guide" ? "module title" : "title");
+        required(item.title, "title");
         if (kind === "events") {
             if (!item.starts_at || !Number.isFinite(new Date(item.starts_at).getTime()))
                 fail("Choose a valid event start.");
@@ -97,16 +96,7 @@ export function validatePublished(kind: Section, payload: Payload, base: Payload
                 fail("Post event end must be after its start.");
             safeUrl(item.event_registration_url, "registration", true);
         }
-        if (kind === "guide") { const original=(base.items||[]).find((row:any)=>row.id===item.id);if(original?.published_slug&&original.published_slug!==item.slug)fail("Published guide addresses are locked to keep existing links working.");
-            guide.validateContent(guide.normalizeContent(item));
-            safeUrl(item.image_url, "module image", true);
-        }
     }
     if ([...originalIds].some(id => !ids.has(id)))
         fail("A record is missing from the draft. Reload the section before publishing.", 409);
-    if (kind === "guide") {
-        const slugs = payload.items.filter((item: any) => !item.deleted).map((item: any) => guide.normalizeContent(item).slug);
-        if (new Set(slugs).size !== slugs.length)
-            fail("Each guide module needs a unique address.");
-    }
 }

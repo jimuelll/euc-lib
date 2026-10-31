@@ -11,6 +11,7 @@ export { default as AdminManage } from "./manage/Index";
 export * from "./hooks/useAdminUrlState";
 export * from "./hooks/useAdminFilters";
 export * from "./hooks/useUnsavedChanges";
+export * from "./hooks/useDrawerRecord";
 export { visibleSidebarSections } from "./layout/AdminLayoutData";
 
 export { default as AdminDateRange } from "./components/AdminDateRange";

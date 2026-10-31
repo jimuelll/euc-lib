@@ -61,7 +61,7 @@ test('staff desk features work through the application mounts while financial an
       replace(`../modules/${path}`);
       routers[name] = require(`../modules/${path}`);
     }
-    for (const name of ['authRoutes', 'publicCatalogRoutes', 'recommendationPublicRoutes', 'borrowingRoutes', 'reservationRoutes', 'bulletinRoutes', 'eventRoutes', 'aboutRoutes', 'attendanceRoutes', 'subscriptionsRoutes', 'analyticsRoutes', 'myLibraryRoutes', 'siteContentRoutes', 'userGuideRoutes', 'publishingRoutes']) routers[name] = express.Router();
+    for (const name of ['authRoutes', 'publicCatalogRoutes', 'recommendationPublicRoutes', 'borrowingRoutes', 'reservationRoutes', 'bulletinRoutes', 'eventRoutes', 'aboutRoutes', 'attendanceRoutes', 'subscriptionsRoutes', 'analyticsRoutes', 'myLibraryRoutes', 'siteContentRoutes', 'publishingRoutes']) routers[name] = express.Router();
     replace('../modules/admin/barcode.routes');
     replace('../modules', routers);
     replace('../app');

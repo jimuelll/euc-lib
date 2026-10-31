@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 import AcademicSettings from "./AdminHolidays";
-import AdminUsersRedirect from "@/features/admin/manage/AdminUsersRedirect";
+import AdminRedirect from "@/features/admin/components/AdminRedirect";
 import * as api from "./api";
 
 vi.mock("./api", () => ({ fetchLibrarySettings: vi.fn(), fetchAcademicPrograms: vi.fn(), fetchAcademicTerms: vi.fn(), fetchDepartments: vi.fn() }));
@@ -18,13 +18,13 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 it.each([["programs", "programId", 7], ["terms", "termId", 8], ["departments", "departmentId", 9]])("opens Users with the correct %s reference filter", async (tab, filter, id) => {
-  render(<MemoryRouter initialEntries={[`/admin/holidays?tab=${tab}`]}><Routes><Route path="/admin/holidays" element={<AcademicSettings />} /><Route path="/admin/manage" element={<Destination />} /></Routes></MemoryRouter>, { wrapper: createTestQueryClientWrapper() });
+  render(<MemoryRouter initialEntries={[`/admin/settings/academic?tab=${tab}`]}><Routes><Route path="/admin/settings/academic" element={<AcademicSettings />} /><Route path="/admin/users" element={<Destination />} /></Routes></MemoryRouter>, { wrapper: createTestQueryClientWrapper() });
   const link = await screen.findByRole("link", { name: "2 user references" });
-  expect(link).toHaveAttribute("href", expect.stringContaining(`/admin/manage?${filter}=${id}&status=all`));
+  expect(link).toHaveAttribute("href", expect.stringContaining(`/admin/users?${filter}=${id}&status=all`));
   fireEvent.click(link);
-  expect(await screen.findByTestId("destination")).toHaveTextContent(`/admin/manage?${filter}=${id}&status=all&academicLabel=`);
+  expect(await screen.findByTestId("destination")).toHaveTextContent(`/admin/users?${filter}=${id}&status=all&academicLabel=`);
 });
 it("keeps academic and patron parameters when redirecting an older Users address", () => {
-  render(<MemoryRouter initialEntries={["/admin/users?programId=7&status=all&academicLabel=Information%20Systems&patron=CARD-1#details"]}><Routes><Route path="/admin/users" element={<AdminUsersRedirect />} /><Route path="/admin/manage" element={<Destination />} /></Routes></MemoryRouter>);
-  expect(screen.getByTestId("destination")).toHaveTextContent("/admin/manage?programId=7&status=all&academicLabel=Information%20Systems&patron=CARD-1#details");
+  render(<MemoryRouter initialEntries={["/admin/manage?programId=7&status=all&academicLabel=Information%20Systems&patron=CARD-1#details"]}><Routes><Route path="/admin/manage" element={<AdminRedirect to="/admin/users" />} /><Route path="/admin/users" element={<Destination />} /></Routes></MemoryRouter>);
+  expect(screen.getByTestId("destination")).toHaveTextContent("/admin/users?programId=7&status=all&academicLabel=Information%20Systems&patron=CARD-1#details");
 });

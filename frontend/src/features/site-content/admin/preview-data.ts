@@ -5,13 +5,12 @@ export interface PreviewSnapshot {
   section: ContentSection;
   documents: Partial<Record<ContentSection, ContentPayload>>;
   user: User | null;
-  role: string;
   token: string | null;
 }
 
 export const previewPaths: Record<ContentSection, string> = {
   homepage: "/", about: "/about", bulletin: "/bulletin", events: "/bulletin#upcoming-events",
-  subscriptions: "/services/subscriptions", guide: "/admin/user-guide",
+  subscriptions: "/services/subscriptions",
 };
 
 const records = (value?: ContentPayload): ContentPayload[] =>
@@ -21,7 +20,7 @@ const ordered = (items: ContentPayload[]) => [...items].sort((a, b) => (a.sort_o
 
 // Match the public API shapes so the production pages own all rendering.
 export function resolvePreviewData(snapshot: PreviewSnapshot, path: string, params: Record<string, unknown> = {}): unknown {
-  const { documents, role } = snapshot;
+  const { documents } = snapshot;
   if (path === "/api/site-content" && documents.homepage) return documents.homepage;
   if (path === "/api/about" && documents.about) return documents.about;
   if (path === "/api/subscriptions" && documents.subscriptions)
@@ -29,8 +28,6 @@ export function resolvePreviewData(snapshot: PreviewSnapshot, path: string, para
   if (path === "/api/events" && documents.events)
     return records(documents.events).filter(item => new Date(item.ends_at || item.starts_at).getTime() >= Date.now())
       .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
-  if (path === "/api/user-guide" && documents.guide)
-    return ordered(records(documents.guide).filter(item => item.is_published && item.audience_roles?.includes(role)));
   if (path === "/api/bulletin" && documents.bulletin) {
     const search = String(params.search ?? "").trim().toLowerCase();
     const items: ContentPayload[] = records(documents.bulletin).filter(item => !item.archived)

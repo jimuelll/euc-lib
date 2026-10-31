@@ -9,7 +9,6 @@ const state=vi.hoisted(()=>({role:'admin',notifications:[] as Array<Record<strin
 vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:{role:state.role}})}));
 vi.mock('@/context/NotificationsContext',()=>({useNotifications:()=>state}));
 vi.mock('@/components/ui/sidebar',()=>({SidebarTrigger:()=> <button>Open navigation</button>}));
-vi.mock('../components/AdminThemeToggle',()=>({AdminThemeToggle:()=> <button>Theme</button>}));
 function Location(){return <output data-testid="location">{useLocation().pathname}</output>;}
 function mount(){render(<MemoryRouter initialEntries={['/admin']}><AdminTopbar pathname="/admin"/><Location/></MemoryRouter>);}
 async function open(){const trigger=screen.getByRole('button',{name:state.unreadCount?`${state.unreadCount} unread notifications`:'Notifications'});fireEvent.pointerDown(trigger,{button:0,ctrlKey:false});return screen.findByRole('menu');}

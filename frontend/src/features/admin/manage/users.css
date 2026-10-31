@@ -64,7 +64,7 @@
 .users-role-choices { min-width:0; border:0; padding:0; }
 .users-role-choices legend { font-weight:600; margin-bottom:12px; }
 .users-role-choices>div { display:grid; gap:8px; }
-.users-role-choice { display:flex; align-items:start; gap:12px; padding:12px; border:1px solid var(--drawer-control-border); cursor:pointer; }
+.users-role-choice { display:flex; align-items:start; gap:12px; padding:12px; border:1px solid hsl(var(--input)); cursor:pointer; }
 .users-role-choice:has(input:checked) { border-color:var(--library-maroon); background:hsl(var(--muted)); outline:1px solid var(--library-maroon); }
 .users-role-choice input { margin-top:4px; width:18px; height:18px; accent-color:var(--library-maroon); }
 .users-drawer .users-role-choice input { min-height:18px; }
@@ -108,4 +108,16 @@
 }
 @media(max-width:767px) {
  [data-library-design][data-library-design] .users-obligations .users-borrowing-summary>div a { padding:10px 12px; }
+}
+.users-drawer .admin-desk-tabs { position:sticky; top:0; z-index:2; align-self:start; background:hsl(var(--card)); }
+
+/* Phone rows: name and ID first, then role, borrowing and access in a compact block (about 120px per user). */
+@media(max-width:640px) {
+  .users-row { grid-template-columns:24px auto minmax(0,1fr) 44px; gap:6px 12px; padding:12px; align-items:center; }
+  .users-identity { grid-column:2/4; grid-row:1; }
+  .users-identity .users-avatar { display:none; }
+  .users-row>.users-role { grid-column:2; grid-row:2; margin-left:0; align-self:start; }
+  .users-borrowing { grid-column:3; grid-row:2/4; margin-left:0; font-size:13px; }
+  .users-row>div:last-of-type { grid-column:2; grid-row:3; margin-left:0; }
+  .users-row>button:last-child { grid-column:4; grid-row:1; }
 }

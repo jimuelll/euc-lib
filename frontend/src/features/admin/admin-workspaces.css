@@ -6,7 +6,7 @@
 [data-library-design][data-library-design] :is(.circulation-status-filters,.circulation-search-row) { min-width:0; max-width:100%; }
 [data-library-design][data-library-design] :is(.config-filters,.publishing-chips,.ai-list-filters,.circulation-status-filters,.notification-segments) button { background:hsl(var(--card)); color:hsl(var(--foreground)); border-radius:0; }
 [data-library-design][data-library-design] :is(.config-filters,.publishing-chips,.ai-list-filters,.circulation-status-filters,.notification-segments) button[aria-pressed=true] { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); border-color:hsl(var(--primary)); }
-.dark [data-library-design][data-library-design] :is(.config-filters,.publishing-chips,.ai-list-filters,.circulation-status-filters,.notification-segments) button[aria-pressed=true] { background:hsl(var(--action)); color:hsl(var(--background)); border-color:hsl(var(--action)); }
+.dark [data-library-design][data-library-design] :is(.config-filters,.publishing-chips,.ai-list-filters,.circulation-status-filters,.notification-segments) button[aria-pressed=true] { background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); border-color:hsl(var(--fill)); }
 [data-library-design][data-library-design] :is(.config-filters,.publishing-chips,.ai-list-filters,.circulation-status-filters,.notification-segments) button > span { color:inherit; background:transparent; font-family:ui-monospace,monospace; }
 [data-library-design][data-library-design] .admin-record-header :is(code,.config-chip) { color:hsl(var(--foreground)); background:transparent; }
 [data-library-design][data-library-design] .admin-record-header .config-chip { border-color:hsl(var(--border)); }
@@ -253,3 +253,87 @@
 @media print {
  [data-library-design][data-library-design] .records-accessible-head th { height:auto; padding:5px; font-size:8pt; line-height:normal; border-bottom:1px solid hsl(var(--border)); }
 }
+
+/* Read-only drawer fields and disabled drawer actions stay legible instead of fading. */
+body.admin-workspace [data-library-design] .admin-record-body :is(input, textarea, [role="combobox"]):disabled { opacity: 1; color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+body.admin-workspace [data-library-design] .admin-record-footer button:disabled { opacity: 1; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border-color: hsl(var(--border)); box-shadow: none; }
+
+/* Record drawer: paper header with a double rule, three widths, a mode label and a named close button. */
+.admin-desk-drawer[data-size] { display:flex; flex-direction:column; gap:0; width:100%; max-width:640px; padding:0; overflow:hidden; }
+.admin-desk-drawer[data-size="sm"] { max-width:480px; }
+.admin-desk-drawer[data-size="lg"] { max-width:880px; }
+.admin-record-header { flex-shrink:0; background:hsl(var(--card)); color:hsl(var(--foreground)); border-top:3px double hsl(var(--foreground)); border-bottom:1px solid hsl(var(--border)); padding:16px 64px 14px 18px; text-align:left; }
+.admin-record-header h2 { color:inherit; font-size:20px; line-height:1.3; }
+.admin-record-header p { color:hsl(var(--muted-foreground)); font-size:14px; }
+.admin-record-header .admin-record-mode { display:flex; align-items:center; gap:10px; margin:0 0 2px; font-size:12px; font-weight:600; color:hsl(var(--muted-foreground)); }
+.admin-record-dirty { display:inline-flex; align-items:center; gap:6px; font-weight:500; color:hsl(var(--admin-tone-amber)); }
+.admin-record-dirty > span { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.admin-record-header-actions { display:flex; gap:8px; margin-top:12px; }
+.admin-record-header-actions button { color:hsl(var(--foreground)); border-color:hsl(var(--input)); background:transparent; min-height:40px; }
+.admin-desk-drawer > [data-library-ui="sheet-close"] { display:grid; place-items:center; width:44px; height:44px; top:12px; right:12px; color:hsl(var(--foreground)); opacity:1; background:transparent; border-radius:0; }
+.admin-desk-drawer > [data-library-ui="sheet-close"]:hover { background:hsl(var(--muted)); }
+.admin-desk-drawer > [data-library-ui="sheet-close"] svg { width:20px; height:20px; }
+.admin-record-body { flex:1; min-height:0; overflow-y:auto; padding:24px; }
+.admin-record-footer { flex-shrink:0; padding:16px 24px; border-top:1px solid hsl(var(--border)); background:hsl(var(--card)); display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.admin-record-footer button { min-height:44px; }
+@media(max-width:640px) { .admin-record-body { padding:16px; } .admin-record-header { padding-left:16px; } .admin-record-footer { padding:12px 16px calc(12px + env(safe-area-inset-bottom)); } }
+
+.admin-desk-drawer:is(.reservation-detail,.circulation-detail) { overflow:hidden; width:100%; }
+
+.admin-record-footer :is(.circulation-inline-actions,.reservation-actions) { display:flex; gap:8px; flex-wrap:wrap; margin:0; }
+
+/* Records control row (AdminControlRow): chips, search and Filters on one line. */
+.admin-control-row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; min-width:0; }
+.admin-control-search { display:flex; flex:1; min-width:240px; align-items:center; gap:10px; padding:0 12px; border:1px solid hsl(var(--input)); background:hsl(var(--card)); }
+.admin-control-search > svg { width:18px; height:18px; flex-shrink:0; color:hsl(var(--muted-foreground)); }
+.admin-control-search input { min-height:40px; padding:0; border:0; background:transparent; box-shadow:none; }
+.admin-control-search:focus-within { outline:2px solid var(--focus-ring); outline-offset:2px; }
+.admin-control-search input:focus-visible { outline:none; box-shadow:none; }
+.admin-control-filters { gap:8px; }
+.admin-control-count { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 6px; background:hsl(var(--fill)); color:hsl(var(--fill-foreground)); font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+.admin-control-popover { display:grid; gap:14px; width:min(320px, calc(100vw - 32px)); }
+@media (max-width:760px) {
+  .admin-control-row > .admin-desk-filter-chips { flex-basis:100%; }
+  .admin-control-search { flex:1 1 0; min-width:0; }
+}
+
+/* Phone layout: keep the first screen for work, not chrome. */
+@media (max-width:640px) {
+  /* Header actions: one sideways-scrolling row, primary action first, Updated as small inline text. */
+  body.admin-workspace [data-library-design] .admin-desk-header { gap:12px; min-width:0; max-width:100%; }
+  body.admin-workspace [data-library-design] .admin-desk-header > * { min-width:0; max-width:100%; }
+  body.admin-workspace [data-library-design] .admin-desk-header-actions { display:flex; flex-wrap:nowrap; align-items:center; gap:8px; width:100%; overflow-x:auto; scrollbar-width:none; }
+  body.admin-workspace [data-library-design] .admin-desk-header-actions::-webkit-scrollbar { display:none; }
+  body.admin-workspace [data-library-design] .admin-desk-header-actions > * { flex:none; }
+  body.admin-workspace [data-library-design] .admin-desk-header-actions > [data-variant="default"] { order:-1; }
+  body.admin-workspace [data-library-design] .admin-desk-header-actions > .admin-desk-secondary { order:1; font-size:12px; white-space:nowrap; }
+
+  /* Summary tiles become shallow rows: label and number, hint underneath, no icon plate. */
+  body.admin-workspace [data-library-design] .admin-desk-tile { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:4px 12px; min-height:0; padding:12px 14px; }
+  body.admin-workspace [data-library-design] .admin-desk-tile .admin-desk-tile-icon { display:none; }
+  body.admin-workspace [data-library-design] .admin-desk-tile .admin-desk-tile-copy { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; margin:0; text-align:left; }
+  body.admin-workspace [data-library-design] .admin-desk-tile .admin-desk-tile-copy strong { font-size:30px; line-height:1.1; }
+  body.admin-workspace [data-library-design] .admin-desk-tile[data-library-currency] .admin-desk-tile-copy strong { font-size:26px; }
+  /* Drawer footers: actions share one row instead of stacking. */
+  body.admin-workspace [data-library-design] .admin-record-footer :is(.circulation-inline-actions, .reservation-actions) { flex-wrap:nowrap; }
+  body.admin-workspace [data-library-design] .admin-record-footer :is(button, a[data-library-ui="button"]) { flex:1 1 0; min-width:0; padding-inline:10px; }
+  body.admin-workspace [data-library-design] .admin-desk-tile .library-shelf-footer { grid-column:1 / -1; margin:0; padding:6px 0 0; font-size:12px; }
+
+}
+
+/* AdminHelpNote: collapsed explanations. */
+.admin-help-note { font-size:13px; line-height:1.55; color:hsl(var(--muted-foreground)); }
+.admin-help-note > summary { display:inline-flex; align-items:center; gap:6px; min-height:32px; cursor:pointer; list-style:none; color:hsl(var(--muted-foreground)); }
+.admin-help-note > summary::-webkit-details-marker { display:none; }
+.admin-help-note > summary:hover { color:hsl(var(--foreground)); }
+.admin-help-note > summary > svg { width:16px; height:16px; flex-shrink:0; }
+.admin-help-note > div { display:grid; gap:6px; max-width:72ch; padding:4px 0 8px 22px; }
+.admin-help-note p { margin:0; }
+
+/* Inline drawer confirmation: replaces the footer, never stacks a dialog over the drawer. */
+.admin-record-confirm { flex-direction:column; align-items:stretch; gap:10px; border-top:2px solid hsl(var(--foreground)); }
+.admin-record-confirm[data-tone="danger"] { border-top-color:hsl(var(--admin-tone-red)); }
+.admin-record-confirm-copy strong { display:block; font-size:14px; font-weight:600; color:hsl(var(--foreground)); }
+.admin-record-confirm-copy p { margin:2px 0 0; font-size:13px; color:hsl(var(--muted-foreground)); }
+.admin-record-confirm-actions { display:flex; justify-content:flex-end; gap:8px; }
+

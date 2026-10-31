@@ -17,7 +17,7 @@ it("keeps tools and totals in History while Desk retains scanner controls and a 
   setup();
   expect(screen.getByRole("heading", { name: "Borrow & Return", level: 1 })).toBeTruthy();
   expect(screen.getByText("Record loans and returns, or review circulation history.")).toBeTruthy();
-  await waitFor(() => expect(screen.getByRole("tab", { name: "Transaction history" }).getAttribute("aria-describedby")).toBe("circulation-history-overdue"));
+  await waitFor(() => expect(screen.getByRole("tab", { name: "History" }).getAttribute("aria-describedby")).toBe("circulation-history-overdue"));
   expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
   expect(screen.queryByRole("button", { name: "View archive" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
@@ -27,14 +27,14 @@ it("keeps tools and totals in History while Desk retains scanner controls and a 
   expect(within(copy).getByRole("button", { name: "Search catalog" })).toBeTruthy();
   expect(within(copy).queryByRole("button", { name: "Scan copy QR code" })).toBeNull();
   expect(within(copy).queryByRole("button", { name: "Look up accession number or copy QR code" })).toBeNull();
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Transaction history" }), { button: 0, ctrlKey: false });
-  expect(screen.getByRole("tabpanel", { name: "Transaction history" })).toBeTruthy();
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "History" }), { button: 0, ctrlKey: false });
+  expect(screen.getByRole("tabpanel", { name: "History" })).toBeTruthy();
   expect(screen.getAllByRole("heading", { name: "Borrow & Return", level: 1 })).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Refresh" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "View archive" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
   expect(screen.getByTestId("route").textContent).toBe("?tab=history&mode=borrow");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Desk transaction" }), { button: 0, ctrlKey: false });
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Desk" }), { button: 0, ctrlKey: false });
   expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
 });
 it("opens Copy first through a Return deep link and keeps the mode when switching page tabs", async () => {
@@ -42,8 +42,8 @@ it("opens Copy first through a Return deep link and keeps the mode when switchin
   expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Accession number or copy QR code" }));
   expect(screen.queryByRole("textbox", { name: "Student / employee ID or name" })).toBeNull();
   expect(screen.getByRole("button", { name: /^Return$/ }).getAttribute("aria-pressed")).toBe("true");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Transaction history" }), { button: 0, ctrlKey: false });
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "History" }), { button: 0, ctrlKey: false });
   expect(screen.getByTestId("route").textContent).toBe("?tab=history&mode=return");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Desk transaction" }), { button: 0, ctrlKey: false });
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Desk" }), { button: 0, ctrlKey: false });
   expect(screen.getByRole("textbox", { name: "Accession number or copy QR code" })).toBeTruthy();
 });

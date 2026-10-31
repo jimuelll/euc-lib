@@ -32,9 +32,9 @@ describe("circulation history", () => {
     expect(within(screen.getByRole("group", { name: "Loan status" })).getAllByRole("button").at(-1)?.textContent).toBe("All10");
     expect(screen.getByRole("button", { name: /^Return$/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: "View fine" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Overdue 4" }));
-    await waitFor(() => expect(api.getCirculationLog).toHaveBeenCalledWith(expect.objectContaining({ status: "overdue" }), expect.any(AbortSignal)));
-    expect(screen.getByRole("button", { name: "Active 2" })).toBeTruthy();
+    // Overdue and Active are filtered from the summary tiles, so the chips do not repeat them.
+    expect(screen.queryByRole("button", { name: "Overdue 4" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Active 2" })).toBeNull();
     expect(screen.getByText("24 days overdue", { exact: false })).toBeTruthy();
     expect(screen.getByText("DEMO-REAL-004")).toBeTruthy();
   });

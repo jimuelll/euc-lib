@@ -7,10 +7,10 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {useModerationStats} from "@/features/moderation";
 import { useAuth } from "@/context/AuthContext";
-import { dashboardItem, visibleSidebarSections, resolveCurrentItem, getInitials } from "../AdminLayoutData";
+import { dashboardItem, helpItem, visibleSidebarSections, resolveCurrentItem, getInitials } from "../AdminLayoutData";
 import type { SidebarItem } from "../AdminLayout.types";
 import { AdminSidebarIcon, adminSidebarIconByUrl } from "./AdminSidebarIcon";
-import { AdminThemeToggle as ThemeToggle } from "../../components/AdminThemeToggle";
+import { useTheme } from "@/hooks/use-theme";
 
 export function AdminSidebar() {
   const { state, isMobile, openMobile, setOpenMobile } = useSidebar();
@@ -28,6 +28,7 @@ export function AdminSidebar() {
   const compact = state === "collapsed" && !isMobile;
   const { pathname, search } = useLocation();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const reviewStats=useModerationStats();
   const navigationRef = useRef<HTMLDivElement>(null);
   const [moreBelow, setMoreBelow] = useState(false);
@@ -76,23 +77,26 @@ export function AdminSidebar() {
       </SidebarContent>
       </div>
       <SidebarFooter className="admin-account-footer">
-        {isMobile && <div className="flex items-center justify-between px-2 py-2 text-sm"><span>Appearance</span><ThemeToggle /></div>}
-        <DropdownMenu>
-          <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
-            <button type="button" className="admin-account-trigger" aria-label={`Account menu for ${name}`}>
-              <span className="admin-account-initials">{getInitials(user?.name)}</span>
-              {!compact && <><span className="admin-account-copy"><span className="admin-account-name">{name}</span><span className="admin-account-role">{user?.role?.replace(/_/g, " ")}</span></span><AdminIcon name="more" width={16} height={16} aria-hidden="true" /></>}
-            </button>
-          </DropdownMenuTrigger></TooltipTrigger><TooltipContent side={isMobile ? "top" : "right"}>{name}</TooltipContent></Tooltip>
-          <DropdownMenuContent side={isMobile ? "top" : "right"} align="end">
-            <DropdownMenuLabel>My account</DropdownMenuLabel>
-            <DropdownMenuItem asChild><Link to="/edit-profile" onClick={close}><AdminIcon name="account" className="mr-2 size-4" />My account</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/change-password" onClick={close}><AdminIcon name="password" className="mr-2 size-4" />Change password</Link></DropdownMenuItem>
-            <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => void logout()}>Sign out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <div className="admin-signout-row">
-          <Tooltip><TooltipTrigger asChild><button type="button" className="admin-signout" onClick={() => void logout()} aria-label="Sign out"><AdminSidebarIcon name="logout" />{!compact && <span>Sign out</span>}</button></TooltipTrigger><TooltipContent side="right" hidden={!compact}>Sign out</TooltipContent></Tooltip>
+        <div className="admin-account-row">
+          <DropdownMenu>
+            <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
+              <button type="button" className="admin-account-trigger" aria-label={`Account menu for ${name}`}>
+                <span className="admin-account-initials">{getInitials(user?.name)}</span>
+                {!compact && <><span className="admin-account-copy"><span className="admin-account-name">{name}</span><span className="admin-account-role">{user?.role?.replace(/_/g, " ")}</span></span><AdminIcon name="chevronDown" className="admin-account-chevron" aria-hidden="true" /></>}
+              </button>
+            </DropdownMenuTrigger></TooltipTrigger><TooltipContent side={isMobile ? "top" : "right"}>{name}</TooltipContent></Tooltip>
+            <DropdownMenuContent side={isMobile ? "top" : "right"} align="end" className="min-w-56">
+              <DropdownMenuLabel>{name}</DropdownMenuLabel>
+              <DropdownMenuItem asChild><Link to="/edit-profile" onClick={close}><AdminIcon name="account" className="mr-2 size-4" />My account</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/change-password" onClick={close}><AdminIcon name="password" className="mr-2 size-4" />Change password</Link></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild><Link to={helpItem.url} onClick={close}><AdminIcon name="help" className="mr-2 size-4" />{helpItem.title}</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><a href="/" target="_blank" rel="noreferrer"><AdminIcon name="external" className="mr-2 size-4" />View public website</a></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => void logout()}><AdminSidebarIcon name="logout" className="mr-2 size-4" />Sign out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {!compact && <Tooltip><TooltipTrigger asChild><button type="button" className="admin-theme-button" onClick={toggleTheme} aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}><AdminIcon name={theme === "dark" ? "sun" : "moon"} /></button></TooltipTrigger><TooltipContent side="top">{theme === "dark" ? "Light theme" : "Dark theme"}</TooltipContent></Tooltip>}
         </div>
       </SidebarFooter>
     </div>

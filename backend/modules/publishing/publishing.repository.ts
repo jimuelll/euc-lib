@@ -3,7 +3,6 @@ import type { Section, Payload, DraftRow } from "./publishing.types";
 import audit = require("../analytics/transactional-audit");
 import {contentChanged} from "../bulletin/bulletin.content";
 import { canonical } from "./publishing.validation";
-import guide = require("../user-guide/user-guide.service");
 import about = require("../about/about.repository");
 const db = require("../../db") as Pool;
 export const getConnection = () => db.getConnection();
@@ -30,18 +29,14 @@ export async function readLive(conn: PoolConnection, kind: Section, lock = false
         events: "SELECT id,title,starts_at,ends_at FROM library_events ORDER BY id",
         subscriptions: "SELECT id,title,url,description,category,image_url,image_alt,image_public_id,is_active,sort_order FROM academic_subscriptions WHERE deleted_at IS NULL ORDER BY id",
         bulletin: "SELECT id,title,content,edited_at,content_revision,image_url,image_alt,gallery,image_public_id,post_type,event_starts_at,event_ends_at,event_location,event_registration_url,is_pinned,created_at,deleted_at FROM bulletin_posts ORDER BY id",
-        guide: "SELECT id,sort_order,draft_content,published_content,is_published,published_at FROM user_guide_modules WHERE deleted_at IS NULL ORDER BY id",
     };
     const [rows] = await conn.query<RowDataPacket[]>(sql[kind] + suffix);
-    return { items: rows.map(row => kind === "guide" ? { ...guide.normalizeContent(parse(row.draft_content, {})), id: Number(row.id), sort_order: Number(row.sort_order), is_published: Boolean(row.is_published), published_at: date(row.published_at), published_slug:parse(row.published_content,{})?.slug||null, has_unpublished_changes: canonical(parse(row.draft_content, {})) !== canonical(parse(row.published_content, {})) } : { ...row, ...Object.fromEntries(Object.entries(row).filter(([key]) => key.endsWith("_at")).map(([key, value]) => [key, date(value)])), ...(kind === "subscriptions" ? { is_active: Boolean(row.is_active) } : {}), ...(kind === "bulletin" ? { is_pinned: Boolean(row.is_pinned), archived: Boolean(row.deleted_at), gallery:parse(row.gallery,[]) } : {}) }) };
+    return { items: rows.map(row => ({ ...row, ...Object.fromEntries(Object.entries(row).filter(([key]) => key.endsWith("_at")).map(([key, value]) => [key, date(value)])), ...(kind === "subscriptions" ? { is_active: Boolean(row.is_active) } : {}), ...(kind === "bulletin" ? { is_pinned: Boolean(row.is_pinned), archived: Boolean(row.deleted_at), gallery:parse(row.gallery,[]) } : {}) })) };
 }
 export async function writeDraft(conn: PoolConnection, kind: Section, payload: Payload | null, base: Payload | null, userId: number): Promise<void> {
     await conn.query("UPDATE website_content_drafts SET draft_json=?,base_json=?,revision=revision+1,saved_at=?,updated_by=? WHERE section=?", [payload ? JSON.stringify(payload) : null, base ? JSON.stringify(base) : null, payload ? new Date() : null, userId, kind]);
 }
 export async function markPublished(conn: PoolConnection, kind: Section, userId: number): Promise<void> { await conn.query("UPDATE website_content_drafts SET draft_json=NULL,base_json=NULL,revision=revision+1,saved_at=NULL,published_at=NOW(),updated_by=? WHERE section=?", [userId, kind]); }
-export async function discardLegacyGuideDraft(conn: PoolConnection, actor: number,id?:number): Promise<void> {
-    await conn.query("UPDATE user_guide_modules SET draft_content=published_content,updated_by=? WHERE is_published=1 AND published_content IS NOT NULL AND deleted_at IS NULL"+(id?" AND id=?":""),id?[actor,id]:[actor]);
-}
 const sqlDate = (value: any) => value ? String(value).replace("T", " ").slice(0, 19) : null;
 export async function writeLive(conn: PoolConnection, kind: Section, payload: Payload, base: Payload, actor: number, itemKey?:string): Promise<void> {
     if (kind === "homepage") {
@@ -56,7 +51,7 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
     for (const item of payload.items) {
         if(itemKey && String(item.id||item._key)!==itemKey)continue;
         const original = base.items.find((row: any) => Number(row.id) === Number(item.id));
-        if (original && canonical(original) === canonical(item) && !(kind === "guide" && item.is_published && item.has_unpublished_changes))
+        if (original && canonical(original) === canonical(item))
             continue;
         if (item.deleted) {
             if (!item.id)
@@ -68,8 +63,6 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
             if (kind === "bulletin") {
                 await conn.query("UPDATE bulletin_posts SET deleted_at=NOW(),deleted_by=?,is_pinned=0 WHERE id=?", [actor, item.id]);
             }
-            if (kind === "guide")
-                await conn.query("UPDATE user_guide_modules SET slug=CONCAT(slug,'-archived-',id),deleted_at=NOW(),updated_by=? WHERE id=?", [actor, item.id]);
             continue;
         }
         let fields: string[] = [];
@@ -89,16 +82,6 @@ export async function writeLive(conn: PoolConnection, kind: Section, payload: Pa
             table = "bulletin_posts";
             fields = ["title", "excerpt", "content", "image_url", "image_alt", "gallery", "image_public_id", "post_type", "event_starts_at", "event_ends_at", "event_location", "event_registration_url", "is_pinned", "deleted_at", "deleted_by"];
             values = [item.title, item.content.slice(0, 500), item.content, item.image_url || null, item.image_alt||null, JSON.stringify(item.gallery||[]), item.image_public_id || null, item.post_type, sqlDate(item.event_starts_at), sqlDate(item.event_ends_at), item.event_location || null, item.event_registration_url || null, item.archived ? 0 : item.is_pinned ? 1 : 0, item.archived ? new Date() : null, item.archived ? actor : null];
-        }
-        if (kind === "guide") {
-            const content = guide.normalizeContent(item);
-            table = "user_guide_modules";
-            fields = ["slug", "sort_order", "draft_content", "is_published", "updated_by"];
-            values = [content.slug, item.sort_order || 0, JSON.stringify(content), item.is_published ? 1 : 0, actor];
-            if (item.is_published) {
-                fields.push("published_content", "published_at");
-                values.push(JSON.stringify(content), new Date());
-            }
         }
         if (item.id) {
             if(kind==='bulletin' && original && contentChanged(original,item)){fields.push('edited_at','content_revision');values.push(new Date(),Number(original.content_revision||1)+1);await audit.enqueueTransactionalAudit(conn,{actorId:actor,route:`/api/bulletin/${item.id}`,category:'content',description:`Edited bulletin post ${item.id} through Website Content`,before:original,after:{...item,content_revision:Number(original.content_revision||1)+1}});}

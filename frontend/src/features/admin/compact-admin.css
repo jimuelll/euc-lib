@@ -158,7 +158,6 @@
   .admin-dashboard-header { align-items: flex-start; }
   .admin-dashboard-refresh { flex-direction: column; align-items: flex-end; gap: 4px; }
   .admin-dashboard-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .admin-dashboard-actions > a:last-child { grid-column: 1 / -1; }
   .admin-dashboard-outstanding { grid-template-columns: minmax(0, 1fr); }
   .admin-dashboard-summary-value { font-size: 1.5rem; }
   .admin-workspace .admin-compact-text-link,
@@ -174,7 +173,6 @@
   .admin-dashboard-header { flex-wrap: wrap; }
   .admin-dashboard-refresh { flex-direction: row; justify-content: space-between; width: 100%; }
   .admin-dashboard-actions { grid-template-columns: minmax(0, 1fr); }
-  .admin-dashboard-actions > a:last-child { grid-column: auto; }
   .admin-compact-metric { gap: 8px; }
   .admin-compact-metric .admin-compact-metric-arrow { display: none; }
 }
@@ -185,6 +183,23 @@
 /* Shared operational vocabulary, opt-in on adopted admin surfaces. */
 .admin-desk-header { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
 .admin-desk-header h1 { font-size:28px; font-weight:650; line-height:1.25; letter-spacing:-.03em; margin-bottom:6px; }
+.admin-desk-title-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; min-width:0; }
+.admin-desk-title-row h1 { margin-bottom:0; }
+.admin-page-help-trigger { display:inline-grid; place-items:center; flex:none; width:28px; height:28px; border:1px solid hsl(var(--border)); border-radius:999px; background:hsl(var(--card)); color:hsl(var(--muted-foreground)); transition:color .15s, border-color .15s; }
+.admin-page-help-trigger svg { width:16px; height:16px; }
+.admin-page-help-trigger:hover, .admin-page-help-trigger[data-state="open"] { color:hsl(var(--action)); border-color:hsl(var(--action)); }
+.admin-page-help-trigger:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+@media (max-width:767px) { .admin-page-help-trigger { width:36px; height:36px; } }
+.admin-page-help { width:min(22rem, calc(100vw - 32px)); padding:16px; border-radius:0; background:hsl(var(--card)); color:hsl(var(--foreground)); }
+.admin-page-help-eyebrow { font-size:12px; font-weight:600; color:hsl(var(--muted-foreground)); }
+.admin-page-help h2 { margin:2px 0 6px; font-size:16px; font-weight:600; }
+.admin-page-help-summary { font-size:13px; line-height:1.55; color:hsl(var(--muted-foreground)); }
+.admin-page-help section { margin-top:12px; padding-top:12px; border-top:1px solid hsl(var(--border)); }
+.admin-page-help h3 { font-size:13px; font-weight:600; margin-bottom:6px; }
+.admin-page-help ul { display:grid; gap:6px; padding-left:18px; list-style:disc; font-size:13px; line-height:1.5; }
+.admin-page-help-link { display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-size:13px; font-weight:600; color:hsl(var(--action)); text-underline-offset:3px; }
+.admin-page-help-link:hover { text-decoration:underline; }
+.admin-page-help-link svg { width:14px; height:14px; }
 .admin-desk-header p,.admin-desk-secondary { color:hsl(var(--muted-foreground)); font-size:13px; line-height:1.5; }
 .admin-desk-header-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
 .admin-desk-tile { display:flex; align-items:center; gap:12px; padding:16px; border:1px solid hsl(var(--border)); border-radius:8px; background:hsl(var(--card)); text-align:left; min-width:0; }
@@ -194,11 +209,11 @@
 .admin-desk-tile>svg { width:18px; height:18px; flex-shrink:0; }
 .admin-desk-tile-icon { display:flex; padding:10px; border-radius:6px; background:hsl(var(--muted)); flex-shrink:0; }
 .admin-desk-tile-icon svg { width:24px; height:24px; }
-.admin-desk-tile[data-tone=red] { background:hsl(var(--admin-tone-red-surface)); border-color:hsl(var(--admin-tone-red-border)); }
-.dark .admin-desk-tile[data-tone=red] { background:hsl(10 24% 16%); }
-.admin-desk-tile[data-tone=green] { background:hsl(var(--admin-tone-green-surface)); border-color:hsl(var(--admin-tone-green-border)); }
-.admin-desk-tile[data-tone=amber] { background:hsl(var(--admin-tone-amber-surface)); border-color:hsl(var(--admin-tone-amber)/.45); }
-.admin-desk-tile[data-tone=blue] { background:hsl(var(--admin-tone-blue-surface)); border-color:hsl(var(--admin-tone-blue)/.45); }
+/* Tiles stay on the panel surface; the number and bottom rule carry the status colour, so urgency reads without a tinted block. */
+.admin-desk-tile[data-tone=red] { border-color:hsl(var(--admin-tone-red-border)); }
+.admin-desk-tile[data-tone=green] { border-color:hsl(var(--admin-tone-green-border)); }
+.admin-desk-tile[data-tone=amber] { border-color:hsl(var(--admin-tone-amber)/.45); }
+.admin-desk-tile[data-tone=blue] { border-color:hsl(var(--admin-tone-blue)/.45); }
 .admin-desk-tile[data-tone=red] :is(strong,.admin-desk-tile-icon),.admin-desk-status[data-tone=red] { color:hsl(var(--admin-tone-red)); }
 .admin-desk-tile[data-tone=green] :is(strong,.admin-desk-tile-icon),.admin-desk-status[data-tone=green] { color:hsl(var(--admin-tone-green)); }
 .admin-desk-tile[data-tone=amber] :is(strong,.admin-desk-tile-icon),.admin-desk-status[data-tone=amber] { color:hsl(var(--admin-tone-amber)); }
@@ -235,23 +250,7 @@
 @media(max-width:760px) { .admin-desk-header-actions>span { flex-basis:100%; } .admin-desk-header-actions { gap:8px; } .admin-desk-filter-chips button { min-height:44px; } .admin-desk-tabs > .admin-desk-page-tabs { gap:4px; } }
 
 /* Shared record drawers: one fixed header/footer and an independently scrolling body. */
-.admin-desk-drawer { display:flex; flex-direction:column; gap:0; width:100%; max-width:640px; padding:0; overflow:hidden; }
-.admin-record-header { flex-shrink:0; background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); padding:20px 64px 20px 24px; text-align:left; }
-.admin-record-header h2 { color:inherit; font-size:20px; }
-.admin-record-header p { color:hsl(var(--primary-foreground)/.85); font-size:14px; }
-.admin-record-header-actions { display:flex; gap:8px; margin-top:12px; }
-.admin-record-header-actions button { color:inherit; border-color:hsl(var(--primary-foreground)/.4); background:transparent; min-height:40px; }
-.admin-desk-drawer>button:last-child { display:grid; place-items:center; width:44px; height:44px; top:12px; right:12px; color:hsl(var(--primary-foreground)); opacity:1; background:transparent; border-radius:6px; }
-.admin-desk-drawer>button:last-child:hover { background:hsl(var(--primary-foreground)/.15); }
-.admin-desk-drawer>button:last-child svg { width:20px; height:20px; }
-.admin-record-body { flex:1; min-height:0; overflow-y:auto; padding:24px; }
-.admin-record-footer { flex-shrink:0; padding:16px 24px; border-top:1px solid hsl(var(--border)); background:hsl(var(--card)); display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
-.admin-record-footer button { min-height:44px; }
-@media(max-width:640px) { .admin-record-body { padding:16px; } .admin-record-header { padding-left:16px; } .admin-record-footer { padding:12px 16px calc(12px + env(safe-area-inset-bottom)); } }
-
-.admin-desk-drawer:is(.reservation-detail,.circulation-detail) { overflow:hidden; width:100%; }
-
-.admin-record-footer :is(.circulation-inline-actions,.reservation-actions) { display:flex; gap:8px; flex-wrap:wrap; margin:0; }
+/* Record drawer styles live in admin-workspaces.css so every admin page gets them. */
 
 .admin-desk-filter-chips button[data-tone=amber]:not([aria-pressed=true]) { background:hsl(var(--admin-tone-amber)/.1); border-color:hsl(var(--admin-tone-amber)/.5); color:hsl(var(--admin-tone-amber)); }
 

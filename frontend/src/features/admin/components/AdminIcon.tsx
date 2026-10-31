@@ -18,6 +18,7 @@ const drawings = {
   attendance: <><circle cx="10" cy="10" r="7" /><path d="m13 20 3 2 6-7" /><path d="M10 6v4l3 2" stroke={gold} /></>,
   attendanceActivity: <><circle cx="8" cy="7" r="3" /><path d="M2 21v-3a6 6 0 0 1 10-4" /><circle cx="17" cy="16" r="5" /><path d="M17 13v3l2 1" /></>,
   content: <><path d="M12 21H3V3h18v9M3 8h18M6 12h6M6 16h3" /><path d="m14 17 5-5 3 3-5 5-4 1z" stroke={gold} /></>,
+  email: <><path d="M3 6h18v12H3z" /><path d="m3 7 9 6 9-6" stroke={gold} /></>,
   notifications: <><path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4zM12 2v2" /><path d="M10 20a2 2 0 0 0 4 0" stroke={gold} /></>,
   analytics: <><path d="M3 21h18M5 17v-5h4v5M11 17V8h4v9" /><path d="M17 17V3h4v14" stroke={gold} /></>,
   reports: <><path d="M18 21H4V3h11l5 5v3M15 3v5h5M7 7h4M7 11h5M7 15h3" /><path d="m12 19 3-4 3 2 4-5" stroke={gold} /></>,
@@ -38,6 +39,7 @@ const drawings = {
   chevronDown: <path d="m5 9 7 7 7-7" />,
   refresh: <><path d="M20 9a8 8 0 1 0-1 9M20 3v6h-6" /></>,
   search: <><circle cx="10.5" cy="10.5" r="7" /><path d="m16 16 5 5" /></>,
+  filter: <><path d="M4 6h16M7 12h10M10 18h4" /></>,
   more: <><circle cx="5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="19" cy="12" r="1" fill="currentColor" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" /></>,
   archive: <><path d="M3 3h18v5H3zM5 8v13h14V8M9 12h6" /></>,
@@ -60,11 +62,11 @@ const drawings = {
 export type AdminIconName = keyof typeof drawings;
 export const adminIconByUrl: Record<string, AdminIconName> = {
   "/admin/user-guide": "help", "/admin": "dashboard", "/admin/circulation": "circulation", "/admin/reservations": "reservations",
-  "/admin/clearance": "clearance", "/admin/manage": "users", "/admin/catalog": "catalog",
-  "/admin/attendance-logs": "attendance", "/admin/content": "content", "/admin/notifications": "notifications",
-  "/admin/moderation": "moderation", "/admin/analytics": "analytics", "/admin/query": "reports", "/admin/holidays": "academic",
-  "/admin/book-types": "policies", "/admin/catalog?tab=builder": "configuration",
-  "/admin/catalog?tab=ai": "recommendations", "/admin/audit-logs": "audit", "/admin/backup": "backup",
+  "/admin/clearance": "clearance", "/admin/attendance": "attendance", "/admin/users": "users", "/admin/catalog": "catalog",
+  "/admin/content": "content", "/admin/notifications": "notifications", "/admin/library-emails": "email",
+  "/admin/moderation": "moderation", "/admin/analytics": "analytics", "/admin/reports": "reports", "/admin/audit-logs": "audit",
+  "/admin/settings/academic": "academic", "/admin/settings/loan-policies": "policies",
+  "/admin/settings/catalog-fields": "configuration", "/admin/settings/ai": "recommendations", "/admin/settings/backup": "backup",
 };
 
 export function AdminIcon({ name, accent = false, ...props }: SVGProps<SVGSVGElement> & { name: AdminIconName; accent?: boolean }) {

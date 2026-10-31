@@ -15,6 +15,8 @@ export function useUnsavedChanges(value: unknown, open: boolean, identity: strin
   const confirmDiscard = useCallback(async () => !dirty || await confirm({
     title: "Discard unsaved changes?", description: "Your changes have not been saved. Keep editing to preserve them.",
     actionLabel: "Discard changes", cancelLabel: "Keep editing", tone: "danger",
+    // Staff expect this one as a modal: it interrupts an accidental close more clearly than a footer swap.
+    placement: "dialog",
   }), [dirty, confirm]);
   useEffect(() => {
     if (!dirty) return;

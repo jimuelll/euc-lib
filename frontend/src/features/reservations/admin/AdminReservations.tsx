@@ -1,11 +1,10 @@
 import { LibraryAvailability } from "@/components/ui/library-patterns";
-import {useSearchParams} from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdminDetailDrawer, AdminIcon, CompactPanel, AdminPageHeader, AdminSummaryTile, AdminFilterChips, AdminStatusBadge, AdminSelectionCheckbox } from "@/features/admin";
+import { useDrawerRecord, AdminDetailDrawer, AdminIcon, CompactPanel, AdminPageHeader, AdminSummaryTile, AdminFilterChips, AdminStatusBadge, AdminSelectionCheckbox } from "@/features/admin";
 import ReservationRowActions from "./components/ReservationRowActions";
 import { useReservations } from "./hooks/useReservations";
 import type { AdminReservation } from "./reservations.types";
@@ -32,18 +31,20 @@ export function preparationBlocker(row: AdminReservation) {
 }
 const labels = { pending: "Pending", ready: "Ready", fulfilled: "Fulfilled", cancelled: "Cancelled", expired: "Expired" };
 
+const reservationId = (row: AdminReservation) => row.id;
+
 export default function AdminReservations() {
   const desk = useReservations();
-  const [auditParams]=useSearchParams(),openedRecord=useRef(0);
+  ;
   const [selected, setSelected] = useState<number[]>([]);
-  const [detail, setDetail] = useState<AdminReservation | null>(null);
   const [cancelRows, setCancelRows] = useState<AdminReservation[]>([]);
   const [reason, setReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => setSelected([]), [desk.statusFilter, desk.page, desk.search, desk.showArchived]);
   const rows = desk.data?.rows ?? [];
-  useEffect(()=>{const id=Number(auditParams.get("recordId"));if(id&&openedRecord.current!==id){const match=rows.find(row=>row.id===id);if(match){openedRecord.current=id;setDetail(match);}}},[rows,auditParams]);
+  // recordId is also what audit-log links use to open a reservation.
+  const [detail, openDetail, closeDetail] = useDrawerRecord(rows, reservationId, "recordId");
   const summary = desk.data?.summary;
   const busy = desk.actionId !== null || desk.bulkBusy || cancelBusy;
   const selectedRows = rows.filter(row => selected.includes(row.id) && !closed(row));
@@ -54,7 +55,7 @@ export default function AdminReservations() {
   const closedCount = summary ? summary.fulfilled_count + summary.cancelled_count + summary.expired_count : undefined;
   const counts: Record<string, number | undefined> = { needs_action: summary ? summary.pending_count + summary.ready_count : undefined, pending: summary?.pending_count, ready: summary?.ready_count, attention: summary?.expiring_count !== undefined ? summary.expiring_count + summary.expired_count : undefined, closed: closedCount, all: summary?.total_records };
   const openCancel = (items: AdminReservation[]) => { opener.current = document.getElementById(`reservation-detail-${items[0]?.id}`) || document.activeElement as HTMLElement; setReason(""); setCancelRows(items); };
-  const showDetails = (row: AdminReservation) => { opener.current = document.getElementById(`reservation-detail-${row.id}`) || document.activeElement as HTMLElement; setDetail(row); };
+  const showDetails = (row: AdminReservation) => { opener.current = document.getElementById(`reservation-detail-${row.id}`) || document.activeElement as HTMLElement; openDetail(row); };
   const onCancel = (id: number) => { const row = rows.find(item => item.id === id); if (row) openCancel([row]); };
   const actions = (row: AdminReservation) => <ReservationRowActions id={row.id} title={row.book_title} status={row.status} isActing={busy || desk.loading} showArchived={desk.showArchived} preparationBlocker={preparationBlocker(row)} onMarkReady={desk.handleMarkReady} onFulfill={() => void desk.handleFulfill(row)} onCancel={onCancel} onArchive={desk.handleArchive} onRestore={desk.handleRestore} onDetails={() => showDetails(row)} />;
   const renderRows = (items: AdminReservation[]) => <ul className="reservation-list">{items.map(row => {
@@ -74,7 +75,7 @@ export default function AdminReservations() {
   const group = (title: string, id: string, items: AdminReservation[]) => items.length ? <CompactPanel title={`${title} · ${items.length}`} id={id}>{renderRows(items)}</CompactPanel> : null;
   return <div className="reservations-page" aria-busy={desk.loading}>
     {desk.confirmDialog}
-    <AdminPageHeader title="Reservations" subtitle="Prepare holds and process patron pickups through Borrow & Return." updatedAt={desk.updatedAt} loading={desk.loading || busy} onRefresh={() => void desk.fetchReservations()} actions={<Button variant="outline" className="admin-compact-button" disabled={busy} onClick={desk.handleToggleArchived}><AdminIcon name="archive" />{desk.showArchived ? "View active reservations" : "View archive"}</Button>} />
+    <AdminPageHeader title="Reservations" subtitle="Set aside requested books and hand them over at pickup." updatedAt={desk.updatedAt} loading={desk.loading || busy} onRefresh={() => void desk.fetchReservations()} actions={<Button variant="outline" className="admin-compact-button" disabled={busy} onClick={desk.handleToggleArchived}><AdminIcon name="archive" />{desk.showArchived ? "View active reservations" : "View archive"}</Button>} />
     {desk.error && <div role="alert" className="reservation-error"><span>{desk.error}{desk.data && " Showing the last available records."}</span><Button variant="outline" onClick={() => void desk.fetchReservations()}>Try again</Button></div>}
     {!desk.showArchived && <section aria-label="Outstanding reservations" className="reservation-summary">{[
       { label: "Ready for pickup", filter: "ready", tone: "green", icon: "reservations" as const, count: counts.ready, hint: summary?.soonest_expiry ? `Soonest expiry ${stamp(summary.soonest_expiry)}` : "Prepared holds awaiting pickup" },
@@ -92,6 +93,6 @@ export default function AdminReservations() {
       <footer className="reservation-footer"><span className="reservation-secondary">{desk.data.total ? `${(desk.page - 1) * 15 + 1}–${Math.min(desk.page * 15, desk.data.total)} of ${desk.data.total}` : "0 records"}{desk.loading && " · Updating…"}</span><div><Button variant="outline" disabled={desk.page <= 1 || desk.loading || busy} onClick={() => desk.setPage(desk.page - 1)}>Previous</Button><span className="reservation-secondary">Page {desk.page} of {Math.max(1, desk.data.totalPages)}</span><Button variant="outline" disabled={desk.page >= desk.data.totalPages || desk.loading || busy} onClick={() => desk.setPage(desk.page + 1)}>Next</Button></div></footer>
     </>}
     <Dialog open={!!cancelRows.length} onOpenChange={open => { if (!open && !cancelBusy) setCancelRows([]); }}><DialogContent className="reservation-dialog" onCloseAutoFocus={event => { event.preventDefault(); opener.current?.focus(); }}><DialogHeader><DialogTitle>Cancel {cancelRows.length === 1 ? "reservation" : `${cancelRows.length} reservations`}?</DialogTitle><DialogDescription>This releases the hold and notifies the patron. Add a reason for the reservation record.</DialogDescription></DialogHeader><label htmlFor="reservation-cancel-reason">Cancellation reason</label><textarea id="reservation-cancel-reason" maxLength={500} rows={3} value={reason} disabled={cancelBusy} onChange={event => setReason(event.target.value)} placeholder="Why is this hold being cancelled?" /><DialogFooter><Button variant="outline" disabled={cancelBusy} onClick={() => setCancelRows([])}>Keep reservation</Button><Button variant="destructive" disabled={!reason.trim() || cancelBusy} onClick={async () => { setCancelBusy(true); try { if (cancelRows.length === 1) await desk.handleCancel(cancelRows[0].id, cancelRows[0].book_title, reason.trim()); else await desk.handleBulk("cancel", cancelRows, reason.trim()); setCancelRows([]); setSelected([]); } finally { setCancelBusy(false); } }}>{cancelBusy ? "Cancelling…" : "Cancel reservation"}</Button></DialogFooter></DialogContent></Dialog>
-    <AdminDetailDrawer open={!!detail} onClose={() => setDetail(null)} title="Reservation details" description="Request, pickup deadline and patron information." className="reservation-detail" footer={detail ? actions(detail) : undefined} onAfterClose={() => opener.current?.focus()}>{detail && <><h3>{detail.book_title}</h3><p className="reservation-secondary">{detail.book_author}</p><dl><div><dt>Patron</dt><dd>{detail.user_name}<span className="reservation-id">{detail.student_employee_id}</span></dd></div><div><dt>Contact</dt><dd>{detail.patron_email || detail.patron_contact ? <>{detail.patron_email && <span>{detail.patron_email}</span>}{detail.patron_contact && <span>{detail.patron_contact}</span>}</> : "Not provided"}</dd></div><div><dt>Status</dt><dd>{labels[detail.status]}</dd></div><div><dt>Notes</dt><dd className="reservation-notes">{detail.notes || "No notes recorded"}</dd></div></dl><section className="reservation-request-history" aria-label="Request history"><h4>Request history</h4><ol><li><strong>Reserved</strong><time>{stamp(detail.reserved_at)}</time></li>{detail.expires_at && <li><strong>Pickup deadline</strong><time>{stamp(detail.expires_at)}</time></li>}<li><strong>Current status</strong><span>{labels[detail.status]}</span></li></ol></section></>}</AdminDetailDrawer>
+    <AdminDetailDrawer open={!!detail} onClose={closeDetail} title="Reservation details" description="Request, pickup deadline and patron information." className="reservation-detail" footer={detail ? actions(detail) : undefined} onAfterClose={() => opener.current?.focus()}>{detail && <><h3>{detail.book_title}</h3><p className="reservation-secondary">{detail.book_author}</p><dl><div><dt>Patron</dt><dd>{detail.user_name}<span className="reservation-id">{detail.student_employee_id}</span></dd></div><div><dt>Contact</dt><dd>{detail.patron_email || detail.patron_contact ? <>{detail.patron_email && <span>{detail.patron_email}</span>}{detail.patron_contact && <span>{detail.patron_contact}</span>}</> : "Not provided"}</dd></div><div><dt>Status</dt><dd>{labels[detail.status]}</dd></div><div><dt>Notes</dt><dd className="reservation-notes">{detail.notes || "No notes recorded"}</dd></div></dl><section className="reservation-request-history" aria-label="Request history"><h4>Request history</h4><ol><li><strong>Reserved</strong><time>{stamp(detail.reserved_at)}</time></li>{detail.expires_at && <li><strong>Pickup deadline</strong><time>{stamp(detail.expires_at)}</time></li>}<li><strong>Current status</strong><span>{labels[detail.status]}</span></li></ol></section></>}</AdminDetailDrawer>
   </div>;
 }
