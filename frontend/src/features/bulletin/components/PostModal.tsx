@@ -9,8 +9,9 @@ import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/u
 import {archiveBulletinPost,fetchBulletinPost,setBulletinPinned,setDiscussionLocked} from '../api';
 import {toPost,getInitials,copyBulletinLink} from '../utils';
 import {bulletinKeys} from '../bulletin.keys';
+import {announcePostArchived} from '../archive-feedback';
 import type {PostModalProps} from './types/postModal.types';
-import {useAdminConfirmDialog} from '@/features/admin';
+import {useAdminConfirmDialog} from '@/features/admin/public';
 import {RoleBadges} from './CommentIdentity';
 import PostTimestamp from './PostTimestamp';
 import PostModalActions from './PostModalActions';
@@ -30,9 +31,9 @@ function PostReader(props:PostModalProps){
  const query=useQuery({queryKey:bulletinKeys.post(initial.id),queryFn:({signal})=>fetchBulletinPost(initial.id,signal),staleTime:0,retry:false});
  const post=useMemo(()=>query.data?toPost(query.data):initial,[query.data,initial]);
  const admin=['admin','super_admin'].includes(user?.role||''),canEdit=admin||(user?.role==='staff'&&user.id===post.author_id),canArchive=admin||user?.id===post.author_id;
- const pin=useMutation({mutationFn:()=>setBulletinPinned(post.id,!post.is_pinned),onSuccess:async()=>{props.onPinToggle?.(post.id,!post.is_pinned);await Promise.all([query.refetch(),client.invalidateQueries({queryKey:bulletinKeys.lists()})]);}});
- const archive=useMutation({mutationFn:()=>archiveBulletinPost(post.id),onSuccess:async()=>{await client.invalidateQueries({queryKey:bulletinKeys.lists()});props.onArchived?.(post.id);props.onClose();}});
- const lock=useMutation({mutationFn:()=>setDiscussionLocked(post.id,!post.comments_locked),onSuccess:async()=>{await Promise.all([query.refetch(),client.invalidateQueries({queryKey:['bulletin-discussion-updates',post.id]})]);}});
+ const pin=useMutation({mutationFn:()=>setBulletinPinned(post.id,!post.is_pinned),onSuccess:async()=>{setShareFeedback(post.is_pinned?'Post unpinned.':'Post pinned.');props.onPinToggle?.(post.id,!post.is_pinned);await Promise.all([query.refetch(),client.invalidateQueries({queryKey:bulletinKeys.lists()})]);}});
+ const archive=useMutation({mutationFn:()=>archiveBulletinPost(post.id),onSuccess:async()=>{await client.invalidateQueries({queryKey:bulletinKeys.lists()});props.onArchived?.(post.id);announcePostArchived(client,post.id,admin);props.onClose();}});
+ const lock=useMutation({mutationFn:()=>setDiscussionLocked(post.id,!post.comments_locked),onSuccess:async()=>{setShareFeedback(post.comments_locked?'Discussion reopened.':'Discussion locked.');await Promise.all([query.refetch(),client.invalidateQueries({queryKey:['bulletin-discussion-updates',post.id]})]);}});
  const images=useMemo(()=>[...(post.image_url?[{url:post.image_url,alt:post.image_alt||''}]:[]),...(post.gallery||[])],[post.image_url,post.image_alt,post.gallery]);
  const summary=useMemo(()=>({reaction_counts:post.reaction_counts||{like:post.likes,helpful:0,thanks:0,interested:0},helpful_count:post.helpful_count,helpful_by_me:post.helpful_by_me,saved_by_me:post.saved_by_me,interested_count:post.interested_count,interested_by_me:post.interested_by_me,reaction_total:post.reaction_total??post.likes,my_reaction:post.my_reaction??(post.liked_by_me?'like' as const:null),likes:post.likes,liked_by_me:post.liked_by_me}),[post]);
  const requireLogin=()=>{if(props.onRequireLogin)props.onRequireLogin();else setLogin(true);};

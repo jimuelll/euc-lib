@@ -2,7 +2,7 @@ import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql
 import transforms = require("./snapshot.transforms");
 import snapshot = require("./snapshot.service");
 import accession = require("./accession.restore");
-import type { SnapshotPayload, SnapshotRow } from "./snapshot.types";
+import type { SnapshotPayload } from "./snapshot.types";
 
 const db = require("../../db") as Pool;
 type QueryConnection = Pool | PoolConnection;

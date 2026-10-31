@@ -1,6 +1,3 @@
-import { BookOpen, RotateCcw } from "lucide-react";
-import type { ElementType } from "react";
-
 export type TransactionType = "borrow" | "return";
 
 export interface BookInfo {
@@ -72,27 +69,3 @@ export interface ReturnPreview {
 export interface ReturnReceipt extends ReturnPreview {
   returned_at: string;
 }
-
-export interface TransactionConfig {
-  label: string;
-  icon: ElementType;
-  color: string;
-  bg: string;
-}
-
-export const TRANSACTION_CONFIG: Record<TransactionType, TransactionConfig> = {
-  borrow: {
-    label: "Borrow",
-    icon:  BookOpen,
-    color: "text-info",
-    bg:    "bg-info/10 border-info/20",
-  },
-  return: {
-    label: "Return",
-    icon:  RotateCcw,
-    color: "text-success",
-    bg:    "bg-success/10 border-success/20",
-  },
-};
-
-export const DEFAULT_LOAN_DAYS = 7;

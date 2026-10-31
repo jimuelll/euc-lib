@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAdminConfirmDialog, formatPeso } from "@/features/admin";
 import { fetchClearanceProfile, recordClearancePayment, adjustClearanceFine, clearanceKeys } from "@/features/clearance";
@@ -31,12 +32,16 @@ export default function ReturnFineActions({ loan, disabled, onBusyChange }: { lo
     const confirmedAmount = profile.data?.outstandingAmount;
     if (confirmedAmount === undefined || busy || !await confirm({ title: "Record cash payment?", description: `Confirm that ${currency(confirmedAmount)} has been collected. This settles all outstanding fines for ${loan.user_name}. A receipt is generated after recording.`, actionLabel: "Record cash payment" })) return;
     setError("");
-    try { await payment.mutateAsync(confirmedAmount); } catch (err) { setError(getApiErrorMessage(err, "Could not record payment. Please retry.")); }
+    try {
+      const { receiptNumber } = await payment.mutateAsync(confirmedAmount);
+      toast.success(`${currency(confirmedAmount)} payment recorded.`, receiptNumber ? { action: { label: "View receipt", onClick: () => window.open(`/admin/clearance/receipt/${encodeURIComponent(receiptNumber)}`, "_blank", "noopener") } } : undefined);
+    } catch (err) { setError(getApiErrorMessage(err, "Could not record payment. Please retry.")); }
   };
   const waive = async () => {
     if (!reason.trim() || busy || !fine || fine.unsettled_amount <= 0) return;
     setError("");
-    try { await waiver.mutateAsync(); setWaiveOpen(false); setReason(""); } catch (err) { setError(getApiErrorMessage(err, "Could not waive the fine. Please retry.")); }
+    const waivedAmount = fine.unsettled_amount;
+    try { await waiver.mutateAsync(); setWaiveOpen(false); setReason(""); toast.success(`${currency(waivedAmount)} fine waived.`); } catch (err) { setError(getApiErrorMessage(err, "Could not waive the fine. Please retry.")); }
   };
   return <div className="circulation-fine">{confirmDialog}
     {profile.isPending ? <p role="status">Calculating fine…</p> : profile.isError ? <p role="alert" className="circulation-error">Fine unavailable. <button type="button" onClick={() => void profile.refetch()}>Retry</button> · You can still record the return.</p> : !fine ? <p className="circulation-secondary">Fine details unavailable. <Link to={`/admin/clearance?student_employee_id=${encodeURIComponent(loan.student_employee_id)}`}>Open clearance</Link></p> : <>

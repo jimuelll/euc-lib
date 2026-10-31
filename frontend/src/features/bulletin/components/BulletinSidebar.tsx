@@ -2,7 +2,9 @@ import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminDateTime } from "@/features/admin";
+import { AdminDateTime } from "@/features/admin/date-time";
+import { toast } from "@/components/ui/sonner";
+import { formatLibraryDate } from "@/utils/libraryTime";
 import type { UpcomingEvent } from "../types";
 import { createEvent, fetchEvents, type SiteEvent } from "@/features/site-content";
 import {PublicationNotificationOption} from "@/features/notifications/PublicationNotificationOption";
@@ -49,6 +51,7 @@ export function BulletinSidebar() {
         ends_at: new Date(`${endsAt || startsAt}T23:59:59`).toISOString(),
         notifyUsers,
       });
+      toast.success(`Event added: ${title.trim()}, ${formatLibraryDate(startsAt)}.`);
       setTitle(""); setStartsAt(""); setEndsAt(""); notice.reset(); setOpen(false);
     } catch (error:any) { setSaveError(error.response?.data?.message||error.message||"The event could not be added. Please try again."); } finally {saveLock.current=false;}
   };

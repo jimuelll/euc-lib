@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {ArrowLeft,ArrowDown,Lock,Send,X} from 'lucide-react';
-import {useAdminConfirmDialog} from '@/features/admin';
+import {useAdminConfirmDialog} from '@/features/admin/public';
 import {useAuth} from '@/context/AuthContext';
 import {createBulletinComment,deleteBulletinComment,setCommentHelpful,moderateComment,fetchCommentContext,fetchDiscussionUpdates,fetchCommentSnapshots} from '../api';
 import type {ApiComment,CommentSort} from '../types';

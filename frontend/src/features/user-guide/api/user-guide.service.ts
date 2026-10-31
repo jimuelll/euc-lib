@@ -34,13 +34,6 @@ export type GuideModule = GuideContent & {
   sort_order: number;
 };
 
-export type EditableGuideModule = GuideModule & {
-  is_published: boolean;
-  has_unpublished_changes: boolean;
-  published_at: string | null;
-  updated_at: string;
-};
-
 const unwrap = <T>(response: { data: T | { data: T } }): T => {
   const payload = response.data;
   return payload && typeof payload === "object" && "data" in payload
@@ -50,24 +43,3 @@ const unwrap = <T>(response: { data: T | { data: T } }): T => {
 
 export const getPublishedGuide = async (signal?: AbortSignal) =>
   unwrap<GuideModule[]>(await axiosInstance.get("/api/user-guide", { signal }));
-
-export const getGuideForEditing = async (signal?: AbortSignal) =>
-  unwrap<EditableGuideModule[]>(await axiosInstance.get("/api/admin/user-guide", { signal }));
-
-export const createGuideDraft = async (draft: GuideContent) =>
-  unwrap<EditableGuideModule>(await axiosInstance.post("/api/admin/user-guide", draft));
-
-export const updateGuideDraft = async (id: number, draft: GuideContent) =>
-  unwrap<EditableGuideModule>(await axiosInstance.put(`/api/admin/user-guide/${id}`, draft));
-
-export const publishGuideDraft = async (id: number) =>
-  unwrap<EditableGuideModule>(await axiosInstance.post(`/api/admin/user-guide/${id}/publish`));
-
-export const unpublishGuideModule = async (id: number) =>
-  unwrap<EditableGuideModule>(await axiosInstance.post(`/api/admin/user-guide/${id}/unpublish`));
-
-export const archiveGuideModule = async (id: number) =>
-  axiosInstance.delete(`/api/admin/user-guide/${id}`);
-
-export const reorderGuideModules = async (ids: number[]) =>
-  axiosInstance.patch("/api/admin/user-guide/reorder", { ids });

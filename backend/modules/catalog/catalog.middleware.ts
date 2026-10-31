@@ -30,13 +30,6 @@ const BARCODE_REGEX = /^LIB-\d{6}-\d{3}$/;
 const OPERATIONAL_KEYS = new Set(["material_type", "book_type_id", "isbn", "copies"]);
 const REQUIRED_SYSTEM_FIELDS = { title: { type: "text", required: true, locked: true, scope: "shared" }, author: { type: "text", required: true, locked: true, scope: "shared" } };
 
-const requireAdminRole = (req: CatalogRequest, res: Response, next: NextFunction): Response | void => {
-  if (!req.user || !ADMIN_ROLES.includes(req.user.role)) {
-    return res.status(403).json({ message: "Access denied" });
-  }
-  next();
-};
-
 const requireSuperAdminRole = (req: CatalogRequest, res: Response, next: NextFunction): Response | void => {
   if (!req.user || req.user.role !== "super_admin") {
     return res.status(403).json({ message: "Access denied" });
@@ -248,7 +241,6 @@ const validateUpdateBookPayload = validate(async (req: CatalogRequest) => {
 });
 
 export = {
-  requireAdminRole,
   requireSuperAdminRole,
   requireCatalogRole,
   validateSchemaPayload,

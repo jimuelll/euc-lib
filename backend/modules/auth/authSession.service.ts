@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { PoolConnection } from "mysql2/promise";
 import repository = require("./auth-session.repository");
 import auth = require("./jwt.util");
-import type { AuthTokenPayload } from "./auth.types";
 
 function toMySqlDateTime(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ");

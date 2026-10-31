@@ -3,6 +3,8 @@ import type { CSSProperties } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AdminSidebar, AdminTopbar } from "./components/AdminLayoutComponents";
+import "../admin-theme.css";
+import "../admin-workspaces.css";
 
 const AdminLayoutBuilder = () => {
   const { pathname } = useLocation();

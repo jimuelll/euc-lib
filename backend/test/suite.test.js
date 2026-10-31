@@ -4,6 +4,7 @@ const db = require("../db");
 require("./db.timezone.test");
 require("./analytics.helpers.test");
 require("./analytics.period.test");
+require("./aiReport.test");
 require("./attendance.visits.test");
 require("./rate-limit.test");
 require("./auth-session.test");

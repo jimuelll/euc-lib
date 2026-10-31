@@ -34,7 +34,3 @@ export function formatLibraryTime(value: TimeValue): string {
 export function formatLibraryDateTime(value: TimeValue): string {
   return new Intl.DateTimeFormat("en-PH", { timeZone: LIBRARY_TIME_ZONE, month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(dateValue(value));
 }
-
-export function formatLibraryDeadline(value: TimeValue): string {
-  return `${formatLibraryDateTime(value)} Philippine time (UTC+8)`;
-}

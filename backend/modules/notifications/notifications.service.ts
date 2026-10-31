@@ -14,10 +14,6 @@ import type {
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-// Notification source columns are part of the database baseline. This remains
-// as a compatibility entry point for callers from before the repository split.
-const ensureNotificationSourceColumns = async (): Promise<void> => undefined;
-
 const normaliseNotification = (row: NotificationRecord) => ({
   id: row.id,
   type: row.type,
@@ -192,7 +188,6 @@ const getAdminStats = async () => {
 };
 
 export = {
-  ensureNotificationSourceColumns,
   listForUser,
   getUnreadCountForUser,
   searchNotificationRecipients,

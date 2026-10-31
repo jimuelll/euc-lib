@@ -6,7 +6,7 @@ import {createTestQueryClientWrapper} from '@/test-utils/query-client';
 import PostComments from './PostComments';
 import * as api from '../api';
 vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:{id:7,role:'student'}})}));
-vi.mock('@/features/admin',()=>({useAdminConfirmDialog:()=>({confirm:async()=>true,confirmDialog:null})}));
+vi.mock('@/features/admin/public',()=>({useAdminConfirmDialog:()=>({confirm:async()=>true,confirmDialog:null})}));
 vi.mock('../api',()=>({fetchPostComments:vi.fn(),createBulletinComment:vi.fn(),deleteBulletinComment:vi.fn(),reportBulletinComment:vi.fn(),setCommentHelpful:vi.fn(),moderateComment:vi.fn(),fetchCommentContext:vi.fn(),fetchDiscussionUpdates:vi.fn(),fetchCommentSnapshots:vi.fn(),fetchCommentLikers:vi.fn(),fetchMyCommentReviews:vi.fn(),requestCommentReview:vi.fn()}));
 const row=(id:number,parent_id:number|null,author:string,reply_count=0)=>({id,parent_id,author,author_id:id,text:`Message ${id}`,created_at:'2026-10-27T00:00:00Z',reply_count});
 beforeEach(()=>{localStorage.clear();vi.resetAllMocks();vi.mocked(api.fetchCommentSnapshots).mockResolvedValue([]);vi.mocked(api.fetchMyCommentReviews).mockResolvedValue({data:[],page:1,hasMore:false});vi.mocked(api.fetchPostComments).mockImplementation(async(_id,parent)=>({data:[parent===null?row(1,null,'Reader',1):parent===1?row(2,1,'Librarian',1):row(3,2,'Student')],page:1,hasMore:false}));});afterEach(cleanup);

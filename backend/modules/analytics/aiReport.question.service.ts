@@ -1,15 +1,31 @@
-const repository = require("./analytics.repository");
+import { addLibraryDays, libraryDateKey } from "../time/library-time";
+
+/**
+ * Decides whether a question may be answered from aggregate analytics, before
+ * any evidence is gathered or any text is sent to a model. Everything here is
+ * deterministic; the model scope check in aiReport.providers is only consulted
+ * for questions these rules cannot place.
+ */
 
 interface ReportDateRangeInput { dateFrom?: string; dateTo?: string; allTime?: boolean; }
-interface ReportDateRange { dateFrom: string; dateTo: string; days: number; }
-type ReportError = Error & { status: number; code?: string | null };
+interface ReportDateRange { dateFrom: string; dateTo: string; days: number; allTime?: boolean; }
+interface MentionedPeriod { label: string; dateFrom: string; dateTo: string; }
+interface QuestionPeriod extends MentionedPeriod { coverage: "full" | "partial"; }
+interface QuestionAssessment {
+  mode: "summary" | "answer";
+  intents: string[] | null;
+  periods: QuestionPeriod[];
+}
+type ReportError = Error & { status: number; code?: string | null; details?: Record<string, unknown> };
 
 const MAX_REPORT_DAYS = 366;
+const MAX_QUESTION_LENGTH = 500;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-function requestError(message: string, status = 400, code: string | null = null): ReportError {
+function requestError(message: string, status = 400, code: string | null = null, details?: Record<string, unknown>): ReportError {
   const error = Object.assign(new Error(message), { status }) as ReportError;
   if (code) error.code = code;
+  if (details) error.details = details;
   return error;
 }
 
@@ -17,46 +33,62 @@ const PRIVACY_RESTRICTION_CODE = "AI_REPORT_PRIVACY_RESTRICTED";
 const PRIVACY_RESTRICTION_MESSAGE = "AI reports cannot identify individual visitors or patrons. Ask for an aggregate count instead. To review authorized individual attendance records, use Attendance History.";
 const IRRELEVANT_QUESTION_CODE = "AI_REPORT_IRRELEVANT_QUESTION";
 const IRRELEVANT_QUESTION_MESSAGE = "AI Reports only answer questions about the library operations data available here. Ask about borrowing, returns, reservations, attendance, website activity, fines, or collection performance.";
-const DATE_NOT_RECORDED_CODE = "AI_REPORT_DATE_NOT_RECORDED";
 const DATE_OUTSIDE_RANGE_CODE = "AI_REPORT_DATE_OUTSIDE_RANGE";
+
+function cleanQuestion(question: unknown): string {
+  if (question === undefined || question === null) return "";
+  if (typeof question !== "string") throw requestError("The report question must be text.");
+  // Control characters are never meaningful in a question and could disguise
+  // instructions inside the prompt.
+  return question.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().replace(/\s+/g, " ").slice(0, MAX_QUESTION_LENGTH);
+}
+
+const PERSON = String.raw`(?:people|person|persons|patrons?|users?|students?|employees?|staff|visitors?|borrowers?|members?|readers?|faculty|teachers?|individuals?)`;
+const PERSON_TERMS = new RegExp(String.raw`\b${PERSON}\b`, "i");
 
 function isIdentitySeekingQuestion(question: string): boolean {
   if (!question) return false;
-  const personTerms = /\b(?:people|person|persons|patrons?|users?|students?|employees?|staff|visitors?|borrowers?|members?)\b/i;
-  const directIdentityTerms = /\b(?:name|names|named|identify|identified|identity|identities)\b/i;
-  const personActivityTerms = /\b(?:visit(?:ed|ing|s)?|attendance|check(?:ed|ing)?[- ]?(?:in|out)|enter(?:ed|ing|s)?|exit(?:ed|ing|s)?|borrow(?:ed|ing|s)?|reserv(?:e|ed|ing|ation|ations)|overdue|fines?)\b/i;
+  const directIdentityTerms = /\b(?:name|names|named|identify|identified|identity|identities|profiles?)\b/i;
+  const personActivityTerms = /\b(?:visit(?:ed|ing|s)?|attendance|check(?:ed|ing)?[- ]?(?:in|out)|enter(?:ed|ing|s)?|exit(?:ed|ing|s)?|borrow(?:ed|ing|s)?|reserv(?:e|ed|ing|ation|ations)|overdue|owe[sd]?|fines?|paid|returned)\b/i;
   const asksWho = /\bwho(?:se|m)?\b/i.test(question);
-  const asksWhichPeople = /\bwhich\s+(?:people|person|persons|patrons?|users?|students?|employees?|staff|visitors?|borrowers?|members?)\b/i.test(question);
-  const asksNamedPeople = directIdentityTerms.test(question) && personTerms.test(question);
-  const asksWhoDidActivity = asksWho && (personTerms.test(question) || personActivityTerms.test(question));
-  const asksForTopPerson = /\b(?:the\s+)?top\s+(?:user|patron|borrower|student|employee|visitor)\b/i.test(question);
-  const asksForPersonalField = /\b(?:student|employee|patron|user)\s*(?:id|number|email|address|contact|phone|barcode)\b/i.test(question);
-  return asksWhichPeople || asksNamedPeople || asksWhoDidActivity || asksForTopPerson || asksForPersonalField;
+  return (
+    new RegExp(String.raw`\bwhich\s+${PERSON}\b`, "i").test(question)
+    || (directIdentityTerms.test(question) && PERSON_TERMS.test(question))
+    || (asksWho && (PERSON_TERMS.test(question) || personActivityTerms.test(question)))
+    || new RegExp(String.raw`\b(?:top|most active|most frequent|frequent|regular|biggest|heaviest|best|worst|leading)\s+${PERSON}\b`, "i").test(question)
+    || new RegExp(String.raw`\b${PERSON}\s+(?:with|who has|who have|that has|that have)\s+(?:the\s+)?(?:most|highest|largest|biggest)\b`, "i").test(question)
+    || new RegExp(String.raw`\b(?:list|show|give|export)\s+(?:me\s+)?(?:all\s+|the\s+|a list of\s+)*${PERSON}\b`, "i").test(question)
+    || /\b(?:student|employee|patron|user|member|borrower|visitor)\s*(?:id|ids|number|numbers|email|emails|address|addresses|contact|phone|barcode|card)s?\b/i.test(question)
+    || /\b(?:e-?mail|phone|contact)\s+(?:address(?:es)?|numbers?|details)\b/i.test(question)
+  );
 }
 
 const REPORT_INTENTS: Array<[string, RegExp]> = [
   ["circulation", /\b(?:borrow(?:ed|er|ers|ing|ings)?|return(?:ed|ing|s)?|circulation|loan(?:ed|s)?|books?|titles?)\b/i],
-  ["reservations", /\b(?:reserv(?:e|ed|ing|ation|ations)|fulfilled|cancelled|ready for pickup)\b/i],
-  ["attendance", /\b(?:attendance|visit(?:ed|or|ors|ing|s)?|entr(?:y|ies)|exit(?:ed|s)?|check[- ]?(?:in|out|ins|outs)|library scans?|went (?:in|into|to) (?:the )?library)\b/i],
-  ["site_activity", /\b(?:website|site activity|page hits?|online visit(?:or|ors|s)?)\b/i],
-  ["fines", /\b(?:fines?|payments?|settled|collections?|outstanding balance)\b/i],
-  ["catalog", /\b(?:catalog(?:ue)?|collection|copies|copy|inventory|condition|damaged|lost)\b/i],
+  ["reservations", /\b(?:reserv(?:e|ed|ing|ation|ations)|fulfilled|cancelled|canceled|holds?|ready for pickup)\b/i],
+  ["attendance", /\b(?:attendance|visit(?:ed|or|ors|ing|s)?|entr(?:y|ies)|exit(?:ed|s)?|check[- ]?(?:in|out|ins|outs)|library scans?|scans?|foot ?traffic|went (?:in|into|to) (?:the )?library)\b/i],
+  ["site_activity", /\b(?:website|web ?site|site activity|page (?:hits?|views?)|online visit(?:or|ors|s)?)\b/i],
+  ["fines", /\b(?:fines?|payments?|settled|collections?|outstanding balance|penalt(?:y|ies)|pesos?|php|₱)\b/i],
+  ["catalog", /\b(?:catalog(?:ue)?|collection|copies|copy|inventory|holdings|condition|damaged|lost|accession(?:ed)?)\b/i],
 ];
 const REPORT_INTENT_NAMES = REPORT_INTENTS.map(([intent]) => intent).concat("performance");
-const ANALYTICS_SIGNAL = /\b(?:how many|how much|number of|count|total|sum|amount|most|top|least|popular|highest|lowest|average|rate|ratio|percentage|percent|difference|net|calculate|compute|change|changed|increase|decrease|trend|compare|comparison|performance|summary|summarize|activity|busiest|quietest|outstanding|overdue|available|status|were|was|did|has|have|created|fulfilled|cancelled|collected)\b/i;
-const PERIOD_ANALYSIS = /\b(?:what changed|key findings|performance|operational activity|activity summary|reporting period|selected period|during this period|compare|comparison|trend|busiest|quietest)\b/i;
-const UNSUPPORTED_REQUEST = /(?:\d+(?:\.\d+)?(?:\s*(?:[+*×÷^]|\s[-/]\s)|\s+\b(?:plus|minus|times|multiplied|divided)\b\s*)\d+|\b(?:capital of|weather|recipe|translate|president of|tell (?:me )?(?:a )?joke|write (?:me )?(?:a )?(?:poem|story|email|code))\b)/i;
+const ANALYTICS_SIGNAL = /\b(?:how many|how much|number of|count|total|sum|amount|most|top|least|popular|highest|lowest|average|rate|ratio|percentage|percent|difference|net|calculate|compute|change|changed|increase|decrease|trend|compare|comparison|performance|summary|summarize|overview|activity|busiest|quietest|outstanding|overdue|available|status|were|was|did|has|have|created|fulfilled|cancelled|collected|what happened|any)\b/i;
+const PERIOD_ANALYSIS = /\b(?:what changed|key findings|performance|operational activity|activity summary|reporting period|selected period|during this period|compare|comparison|trend|busiest|quietest|overview|summar(?:y|ize|ise))\b/i;
+// Standalone arithmetic may still be about library figures ("Oct 1 - 7
+// borrowings"), so it only defers to the model scope check. Off-topic and
+// instruction-override requests are always refused.
+const ARITHMETIC_REQUEST = /\d+(?:\.\d+)?(?:\s*[+*×÷^]\s*|\s[-/]\s|\s+\b(?:plus|minus|times|multiplied|divided)\b\s*)\d+/i;
+const OFF_TOPIC_REQUEST = /\b(?:capital of|weather|recipe|translate|president of|tell (?:me )?(?:a )?joke|write (?:me )?(?:a |an )?(?:poem|story|song|essay|email|letter|code)|ignore (?:all |the |previous |prior |your |above )*(?:instructions|rules)|system prompt|developer message|pretend (?:to be|you are)|role-?play|jailbreak)\b/i;
+const UNSUPPORTED_REQUEST = new RegExp(`${ARITHMETIC_REQUEST.source}|${OFF_TOPIC_REQUEST.source}`, "i");
 
 function classifyReportQuestion(question: string): string[] | null {
   if (!question) return ["summary"];
   if (UNSUPPORTED_REQUEST.test(question)) return null;
 
-  const clauses = question.split(/\s*(?:;|\b(?:and|also|plus|then)\b)\s*/i).map((part) => part.trim()).filter(Boolean);
+  const clauses = question.split(/\s*(?:;|\?|\b(?:and|also|plus|then)\b)\s*/i).map((part) => part.trim()).filter(Boolean);
   const clauseMatches = clauses.map((clause) => {
     const intents = REPORT_INTENTS.filter(([, pattern]) => pattern.test(clause)).map(([intent]) => intent);
-    const datedHistory = /\bwhat happened\b/i.test(clause) && /\b(?:today|yesterday|this (?:week|month|year)|last \d+ days?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}|\d{4}-\d{2}-\d{2})\b/i.test(clause);
-    if (PERIOD_ANALYSIS.test(clause)) return { intents: intents.length ? intents : ["performance"], complete: true };
-    if (datedHistory && intents.length > 0) return { intents, complete: true };
+    if (PERIOD_ANALYSIS.test(clause) || /\bwhat happened\b/i.test(clause)) return { intents: intents.length ? intents : ["performance"], complete: true };
     return { intents, complete: intents.length > 0 && ANALYTICS_SIGNAL.test(clause) };
   });
 
@@ -72,12 +104,12 @@ function isReportRelevantQuestion(question: string): boolean {
   return classifyReportQuestion(question) !== null;
 }
 
+const MONTH_PATTERN = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 const MONTH_NUMBERS: Record<string, number> = {
-  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
-  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
-  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
-  dec: 12, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
+const monthNumber = (name: string): number => MONTH_NUMBERS[name.toLowerCase().slice(0, 3)];
+const pad = (value: number): string => String(value).padStart(2, "0");
 
 function validDateParts(year: number, month: number, day: number): string | null {
   const candidate = new Date(Date.UTC(year, month - 1, day));
@@ -85,62 +117,165 @@ function validDateParts(year: number, month: number, day: number): string | null
   return candidate.toISOString().slice(0, 10);
 }
 
-function extractMentionedDate(question: string, referenceDate = new Date()): string | null {
-  const iso = question.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) return validDateParts(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+function monthEnd(year: number, month: number): string {
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
 
-  const numeric = question.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\b/);
-  if (numeric) {
-    let year = numeric[3] ? Number(numeric[3]) : referenceDate.getFullYear();
+/** A date written without a year means its most recent occurrence on or before the reference date. */
+function impliedYear(month: number, day: number, reference: string): number {
+  const year = Number(reference.slice(0, 4));
+  return `${year}-${pad(month)}-${pad(day)}` > reference ? year - 1 : year;
+}
+
+function daysBetween(dateFrom: string, dateTo: string): number {
+  return Math.floor((Date.parse(`${dateTo}T00:00:00Z`) - Date.parse(`${dateFrom}T00:00:00Z`)) / 86400000) + 1;
+}
+
+/**
+ * Finds the calendar periods a question names. `reference` is the selected
+ * range's end date (for implied years); `today` is the library's UTC+08 date
+ * (for relative words such as "yesterday").
+ */
+function extractMentionedPeriods(question: string, { reference, today }: { reference: string; today: string }): MentionedPeriod[] {
+  const periods: MentionedPeriod[] = [];
+  const add = (label: string, dateFrom: string | null, dateTo: string | null = dateFrom) => {
+    if (dateFrom && dateTo && !periods.some((period) => period.dateFrom === dateFrom && period.dateTo === dateTo)) periods.push({ label, dateFrom, dateTo });
+  };
+  let text = question;
+  const consume = (pattern: RegExp, handler: (match: RegExpExecArray) => void) => {
+    text = text.replace(pattern, (...args: any[]) => {
+      handler(args.slice(0, -2) as unknown as RegExpExecArray);
+      return " ";
+    });
+  };
+
+  consume(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (match) => add(match[0], validDateParts(Number(match[1]), Number(match[2]), Number(match[3]))));
+  consume(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?\b/g, (match) => {
+    const month = Number(match[1]), day = Number(match[2]);
+    let year = match[3] ? Number(match[3]) : impliedYear(month, day, reference);
     if (year < 100) year += 2000;
-    return validDateParts(year, Number(numeric[1]), Number(numeric[2]));
-  }
+    add(match[0], validDateParts(year, month, day));
+  });
+  consume(new RegExp(String.raw`\b(${MONTH_PATTERN})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b`, "gi"), (match) => {
+    const month = monthNumber(match[1]), day = Number(match[2]);
+    add(match[0], validDateParts(match[3] ? Number(match[3]) : impliedYear(month, day, reference), month, day));
+  });
+  consume(new RegExp(String.raw`\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(${MONTH_PATTERN})\.?(?:\s*,?\s*(\d{4}))?\b`, "gi"), (match) => {
+    const month = monthNumber(match[2]), day = Number(match[1]);
+    add(match[0], validDateParts(match[3] ? Number(match[3]) : impliedYear(month, day, reference), month, day));
+  });
+  // A bare month needs a year or a preposition, so "may" as a verb is ignored.
+  consume(new RegExp(String.raw`\b(?:(?:in|during|for|of|throughout|since)\s+)?(${MONTH_PATTERN})\.?\s*,?\s*(\d{4})\b|\b(?:in|during|for|of|throughout)\s+(${MONTH_PATTERN})\b`, "gi"), (match) => {
+    const name = match[1] || match[3];
+    if (!match[2] && /^may$/i.test(name) && !/\b(?:in|during|for|of|throughout)\s+May\b/.test(match[0])) return;
+    const month = monthNumber(name);
+    const year = match[2] ? Number(match[2]) : impliedYear(month, 1, reference);
+    add(match[0].trim(), `${year}-${pad(month)}-01`, monthEnd(year, month));
+  });
+  consume(/\b(?:in|during|for|throughout)\s+(?:the\s+year\s+)?(20\d{2})\b/gi, (match) => add(match[0], `${match[1]}-01-01`, `${match[1]}-12-31`));
 
-  const named = question.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/i);
-  if (!named) return null;
-  const month = MONTH_NUMBERS[named[1].toLowerCase().replace(/\.$/, "")];
-  return validDateParts(named[3] ? Number(named[3]) : referenceDate.getFullYear(), month, Number(named[2]));
+  const weekday = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+  const relative: Array<[RegExp, () => [string, string]]> = [
+    [/\btoday\b/i, () => [today, today]],
+    [/\byesterday\b/i, () => [addLibraryDays(today, -1), addLibraryDays(today, -1)]],
+    [/\bthis week\b/i, () => [addLibraryDays(today, -weekday), today]],
+    [/\blast week\b/i, () => [addLibraryDays(today, -weekday - 7), addLibraryDays(today, -weekday - 1)]],
+    [/\bthis month\b/i, () => [`${today.slice(0, 7)}-01`, today]],
+    [/\blast month\b/i, () => {
+      const end = addLibraryDays(`${today.slice(0, 7)}-01`, -1);
+      return [`${end.slice(0, 7)}-01`, end];
+    }],
+    [/\bthis year\b/i, () => [`${today.slice(0, 4)}-01-01`, today]],
+    [/\blast year\b/i, () => [`${Number(today.slice(0, 4)) - 1}-01-01`, `${Number(today.slice(0, 4)) - 1}-12-31`]],
+  ];
+  for (const [pattern, resolve] of relative) {
+    const match = text.match(pattern);
+    if (match) add(match[0], ...resolve());
+  }
+  const lastDays = text.match(/\b(?:last|past|previous)\s+(\d{1,3})\s+days?\b/i);
+  if (lastDays && Number(lastDays[1]) > 0) add(lastDays[0], addLibraryDays(today, -(Number(lastDays[1]) - 1)), today);
+  return periods;
 }
 
-async function requireRecordedDateQuestion(question: string, input: ReportDateRangeInput): Promise<boolean> {
-  const reference = DATE_ONLY.test(String(input.dateTo || "")) ? new Date(`${input.dateTo}T00:00:00`) : new Date();
-  const date = extractMentionedDate(question, reference);
-  if (!date || !/\bwhat happened\b/i.test(question)) return false;
-
-  const dateFrom = input.dateFrom || "";
-  const dateTo = input.dateTo || "";
-  if (!input.allTime && DATE_ONLY.test(dateFrom) && DATE_ONLY.test(dateTo) && (date < dateFrom || date > dateTo)) {
-    throw requestError(`The mentioned date (${date}) is outside the selected reporting period. Change the report period and try again.`, 400, DATE_OUTSIDE_RANGE_CODE);
-  }
-
-  const startAt = `${date} 00:00:00`;
-  const next = new Date(`${date}T00:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
-  const nextAt = `${next.toISOString().slice(0, 10)} 00:00:00`;
-  const recorded = await repository.hasRecordedActivity({ startAt, nextAt, date });
-  if (!recorded) throw requestError(`No recorded library activity was found for ${date}. Try another date or ask for a broader period summary.`, 400, DATE_NOT_RECORDED_CODE);
-  return true;
+/** Retained for callers that only need the first single date a question names. */
+function extractMentionedDate(question: string, referenceDate = new Date()): string | null {
+  const reference = libraryDateKey(referenceDate);
+  const period = extractMentionedPeriods(question, { reference, today: reference }).find((item) => item.dateFrom === item.dateTo);
+  return period?.dateFrom || null;
 }
-
 
 function normalizeDateRange({ dateFrom, dateTo }: ReportDateRangeInput, { allowLongRange = false }: { allowLongRange?: boolean } = {}): ReportDateRange {
   if (!DATE_ONLY.test(String(dateFrom || "")) || !DATE_ONLY.test(String(dateTo || ""))) {
     throw requestError("Choose a valid start and end date.");
   }
-
-  const start = new Date(`${dateFrom}T00:00:00Z`);
-  const end = new Date(`${dateTo}T00:00:00Z`);
-  if (
-    Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())
-    || start.toISOString().slice(0, 10) !== dateFrom
-    || end.toISOString().slice(0, 10) !== dateTo
-  ) throw requestError("Choose a valid date range.");
-  if (start > end) throw requestError("The start date must be on or before the end date.");
-  if (!allowLongRange && Math.floor((end.getTime() - start.getTime()) / 86400000) + 1 > MAX_REPORT_DAYS) {
-    throw requestError(`Reports can cover up to ${MAX_REPORT_DAYS} days.`);
+  if (!validDateParts(Number(dateFrom!.slice(0, 4)), Number(dateFrom!.slice(5, 7)), Number(dateFrom!.slice(8)))
+    || !validDateParts(Number(dateTo!.slice(0, 4)), Number(dateTo!.slice(5, 7)), Number(dateTo!.slice(8)))) {
+    throw requestError("Choose a valid date range.");
   }
-
-  return { dateFrom, dateTo, days: Math.floor((end.getTime() - start.getTime()) / 86400000) + 1 };
+  if (dateFrom! > dateTo!) throw requestError("The start date must be on or before the end date.");
+  const days = daysBetween(dateFrom!, dateTo!);
+  if (!allowLongRange && days > MAX_REPORT_DAYS) throw requestError(`Reports can cover up to ${MAX_REPORT_DAYS} days.`);
+  return { dateFrom: dateFrom!, dateTo: dateTo!, days };
 }
 
+function outsideRangeError(period: MentionedPeriod, range: ReportDateRange, today: string): ReportError {
+  const single = period.dateFrom === period.dateTo;
+  const suggestedTo = period.dateTo > today ? today : period.dateTo;
+  const suggestedFrom = daysBetween(period.dateFrom, suggestedTo) > MAX_REPORT_DAYS ? addLibraryDays(suggestedTo, -(MAX_REPORT_DAYS - 1)) : period.dateFrom;
+  const requested = single ? period.dateFrom : `${period.dateFrom} to ${period.dateTo}`;
+  return requestError(
+    `The question asks about ${requested}, which is outside the selected reporting period (${range.dateFrom} to ${range.dateTo}). Change the report period and try again.`,
+    400,
+    DATE_OUTSIDE_RANGE_CODE,
+    suggestedFrom <= suggestedTo ? { requested: period, suggestedRange: { dateFrom: suggestedFrom, dateTo: suggestedTo } } : { requested: period },
+  );
+}
 
-export = { DATE_ONLY, DATE_OUTSIDE_RANGE_CODE, IRRELEVANT_QUESTION_CODE, IRRELEVANT_QUESTION_MESSAGE, MAX_REPORT_DAYS, PERIOD_ANALYSIS, PRIVACY_RESTRICTION_CODE, PRIVACY_RESTRICTION_MESSAGE, REPORT_INTENTS, REPORT_INTENT_NAMES, UNSUPPORTED_REQUEST, classifyReportQuestion, extractMentionedDate, isIdentitySeekingQuestion, isReportRelevantQuestion, normalizeDateRange, requestError, requireRecordedDateQuestion };
+/**
+ * Applies every deterministic rule: privacy first, then scope, then the
+ * selected range. `intents` is null when the rules cannot decide scope and the
+ * model scope check must be consulted.
+ */
+function assessQuestion(question: string, range: ReportDateRange, { today = libraryDateKey() }: { today?: string } = {}): QuestionAssessment {
+  if (!question) return { mode: "summary", intents: ["summary"], periods: [] };
+  if (isIdentitySeekingQuestion(question)) throw requestError(PRIVACY_RESTRICTION_MESSAGE, 400, PRIVACY_RESTRICTION_CODE);
+
+  const hasReportTopic = REPORT_INTENTS.some(([, pattern]) => pattern.test(question)) || PERIOD_ANALYSIS.test(question);
+  if (OFF_TOPIC_REQUEST.test(question) || (ARITHMETIC_REQUEST.test(question) && !hasReportTopic)) {
+    throw requestError(IRRELEVANT_QUESTION_MESSAGE, 400, IRRELEVANT_QUESTION_CODE);
+  }
+
+  const periods: QuestionPeriod[] = [];
+  for (const period of extractMentionedPeriods(question, { reference: range.dateTo, today })) {
+    if (period.dateTo < range.dateFrom || period.dateFrom > range.dateTo) throw outsideRangeError(period, range, today);
+    const coverage = period.dateFrom >= range.dateFrom && period.dateTo <= range.dateTo ? "full" : "partial";
+    periods.push({ ...period, coverage });
+  }
+
+  return { mode: "answer", intents: classifyReportQuestion(question), periods };
+}
+
+export = {
+  DATE_ONLY,
+  DATE_OUTSIDE_RANGE_CODE,
+  IRRELEVANT_QUESTION_CODE,
+  IRRELEVANT_QUESTION_MESSAGE,
+  MAX_QUESTION_LENGTH,
+  MAX_REPORT_DAYS,
+  PERIOD_ANALYSIS,
+  PRIVACY_RESTRICTION_CODE,
+  PRIVACY_RESTRICTION_MESSAGE,
+  REPORT_INTENTS,
+  REPORT_INTENT_NAMES,
+  UNSUPPORTED_REQUEST,
+  assessQuestion,
+  classifyReportQuestion,
+  cleanQuestion,
+  daysBetween,
+  extractMentionedDate,
+  extractMentionedPeriods,
+  isIdentitySeekingQuestion,
+  isReportRelevantQuestion,
+  normalizeDateRange,
+  requestError,
+};

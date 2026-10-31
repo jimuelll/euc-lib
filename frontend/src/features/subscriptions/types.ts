@@ -10,9 +10,3 @@ export interface Subscription {
 }
 
 export type FetchStatus = "idle" | "loading" | "success" | "error";
-
-export interface SubscriptionsState {
-  data: Subscription[];
-  status: FetchStatus;
-  error: string | null;
-}

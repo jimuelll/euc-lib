@@ -463,7 +463,6 @@ const enrichBookWithOutcome = async (bookId: number, { retryRateLimit = false,re
     enrichment.synopsisLastError = synopsisError;
     enrichment.googleBooksSynopsisLastError = synopsisError;
   }
-  const usefulMetadataFound = hasUsefulMetadata(enrichment);
   const lookupFailed = metadata.errors.length > 0;
   const lookupErrors = metadata.errors.map(publicMetadataError);
   if (!hasUsefulMetadata(enrichment) && metadata.errors.length) {

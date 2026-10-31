@@ -549,20 +549,6 @@ const findUserForPaymentOverview = async (studentEmployeeId: string): Promise<Da
   return user ?? null;
 };
 
-const findPaymentRows = async (userId: number, conn: QueryConnection): Promise<DataRow[]> => {
-  const [rows] = await conn.query<DataRow[]>(
-    `SELECT b.id, b.user_id, b.status, b.borrowed_at, b.due_date, b.returned_at,
-            COALESCE(b.settled_amount, 0) AS settled_amount,
-            bk.title AS book_title, bk.author AS book_author, bk.isbn, bc.barcode AS copy_barcode
-       FROM borrowings b JOIN books bk ON bk.id = b.book_id AND bk.deleted_at IS NULL
-       LEFT JOIN book_copies bc ON bc.id = b.copy_id AND bc.deleted_at IS NULL
-      WHERE b.user_id = ? AND b.deleted_at IS NULL
-      ORDER BY COALESCE(b.returned_at, b.due_date) ASC, b.id ASC FOR UPDATE`,
-    [userId],
-  );
-  return rows;
-};
-
 const findOverdueCandidates = async (conn: QueryConnection = db): Promise<BorrowingRecord[]> => {
   const [rows] = await conn.query<BorrowingRecord[]>(
     `SELECT
@@ -689,7 +675,6 @@ module.exports = {
   getAdminBorrowings,
   findUserForPayment,
   findUserForPaymentOverview,
-  findPaymentRows,
   findOverdueCandidates,
   markOverdue,
   markOverdueNotificationSent,

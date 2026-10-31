@@ -1,6 +1,5 @@
 import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type {
-  CreateNotificationInput,
   NotificationAdminStats,
   NotificationContext,
   NotificationCountRow,

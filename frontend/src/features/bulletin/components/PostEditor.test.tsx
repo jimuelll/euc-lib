@@ -6,7 +6,7 @@ import {createTestQueryClientWrapper} from '@/test-utils/query-client';
 import {CreatePostModal} from './CreatePostModal';
 import * as api from '../api';
 vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:{id:7,role:'staff'}})}));
-vi.mock('@/features/admin',()=>({useAdminConfirmDialog:()=>({confirm:async()=>true,confirmDialog:null})}));
+vi.mock('@/features/admin/public',()=>({useAdminConfirmDialog:()=>({confirm:async()=>true,confirmDialog:null})}));
 vi.mock('@/features/notifications/usePublicationNotice',()=>({usePublicationNotice:()=>({reset:()=>{},confirmDialog:null})}));
 vi.mock('@/hooks/useCloudinaryUpload',()=>({useCloudinaryUpload:()=>({upload:vi.fn(),uploading:false})}));
 vi.mock('../api',()=>({editBulletinPost:vi.fn(),createBulletinPost:vi.fn(),fetchBulletinPost:vi.fn()}));

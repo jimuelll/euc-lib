@@ -13,7 +13,7 @@ interface SiteVisitInput {
   ipAddress?: string | null;
   userAgent?: string | null;
 }
-interface RecordedActivityInput { startAt: string; nextAt: string; date: string; }
+interface RecordedActivityInput { startAt: Date | string; nextAt: Date | string; date: string; }
 interface AuditEventInput extends Record<string, any> {
   actorId?: number | null;
   actorName?: string | null;
@@ -28,14 +28,8 @@ interface AuditEventInput extends Record<string, any> {
 interface AuditFilterOptions { category?: string; action?: string; query?: string; dateFrom?: string; dateTo?: string; }
 interface AuditLogOptions extends AuditFilterOptions { limit?: number | string; page?: number | string; }
 interface ReportPeriod { dateFrom: string; dateTo: string; }
-interface AiReportQueryInput {
-  range: ReportPeriod;
-  previousRange: ReportPeriod;
-  startAt: string;
-  endExclusive: string;
-  previousStartAt: string;
-  previousEndAt: string;
-}
+interface ReportPeriodBounds extends ReportPeriod { startAt: Date; endAt: Date; }
+interface AiReportQueryInput { current: ReportPeriodBounds; previous: ReportPeriodBounds; }
 
 async function recordSiteVisit({ visitorId, userId = null, path = "/", ipAddress = null, userAgent = null }: SiteVisitInput): Promise<void> {
   await db.query(
@@ -306,109 +300,90 @@ async function getDashboardOverviewData(daysAgo: number) {
 }
 
 async function getReportRangeBounds() {
+  // Stored timestamps are UTC; the earliest event is reported on its UTC+08 calendar date.
   const [[row]] = await db.query(
     `SELECT
-       DATE_FORMAT(COALESCE(MIN(event_date), DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)), '%Y-%m-%d') AS dateFrom,
+       DATE_FORMAT(COALESCE(DATE(MIN(event_at) + INTERVAL 8 HOUR), DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR)), '%Y-%m-%d') AS dateFrom,
        DATE_FORMAT(DATE(UTC_TIMESTAMP() + INTERVAL 8 HOUR), '%Y-%m-%d') AS dateTo
      FROM (
-       SELECT MIN(borrowed_at) AS event_date FROM borrowings
+       SELECT MIN(borrowed_at) AS event_at FROM borrowings
        UNION ALL SELECT MIN(returned_at) FROM borrowings WHERE returned_at IS NOT NULL
        UNION ALL SELECT MIN(reserved_at) FROM reservations
        UNION ALL SELECT MIN(fulfilled_at) FROM reservations WHERE fulfilled_at IS NOT NULL
        UNION ALL SELECT MIN(cancelled_at) FROM reservations WHERE cancelled_at IS NOT NULL
        UNION ALL SELECT MIN(created_at) FROM attendance_logs
-       UNION ALL SELECT MIN(visit_date) FROM site_daily_visits
        UNION ALL SELECT MIN(effective_at) FROM fine_ledger_entries WHERE kind IN ('payment','legacy_credit','reversal')
      ) report_events`
   );
-  return row;
+  // site_daily_visits.visit_date is already a UTC+08 calendar date.
+  const [[visits]] = await db.query("SELECT DATE_FORMAT(MIN(visit_date), '%Y-%m-%d') AS dateFrom FROM site_daily_visits");
+  return visits?.dateFrom && visits.dateFrom < row.dateFrom ? { ...row, dateFrom: visits.dateFrom } : row;
 }
 
-async function getAiReportQueryData({ range, previousRange, startAt, endExclusive, previousStartAt, previousEndAt }: AiReportQueryInput) {
-  const [
-    [circulationRows],
-    [reservationRows],
-    [attendanceRows],
-    [visitRows],
-    [fineRows],
-    [topBooks],
-    [watchRows],
-    [previousCirculationRows],
-    [previousReservationRows],
-    [previousAttendanceRows],
-    [previousVisitRows],
-    [previousFineRows],
-    [dailyActivity],
-    [topBorrowers],
-  ] = await Promise.all([
+/**
+ * Aggregates one reporting period. `startAt`/`endAt` are the UTC instants of
+ * the period's first UTC+08 midnight and the midnight after its last day.
+ */
+async function getPeriodTotals({ dateFrom, dateTo, startAt, endAt }: ReportPeriodBounds) {
+  const [[[circulation]], [[reservations]], [[attendance]], [[visits]], [[fines]]] = await Promise.all([
     db.query(
-      `SELECT SUM(borrowed_at >= ? AND borrowed_at < DATE_ADD(?, INTERVAL 1 DAY)) AS borrowed,
-              SUM(returned_at IS NOT NULL AND returned_at >= ? AND returned_at < DATE_ADD(?, INTERVAL 1 DAY)) AS returned
+      `SELECT SUM(borrowed_at >= ? AND borrowed_at < ?) AS borrowed,
+              SUM(returned_at IS NOT NULL AND returned_at >= ? AND returned_at < ?) AS returned
        FROM borrowings`,
-      [startAt, endExclusive, startAt, endExclusive]
+      [startAt, endAt, startAt, endAt]
     ),
     db.query(
-      `SELECT SUM(reserved_at >= ? AND reserved_at < DATE_ADD(?, INTERVAL 1 DAY)) AS created,
-              SUM(fulfilled_at IS NOT NULL AND fulfilled_at >= ? AND fulfilled_at < DATE_ADD(?, INTERVAL 1 DAY)) AS fulfilled,
-              SUM(cancelled_at IS NOT NULL AND cancelled_at >= ? AND cancelled_at < DATE_ADD(?, INTERVAL 1 DAY)) AS cancelled
+      `SELECT SUM(reserved_at >= ? AND reserved_at < ?) AS created,
+              SUM(fulfilled_at IS NOT NULL AND fulfilled_at >= ? AND fulfilled_at < ?) AS fulfilled,
+              SUM(cancelled_at IS NOT NULL AND cancelled_at >= ? AND cancelled_at < ?) AS cancelled
        FROM reservations`,
-      [startAt, endExclusive, startAt, endExclusive, startAt, endExclusive]
+      [startAt, endAt, startAt, endAt, startAt, endAt]
     ),
     db.query(
-      `SELECT SUM(purpose = 'entry_exit') AS entry_exit_scans, SUM(purpose = 'borrowing') AS borrowing_scans
-       FROM attendance_logs WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)`,
-      [startAt, endExclusive]
+      `SELECT SUM(purpose = 'entry_exit') AS entry_exit_scans, SUM(purpose = 'borrowing') AS borrowing_scans,
+              SUM(purpose = 'entry_exit' AND type = 'check_in') AS library_entries,
+              COUNT(DISTINCT CASE WHEN purpose = 'entry_exit' AND type = 'check_in' THEN user_id END) AS unique_library_visitors
+       FROM attendance_logs WHERE created_at >= ? AND created_at < ?`,
+      [startAt, endAt]
     ),
+    // One row per visitor per day, so COUNT(*) is the sum of daily unique visitors.
     db.query(
-      `SELECT COUNT(DISTINCT visitor_id) AS unique_visitors, COALESCE(SUM(hit_count), 0) AS page_hits
+      `SELECT COUNT(*) AS unique_visitors, COUNT(DISTINCT visitor_id) AS distinct_visitors, COALESCE(SUM(hit_count), 0) AS page_hits
        FROM site_daily_visits WHERE visit_date >= ? AND visit_date <= ?`,
-      [range.dateFrom, range.dateTo]
+      [dateFrom, dateTo]
     ),
     db.query(
-      `SELECT COALESCE(SUM(CASE WHEN kind IN ('payment','legacy_credit','reversal') THEN -amount ELSE 0 END), 0) AS settled_amount
+      `SELECT COALESCE(SUM(-amount), 0) AS settled_amount
        FROM fine_ledger_entries WHERE kind IN ('payment','legacy_credit','reversal')
-         AND effective_at >= ? AND effective_at < DATE_ADD(?, INTERVAL 1 DAY)`,
-      [startAt, endExclusive]
+         AND effective_at >= ? AND effective_at < ?`,
+      [startAt, endAt]
     ),
+  ]);
+  return { circulation, reservations, attendance, visits, fines };
+}
+
+async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
+  const { startAt, endAt } = current;
+  const [currentTotals, previousTotals, [topBooks], [[watchItems]], [dailyActivity]] = await Promise.all([
+    getPeriodTotals(current),
+    getPeriodTotals(previous),
     db.query(
       `SELECT bk.title AS title, COUNT(*) AS borrowings
        FROM borrowings b LEFT JOIN books bk ON bk.id = b.book_id
-       WHERE b.borrowed_at >= ? AND b.borrowed_at < DATE_ADD(?, INTERVAL 1 DAY)
+       WHERE b.borrowed_at >= ? AND b.borrowed_at < ?
        GROUP BY b.book_id, bk.id, bk.title ORDER BY borrowings DESC, bk.title ASC LIMIT 5`,
-      [startAt, endExclusive]
+      [startAt, endAt]
     ),
     db.query(
       `SELECT (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue') AS overdue_borrowings,
-              (SELECT COUNT(*) FROM reservations WHERE deleted_at IS NULL AND status = 'ready' AND (expires_at IS NULL OR expires_at > NOW())) AS ready_reservations`
-    ),
-    db.query(
-      `SELECT SUM(borrowed_at >= ? AND borrowed_at < DATE_ADD(?, INTERVAL 1 DAY)) AS borrowed,
-              SUM(returned_at IS NOT NULL AND returned_at >= ? AND returned_at < DATE_ADD(?, INTERVAL 1 DAY)) AS returned
-       FROM borrowings`,
-      [previousStartAt, previousEndAt, previousStartAt, previousEndAt]
-    ),
-    db.query(
-      `SELECT SUM(reserved_at >= ? AND reserved_at < DATE_ADD(?, INTERVAL 1 DAY)) AS created,
-              SUM(fulfilled_at IS NOT NULL AND fulfilled_at >= ? AND fulfilled_at < DATE_ADD(?, INTERVAL 1 DAY)) AS fulfilled,
-              SUM(cancelled_at IS NOT NULL AND cancelled_at >= ? AND cancelled_at < DATE_ADD(?, INTERVAL 1 DAY)) AS cancelled
-       FROM reservations`,
-      [previousStartAt, previousEndAt, previousStartAt, previousEndAt, previousStartAt, previousEndAt]
-    ),
-    db.query(
-      `SELECT SUM(purpose = 'entry_exit') AS entry_exit_scans, SUM(purpose = 'borrowing') AS borrowing_scans
-       FROM attendance_logs WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)`,
-      [previousStartAt, previousEndAt]
-    ),
-    db.query(
-      `SELECT COUNT(DISTINCT visitor_id) AS unique_visitors, COALESCE(SUM(hit_count), 0) AS page_hits
-       FROM site_daily_visits WHERE visit_date >= ? AND visit_date <= ?`,
-      [previousRange.dateFrom, previousRange.dateTo]
-    ),
-    db.query(
-      `SELECT COALESCE(SUM(CASE WHEN kind IN ('payment','legacy_credit','reversal') THEN -amount ELSE 0 END), 0) AS settled_amount
-       FROM fine_ledger_entries WHERE kind IN ('payment','legacy_credit','reversal')
-         AND effective_at >= ? AND effective_at < DATE_ADD(?, INTERVAL 1 DAY)`,
-      [previousStartAt, previousEndAt]
+              (SELECT COUNT(*) FROM reservations WHERE deleted_at IS NULL AND status = 'ready' AND (expires_at IS NULL OR expires_at > NOW())) AS ready_reservations,
+              (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status IN ('borrowed', 'overdue')) AS active_loans,
+              (SELECT COUNT(*) FROM books WHERE deleted_at IS NULL) AS catalog_titles,
+              (SELECT COUNT(*) FROM book_copies WHERE deleted_at IS NULL AND is_active = 1) AS catalog_copies,
+              (SELECT COUNT(*) FROM book_copies bc WHERE ${availableToBorrow("bc")}) AS available_copies,
+              (SELECT COUNT(*) FROM book_copies bc WHERE bc.deleted_at IS NULL AND bc.is_active = 1 AND NOT ${hasAccession("bc")}) AS copies_needing_accession,
+              (SELECT COUNT(*) FROM book_copies WHERE deleted_at IS NULL AND is_active = 1 AND \`condition\` = 'damaged') AS damaged_copies,
+              (SELECT COUNT(*) FROM book_copies WHERE deleted_at IS NULL AND is_active = 1 AND \`condition\` = 'lost') AS lost_copies`
     ),
     db.query(
       `SELECT day, SUM(borrowed) AS borrowed, SUM(returned) AS returned,
@@ -417,42 +392,34 @@ async function getAiReportQueryData({ range, previousRange, startAt, endExclusiv
          SUM(unique_visitors) AS unique_visitors, SUM(page_hits) AS page_hits
        FROM (
          SELECT DATE_FORMAT(DATE_ADD(borrowed_at, INTERVAL 8 HOUR), '%Y-%m-%d') AS day, COUNT(*) AS borrowed, 0 AS returned, 0 AS entry_exit_scans, 0 AS library_entries, 0 AS unique_library_visitors, 0 AS borrowing_scans, 0 AS unique_visitors, 0 AS page_hits
-         FROM borrowings WHERE borrowed_at >= ? AND borrowed_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(borrowed_at, INTERVAL 8 HOUR), '%Y-%m-%d')
+         FROM borrowings WHERE borrowed_at >= ? AND borrowed_at < ? GROUP BY DATE_FORMAT(DATE_ADD(borrowed_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
          SELECT DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d'), 0, COUNT(*), 0, 0, 0, 0, 0, 0
-         FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= ? AND returned_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d')
+         FROM borrowings WHERE returned_at IS NOT NULL AND returned_at >= ? AND returned_at < ? GROUP BY DATE_FORMAT(DATE_ADD(returned_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
          SELECT DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d'), 0, 0, SUM(purpose = 'entry_exit'), SUM(purpose = 'entry_exit' AND type = 'check_in'), COUNT(DISTINCT CASE WHEN purpose = 'entry_exit' AND type = 'check_in' THEN user_id END), SUM(purpose = 'borrowing'), 0, 0
-         FROM attendance_logs WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
+         FROM attendance_logs WHERE created_at >= ? AND created_at < ? GROUP BY DATE_FORMAT(DATE_ADD(created_at, INTERVAL 8 HOUR), '%Y-%m-%d')
          UNION ALL
          SELECT DATE_FORMAT(visit_date, '%Y-%m-%d'), 0, 0, 0, 0, 0, 0, COUNT(DISTINCT visitor_id), COALESCE(SUM(hit_count), 0)
          FROM site_daily_visits WHERE visit_date >= ? AND visit_date <= ? GROUP BY DATE_FORMAT(visit_date, '%Y-%m-%d')
        ) daily GROUP BY day ORDER BY day ASC`,
-      [startAt, endExclusive, startAt, endExclusive, startAt, endExclusive, range.dateFrom, range.dateTo]
-    ),
-    db.query(
-      `SELECT u.name, COUNT(*) AS borrowings
-       FROM borrowings b JOIN users u ON u.id = b.user_id
-       WHERE b.borrowed_at >= ? AND b.borrowed_at < DATE_ADD(?, INTERVAL 1 DAY)
-       GROUP BY u.id, u.name ORDER BY borrowings DESC, u.name ASC LIMIT 1`,
-      [startAt, endExclusive]
+      [startAt, endAt, startAt, endAt, startAt, endAt, current.dateFrom, current.dateTo]
     ),
   ]);
   return {
-    circulation: circulationRows[0],
-    reservations: reservationRows[0],
-    attendance: attendanceRows[0],
-    visits: visitRows[0],
-    fines: fineRows[0],
+    circulation: currentTotals.circulation,
+    reservations: currentTotals.reservations,
+    attendance: currentTotals.attendance,
+    visits: currentTotals.visits,
+    fines: currentTotals.fines,
     topBooks,
-    watchItems: watchRows[0],
-    previousCirculation: previousCirculationRows[0],
-    previousReservations: previousReservationRows[0],
-    previousAttendance: previousAttendanceRows[0],
-    previousVisits: previousVisitRows[0],
-    previousFines: previousFineRows[0],
+    watchItems,
+    previousCirculation: previousTotals.circulation,
+    previousReservations: previousTotals.reservations,
+    previousAttendance: previousTotals.attendance,
+    previousVisits: previousTotals.visits,
+    previousFines: previousTotals.fines,
     dailyActivity,
-    topBorrower: topBorrowers[0] || null,
   };
 }
 

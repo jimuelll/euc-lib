@@ -1,5 +1,5 @@
 import type { Pool, PoolConnection, ResultSetHeader } from "mysql2/promise";
-import type { CreateEventInput, EventWrite, LibraryEvent } from "./events.types";
+import type { EventWrite, LibraryEvent } from "./events.types";
 
 const db = require("../../db") as Pool;
 

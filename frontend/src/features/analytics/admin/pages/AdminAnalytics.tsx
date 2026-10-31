@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { TabsContent } from '@/components/ui/tabs';
@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AdminPageHeader, AdminPageTabs, AdminDateRange, AdminIcon, useAdminUrlState, formatPeso, formatAdminDate } from '@/features/admin';
 import { getApiErrorMessage } from '@/utils/apiError';
-import { createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse } from '../../api/adminAnalytics.api';
+import { aiReportErrorInfo, createAiAnalyticsReport, fetchAdminDashboard, type AiAnalyticsReportResponse, type AiReportErrorCode, type AiReportErrorDetails } from '../../api/adminAnalytics.api';
 import { Panel, DailyChart, Distribution, Snapshot, Sparkline, colors, shortDate } from '../AnalyticsCharts';
 import { saveBrief, printBrief } from '../SavedBriefs';
+import { BriefNarrative } from '../BriefNarrative';
 import type { AnalyticsRange, TrendPoint } from '../analytics.types';
 export type { AnalyticsRange, DashboardResponse, DashboardStats, NamedValue, TrendPoint, PopularBookPoint, CategoryPoint } from '../analytics.types';
 import { analyticsRows, downloadAnalyticsCsv, printAnalytics } from '../analytics.export';
@@ -22,39 +23,46 @@ else
     start.setDate(start.getDate() - (range === '30d' ? 29 : 6)); return { dateFrom: localDate(start), dateTo: localDate(end) }; };
 const sum = (data: TrendPoint[], key: string) => data.reduce((total, row) => total + Number(row[key as keyof TrendPoint] || 0), 0);
 const suggestions = ['What changed most during this period?', 'What was the most borrowed title?', 'How many people visited the library?'];
-function Narrative({ text }: {
-    text: string;
-}) { const bold = (value: string): ReactNode => value.split(/(\*\*[^*]+\*\*|₱[\d,.]+|\b\d[\d,.]*\b)/g).map((part, index) => /^\*\*|^₱|^\d/.test(part) ? <strong key={index}>{part.replace(/\*\*/g, '')}</strong> : part); return <div className="analytics-narrative">{text.split(/\n\s*\n/).filter(Boolean).map((block, index) => { const lines = block.split('\n'); const first = lines[0].replace(/^#+\s*/, ''), heading = /^(Performance assessment|What changed|Key findings|Recommended follow-up|Summary):?$/i.test(first) || /^#+/.test(lines[0]); const body = heading ? lines.slice(1) : lines; return <section key={index}>{heading && <h3>{first.replace(/:$/, '')}</h3>}{body.every(line => /^\s*([-*]|\d+[.)])\s/.test(line)) ? <ul>{body.map((line, i) => <li key={i}>{bold(line.replace(/^\s*([-*]|\d+[.)])\s*/, ''))}</li>)}</ul> : <p>{body.map((line, i) => <span key={i}>{bold(line)}{i < body.length - 1 && <br />}</span>)}</p>}</section>; })}</div>; }
+type AiError = { message: string; code?: AiReportErrorCode; details?: AiReportErrorDetails };
+const RECENT_KEY = 'analytics.recent-questions';
+const readAiError = (error: unknown): AiError => ({ message: getApiErrorMessage(error, 'Could not generate the report. Try again.'), ...aiReportErrorInfo(error) });
+const RETRYABLE = new Set<string | undefined>([undefined, 'AI_REPORT_PROVIDER_UNAVAILABLE', 'AI_REPORT_SCOPE_UNVERIFIED']);
+/** Explains a failed AI report and offers the one action that resolves it. */
+function AiReportError({ error, onRetry, onUseRange }: { error: AiError; onRetry: () => void; onUseRange: (range: { dateFrom: string; dateTo: string }) => void }) {
+    const range = error.code === 'AI_REPORT_DATE_OUTSIDE_RANGE' ? error.details?.suggestedRange : undefined;
+    return <div role="alert" className="analytics-notice"><span>{error.message}</span>{range && <Button type="button" variant="outline" size="sm" onClick={() => onUseRange(range)}>Use {range.dateFrom === range.dateTo ? shortDate(range.dateFrom) : `${shortDate(range.dateFrom)} – ${shortDate(range.dateTo)}`}</Button>}{error.code === 'AI_REPORT_PRIVACY_RESTRICTED' && <Link to="/admin/attendance">Open Attendance History</Link>}{RETRYABLE.has(error.code) && <Button type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button>}</div>;
+}
 export default function AdminAnalytics() {
     const [params, patch] = useAdminUrlState(), tab = ['overview', 'circulation', 'visitors', 'collection', 'ai-report'].includes(params.get('tab') || '') ? params.get('tab')! : 'overview', range = (params.get('range') || '7d') as AnalyticsRange;
     const allTime = params.get('period') === 'all-time', defaults = defaultDates(range), dateFrom = params.get('from') || defaults.dateFrom, dateTo = params.get('to') || defaults.dateTo, period = allTime ? { allTime: true } : { dateFrom, dateTo };
     const query = useQuery({ queryKey: ['analytics', 'dashboard', period], queryFn: ({ signal }) => fetchAdminDashboard(range, signal, period) });
     const data = query.data, charts = data?.charts;
-    const [question, setQuestion] = useState(''), [report, setReport] = useState<AiAnalyticsReportResponse | null>(null), [reportKey, setReportKey] = useState(''), [error, setError] = useState(''), [feedback, setFeedback] = useState(''), [recent, setRecent] = useState<string[]>(() => { try {
-        const stored = JSON.parse(localStorage.getItem('analytics.recent-questions') || '[]'); return Array.isArray(stored) ? stored.filter(item => typeof item === 'string').slice(0, 5) : [];
+    const [question, setQuestion] = useState(''), [report, setReport] = useState<AiAnalyticsReportResponse | null>(null), [reportKey, setReportKey] = useState<{ period: string; question: string } | null>(null), [error, setError] = useState(''), [aiError, setAiError] = useState<AiError | null>(null), [feedback, setFeedback] = useState(''), [recent, setRecent] = useState<string[]>(() => { try {
+        const stored = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(stored) ? stored.filter(item => typeof item === 'string').slice(0, 5) : [];
     }
     catch {
         return [];
     } });
     const mutation = useMutation({ mutationFn: createAiAnalyticsReport });
-    const selectionKey = JSON.stringify(period) + question.trim();
-    const stale = Boolean(report && selectionKey !== reportKey);
+    // A report is stale once the selected period or the question differs from the one it answered.
+    const staleReason = !report || !reportKey ? '' : reportKey.period !== JSON.stringify(period) ? `This ${report.mode === 'answer' ? 'answer' : 'brief'} covers ${shortDate(report.range.dateFrom)} – ${shortDate(report.range.dateTo)}, not the selected period.` : reportKey.question !== question.trim() ? 'The question has changed since this was generated.' : '';
+    const stale = Boolean(staleReason);
     const currentPeriod = allTime ? (data?.period || { dateFrom, dateTo }) : { dateFrom, dateTo };
     const periodLabel = `${shortDate(currentPeriod.dateFrom)} – ${shortDate(currentPeriod.dateTo)}${allTime ? ' · all recorded history' : ''}`;
     const verifyHref = (tab: string) => '/admin/analytics?' + new URLSearchParams({ tab, from: report?.range.dateFrom || dateFrom, to: report?.range.dateTo || dateTo }).toString();
     const selectTab = (value: string) => patch({ tab: value });
-    const generate = async () => { setError(''); setFeedback(''); try {
-        const result = await mutation.mutateAsync({ ...period, question: question.trim() || undefined });
-        setReport({ ...result, generatedAt: result.generatedAt || new Date().toISOString() });
-        setReportKey(selectionKey);
-        if (question.trim()) {
-            const next = [question.trim(), ...recent.filter(item => item !== question.trim())].slice(0, 8);
+    const generate = async () => { setError(''); setFeedback(''); setAiError(null); const asked = question.trim(); try {
+        const result = await mutation.mutateAsync({ ...period, question: asked || undefined });
+        setReport({ ...result, question: result.question ?? (asked || null), generatedAt: result.generatedAt || new Date().toISOString() });
+        setReportKey({ period: JSON.stringify(period), question: asked });
+        if (asked) {
+            const next = [asked, ...recent.filter(item => item !== asked)].slice(0, 5);
             setRecent(next);
-            localStorage.setItem('analytics.recent-questions', JSON.stringify(next));
+            try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* recent questions are a convenience */ }
         }
     }
     catch (error) {
-        setError(getApiErrorMessage(error, 'Could not generate the report. Try again.'));
+        setAiError(readAiError(error));
     } };
     const exportRows=data ? analyticsRows(data,tab,periodLabel,report) : [];
     const exportMeta={libraryName:data?.libraryName || 'Library',generatedBy:data?.generatedBy || 'Administrator',title:`Operations Analytics · ${tab==='ai-report'?'AI Report':tab[0].toUpperCase()+tab.slice(1)}`,period:periodLabel,generatedAt:new Date(query.dataUpdatedAt || Date.now()).toISOString()};
@@ -73,24 +81,24 @@ export default function AdminAnalytics() {
  <TabsContent value="visitors" className="analytics-tab"><div className="analytics-grid"><DailyChart periodLabel={periodLabel} title="Library arrivals" emptyMessage="No check-ins in this range" totalLabel={`${sum(charts.attendanceTrend,'library_entries')} check-ins`} data={charts.attendanceTrend} metrics={[{ key: 'library_entries', label: 'Check-ins', color: colors.blue }, { key: 'unique_library_visitors', label: 'Unique patrons each day', color: colors.purple }]}/><DailyChart periodLabel={periodLabel} title="Library scans" data={charts.attendanceTrend} metrics={[{ key: 'entry_exit_count', label: 'Check-in / check-out', color: colors.purple }, { key: 'borrowing_count', label: 'Borrowing scans', color: colors.blue }]}/><DailyChart periodLabel={periodLabel} title="Website activity" totalLabel={`${sum(charts.visitTrend,'visit_hits')} page hits · ${sum(charts.visitTrend,'unique_visitors')} daily unique visitors`} data={charts.visitTrend} metrics={[{ key: 'unique_visitors', label: 'Unique visitors each day', color: colors.blue }, { key: 'visit_hits', label: 'Page hits', color: colors.purple }]}/><Panel title="Registered users by role"><Distribution items={charts.userRoles}/></Panel></div><p className="analytics-note">Arrivals count check-ins in Attendance History. Scans also include check-outs and borrowing scans; “inside now” counts currently open visits. Website visitor totals add daily unique visitors, so a person visiting on two days counts twice.</p><Link to="/admin/attendance">Verify in Attendance</Link></TabsContent>
  <TabsContent value="collection" className="analytics-tab">{collectionNotice}<p className="analytics-note">{data.stats.active_accessioned_copies} of {data.stats.total_book_copies} active copies are accessioned. Accessioning is required for borrowing; condition, policy and existing loans also affect the {data.stats.available_book_copies} copies available now.</p><div className="analytics-grid"><Panel title="Catalog by category" total={data.stats.total_books + ' titles'}>{charts.catalogByCategory.find(item => item.name === 'Uncategorized') && <Link className="analytics-notice" to="/admin/catalog?uncategorized=1">Uncategorized: {charts.catalogByCategory.find(item => item.name === 'Uncategorized')!.titles} titles · Review in Catalog</Link>}<Distribution items={charts.catalogByCategory.map(item => ({ name: item.name, value: item.titles }))}/></Panel><Panel title="Physical copy condition" total={data.stats.total_book_copies + ' copies'}>{charts.copyCondition.filter(item => item.value > 0).length === 1 ? <p>{charts.copyCondition.find(item => item.value > 0)!.value} of {data.stats.total_book_copies} copies in {charts.copyCondition.find(item => item.value > 0)!.name} condition</p> : <Distribution items={charts.copyCondition} stacked/>}</Panel><Panel title="Collection snapshot"><Snapshot label="Active accessioned" value={data.stats.active_accessioned_copies} href="/admin/catalog?tab=holdings&completion=complete"/><Snapshot label="Needs accession" value={data.stats.needs_accession_copies} href="/admin/catalog?tab=holdings&completion=missing" attention/><Snapshot label="Available to borrow" value={data.stats.available_book_copies} href="/admin/catalog?tab=holdings&hstatus=available" attention={data.stats.available_book_copies <= 1}/><Snapshot label="On loan" value={data.stats.borrowed_book_copies} href="/admin/borrowing?tab=return"/></Panel></div></TabsContent>
  </>}
- <TabsContent value="ai-report" className="analytics-tab"><Panel><p className="analytics-using-range">Using {periodLabel}</p><p className="analytics-note">Uses aggregate library data only. No patron identities are shared with the model.</p><label htmlFor="analytics-question" className="analytics-question-label">Question (optional)</label><div className="analytics-compose-row"><Input id="analytics-question" maxLength={500} value={question} onChange={event => setQuestion(event.target.value)} placeholder="Ask about borrowing, visits or fine collections"/><Button disabled={mutation.isPending || query.isFetching} onClick={() => void generate()}><AdminIcon name="recommendations"/>{mutation.isPending ? 'Generating report…' : report ? 'Regenerate' : 'Generate report'}</Button></div><div className="analytics-suggestions">{suggestions.map(item => <Button key={item} variant="outline" size="sm" onClick={() => setQuestion(item)}>{item}</Button>)}</div>{recent.length > 0 && <details className="analytics-recent"><summary>Recent questions</summary>{recent.map(item => <button key={item} onClick={() => setQuestion(item)}>{item}</button>)}</details>}{mutation.isPending && <p role="status" className="analytics-note">Preparing the evidence and writing your brief…</p>}{error && <p role="alert" className="analytics-notice">{error}</p>}{feedback && <p role="status" className="analytics-notice">{feedback}</p>}</Panel>
- {report && <Panel title={report.mode === 'answer' ? 'Library analytics answer' : 'Performance brief'} total={<span className="analytics-note">Generated {formatAdminDate(report.generatedAt)}</span>}><p className="analytics-note">{shortDate(report.range.dateFrom)} – {shortDate(report.range.dateTo)}</p>{stale && <p role="status" className="analytics-notice">This brief uses an earlier period or question. Regenerate to update it.</p>}<div className="analytics-report-figures"><Snapshot label="Borrowed" value={report.evidence.activity.circulation.borrowed} href={verifyHref('circulation')}/><Snapshot label="Returned" value={report.evidence.activity.circulation.returned} href={verifyHref('circulation')}/><Snapshot label="Settled fines" value={formatPeso(report.evidence.activity.fine_collections.settled_amount)} href={verifyHref('circulation')}/><Snapshot label="Daily unique site visitors" value={report.evidence.activity.site_activity.unique_visitors} href={verifyHref('visitors')}/></div>{report.evidence.comparison?.available === false && <p className="analytics-notice">No prior data to compare.</p>}<Narrative text={report.report}/><div className="analytics-report-actions"><Button variant="outline" onClick={async () => { try {
+ <TabsContent value="ai-report" className="analytics-tab"><Panel><p className="analytics-using-range">Using {periodLabel}</p><p className="analytics-note">Uses aggregate library data only. No patron identities are shared with the model. Dates are reported in UTC+08.</p><form onSubmit={event => { event.preventDefault(); void generate(); }}><label htmlFor="analytics-question" className="analytics-question-label">Question (optional)</label><div className="analytics-compose-row"><Input id="analytics-question" maxLength={500} value={question} onChange={event => { setQuestion(event.target.value); setAiError(null); }} placeholder="Ask about borrowing, visits or fine collections"/><Button type="submit" disabled={mutation.isPending || query.isFetching}><AdminIcon name="recommendations"/>{mutation.isPending ? 'Generating report…' : report ? 'Regenerate' : 'Generate report'}</Button></div></form><div className="analytics-suggestions">{suggestions.map(item => <Button key={item} type="button" variant="outline" size="sm" onClick={() => { setQuestion(item); setAiError(null); }}>{item}</Button>)}</div>{recent.length > 0 && <details className="analytics-recent"><summary>Recent questions</summary>{recent.map(item => <button key={item} type="button" onClick={() => { setQuestion(item); setAiError(null); }}>{item}</button>)}</details>}{mutation.isPending && <p role="status" className="analytics-note">Checking the question, gathering {periodLabel} figures and writing your {question.trim() ? 'answer' : 'brief'}…</p>}{aiError && <AiReportError error={aiError} onRetry={() => void generate()} onUseRange={range => { setAiError(null); patch({ from: range.dateFrom, to: range.dateTo, period: null }); }}/>}{error && <p role="alert" className="analytics-notice">{error}</p>}{feedback && <p role="status" className="analytics-notice">{feedback}</p>}</Panel>
+ {report && <Panel title={report.mode === 'answer' ? 'Library analytics answer' : 'Performance brief'} total={<span className="analytics-note">Generated {formatAdminDate(report.generatedAt)}{report.source?.kind === 'rules' ? ' · From recorded totals, no AI call needed' : ''}</span>}><div aria-busy={mutation.isPending}><p className="analytics-note">{shortDate(report.range.dateFrom)} – {shortDate(report.range.dateTo)}{report.range.allTime ? ' · all recorded history' : ''}{report.question ? ` · “${report.question}”` : ''}</p>{staleReason && <p role="status" className="analytics-notice">{staleReason} Regenerate to update it.</p>}<div className="analytics-report-figures"><Snapshot label="Borrowed" value={report.evidence.activity.circulation.borrowed} href={verifyHref('circulation')}/><Snapshot label="Returned" value={report.evidence.activity.circulation.returned} href={verifyHref('circulation')}/><Snapshot label="Settled fines" value={formatPeso(report.evidence.activity.fine_collections.settled_amount)} href={verifyHref('circulation')}/>{report.evidence.activity.attendance.library_entries !== undefined && <Snapshot label="Library check-ins" value={report.evidence.activity.attendance.library_entries} href={verifyHref('visitors')}/>}<Snapshot label="Site visitors · daily unique, summed" value={report.evidence.activity.site_activity.unique_visitors} href={verifyHref('visitors')}/></div>{report.warnings?.map(warning => <p key={warning} role="note" className="analytics-notice">{warning}</p>)}<BriefNarrative text={report.report}/><div className="analytics-report-actions"><Button variant="outline" onClick={async () => { try {
         await navigator.clipboard.writeText(report.report);
         setFeedback('Brief copied.');
     }
     catch {
         setError('Could not copy. Select the text and copy it manually.');
     } }}><AdminIcon name="copy"/>Copy brief</Button><Button variant="outline" title="Open the print dialog and choose Save as PDF" onClick={() => { try {
-        printBrief(report, question || 'Library performance brief');
+        printBrief(report, report.question || 'Library performance brief');
     }
     catch (error) {
         setError((error as Error).message);
-    } }}><AdminIcon name="reports"/>Print / PDF</Button><Button disabled={stale} onClick={() => { try {
-        saveBrief(report, question);
+    } }}><AdminIcon name="reports"/>Print / PDF</Button><Button disabled={Boolean(staleReason)} title={staleReason ? 'Regenerate before saving this brief' : undefined} onClick={() => { try {
+        saveBrief(report, report.question || '');
         setFeedback('Saved to Reports on this device.');
     }
     catch {
         setError('Could not save on this device. Export a PDF instead.');
-    } }}>Save to reports</Button><Link to="/admin/query?tab=briefs">Saved briefs</Link></div><div className="analytics-verify"><Link to={verifyHref('circulation')}>Verify circulation figures</Link><Link to={verifyHref('visitors')}>Verify visitor figures</Link><Link to="/admin/clearance?tab=queue&filter=blocked">Review overdue loans</Link></div></Panel>}
+    } }}>Save to reports</Button><Link to="/admin/query?tab=briefs">Saved briefs</Link></div><div className="analytics-verify"><Link to={verifyHref('circulation')}>Verify circulation figures</Link><Link to={verifyHref('visitors')}>Verify visitor figures</Link><Link to="/admin/clearance?tab=queue&filter=blocked">Review overdue loans</Link></div></div></Panel>}
  </TabsContent></AdminPageTabs></div>;
 }

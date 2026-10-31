@@ -16,12 +16,7 @@ const findById = async (id: number): Promise<UserRecord | null> => {
   return rows[0] || null;
 };
 
-const updatePassword = (userId: number, newPasswordHash: string) => db.query(
-  "UPDATE users SET password_hash = ?, must_change_password = FALSE WHERE id = ?",
-  [newPasswordHash, userId],
-);
-
 const updateLastLogin = (userId: number) =>
   db.query("UPDATE users SET last_login = NOW() WHERE id = ?", [userId]);
 
-export = { findByEmployeeId, findById, updatePassword, updateLastLogin };
+export = { findByEmployeeId, findById, updateLastLogin };

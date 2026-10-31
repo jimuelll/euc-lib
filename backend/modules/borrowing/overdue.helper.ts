@@ -3,7 +3,6 @@ import repository = require("./borrowing.repository");
 import notifications = require("../notifications/notifications.service");
 import librarySettings = require("../library-settings/library-settings.service");
 import fine = require("./fine-calculation");
-import { addLibraryCalendarDays, libraryDateKey } from "../time/library-time";
 
 interface BorrowingRow extends RowDataPacket {
   id: number;
@@ -54,18 +53,6 @@ const ensureBorrowingPaymentColumns = async (): Promise<void> => {
   if (ensuredBorrowingPaymentColumns) return;
   // Settlement columns are guaranteed by the migration baseline. Request handlers must never change schema.
   ensuredBorrowingPaymentColumns = true;
-};
-
-const calculateDueDateWithHolidays = async (borrowedAt: Date | string | number, daysAllowed: number, conn?: PoolConnection): Promise<Date> => {
-  const holidayDateSet = await librarySettings.getHolidayDateSet(conn);
-  let dueDate = new Date(borrowedAt);
-  let countedDays = 0;
-  while (countedDays < daysAllowed) {
-    dueDate = addLibraryCalendarDays(dueDate, 1);
-    if (holidayDateSet.has(libraryDateKey(dueDate))) continue;
-    countedDays += 1;
-  }
-  return dueDate;
 };
 
 interface FinePolicy extends FineCalculationInput {
@@ -191,4 +178,4 @@ async function listUnsettledBorrowings({ userId = null, limit = null, page = nul
   return result;
 }
 
-export = { ensureBorrowingPaymentColumns, calculateDueDateWithHolidays, getFineDetails, mapBorrowingsWithFineDetails, syncOverdueBorrowings, listUnsettledBorrowings };
+export = { ensureBorrowingPaymentColumns, getFineDetails, mapBorrowingsWithFineDetails, syncOverdueBorrowings, listUnsettledBorrowings };

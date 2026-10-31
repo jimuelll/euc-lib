@@ -126,6 +126,4 @@ const limiters = Object.fromEntries(
   (Object.keys(policies) as PolicyName[]).map((name) => [name, createLimiter(name)]),
 ) as Record<PolicyName, RequestHandler & { resetKey: (key: string) => void }>;
 
-const loginLimiter = limiters.login;
-
-export = { policies, createLimiter, limiters, loginLimiter, rateLimitExposedHeaders };
+export = { policies, createLimiter, limiters, rateLimitExposedHeaders };

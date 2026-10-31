@@ -67,8 +67,10 @@ async function handleCreateAiAnalyticsReport(req: AnalyticsRequest, res: Respons
     const result = await createAiAnalyticsReport(req.body || {}, req.user?.id);
     res.json(result);
   } catch (err: any) {
-    if (err.status && err.status < 500) return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}) });
-    if (err.status === 503) return res.status(503).json({ message: err.message });
+    // Coded errors carry user-facing guidance; details only ever hold dates.
+    if (err.status && (err.status < 500 || err.status === 503)) {
+      return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}), ...(err.details ? { details: err.details } : {}) });
+    }
     logError("[analytics] create AI report:", err);
     res.status(500).json({ message: "Failed to generate the AI report" });
   }

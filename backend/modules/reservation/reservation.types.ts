@@ -1,17 +1,5 @@
 import type { RowDataPacket } from "mysql2/promise";
 
-export interface ReservationRow extends RowDataPacket {
-  id: number;
-  user_id?: number;
-  book_id?: number;
-  status?: string;
-  title?: string;
-  expires_at?: Date | string | null;
-  reserved_copy_id?: number | null;
-  barcode?: string | null;
-  [key: string]: unknown;
-}
-
 export interface ReservationReadyRow extends RowDataPacket {
   id: number;
   book_id: number;

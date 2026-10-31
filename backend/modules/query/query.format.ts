@@ -1,4 +1,3 @@
-type DateFormat = "date" | "dateTime";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-PH", {
   timeZone: "Asia/Manila",

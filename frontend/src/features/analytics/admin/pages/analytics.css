@@ -48,12 +48,12 @@ a.analytics-snapshot-row:hover {text-decoration:underline;text-underline-offset:
 .analytics-narrative h3 {font-size:15px;font-weight:600;margin-bottom:8px;}
 .analytics-narrative p,.analytics-narrative li {font-size:14px;line-height:1.8;overflow-wrap:anywhere;}
 .analytics-narrative ul {list-style:disc;padding-left:20px;}
+.analytics-narrative ol {list-style:decimal;padding-left:20px;}
 .analytics-recent {margin:16px 0;font-size:13px;}
 .analytics-recent button {display:block;text-align:left;padding:10px 0;text-decoration:underline;text-underline-offset:4px;}
 .analytics-saved > ul {list-style:none;padding:0;margin:20px 0;}
 .analytics-saved li {display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 0;border-bottom:1px solid hsl(var(--border));font-size:13px;}
 .analytics-saved li > .analytics-name {margin-right:auto;text-align:left;font-weight:600;text-decoration:underline;text-underline-offset:4px;}
-.analytics-saved-text {font-family:inherit;white-space:pre-wrap;font-size:14px;line-height:1.8;margin:20px 0;}
 .analytics-workspace :is(button,a,input):focus-visible,.analytics-saved :is(button,a):focus-visible {outline:2px solid hsl(var(--ring));outline-offset:3px;}
 @media(max-width:1100px){.analytics-kpis {grid-template-columns:repeat(2,minmax(0,1fr));}.analytics-position {grid-template-columns:minmax(0,1fr);gap:0;}}
 @media(max-width:750px){.analytics-grid {grid-template-columns:minmax(0,1fr);}.analytics-workspace .admin-desk-header-actions {flex-wrap:wrap;width:100%;}.analytics-workspace .admin-desk-page-tabs {overflow-x:auto;flex-wrap:nowrap;justify-content:flex-start;}.analytics-workspace .admin-desk-page-tabs button {flex-shrink:0;}.analytics-kpis {gap:12px;}.analytics-kpis > button {padding:12px;}.analytics-kpis > button > div {flex-direction:column;align-items:flex-start;}.analytics-report-figures {grid-template-columns:minmax(0,1fr);}.analytics-chart {height:240px;}.analytics-panel > header {align-items:flex-start;}.analytics-suggestions button {height:auto;white-space:normal;text-align:left;}.analytics-workspace input {font-size:16px;}.analytics-workspace .admin-desk-header-actions button {max-width:100%;}}

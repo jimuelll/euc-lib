@@ -31,4 +31,3 @@ export function eventSummary(item:AuditItem){
  if(item.target?.url&&['Patron','Book type policy','Policy','Book','Reservation'].includes(item.target.kind))return `${actionLabel(item.action)} ${item.target.kind==='Policy'?'book type policy':item.target.kind.toLowerCase()}: ${item.target.label}`;
  return item.copy_display_description||item.description;
 }
-export function relativeTime(value:string){const minutes=Math.floor((Date.now()-instant(value).getTime())/60000);return minutes<0?eventTime(value):minutes<1?'Just now':minutes<60?`${minutes}m ago`:minutes<1440?`${Math.floor(minutes/60)}h ago`:eventTime(value);}

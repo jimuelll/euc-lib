@@ -4,7 +4,6 @@ import type {
   ClearanceQueueEntry,
   ClearanceQueuePage,
   ClearanceStatus,
-  ClearanceTransactionType,
   FineList,
 } from "./clearance.types";
 

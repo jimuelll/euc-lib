@@ -87,13 +87,3 @@ export const DEFAULT_FIELDS: FormField[] = [
   { key: "illustrators",     label: "Illustrators",     type: "repeatable", public: true,  order: 18, scope: "book" },
   { key: "copies",           label: "Copies",           type: "number",     public: true,  order: 19, scope: "book" },
 ];
-
-export const FIELD_TYPES: { value: FieldType; label: string }[] = [
-  { value: "text",     label: "Text" },
-  { value: "number",   label: "Number" },
-  { value: "date",     label: "Date" },
-  { value: "select",   label: "Dropdown" },
-  { value: "textarea", label: "Textarea" },
-  { value: "repeatable", label: "Repeatable list" },
-];
-

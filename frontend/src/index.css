@@ -35,6 +35,8 @@
     --primary: 0 100% 22.1569%;
     --primary-foreground: 0 0% 100%;
     --primary-hover: #8f0000;
+    /* Library maroon used by content and admin surfaces; library-design.css repeats it in its scope. */
+    --library-maroon: #7a0000;
 
     --action: 0 100% 28.0392%;
 

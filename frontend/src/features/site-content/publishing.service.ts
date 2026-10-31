@@ -19,7 +19,6 @@ export interface PublishingDocument extends PublishingMeta {
     published: ContentPayload;
 }
 export const publishingKeys = { all: ["publishing"] as const, summary: ["publishing", "summary"] as const, document: (section: ContentSection) => ["publishing", section] as const };
-export const getPublishingSummary = async (signal?: AbortSignal) => (await axios.get<PublishingMeta[]>("/api/admin/publishing", { signal })).data;
 export const getPublishingDocument = async (section: ContentSection, signal?: AbortSignal) => (await axios.get<PublishingDocument>(`/api/admin/publishing/${section}`, { signal })).data;
 export const savePublishingDocument = async (section: ContentSection, action: "draft" | "publish" | "discard", document: PublishingDocument, payload: ContentPayload,itemKey?:string,notifyUsers?:{total:number;email:number}) => {
     const body = { revision: document.revision, baseVersion: document.baseVersion, payload,itemKey,notifyUsers };

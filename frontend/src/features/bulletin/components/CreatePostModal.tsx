@@ -3,7 +3,7 @@ import {useQueryClient} from '@tanstack/react-query';
 import {Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle} from '@/components/ui/dialog';
 import {X} from 'lucide-react';
 import {useAuth} from '@/context/AuthContext';
-import {useAdminConfirmDialog} from '@/features/admin';
+import {useAdminConfirmDialog} from '@/features/admin/public';
 import {PublicationNotificationOption} from '@/features/notifications/PublicationNotificationOption';
 import {usePublicationNotice} from '@/features/notifications/usePublicationNotice';
 import {createBulletinPost,editBulletinPost,fetchBulletinPost} from '../api';

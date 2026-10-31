@@ -9,10 +9,3 @@ export interface PostModalProps {
   onRequireLogin?: () => void;
   onArchived?: (postId: number) => void;
 }
-
-export interface PostLiker {
-  id: number;
-  name: string;
-  role: string;
-  created_at: string;
-}

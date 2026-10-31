@@ -55,7 +55,7 @@ const getTodayLogs = async ({ limit = 100, lastId = null }: TodayLogInput = {}) 
 };
 
 const getLogs = async (filters: AttendanceFilters): Promise<AttendanceLogsResult> => {
-  const { page, limit, search, type, purpose, dateFrom, dateTo } = filters;
+  const { page, limit } = filters;
   const result = await repository.getLogs(filters);
   const total = result.total;
   return {

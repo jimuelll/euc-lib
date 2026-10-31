@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import axiosInstance from "@/utils/AxiosInstance";
 import type { AnalyticsRange, DashboardResponse } from "../admin/pages/AdminAnalytics";
 
@@ -8,11 +9,11 @@ export interface AiReportEvidence {
   activity: {
     circulation: { borrowed: number; returned: number };
     reservations: { created: number; fulfilled: number; cancelled: number };
-    attendance: { entry_exit_scans: number; borrowing_scans: number };
-    site_activity: { unique_visitors: number; page_hits: number };
+    attendance: { entry_exit_scans: number; borrowing_scans: number; library_entries?: number; unique_library_visitors?: number };
+    /** unique_visitors sums daily unique visitors, matching the dashboard; distinct_visitors counts each visitor once. */
+    site_activity: { unique_visitors: number; distinct_visitors?: number; page_hits: number };
     fine_collections: { settled_amount: number };
     top_borrowed_titles: { title: string; borrowings: number }[];
-    top_borrower: { name_token: string; borrowings: number } | null;
     daily_activity: {
       date: string; borrowed: number; returned: number; entry_exit_scans: number; library_entries: number;
       unique_library_visitors: number; borrowing_scans: number; unique_visitors: number; page_hits: number;
@@ -21,11 +22,11 @@ export interface AiReportEvidence {
   previous_activity: {
     circulation: { borrowed: number; returned: number };
     reservations: { created: number; fulfilled: number; cancelled: number };
-    attendance: { entry_exit_scans: number; borrowing_scans: number };
-    site_activity: { unique_visitors: number; page_hits: number };
+    attendance: { entry_exit_scans: number; borrowing_scans: number; library_entries?: number; unique_library_visitors?: number };
+    site_activity: { unique_visitors: number; distinct_visitors?: number; page_hits: number };
     fine_collections: { settled_amount: number };
   };
-  current_watch_items: { overdue_borrowings: number; ready_reservations: number; outstanding_fines: number };
+  current_watch_items: { overdue_borrowings: number; ready_reservations: number; outstanding_fines: number; active_loans?: number };
 }
 
 export interface AiAnalyticsReportResponse {
@@ -34,8 +35,24 @@ export interface AiAnalyticsReportResponse {
   libraryName?:string;
   report: string;
   mode: "answer" | "summary";
+  question?: string | null;
   range: AiReportEvidence["range"];
   evidence: AiReportEvidence;
+  /** Figures that could not be matched to the evidence, or an incomplete reply. */
+  warnings?: string[];
+  /** "rules" when the server answered without the model (nothing recorded to describe). */
+  source?: { kind: "model"; provider: string; model: string } | { kind: "rules" };
+}
+
+/** Coded failures from the AI report endpoint; details only accompany an out-of-range date. */
+export type AiReportErrorCode =
+  | "AI_REPORT_PRIVACY_RESTRICTED" | "AI_REPORT_IRRELEVANT_QUESTION" | "AI_REPORT_DATE_OUTSIDE_RANGE"
+  | "AI_REPORT_SCOPE_UNVERIFIED" | "AI_REPORT_QUOTA_REACHED" | "AI_REPORT_PROVIDER_UNAVAILABLE" | "AI_REPORT_NOT_CONFIGURED";
+export interface AiReportErrorDetails { requested?: { label: string; dateFrom: string; dateTo: string }; suggestedRange?: { dateFrom: string; dateTo: string } }
+
+export function aiReportErrorInfo(error: unknown): { code?: AiReportErrorCode; details?: AiReportErrorDetails } {
+  const data = isAxiosError<{ code?: AiReportErrorCode; details?: AiReportErrorDetails }>(error) ? error.response?.data : undefined;
+  return { code: data?.code, details: data?.details };
 }
 
 export interface AuditItem {

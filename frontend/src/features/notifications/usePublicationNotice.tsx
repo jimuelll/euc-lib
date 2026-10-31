@@ -1,6 +1,6 @@
 import {useRef,useState} from "react";
 import {useQuery} from "@tanstack/react-query";
-import {useAdminConfirmDialog} from "@/features/admin";
+import {useAdminConfirmDialog} from "@/features/admin/public";
 import {previewNotificationEmail} from "./admin/api";
 export function usePublicationNotice() {
  const [checked,setChecked]=useState(false);

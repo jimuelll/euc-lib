@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ data: undefined as undefined | { address: string; contact_email: string; contact_phone: string; hours: [] } }));
 vi.mock("../useSiteContent", () => ({ useSiteContent: () => state }));
-vi.mock("framer-motion", () => ({ useReducedMotion: () => true, motion: { div: ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div> } }));
+vi.mock("framer-motion", () => ({ useReducedMotion: () => true, LazyMotion: ({ children }: { children: React.ReactNode }) => <>{children}</>, m: { div: ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div> } }));
 import LibraryHoursSection from "./LibraryHoursSection";
 afterEach(cleanup);
 describe("homepage contacts", () => {

@@ -6,7 +6,7 @@ import * as accountEmail from "../auth/account-email.service";
 import { normalizeEmail } from "../email/email.config";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import repository = require("./admin.repository");
-import type { AdminRole, UserProfile, UserSearchQuery } from "./admin.types";
+import type { UserProfile, UserSearchQuery } from "./admin.types";
 const { revokeAllRefreshSessionsForUser } = require("../auth/authSession.service") as { revokeAllRefreshSessionsForUser: (userId: number) => Promise<void> };
 const fineLedger = require("../borrowing/fine-ledger.service");
 const { enqueueTransactionalAudit } = require("../analytics/transactional-audit") as {

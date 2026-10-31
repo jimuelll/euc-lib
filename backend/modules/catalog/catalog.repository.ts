@@ -663,31 +663,6 @@ async function deleteBookType(id: number, actorId: number | null = null) {
   }
 }
 
-async function findCopyForUpdate(copyId: number, conn: any) {
-  const [[copy]] = await conn.query(
-    `SELECT bc.id, bc.book_id, bc.barcode, bc.condition, bc.is_active, bc.notes,
-            bk.title, h.accession_number
-       FROM book_copies bc JOIN books bk ON bk.id = bc.book_id
-       LEFT JOIN copy_holdings h ON h.copy_id = bc.id
-      WHERE bc.id = ? AND bc.deleted_at IS NULL FOR UPDATE`,
-    [copyId],
-  );
-  return copy || null;
-}
-
-async function findActiveLoanForCopy(copyId: number, conn: any) {
-  const [[loan]] = await conn.query("SELECT id FROM borrowings WHERE copy_id = ? AND deleted_at IS NULL AND status IN ('borrowed', 'overdue') FOR UPDATE", [copyId]);
-  return loan || null;
-}
-
-async function findPreparedReservationForCopy(copyId: number, conn: any) {
-  const [[reservation]] = await conn.query(
-    "SELECT id FROM reservations WHERE reserved_copy_id = ? AND deleted_at IS NULL AND status = 'ready' AND (expires_at IS NULL OR expires_at > NOW()) FOR UPDATE",
-    [copyId],
-  );
-  return reservation || null;
-}
-
 async function updateCopyCondition(copyId: number, condition: string, notes: string | null, conn: any): Promise<void> {
   await conn.query("UPDATE book_copies SET `condition` = ?, notes = COALESCE(?, notes) WHERE id = ?", [condition, notes?.trim() || null, copyId]);
 }
@@ -740,8 +715,5 @@ export = {
   createBookType,
   updateBookType,
   deleteBookType,
-  findCopyForUpdate,
-  findActiveLoanForCopy,
-  findPreparedReservationForCopy,
   updateCopyCondition,
 };

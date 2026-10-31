@@ -2,12 +2,15 @@ import {LibraryIcon} from "@/components/ui/library-icon";
 import PostTimestamp from "./PostTimestamp";
 import "../post-card.css";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/sonner";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { MessageCircle, Pin, Archive, Loader2 } from "@/components/ui/library-glyphs";
 import { getInitials } from "../utils";
 import { useAuth } from "@/context/AuthContext";
 import type { BulletinPost } from "../types";
 import { archiveBulletinPost } from "../api";
+import { announcePostArchived } from "../archive-feedback";
 
 interface PostCardProps {
   post: BulletinPost;
@@ -16,15 +19,6 @@ interface PostCardProps {
   /** Called after the post is successfully archived */
   onArchived?: (postId: number) => void;
 }
-
-export const cardVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
 
 const ADMIN_ROLES = ["admin", "super_admin"];
 
@@ -39,6 +33,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
   const excerpt = post.content?.trim();
   const hasExcerpt = Boolean(excerpt && !/^[\s–—-]+$/.test(excerpt));
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const canArchive =
     ADMIN_ROLES.includes(user?.role ?? "") || user?.id === post.author_id;
@@ -61,7 +56,10 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
     try {
       await archiveBulletinPost(post.id);
       onArchived?.(post.id);
-    } catch { /* silent */ }
+      announcePostArchived(queryClient, post.id, ADMIN_ROLES.includes(user?.role ?? ""));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not archive the post. Please try again."));
+    }
     finally { setArchiveBusy(false); setArchiveConfirm(false); }
   };
 
@@ -92,8 +90,7 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
   }
 
   return (
-    <motion.div
-      variants={cardVariants}
+    <div
       data-post-variant={variant}
       data-post-image={hasImage ? "true" : "false"}
       className={`library-post-card group relative flex w-full text-left border-b border-border bg-card transition-colors duration-200 hover:bg-secondary/55 ${
@@ -241,6 +238,6 @@ export function PostCard({ post, onClick, variant = "grid", onArchived }: PostCa
           }
         </button>
       )}
-    </motion.div>
+    </div>
   );
 }

@@ -12,7 +12,6 @@ interface CatalogSchemaOptions {
   publicOnly?: boolean;
 }
 
-const PUBLIC_CATALOGUE_CORE_KEYS = ["id", "title", "author", "isbn", "copies", "material_type", "metadata"];
 const OPERATIONAL_BOOK_KEYS = new Set(["title", "author", "isbn", "copies", "book_type_id", "material_type"]);
 
 const fieldsForMaterial = (schema: CatalogSchemaField[], materialType: string): CatalogSchemaField[] =>
@@ -72,7 +71,6 @@ const upsertSchema = async (fields: CatalogSchemaField[], baseFields:any[], acto
 
 export = {
   OPERATIONAL_BOOK_KEYS,
-  PUBLIC_CATALOGUE_CORE_KEYS,
   fieldsForMaterial,
   getSchema,
   upsertSchema,

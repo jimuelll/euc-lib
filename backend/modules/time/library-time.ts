@@ -51,11 +51,6 @@ export function addLibraryCalendarDays(value: TimeValue, days: number): Date {
   return new Date(`${targetDay}T${valueParts.hour}:${valueParts.minute}:${valueParts.second}.${String(instant.getMilliseconds()).padStart(3, "0")}${LIBRARY_UTC_OFFSET}`);
 }
 
-export function formatLibraryDate(value: TimeValue, options: Intl.DateTimeFormatOptions = {}): string {
-  const instant = typeof value === "string" && dateOnly.test(value) ? new Date(`${value}T12:00:00${LIBRARY_UTC_OFFSET}`) : libraryInstant(value);
-  return new Intl.DateTimeFormat("en-PH", { timeZone: LIBRARY_TIME_ZONE, month: "short", day: "numeric", year: "numeric", ...options }).format(instant);
-}
-
 export function formatLibraryTime(value: TimeValue): string {
   return new Intl.DateTimeFormat("en-PH", { timeZone: LIBRARY_TIME_ZONE, hour: "numeric", minute: "2-digit" }).format(libraryInstant(value));
 }

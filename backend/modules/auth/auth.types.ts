@@ -35,6 +35,3 @@ export interface AcademicTermStatus {
   academic_term_name: string | null;
 }
 
-export interface AuthError extends Error {
-  status?: number;
-}

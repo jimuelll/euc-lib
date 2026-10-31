@@ -10,12 +10,12 @@
 .refined-drawer.refined-drawer .refined-section-index button::before { width:10px; height:15px; top:0; left:8px; }
 
 /* The global dark-theme action rules otherwise substitute salmon for brand maroon. */
-.refined-drawer.refined-drawer .admin-record-footer [data-variant=default]:not(:disabled) { background:#7a0000 !important; color:#fff !important; border-color:#7a0000 !important; }
+.refined-drawer.refined-drawer .admin-record-footer [data-variant=default]:not(:disabled) { background:var(--library-maroon) !important; color:#fff !important; border-color:var(--library-maroon) !important; }
 .refined-drawer.refined-drawer .admin-record-footer [data-variant=default]:not(:disabled):hover { background:#930e0e !important; }
 .refined-drawer.refined-drawer .admin-record-footer button:disabled { background:#e5e1dc !important; color:#65605b !important; border-color:#aaa29a !important; opacity:1 !important; }
 .dark .refined-drawer.refined-drawer .admin-record-footer button:disabled { background:#393532 !important; color:#c2bbb3 !important; border-color:#77716b !important; }
 .refined-drawer.refined-drawer .users-role-choice { border-color:var(--drawer-control-border) !important; }
-.refined-drawer.refined-drawer .users-role-choice:has(input:checked) { border-color:#7a0000 !important; }
+.refined-drawer.refined-drawer .users-role-choice:has(input:checked) { border-color:var(--library-maroon) !important; }
 .dark .refined-drawer.refined-drawer .users-role-choice:has(input:checked) { border-color:#e4a6a6 !important; }
 .users-drawer .admin-desk-tabs { position:sticky; top:0; z-index:2; align-self:start; background:hsl(var(--card)); }
 .dark .refined-drawer.refined-drawer :is(input,textarea,[role=combobox]):disabled { color:#ddd6ce !important; }

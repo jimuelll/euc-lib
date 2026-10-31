@@ -1,4 +1,4 @@
-import type { Request, RequestHandler, Response } from "express";
+import type { Request, RequestHandler } from "express";
 import service = require("./clearance.service");
 
 const { logError } = require("../../logger") as { logError: (...values: unknown[]) => void };

@@ -1,5 +1,6 @@
 import {useInfiniteQuery,useMutation,useQueryClient} from '@tanstack/react-query';
 import {Link} from 'react-router-dom';
+import {toast} from '@/components/ui/sonner';
 import {useAuth} from '@/context/AuthContext';
 import {LibraryIcon} from '@/components/ui/library-icon';
 import {fetchSavedBulletinPosts,setPostSaved} from '@/features/bulletin';
@@ -7,7 +8,9 @@ import {Surface,LoadingPanel,RetryNotice,EmptyPanel} from './MyLibraryPrimitives
 export default function MyLibrarySavedPosts(){
  const {user}=useAuth(),client=useQueryClient();
  const query=useInfiniteQuery({queryKey:['bulletin-saved',user?.id],initialPageParam:1,queryFn:({pageParam,signal})=>fetchSavedBulletinPosts(pageParam,signal),getNextPageParam:last=>last.hasMore?last.page+1:undefined,enabled:Boolean(user)});
- const remove=useMutation({mutationFn:(id:number)=>setPostSaved(id,false),onSuccess:async(_result,id)=>{await Promise.all([client.invalidateQueries({queryKey:['bulletin-saved',user?.id]}),client.invalidateQueries({queryKey:['bulletin','post',id]})]);}});
+ const refreshSaved=(id:number)=>Promise.all([client.invalidateQueries({queryKey:['bulletin-saved',user?.id]}),client.invalidateQueries({queryKey:['bulletin','post',id]})]);
+ const restore=useMutation({mutationFn:(id:number)=>setPostSaved(id,true),onSuccess:(_result,id)=>{void refreshSaved(id);toast.success('Saved post restored.');},onError:()=>toast.error('Could not restore the saved post. Save it again from the bulletin.')});
+ const remove=useMutation({mutationFn:(id:number)=>setPostSaved(id,false),onSuccess:async(_result,id)=>{await refreshSaved(id);toast.success('Removed from saved posts.',{action:{label:'Undo',onClick:()=>restore.mutate(id)}});}});
  const posts=query.data?.pages.flatMap(page=>page.data)||[];
  return <Surface title="Saved posts"><p className="my-library-saved-note">Your private reading list. Saving does not add a public reaction.</p>{query.isPending?<LoadingPanel label="Loading saved posts"/>:query.isError?<RetryNotice message="Could not load saved posts." onRetry={()=>void query.refetch()} retrying={query.isFetching}/>:!posts.length?<EmptyPanel message="Save a bulletin post to keep it here for later." to="/bulletin" action="Browse bulletin"/>:<ul className="my-library-saved-list">{posts.map(post=><li key={post.id}>{post.unavailable?<div className="my-library-saved-copy"><h3>Post unavailable</h3><p>This post was removed or archived.</p></div>:<Link className="my-library-saved-open" to={`/bulletin?post=${post.id}`}>{post.image_url&&<img src={post.image_url} alt={post.image_alt||''} loading="lazy"/>}<div className="my-library-saved-copy"><span>{post.post_type==='event'?'Event':'Bulletin'}</span><h3>{post.title}</h3><p>{post.excerpt}</p><small>Saved {new Date(post.saved_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</small></div></Link>}<button type="button" className="my-library-unsave" disabled={remove.isPending} onClick={()=>remove.mutate(post.id)} aria-label={`Remove ${post.unavailable?'unavailable post':post.title} from saved posts`}><LibraryIcon name="save"/>Remove</button></li>)}</ul>}{remove.isError&&<p role="alert">Could not remove this saved post. Try again.</p>}{query.hasNextPage&&<button className="my-library-more-saved" type="button" disabled={query.isFetchingNextPage} onClick={()=>void query.fetchNextPage()}>{query.isFetchingNextPage?'Loading…':'More saved posts'}</button>}</Surface>;
 }

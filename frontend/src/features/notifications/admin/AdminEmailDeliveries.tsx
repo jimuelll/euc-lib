@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/sonner';
 import { Input } from '@/components/ui/input';
 import { AdminDetailDrawer, AdminEmptyState, AdminFilterChips, AdminIcon, AdminPageHeader, AdminPageTabs } from '@/features/admin';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -43,7 +44,7 @@ export default function AdminEmailDeliveries({page='library'}:{page?:'account'|'
  const back=typeof returnTo==='string' && (returnTo===parent || returnTo.startsWith(parent+'?'))?returnTo:parent;
  const update=(changes:Record<string,string>,resetPage=true)=>{setParams(current=>{const next=new URLSearchParams(current);if(resetPage)next.delete('page');for(const [key,value] of Object.entries(changes)){if(value)next.set(key,value);else next.delete(key);}return next;},{replace:true,state:location.state});};
  const refresh=()=>{if(!invalidDates)void query.refetch();if(selectedId)void detail.refetch();};
- const retry=async(id:string)=>{setBusy(true);setError('');try{await retryEmailDelivery(id);await Promise.all([client.invalidateQueries({queryKey:['admin-email-deliveries']}),client.invalidateQueries({queryKey:['admin-email-delivery',id]})]);}catch(cause){setError(getApiErrorMessage(cause,'Could not retry this email. Refresh its details and try again.'));}finally{setBusy(false);}};
+ const retry=async(id:string)=>{setBusy(true);setError('');try{await retryEmailDelivery(id);await Promise.all([client.invalidateQueries({queryKey:['admin-email-deliveries']}),client.invalidateQueries({queryKey:['admin-email-delivery',id]})]);toast.success('Retry queued. The delivery status updates when it is sent.');}catch(cause){setError(getApiErrorMessage(cause,'Could not retry this email. Refresh its details and try again.'));}finally{setBusy(false);}};
  const clear=()=>{setParams(current=>{const next=new URLSearchParams();if(!account)next.set('tab',tab);if(current.get('delivery'))next.set('delivery',current.get('delivery')!);return next;},{replace:true,state:location.state});};
  const data=query.data,counts=data?.statusTotals,record=detail.data;
  const matchingCategory=record && (account?record.priority===1:record.priority===0 && (tab==='manual'?record.purpose==='manual_notification':record.purpose!=='manual_notification'));

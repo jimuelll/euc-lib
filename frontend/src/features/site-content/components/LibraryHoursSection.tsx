@@ -1,6 +1,8 @@
 import { Clock, MapPin, Mail, Phone } from "@/components/ui/library-glyphs";
-import { motion, useReducedMotion } from "framer-motion";
+import { LazyMotion, m, useReducedMotion } from "framer-motion";
 import { useSiteContent } from "../useSiteContent";
+
+const loadMotionFeatures = () => import("@/lib/motion-features").then((module) => module.default);
 
 const hours = [
   { day: "Monday – Friday", time: "7:00 AM – 9:00 PM", open: true  },
@@ -16,11 +18,12 @@ const LibraryHoursSection = () => {
     { icon: MapPin, label: "Address", value: content.address }, { icon: Mail, label: "Email", value: content.contact_email }, { icon: Phone, label: "Phone", value: content.contact_phone },
   ].filter(item => item.value?.trim()) : [];
   return (
+    <LazyMotion features={loadMotionFeatures}>
     <section id="library-hours" data-library-design className="border-b border-border bg-background py-16 sm:py-20">
       <div className="container px-5 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Section label ── */}
-        <motion.div
+        <m.div
           initial={reducedMotion ? false : { opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -34,12 +37,12 @@ const LibraryHoursSection = () => {
           >
             Hours & Location
           </p>
-        </motion.div>
+        </m.div>
 
         <div className="grid gap-0 border-l border-t border-border md:grid-cols-2">
 
           {/* ── Operating Hours — left column, maroon header band ── */}
-          <motion.div
+          <m.div
             initial={reducedMotion ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -60,7 +63,7 @@ const LibraryHoursSection = () => {
             {/* Hours rows */}
             <div className="flex-1 border-t border-primary/20 px-6 py-4 sm:px-8">
               {visibleHours.map((row, i) => (
-                <motion.div
+                <m.div
                   key={row.day}
                   initial={reducedMotion ? false : { opacity: 0 }}
                   whileInView={{ opacity: 1 }}
@@ -88,13 +91,13 @@ const LibraryHoursSection = () => {
                       Closed
                     </span>
                   )}
-                </motion.div>
+                </m.div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
 
           {/* ── Contact Details — right column ── */}
-          <motion.div
+          <m.div
             initial={reducedMotion ? false : { opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -118,7 +121,7 @@ const LibraryHoursSection = () => {
               {visibleContact.map((item, i) => {
                 const Icon = item.icon;
                 return (
-                  <motion.div
+                  <m.div
                     key={item.label}
                     initial={reducedMotion ? false : { opacity: 0 }}
                     whileInView={{ opacity: 1 }}
@@ -144,16 +147,16 @@ const LibraryHoursSection = () => {
                         {item.value}
                       </p>
                     </div>
-                  </motion.div>
+                  </m.div>
                 );
               })}
             </div>
-          </motion.div>
+          </m.div>
 
         </div>
 
         {/* ── Gold bottom rule — sealing the section like a document footer ── */}
-        <motion.div
+        <m.div
           initial={reducedMotion ? false : { scaleX: 0 }}
           whileInView={{ scaleX: 1 }}
           viewport={{ once: true }}
@@ -163,6 +166,7 @@ const LibraryHoursSection = () => {
 
       </div>
     </section>
+    </LazyMotion>
   );
 };
 

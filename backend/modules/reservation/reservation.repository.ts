@@ -12,7 +12,6 @@ import type {
   ReservationIdentity,
   ReservationNotificationTarget,
   ReservationReadyRow,
-  ReservationRow,
   ExpiredReservationRow,
 } from "./reservation.types";
 const { normalizePagination } = require("../../middlewares/numericInput");
@@ -231,16 +230,6 @@ async function findBookForReservation(bookId: number, conn: PoolConnection): Pro
            AND bc.condition IN ('good','damaged') AND ${hasAccession("bc", "h")}) AS registered_copy_count
      FROM books bk WHERE bk.id = ? AND bk.deleted_at IS NULL FOR UPDATE`,
     [bookId]
-  );
-  return rows[0] || null;
-}
-
-async function findActiveReservationByUserBook(userId: number, bookId: number, conn: PoolConnection): Promise<(RowDataPacket & { id: number }) | null> {
-  const [rows] = await conn.query<Array<RowDataPacket & { id: number }>>(
-    `SELECT id FROM reservations
-     WHERE user_id = ? AND book_id = ? AND status IN ('pending', 'ready')
-       AND deleted_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())`,
-    [userId, bookId]
   );
   return rows[0] || null;
 }
@@ -565,7 +554,6 @@ export = {
   findReservationHistory,
   searchCatalogue,
   findBookForReservation,
-  findActiveReservationByUserBook,
   findActiveReservationByUser,
   getReservationCapacityForBook,
   findActiveBorrowingByUserBook,

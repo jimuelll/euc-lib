@@ -70,12 +70,6 @@ export interface AttendanceSession extends AttendanceSessionRow {
   status: "complete" | "incomplete";
 }
 
-export interface AttendanceLogsQueryResult {
-  rows: AttendanceLogRow[];
-  total: number;
-  summary: AttendanceSummaryRow | null;
-}
-
 export interface AttendanceLogsResult {
   rows: AttendanceLogRow[];
   total: number;

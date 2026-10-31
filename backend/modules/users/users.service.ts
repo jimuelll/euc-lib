@@ -6,9 +6,6 @@ const getUserByEmployeeID = (studentEmployeeId: string): Promise<UserRecord | nu
 
 const getUserByID = (id: number): Promise<UserRecord | null> => repository.findById(id);
 
-const updateUserPassword = (userId: number, newPasswordHash: string) =>
-  repository.updatePassword(userId, newPasswordHash);
-
 const updateLastLogin = (userId: number) => repository.updateLastLogin(userId);
 
-export = { getUserByEmployeeID, getUserByID, updateUserPassword, updateLastLogin };
+export = { getUserByEmployeeID, getUserByID, updateLastLogin };
