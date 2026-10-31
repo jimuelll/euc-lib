@@ -125,7 +125,7 @@ const searchUsers = async ({ allowedRoles, showArchived, studentEmployeeId, name
   let sql = `SELECT u.student_employee_id, u.library_card_number, u.student_number, u.employee_number, u.username, u.email, u.pending_email, u.email_verified_at, u.setup_pending, u.name, u.role,
                     CASE WHEN ${expiredStudentTerm} THEN 0 ELSE u.is_active END AS is_active,
                     u.address, u.contact, u.program_id, u.academic_term_id, u.year_level, u.department_id, u.remarks,
-                    p.name AS program_course, d.name AS department_name, u.deleted_at,
+                    p.name AS program_course, d.name AS department_name, u.deleted_at, u.created_at,
                     CASE WHEN u.deleted_at IS NOT NULL THEN 'Archived account' WHEN u.is_active = 0 THEN 'Access disabled' WHEN ${expiredStudentTerm} THEN 'Academic term missing or expired' ELSE NULL END AS inactive_reason,
                     (SELECT COUNT(*) FROM borrowings b WHERE b.user_id=u.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue')) AS active_loans,
                     (SELECT COUNT(*) FROM borrowings b WHERE b.user_id=u.id AND b.deleted_at IS NULL AND b.status IN ('borrowed','overdue') AND b.due_date < NOW()) AS overdue_loans,

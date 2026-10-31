@@ -56,10 +56,11 @@ async function hasRecordedActivity({ startAt, nextAt, date }: RecordedActivityIn
        ) OR EXISTS(SELECT 1 FROM fine_ledger_entries WHERE effective_at >= ? AND effective_at < ?)
        OR EXISTS(SELECT 1 FROM reservations WHERE
          (reserved_at >= ? AND reserved_at < ?) OR (fulfilled_at >= ? AND fulfilled_at < ?) OR (cancelled_at >= ? AND cancelled_at < ?)
-       )) OR EXISTS(SELECT 1 FROM attendance_logs WHERE created_at >= ? AND created_at < ?)
+       ) OR EXISTS(SELECT 1 FROM attendance_logs WHERE created_at >= ? AND created_at < ?)
        OR EXISTS(SELECT 1 FROM site_daily_visits WHERE visit_date = ?)
+       OR EXISTS(SELECT 1 FROM users WHERE created_at >= ? AND created_at < ?)
      ) AS recorded`,
-    [startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, date]
+    [startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, startAt, nextAt, date, startAt, nextAt]
   );
   return Boolean(Number(row?.recorded));
 }
@@ -325,12 +326,13 @@ async function getReportRangeBounds() {
  * the period's first UTC+08 midnight and the midnight after its last day.
  */
 async function getPeriodTotals({ dateFrom, dateTo, startAt, endAt }: ReportPeriodBounds) {
-  const [[[circulation]], [[reservations]], [[attendance]], [[visits]], [[fines]]] = await Promise.all([
+  const [[[circulation]], [[reservations]], [[attendance]], [[visits]], [[fines]], [[accounts]]] = await Promise.all([
     db.query(
       `SELECT SUM(borrowed_at >= ? AND borrowed_at < ?) AS borrowed,
-              SUM(returned_at IS NOT NULL AND returned_at >= ? AND returned_at < ?) AS returned
+              SUM(returned_at IS NOT NULL AND returned_at >= ? AND returned_at < ?) AS returned,
+              COUNT(DISTINCT CASE WHEN borrowed_at >= ? AND borrowed_at < ? THEN user_id END) AS unique_borrowers
        FROM borrowings`,
-      [startAt, endAt, startAt, endAt]
+      [startAt, endAt, startAt, endAt, startAt, endAt]
     ),
     db.query(
       `SELECT SUM(reserved_at >= ? AND reserved_at < ?) AS created,
@@ -358,13 +360,19 @@ async function getPeriodTotals({ dateFrom, dateTo, startAt, endAt }: ReportPerio
          AND effective_at >= ? AND effective_at < ?`,
       [startAt, endAt]
     ),
+    // users.created_at defaults to the insert time; accounts deleted since are excluded, matching the snapshot.
+    db.query(
+      `SELECT COUNT(*) AS new_accounts, COALESCE(SUM(role IN ('student', 'employee', 'alumni')), 0) AS new_patron_accounts
+       FROM users WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?`,
+      [startAt, endAt]
+    ),
   ]);
-  return { circulation, reservations, attendance, visits, fines };
+  return { circulation, reservations, attendance, visits, fines, accounts };
 }
 
 async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
   const { startAt, endAt } = current;
-  const [currentTotals, previousTotals, [topBooks], [[watchItems]], [dailyActivity]] = await Promise.all([
+  const [currentTotals, previousTotals, [topBooks], [[watchItems]], [dailyActivity], [borrowingByRole], [checkInsByRole], [accountsByRole], [newAccountsByRole]] = await Promise.all([
     getPeriodTotals(current),
     getPeriodTotals(previous),
     db.query(
@@ -377,7 +385,10 @@ async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
     db.query(
       `SELECT (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue') AS overdue_borrowings,
               (SELECT COUNT(*) FROM reservations WHERE deleted_at IS NULL AND status = 'ready' AND (expires_at IS NULL OR expires_at > NOW())) AS ready_reservations,
+              (SELECT COUNT(*) FROM reservations WHERE deleted_at IS NULL AND status IN ('pending', 'ready') AND (expires_at IS NULL OR expires_at > NOW())) AS active_reservations,
               (SELECT COUNT(*) FROM borrowings WHERE deleted_at IS NULL AND status IN ('borrowed', 'overdue')) AS active_loans,
+              (SELECT COUNT(DISTINCT user_id) FROM borrowings WHERE deleted_at IS NULL AND status IN ('borrowed', 'overdue')) AS patrons_with_active_loans,
+              (SELECT COUNT(DISTINCT user_id) FROM borrowings WHERE deleted_at IS NULL AND status = 'overdue') AS patrons_with_overdue_loans,
               (SELECT COUNT(*) FROM books WHERE deleted_at IS NULL) AS catalog_titles,
               (SELECT COUNT(*) FROM book_copies WHERE deleted_at IS NULL AND is_active = 1) AS catalog_copies,
               (SELECT COUNT(*) FROM book_copies bc WHERE ${availableToBorrow("bc")}) AS available_copies,
@@ -405,6 +416,31 @@ async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
        ) daily GROUP BY day ORDER BY day ASC`,
       [startAt, endAt, startAt, endAt, startAt, endAt, current.dateFrom, current.dateTo]
     ),
+    db.query(
+      `SELECT u.role AS role, COUNT(*) AS loans, COUNT(DISTINCT b.user_id) AS borrowers
+       FROM borrowings b JOIN users u ON u.id = b.user_id
+       WHERE b.borrowed_at >= ? AND b.borrowed_at < ? GROUP BY u.role ORDER BY loans DESC, u.role ASC`,
+      [startAt, endAt]
+    ),
+    db.query(
+      `SELECT u.role AS role, COUNT(*) AS check_ins, COUNT(DISTINCT a.user_id) AS patrons
+       FROM attendance_logs a JOIN users u ON u.id = a.user_id
+       WHERE a.purpose = 'entry_exit' AND a.type = 'check_in' AND a.created_at >= ? AND a.created_at < ?
+       GROUP BY u.role ORDER BY check_ins DESC, u.role ASC`,
+      [startAt, endAt]
+    ),
+    // Current snapshot of accounts; "current term" is the academic term marked current in Academic Settings.
+    db.query(
+      `SELECT role, COUNT(*) AS accounts, COALESCE(SUM(is_active = 1), 0) AS active_accounts,
+              COALESCE(SUM(academic_term_id = (SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1)), 0) AS current_term_accounts,
+              COALESCE(SUM(is_active = 1 AND academic_term_id = (SELECT id FROM academic_terms WHERE is_current = 1 LIMIT 1)), 0) AS active_current_term_accounts
+       FROM users WHERE deleted_at IS NULL GROUP BY role ORDER BY accounts DESC, role ASC`
+    ),
+    db.query(
+      `SELECT role, COUNT(*) AS new_accounts FROM users
+       WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ? GROUP BY role ORDER BY new_accounts DESC, role ASC`,
+      [startAt, endAt]
+    ),
   ]);
   return {
     circulation: currentTotals.circulation,
@@ -412,6 +448,9 @@ async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
     attendance: currentTotals.attendance,
     visits: currentTotals.visits,
     fines: currentTotals.fines,
+    accounts: currentTotals.accounts,
+    previousAccounts: previousTotals.accounts,
+    newAccountsByRole,
     topBooks,
     watchItems,
     previousCirculation: previousTotals.circulation,
@@ -420,7 +459,20 @@ async function getAiReportQueryData({ current, previous }: AiReportQueryInput) {
     previousVisits: previousTotals.visits,
     previousFines: previousTotals.fines,
     dailyActivity,
+    borrowingByRole,
+    checkInsByRole,
+    accountsByRole,
   };
 }
 
-export = { recordSiteVisit, hasRecordedActivity, recordAuditEvent, getAuditLog, getAuditLogMeta, getDashboardOverviewData, getReportRangeBounds, getAiReportQueryData };
+/** The current and the immediately preceding academic term, as UTC+08 calendar dates. */
+async function getReportAcademicTerms() {
+  const columns = "name, DATE_FORMAT(starts_on, '%Y-%m-%d') AS dateFrom, DATE_FORMAT(ends_on, '%Y-%m-%d') AS dateTo";
+  const [[[current]], [[previous]]] = await Promise.all([
+    db.query(`SELECT ${columns} FROM academic_terms WHERE is_current = 1 ORDER BY starts_on DESC LIMIT 1`),
+    db.query(`SELECT ${columns} FROM academic_terms WHERE ends_on < (SELECT starts_on FROM academic_terms WHERE is_current = 1 ORDER BY starts_on DESC LIMIT 1) ORDER BY ends_on DESC LIMIT 1`),
+  ]);
+  return { current: current || null, previous: previous || null };
+}
+
+export = { recordSiteVisit, hasRecordedActivity, recordAuditEvent, getAuditLog, getAuditLogMeta, getDashboardOverviewData, getReportRangeBounds, getAiReportQueryData, getReportAcademicTerms };

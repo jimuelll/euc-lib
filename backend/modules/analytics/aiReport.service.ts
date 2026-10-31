@@ -26,7 +26,8 @@ interface Draft { report: string; unverified: string[]; truncated: boolean; }
 async function createAiAnalyticsReport(input: Record<string, any>, actorId?: number): Promise<Record<string, any>> {
   const question = cleanQuestion(input.question);
   const range = await resolveReportRange(input);
-  const assessment = assessQuestion(question, range);
+  const terms = await repository.getReportAcademicTerms();
+  const assessment = assessQuestion(question, range, { terms });
   let intents: string[] | null = assessment.intents;
   if (intents === null) {
     const classification = await classifyAmbiguousQuestion(question);
@@ -34,7 +35,7 @@ async function createAiAnalyticsReport(input: Record<string, any>, actorId?: num
     intents = classification.intents;
   }
 
-  const evidence = await buildAiReportEvidence(input, range);
+  const evidence = await buildAiReportEvidence(input, range, { currentTerm: terms.current });
   const mode: Mode = assessment.mode;
   const comparisonAvailable = evidence.comparison?.available === true;
   const base = async (report: string, extra: Record<string, any> = {}) => ({
@@ -92,7 +93,7 @@ async function unrecordedAnswer(question: string, periods: Array<{ dateFrom: str
     return [
       "## Performance assessment",
       "",
-      `No recorded library activity was found for ${periodLabel(range.dateFrom, range.dateTo)} (UTC+08): no borrowings, returns, reservations, check-ins, website visits or fine collections.`,
+      `No recorded library activity was found for ${periodLabel(range.dateFrom, range.dateTo)} (UTC+08): no borrowings, returns, reservations, check-ins, website visits, fine collections or new accounts.`,
       "",
       "## Recommended follow-up",
       "",
@@ -107,7 +108,7 @@ async function unrecordedAnswer(question: string, periods: Array<{ dateFrom: str
     const { start, end } = libraryDayRange(date);
     if (await repository.hasRecordedActivity({ startAt: start, nextAt: end, date })) return null;
   }
-  return `No recorded library activity was found on ${days.map(dateLabel).join(", ")} (UTC+08): no borrowings, returns, reservations, check-ins, website visits or fine collections were recorded.`;
+  return `No recorded library activity was found on ${days.map(dateLabel).join(", ")} (UTC+08): no borrowings, returns, reservations, check-ins, website visits, fine collections or new accounts were recorded.`;
 }
 
 export = { buildAiReportEvidence, classifyAmbiguousQuestion, classifyReportQuestion, createAiAnalyticsReport, extractMentionedDate, isIdentitySeekingQuestion, isReportRelevantQuestion, normalizeDateRange };

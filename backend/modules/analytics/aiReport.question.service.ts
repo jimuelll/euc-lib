@@ -15,7 +15,11 @@ interface QuestionAssessment {
   mode: "summary" | "answer";
   intents: string[] | null;
   periods: QuestionPeriod[];
+  /** True when the question is about the current state (inventory, accounts) rather than activity over time. */
+  snapshot: boolean;
 }
+interface AcademicTerm { name: string; dateFrom: string; dateTo: string; }
+interface AcademicTerms { current?: AcademicTerm | null; previous?: AcademicTerm | null; }
 type ReportError = Error & { status: number; code?: string | null; details?: Record<string, unknown> };
 
 const MAX_REPORT_DAYS = 366;
@@ -57,7 +61,7 @@ function isIdentitySeekingQuestion(question: string): boolean {
     || (asksWho && (PERSON_TERMS.test(question) || personActivityTerms.test(question)))
     || new RegExp(String.raw`\b(?:top|most active|most frequent|frequent|regular|biggest|heaviest|best|worst|leading)\s+${PERSON}\b`, "i").test(question)
     || new RegExp(String.raw`\b${PERSON}\s+(?:with|who has|who have|that has|that have)\s+(?:the\s+)?(?:most|highest|largest|biggest)\b`, "i").test(question)
-    || new RegExp(String.raw`\b(?:list|show|give|export)\s+(?:me\s+)?(?:all\s+|the\s+|a list of\s+)*${PERSON}\b`, "i").test(question)
+    || new RegExp(String.raw`\b(?:list|show|give|export)\s+(?:me\s+)?(?:all\s+|every\s+|the\s+|a list of\s+)*(?:(?:active|inactive|registered|current|new|enrolled|overdue|blocked)\s+)?${PERSON}\b(?!\s+(?:counts?|totals?|numbers?|by role|per role))`, "i").test(question)
     || /\b(?:student|employee|patron|user|member|borrower|visitor)\s*(?:id|ids|number|numbers|email|emails|address|addresses|contact|phone|barcode|card)s?\b/i.test(question)
     || /\b(?:e-?mail|phone|contact)\s+(?:address(?:es)?|numbers?|details)\b/i.test(question)
   );
@@ -69,8 +73,11 @@ const REPORT_INTENTS: Array<[string, RegExp]> = [
   ["attendance", /\b(?:attendance|visit(?:ed|or|ors|ing|s)?|entr(?:y|ies)|exit(?:ed|s)?|check[- ]?(?:in|out|ins|outs)|library scans?|scans?|foot ?traffic|went (?:in|into|to) (?:the )?library)\b/i],
   ["site_activity", /\b(?:website|web ?site|site activity|page (?:hits?|views?)|online visit(?:or|ors|s)?)\b/i],
   ["fines", /\b(?:fines?|payments?|settled|collections?|outstanding balance|penalt(?:y|ies)|pesos?|php|₱)\b/i],
-  ["catalog", /\b(?:catalog(?:ue)?|collection|copies|copy|inventory|holdings|condition|damaged|lost|accession(?:ed)?)\b/i],
+  ["catalog", /\b(?:catalog(?:ue)?|collection|copies|copy|inventory|holdings|condition|damaged|lost|accession(?:ed)?|in the (?:system|database|library)|do we have|in stock|on the shelves?)\b/i],
+  ["users", /\b(?:users?|accounts?|registered|registrations?|sign[- ]?ups?|enrolled|patrons?|students?|faculty|teachers?|employees?|staff|members?|borrowers?|roles?|semesters?|academic terms?|school year)\b/i],
 ];
+// Words that make a question about activity over time rather than the current state.
+const ACTIVITY_WORDS = /\b(?:borrow(?:ed|ing|ings|s)?|return(?:ed|ing|s)?|loan(?:ed|s)?|circulation|reserv(?:e|ed|ing|ation|ations)|fulfilled|cancell?ed|visit(?:ed|ing|s|ors?)?|attendance|check(?:ed)?[- ]?(?:in|out)s?|entr(?:y|ies)|scans?|website|page (?:hits?|views?)|paid|payments?|settled|collected|happened|changed|trend|busiest|quietest|joined|sign(?:ed)?[- ]?ups?|registrations?|new (?:users?|accounts?|students?|patrons?|members?|borrowers?)|(?:were|was|got|been) (?:registered|created|added))\b/i;
 const REPORT_INTENT_NAMES = REPORT_INTENTS.map(([intent]) => intent).concat("performance");
 const ANALYTICS_SIGNAL = /\b(?:how many|how much|number of|count|total|sum|amount|most|top|least|popular|highest|lowest|average|rate|ratio|percentage|percent|difference|net|calculate|compute|change|changed|increase|decrease|trend|compare|comparison|performance|summary|summarize|overview|activity|busiest|quietest|outstanding|overdue|available|status|were|was|did|has|have|created|fulfilled|cancelled|collected|what happened|any)\b/i;
 const PERIOD_ANALYSIS = /\b(?:what changed|key findings|performance|operational activity|activity summary|reporting period|selected period|during this period|compare|comparison|trend|busiest|quietest|overview|summar(?:y|ize|ise))\b/i;
@@ -136,7 +143,7 @@ function daysBetween(dateFrom: string, dateTo: string): number {
  * range's end date (for implied years); `today` is the library's UTC+08 date
  * (for relative words such as "yesterday").
  */
-function extractMentionedPeriods(question: string, { reference, today }: { reference: string; today: string }): MentionedPeriod[] {
+function extractMentionedPeriods(question: string, { reference, today, terms = {} }: { reference: string; today: string; terms?: AcademicTerms }): MentionedPeriod[] {
   const periods: MentionedPeriod[] = [];
   const add = (label: string, dateFrom: string | null, dateTo: string | null = dateFrom) => {
     if (dateFrom && dateTo && !periods.some((period) => period.dateFrom === dateFrom && period.dateTo === dateTo)) periods.push({ label, dateFrom, dateTo });
@@ -192,6 +199,11 @@ function extractMentionedPeriods(question: string, { reference, today }: { refer
     const match = text.match(pattern);
     if (match) add(match[0], ...resolve());
   }
+  // Semesters resolve to the academic terms configured in Academic Settings.
+  const currentTerm = text.match(/\b(?:this|current|the current|present|ongoing)\s+(?:semester|academic term|school term|term)\b/i);
+  if (currentTerm && terms.current) add(`${currentTerm[0]} (${terms.current.name})`, terms.current.dateFrom, terms.current.dateTo);
+  const previousTerm = text.match(/\b(?:last|previous|past|prior)\s+(?:semester|academic term|school term|term)\b/i);
+  if (previousTerm && terms.previous) add(`${previousTerm[0]} (${terms.previous.name})`, terms.previous.dateFrom, terms.previous.dateTo);
   const lastDays = text.match(/\b(?:last|past|previous)\s+(\d{1,3})\s+days?\b/i);
   if (lastDays && Number(lastDays[1]) > 0) add(lastDays[0], addLibraryDays(today, -(Number(lastDays[1]) - 1)), today);
   return periods;
@@ -236,8 +248,8 @@ function outsideRangeError(period: MentionedPeriod, range: ReportDateRange, toda
  * selected range. `intents` is null when the rules cannot decide scope and the
  * model scope check must be consulted.
  */
-function assessQuestion(question: string, range: ReportDateRange, { today = libraryDateKey() }: { today?: string } = {}): QuestionAssessment {
-  if (!question) return { mode: "summary", intents: ["summary"], periods: [] };
+function assessQuestion(question: string, range: ReportDateRange, { today = libraryDateKey(), terms = {} }: { today?: string; terms?: AcademicTerms } = {}): QuestionAssessment {
+  if (!question) return { mode: "summary", intents: ["summary"], periods: [], snapshot: false };
   if (isIdentitySeekingQuestion(question)) throw requestError(PRIVACY_RESTRICTION_MESSAGE, 400, PRIVACY_RESTRICTION_CODE);
 
   const hasReportTopic = REPORT_INTENTS.some(([, pattern]) => pattern.test(question)) || PERIOD_ANALYSIS.test(question);
@@ -245,14 +257,21 @@ function assessQuestion(question: string, range: ReportDateRange, { today = libr
     throw requestError(IRRELEVANT_QUESTION_MESSAGE, 400, IRRELEVANT_QUESTION_CODE);
   }
 
+  // Current-state questions ("how many books are in the system", "active
+  // students this semester") are answered from the live snapshot, so a date
+  // they mention does not have to fall inside the selected range.
+  // "registered" alone describes accounts ("registered accounts"); with a
+  // period ("students registered this month") it asks about new accounts.
+  const mentioned = extractMentionedPeriods(question, { reference: range.dateTo, today, terms });
+  const snapshot = !ACTIVITY_WORDS.test(question) && !(mentioned.length && /\b(?:registered|created|added)\b/i.test(question));
   const periods: QuestionPeriod[] = [];
-  for (const period of extractMentionedPeriods(question, { reference: range.dateTo, today })) {
+  for (const period of snapshot ? [] : mentioned) {
     if (period.dateTo < range.dateFrom || period.dateFrom > range.dateTo) throw outsideRangeError(period, range, today);
     const coverage = period.dateFrom >= range.dateFrom && period.dateTo <= range.dateTo ? "full" : "partial";
     periods.push({ ...period, coverage });
   }
 
-  return { mode: "answer", intents: classifyReportQuestion(question), periods };
+  return { mode: "answer", intents: classifyReportQuestion(question), periods, snapshot };
 }
 
 export = {

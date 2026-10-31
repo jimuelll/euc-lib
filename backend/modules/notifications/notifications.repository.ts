@@ -21,9 +21,15 @@ interface UserRoleRow extends RowDataPacket {
   role: string;
 }
 
+// Params: viewer userId (account-age gate), userId (direct audience), role.
+// Broadcast and role notifications published before the viewer's account existed are hidden.
 const buildAudienceWhere = (): string => `
   n.is_active = 1
   AND (n.expires_at IS NULL OR n.expires_at > NOW())
+  AND (
+    n.audience_type IN ('user','users')
+    OR n.created_at >= COALESCE((SELECT viewer.created_at FROM users viewer WHERE viewer.id=?), n.created_at)
+  )
   AND (
     n.audience_type = 'all'
     OR (n.audience_type IN ('user','users') AND EXISTS(SELECT 1 FROM users audience_user WHERE audience_user.id=? AND audience_user.deleted_at IS NULL AND audience_user.is_active=1 AND ((n.audience_type='user' AND n.audience_user_id=audience_user.id) OR (n.audience_type='users' AND EXISTS(SELECT 1 FROM notification_recipients r WHERE r.notification_id=n.id AND r.user_id=audience_user.id)))))
@@ -41,7 +47,7 @@ const listForUser = async ({ userId, role, limit, unreadOnly }: NotificationList
         ${unreadClause}
       ORDER BY n.created_at DESC
       LIMIT ?`,
-    [userId, userId, role, limit],
+    [userId, userId, userId, role, limit],
   );
   return rows;
 };
@@ -54,7 +60,7 @@ const getUnreadCountForUser = async ({ userId, role }: NotificationContext): Pro
          ON nr.notification_id = n.id AND nr.user_id = ?
       WHERE ${buildAudienceWhere()}
         AND nr.read_at IS NULL`,
-    [userId, userId, role],
+    [userId, userId, userId, role],
   );
   return row?.total ?? 0;
 };
@@ -68,7 +74,7 @@ const getByIdForUser = async ({ notificationId, userId, role }: NotificationCont
       WHERE n.id = ?
         AND ${buildAudienceWhere()}
       LIMIT 1`,
-    [userId, notificationId, userId, role],
+    [userId, notificationId, userId, userId, role],
   );
   return row ?? null;
 };
@@ -90,7 +96,7 @@ const markAllAsRead = async ({ userId, role }: NotificationContext): Promise<voi
        LEFT JOIN notification_reads nr ON nr.notification_id = n.id AND nr.user_id = ?
       WHERE ${buildAudienceWhere()} AND nr.read_at IS NULL
      ON DUPLICATE KEY UPDATE read_at = VALUES(read_at)`,
-    [userId, userId, userId, role],
+    [userId, userId, userId, userId, role],
   );
 };
 

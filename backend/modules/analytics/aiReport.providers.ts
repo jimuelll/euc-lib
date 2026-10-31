@@ -130,7 +130,7 @@ async function classifyAmbiguousQuestion(question: string): Promise<QuestionClas
     "You classify questions for a library analytics assistant. Do not answer the question.",
     "Decide whether the entire question can be answered using only aggregate library analytics for a selected date range.",
     `Allowed intents: ${REPORT_INTENT_NAMES.join(", ")}.`,
-    "Available subjects: borrowing and returns, reservations, physical attendance, anonymized website activity, fine collections, catalog inventory, and period performance.",
+    "Available subjects: borrowing and returns, reservations, physical attendance, anonymized website activity, fine collections, catalog inventory, current loans and fines, period performance, and aggregate user account counts (by role, active status and current academic term).",
     "relevant=false if any part asks for external knowledge, standalone arithmetic, creative writing, general advice, raw records, information about a specific person, or anything outside those subjects.",
     "Calculations such as totals, differences, averages, rates and percentage changes are relevant when every input comes from the listed aggregate analytics.",
     "mixed=true when supported and unsupported requests are combined.",

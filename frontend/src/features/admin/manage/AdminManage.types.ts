@@ -18,6 +18,7 @@ export interface User {
   active_loans?: number; overdue_loans?: number; unpaid_fines?: number; active_reservations?: number; inactive_reason?: string | null;
   is_active?:          number;
   deleted_at?:         string | null;   // ← new: present when user is archived
+  created_at?:         string | null;
 }
 
 // ─── Form State ───────────────────────────────────────────────────────────────

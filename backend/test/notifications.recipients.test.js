@@ -70,7 +70,7 @@ test('all patron read paths enforce membership through the common authorization 
   await notifications.getByIdForUser({notificationId:41,userId:99,role:'student'});
   await notifications.getUnreadCountForUser({userId:99,role:'student'});
   await notifications.markAllAsRead({userId:99,role:'student'});
-  for(const call of calls){assert.match(call.sql,/notification_recipients r WHERE r.notification_id=n.id AND r.user_id=audience_user.id/);assert.match(call.sql,/audience_user.is_active=1/);assert.ok(call.params.includes(99));}
+  for(const call of calls){assert.match(call.sql,/notification_recipients r WHERE r.notification_id=n.id AND r.user_id=audience_user.id/);assert.match(call.sql,/audience_user.is_active=1/);assert.match(call.sql,/n.created_at >= COALESCE\(\(SELECT viewer.created_at FROM users viewer WHERE viewer.id=\?\)/);assert.equal(call.params.length,(call.sql.match(/\?/g)||[]).length);assert.ok(call.params.includes(99));}
  } finally {db.query=original;}
 });
 test('email exclusions are exclusive and sum to in-app-only accounts',async()=>{
