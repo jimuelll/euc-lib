@@ -1,209 +1,257 @@
-> Visual system update: the repository-level DESIGN.md and scoped library-design.css supersede the earlier colors, typography, corners, cards, icons and tabs below for page content. All active content tabs use bookmark ribbons. Existing workflow, data, accessibility and permission requirements remain in force; protected navigation, mastheads and the homepage hero retain their original design.
+# Admin design system
 
-# Admin interface baseline
+The single visual reference for every page under `/admin`, the admin shell and anything those pages open (drawers, dialogs, menus, popovers). Direction: **compact desk + paper** — warm paper colors and university identity, with the density and plain type staff need for fast, repetitive work.
 
-Version 3 of the content reference adds in-place copy editors, a ruled inventory strip, always-visible policy fine examples, and System/Custom configuration bands. B/T scope marks and square visibility switches retain accessible labels; row dragging retains keyboard alternatives and global-order restrictions. Expanded audit events use separate actor/action lines, ruled diffs and collapsed technical metadata. The root DESIGN.md records these presentation rules; workflow requirements below still apply.
+Behavior, data and permission rules per page live in [WORKFLOWS.md](WORKFLOWS.md). The repository-level [DESIGN.md](../../../../DESIGN.md) governs public pages and kiosks only.
 
-Version 4 extends this to compact notification, clearance, circulation, analytics, backup and publishing ledgers. Holdings sets the drawer treatment: paper headers with double rules, one content surface and fixed actions. Reports use an inline column picker with identity protection, actual default columns and device-local preferences per signed-in user/dataset; export scope appears once beside joined format actions. Narrow tables scroll locally and titles wrap. Filters and tags must pair readable foreground/background colors in both themes. The requested tool-search dialog follows the content design and restores focus to its unchanged top-bar trigger. Existing confirmations, roles, scan progression, downloads and publishing scopes below remain required.
+> **Status: target, not yet built.** The code still runs on the older stacked layers (`admin-theme.css`, `compact-admin.css`, `admin-workspaces.css`, `library-design.css`, `refined-drawers.css`). Each section below is the rule to build toward; [Migration](#migration) lists the order. Until a page is migrated, do not add new styling to the old layers.
 
-## Website Content
+## Principles
 
-Website Content uses the Library desk’s compact headings, distinct icons, neutral panels and underline-only tabs. Load all six documents on entry so tab counts appear before visiting each section. Dots represent unsaved local edits; counted badges represent saved drafts, upcoming events or hidden resources. Keep the section in the URL and use one horizontal tab row on mobile.
+1. **Work first.** The next action on a page is obvious within one glance; reference material sits below or behind a disclosure.
+2. **One way to do each thing.** One tab style, one drawer shell, one header, one primary action per surface.
+3. **Honest data.** Missing values read as unavailable, never zero. Nothing is invented: counts, trends, histories, availability.
+4. **Identity without decoration.** Maroon and gold mark meaning and brand; they are never used as wallpaper.
+5. **Color is never the only cue.** Every status keeps a word or icon.
 
-Homepage and About use a pinned, scoped footer: section name, unsaved change count, publication timestamp or —, Discard, Save draft and Publish section. List tabs have no page footer. Events, Bulletin and Subscriptions use item drawers with scoped publishing controls; User guide places the module footer within its editor. Item actions preserve other drafts. Offer Publish all when multiple sections or records have changes; validate and commit the batch atomically. Status wording is Published / Draft saved. Disabled buttons use the same neutral state; enabled publication uses a bright action fill in dark theme.
+## Tokens
 
-Let the main page scroll. Avoid nested page/editor/module-list scrollbars. Keep the desktop guide module list and About side navigation sticky. About uses navigation underlines, shows one section at a time, and exposes Add staff member only in Staff directory. Homepage has a dismissible publishing tip and an image uploader. View on site is an outline button; Preview uses an eye icon. Events links to the public Upcoming events anchor.
+One token set, defined once on the admin root and inherited by portals. Pages never redefine `--background`, `--card`, `--primary` or `--foreground`.
 
-All record filters place All last. Events uses Drafts / All and groups Upcoming, Past and Unscheduled drafts with end time, duration and relative dates. Bulletin uses Published / Pinned / Archived / Drafts / All, search and month groups; rows include cover thumbnails or neutral placeholders, status badges and clamped body text. Subscriptions uses aligned neutral rows with resource, category, visibility and actions. Guide uses audience chips, module status, a named footer, ordering controls and a slug locked after first publication on both client and server.
+### Light
 
-The shared image uploader validates type, size and decoded dimensions, supports keyboard-accessible crop selection and image descriptions, and previews the uploaded result. Persist descriptions through public views. Bulletin supports an optional gallery of up to eight images. Crop/upload errors retain the previous image. Dates share one calendar/time picker and display format. Deletes confirm and remove only that item; publication, audit and draft retention share a transaction.
+| Token | Value | Use |
+|---|---|---|
+| `--background` | `hsl(42 31% 94%)` cream | Page background |
+| `--card` | `hsl(43 100% 98.6%)` off-white paper | Panels, drawers, top bar, menus |
+| `--foreground` | `hsl(343 15% 9%)` warm ink | Text |
+| `--muted` | `hsl(41 24% 90%)` | Hover rows, read-only fields, disabled fills |
+| `--muted-foreground` | `hsl(354 5% 40%)` | Secondary text |
+| `--border` | `hsl(39 20% 80%)` | Rules and control borders |
+| `--primary` / `--maroon` | `#7a0000` | Primary button, selected chip, sidebar |
+| `--primary-hover` | `#930e0e` | Primary hover |
+| `--gold` | `#c9961f` | Active-tab ribbon, required mark, sidebar icon accents |
+| `--focus` | maroon, 2px ring, 2px offset | Keyboard focus |
 
-The dashboard and shared administration shell establish a compact interface for library staff performing daily operations. This guide applies to admin surfaces only; existing content pages opt into these patterns during later redesigns.
+### Dark
 
-## Visual system
+| Token | Value | Use |
+|---|---|---|
+| `--background` | `hsl(270 6% 7%)` charcoal | Page background |
+| `--card` | `hsl(260 5% 11%)` | Panels, drawers, top bar, menus |
+| `--foreground` | `hsl(36 35% 92%)` warm light ink | Text |
+| `--muted` | `hsl(15 5% 17%)` | Hover rows, read-only fields |
+| `--muted-foreground` | `hsl(6 5% 63%)` | Secondary text |
+| `--border` | `hsl(12 5% 19%)` | Rules and control borders |
+| `--primary` / `--maroon` | `#7a0000` with a `#a83a3a` 1px border | Primary button stays maroon in dark mode |
+| `--link` | `hsl(9 79% 72%)` salmon | Text links, focus ring, selected-tab underline |
+| `--gold` | `#f0c060` | Same uses as light |
 
-- Preserve the university emblem and maroon identity. Existing admin light/dark semantic tokens remain the source of color truth.
-- Use DM Sans throughout, with a 28px page title, 16px section headings, 14px metric labels/body text, and 13px timestamps. Use tabular numerals rather than a separate monospace face for counts, money, and timestamps.
-- Use neutral panel surfaces, thin borders, 8px panel corners, and 6px controls. Reserve maroon fills for the primary action and the sidebar. Separate danger from brand: warm red alerts on lightly tinted surfaces in light mode; coral borders and values on neutral cards in dark mode, without a second thick left edge. Ready reservations is an actionable pickup state, with a pale green surface, a green border, and a stronger icon backplate. Keep its value slightly smaller than overdue/fines totals.
-- Use warm red/coral for overdue loans/fines, green for ready reservations/returns, blue for borrowing, amber for new reservations, and purple for attendance. Daily totals and transaction icons share category colors. Define light/dark palettes independently and retain labels/icons as non-color cues. Supporting dashboard text uses a darker gray in light mode and a brighter gray in dark mode.
-- The opt-in compact tokens are 16px internal gaps/padding, 24px between content sections, and 40px desktop controls. Mobile controls and links use at least 44px targets. The expanded sidebar is 240px, its collapsed rail is 64px, and the top bar is 56px.
+Retired: the cool-gray admin palette, `#710000`, the pink dark-mode action color, and salmon as a button fill.
 
-## Patterns and hierarchy
+### Status colors
 
-- Admin page tabs share a soft action-colored selection background, a 3px underline and a heavier label through `admin-theme.css`. `aria-selected` is the state source, including custom tab controls. Shared desk tab rows wrap on narrow screens; the styling also applies to portalled record drawers. Borrow/Return and queue filter buttons retain their filled selected state.
+| Meaning | Hue | Examples |
+|---|---|---|
+| Blocked, overdue, expired, destructive | Coral / warm red | Overdue loans, blocked patrons, Delete |
+| Waiting, fines only, needs attention | Amber | Pending reservations, Needs holdings |
+| Ready, returned, cleared, success | Green | Ready pickups, returns, cleared patrons |
+| Active loans, borrowing | Blue | Active loans, Borrowed |
+| Attendance | Purple | Attendance counts |
 
-- `CompactAdmin.tsx` provides panels, section headers, actions, totals, and explicit text links. Import `compact-admin.css` on adopted surfaces; do not apply these content styles to legacy layouts.
-- Order operational dashboards by actions, outstanding items, daily totals, recent transactions, then secondary reference metrics.
-- Use a single primary action. Supporting actions use outlines; panel navigation uses compact text links with an arrow.
-- Group the three status panels under the direct heading “Outstanding items.” Each entire panel is one keyboard-accessible link with an icon, label, value, and arrow; omit redundant review text and nested links. Zero status values use neutral surfaces. Daily totals have foreground labels/readable icons, muted zeros, and category colors only for non-zero counts. Retain a collapsed Library overview for secondary metrics.
-- Keep the date beside the page title and group the last-updated timestamp with Refresh. Reserve a non-shrinking sidebar footer for a compact account row and a 44px Sign out target, with 16px bottom clearance. Truncate names to one line while retaining their full accessible name and tooltip. Navigation scrolls independently; a 48px bottom fade appears only while more items remain below, fully conceals the last 12px, and updates on scroll/resize. The authored Chromium scrollbar omits native end arrows. The active item uses a soft warm tint rather than pure white.
-- Keep the API's actual time range visible in the language: daily counts belong under “Today’s totals”; the latest six transactions across dates belong under “Recent transactions.”
+Each meaning has a text color, a tinted surface and a border, defined separately for light and dark, all at least 4.5:1 for text against their own surface. Zero values use neutral surfaces. Money totals alone stay neutral; color shows urgency, not size.
 
-## Icons and navigation
+## Type
 
-- `AdminIcon.tsx` is the typed custom SVG system: 24px geometry, 1.75px rounded strokes, and currentColor. Render ordinary icons at 16–20px and status icons at 24px. Tinted square status and circular metric backplates make meaning easier to scan.
-- `AdminSidebarIcon.tsx` preserves the gold secondary strokes/fills from the original sidebar. Its accent flag sets a scoped CSS variable on sidebar icons only; dashboard icons inherit their semantic color. The dashboard, sidebar, search palette, top bar, and admin theme toggle share the drawings.
-- Preserve role-filtered tools, active query-tab navigation, collapsed-sidebar labels/tooltips, drawer focus restoration, and account/logout actions. On the root dashboard, omit the redundant Home breadcrumb.
+- **DM Sans** for all interface text: controls, labels, tables, body, metadata.
+- **Fraunces** in exactly three places: the page title, summary-tile numerals, and the record title in a drawer header.
+- **Monospace** only for identifiers: accession numbers, ISBNs, library card IDs, receipt and event IDs.
+- Counts, money and times use tabular numerals. Currency uses `formatPeso`.
 
-## Responsive behavior and states
+| Size | Use |
+|---|---|
+| 28px Fraunces 600 | Page title |
+| 20px Fraunces 600 | Drawer record title |
+| 32–40px Fraunces 600 | Tile numerals (currency at the smaller size) |
+| 16px DM Sans 600 | Section headings |
+| 14px DM Sans | Body, table cells, controls |
+| 13px DM Sans | Metadata, timestamps, helper text |
+| 12px DM Sans 600 | Badges, counts, column headings |
 
-- Use three summary columns on desktop, shallow stacked summaries on tablet and stacked summaries on mobile, four daily totals on desktop and two on smaller screens, and a wider transaction panel beside Quick links on large screens.
-- Wrap descriptions and large values. On mobile, place each transaction timestamp beneath its description. Avoid horizontal page scrolling.
-- Use layout-matched skeletons on initial load. Retain figures during refresh and a failed refresh, explicitly labeling the last available data. Initial failure displays unavailable data and retry, never invented zero values.
-- Respect reduced motion, preserve visible keyboard focus, use semantic headings/lists/details, and keep icon-only controls labeled. Empty feed copy is “No recent transactions.”
+No uppercase letter-spaced labels except column headings.
 
-## Circulation desk and history
+## Shape and density
 
-- Borrow & Return uses the shared full-width grid and 28px title with a tab-aware subtitle. Underline page tabs use custom icons and a History overdue badge; the filled segmented control belongs only to Borrow/Return. Updated/Refresh, View archive, CSV Export and the three clickable summaries belong to History: overdue (coral, oldest deadline and accrued ledger fines), active (blue, due within 24 hours) and daily activity (neutral). Missing values are unavailable, never zero. Cached figures survive refresh failures.
-- Mode and history filters live in the URL. Dashboard actions use `?tab=transaction&mode=borrow` or `mode=return`; overdue links to `?tab=history&filter=overdue`. Older `transaction=` mode URLs still work. Summary links clear unrelated date/search/archive filters and highlight the tile matching the selected history status. All stays last in the history status controls.
-- The mode control uses maroon for either selected mode and neutral inactive options. Green borders, icons and the desk header identify Return. Confirmation stays in the sticky desktop summary or fixed mobile/tablet bar. Specific disabled reasons remain readable.
-- Borrow starts with Patron; after selection, show real active loans, overdue count and unpaid balance. Clearance reasons block borrowing. Loan limits are not invented: server clearance is authoritative. Copy follows, with policy-derived due date and catalog lookup in a modal. Copy lookup uses one scan/type input plus Search catalog, with Enter submitting the identifier. Scanner keyboard focus progresses Patron to Copy to Confirm, then resets after success. Return starts with Copy, auto-identifies the borrower and exposes ledger fines and patron warnings. Returning never settles fines automatically.
-- Session logs contain successful writes only. A server-signed, actor-bound 60-second Undo is available for ordinary loans and fine-free, on-time returns. Pickup loans and fine-related records have no Undo. Reversals lock records, reject intervening activity/holds, preserve archived corrections, and commit audit plus corrective notification together. Session logs reset when leaving or reloading the page.
-- History defaults to Needs action, with counted status chips and full-width search. Overdue loans sort by days overdue before due-soon and active loans, on the server before pagination. Returned rows are collapsed in combined views. Each live row exposes Return and overdue rows expose View fine. Other actions belong in the menu; archive/restore is administrator-only and retains confirmation/rollback.
-- Replace native date fields with a range-calendar popover and Today/This week/This month presets. Label it Borrowed date; it filters loan issue dates. CSV exports every page matching the current history filters, escapes cell data and supports cancellation when leaving.
-- Detail drawers show stored patron email, copy, borrowed/due/returned timestamps, issuer, fines and notes. Renewal history is explicitly unavailable because this backend does not persist renewal events. Do not fabricate timelines or counters. Preserve keyboard focus on closing details and wrap rows on mobile rather than scrolling the page horizontally.
+- Corners: 2px on panels, controls, chips, drawers and dialogs. Tabs and table rows are square. Avatars and status dots are round.
+- One level of containment: a panel never holds a bordered card. Group inside a panel with rules and headings.
+- Borders are 1px `--border`. Shadows only on floating layers (drawers, dialogs, popovers, menus).
+- No gradients, glows or decorative textures on admin surfaces.
+- Spacing: 16px panel padding, 24px between sections, 8/12px inside controls and rows.
+- Controls are 40px tall on desktop; every interactive target is at least 44px below 768px.
+- Table rows: 48px compact, 60px when a row has a two-line title.
+
+## Icons
+
+- `AdminIcon` is the only icon set for admin content: 24px grid, 1.75px rounded strokes, `currentColor`. Render at 16–20px inline and 24px on tiles.
+- `AdminSidebarIcon` keeps the same drawings with gold accents, for the sidebar and tool search only.
+- Every sidebar item has a distinct icon. Icon-only buttons always have an accessible name and a tooltip.
+
+## Shell
+
+### Sidebar
+
+- Maroon surface — the only large maroon area in the admin. 240px expanded, 64px collapsed rail with tooltips.
+- Section labels are 12px gold-tinted text; items are 40px rows; the active item uses a soft warm tint, not white.
+- Navigation scrolls independently with a bottom fade only while more items remain below.
+- A fixed footer holds the account row (initials, truncated name with full name on hover), Theme, Help and a 44px Sign out.
+
+### Top bar
+
+- 56px paper bar with a bottom rule. Left: sidebar toggle and breadcrumb (omitted on the Dashboard). Right: tool search (Ctrl+K) and notifications.
+- Theme toggle, Help and "View site" move to the sidebar account footer. No "More" menu.
+
+### Navigation
+
+| Section | Item | Route | Roles |
+|---|---|---|---|
+| — | Dashboard | `/admin` | all |
+| Desk | Borrow & Return | `/admin/circulation` | all |
+| Desk | Reservations | `/admin/reservations` | all |
+| Desk | Clearance & Fines | `/admin/clearance` | all |
+| Desk | Attendance | `/admin/attendance` | admin+ |
+| Records | Users | `/admin/users` | all |
+| Records | Catalog | `/admin/catalog` | all |
+| Publishing | Website Content | `/admin/content` | admin+ |
+| Publishing | Notifications | `/admin/notifications` (Email deliveries as a tab) | admin+ |
+| Publishing | Moderation | `/admin/moderation` | admin+ |
+| Insights | Analytics | `/admin/analytics` | admin+ |
+| Insights | Reports | `/admin/reports` | admin+ |
+| Insights | Audit Logs | `/admin/audit-logs` | super admin |
+| Settings | Academic Calendar | `/admin/settings/academic` | admin+ |
+| Settings | Loan Policies | `/admin/settings/loan-policies` | super admin |
+| Settings | Catalog Fields | `/admin/settings/catalog-fields` | super admin |
+| Settings | AI Recommendations | `/admin/settings/ai` | super admin |
+| Settings | Backup & Restore | `/admin/settings/backup` | super admin |
+
+Rules:
+- A sidebar item points to its own route, never to another page's `?tab=`.
+- Every page is reachable from the sidebar or as a tab of a sidebar page; no orphan routes.
+- Old routes (`/admin/manage`, `/admin/holidays`, `/admin/query`, `/admin/book-types`, `/admin/backup`, `/admin/attendance-logs`, `/admin/library-emails`, `/admin/account-emails`, `catalog?tab=builder|ai`) redirect to the new ones, keeping their query parameters.
+- Tool-search aliases stay with their items.
+
+## Page layouts
+
+Every page uses one of five layouts. The page header is the same on all of them.
+
+**Page header:** 28px Fraunces title with an optional one-line subtitle, then on the right: Updated time + Refresh as a pair, outline secondary actions, and at most one primary action. No divider under the header; page tabs follow 16px below.
+
+| Layout | For | Structure |
+|---|---|---|
+| **Desk** | Borrow & Return | Header, mode switch, step flow (Patron → Copy → Confirm), sticky confirm summary. No tiles, no history tools. |
+| **Queue** | Reservations, Clearance, circulation History, Attendance today, Moderation | Header, tabs, filtering summary tiles, search, list with row actions, record drawer. |
+| **Records** | Users, Catalog, Notifications, Email deliveries, Audit Logs, Reports | Header, tabs, one control row (counted chips, live search, Filters popover), table, pager, record drawer. |
+| **Editor** | Website Content | Header, tabs, editor body, pinned scoped publish footer (section, unsaved count, Discard, Save draft, Publish). |
+| **Settings** | Academic Calendar, Loan Policies, Catalog Fields, AI Recommendations, Backup | Header, tabs, read-only rows with row menus, Add/Edit in a drawer. |
+
+**Dashboard** is its own layout, ordered: attention strip (moderation or failures, only when non-empty), desk actions, outstanding items, today's totals, recent transactions, then a collapsed Library overview. Staff see desk content only; admins also see the attention strip and a Reports link. No link appears twice on the page.
+
+The page scrolls, not its panels. Wide tables scroll horizontally inside their own region with a pinned first column. No horizontal page scroll at any width.
+
+## Components
+
+### Tabs
+
+One tab style everywhere, including inside drawers:
+- Transparent tabs over a full-width 1px rule, left-aligned, optional icon and count badge.
+- Active: ink label at 600 weight, 2px ink underline (salmon in dark mode), and a small gold ribbon notch above the label.
+- Inactive: muted label, brightens on hover. Focus ring inside the tab.
+- Count badges are neutral by default; attention coral only for an actionable non-zero count. Zero counts are visually hidden but stay in the accessible name.
+- Narrow screens scroll the tab row horizontally.
+- Tab state lives in `aria-selected` and in the URL (`?tab=`).
+
+### Filter chips and segmented control
+
+- List filters are counted chips: outline when off; maroon fill with off-white text when on (dark: maroon fill, light ink). "All" is always last.
+- Borrow/Return is the only filled segmented control in the admin.
+- Specify foreground and background together for every selected or filled control.
+
+### Summary tiles
+
+- Only on the Dashboard and Queue pages, and only when the tile filters or navigates. A tile never repeats a chip count shown below it.
+- Each tile is one link or button: icon, label, Fraunces numeral, short hint, arrow. Selected tiles keep a visible semantic border, separate from the focus ring.
+- Zero values are neutral; non-zero values take their status color.
+
+### Tables and lists
+
+- Column headings are 12px, sticky only within the table region. Rows separated by rules, no zebra striping.
+- One visible primary action per row (maroon); secondary actions are outline; rare or destructive actions live in the row menu.
+- Titles clamp to two lines with the full text on hover. Identifiers are monospace. Money is right-aligned.
+- Selection uses checkboxes on the paper surface, maroon when checked, with a sticky bulk-action bar.
+- Pager shows the record range and rows per page; it is hidden when there is one page.
+
+### Drawers
+
+One `AdminDetailDrawer` shell with three explicit variants. A drawer never opens another drawer.
+
+| Variant | When | Header label | Footer |
+|---|---|---|---|
+| **View** | Reading a record | none | Optional secondary actions; an Edit button switches to Edit in place |
+| **Edit** | Changing a record | "Editing" + unsaved-changes dot | Fixed Save changes (primary) / Cancel |
+| **New** | Creating a record | "New …" | Fixed Create (primary) / Cancel |
+
+- **Header:** paper surface with a double rule beneath; the variant label in 12px muted text, the record title in 20px Fraunces, an optional one-line status strip, header actions (QR, open full record) and a named close slot with a 44px target. The header is never maroon.
+- **Sizes:** `sm` 480px for details, `md` 640px for forms, `lg` 880px for multi-section records (Catalog, Users). Below 768px every drawer is full width.
+- **Body:** one 18px inset (14px on mobile), scrolls independently. Forms inside add no second padding layer. `lg` drawers get a sticky section index built once in the shared component.
+- **Shared inner pieces:** section heading, field grid, read-only field, status strip, danger zone. Pages compose these rather than adding drawer-specific CSS.
+- **Danger zone** sits at the end of the body, separated by a rule, with its blockers listed.
+- **Confirmations** happen inline in the footer (the footer swaps to the confirm message and buttons). QR codes, receipts and previews are steps inside the drawer.
+- **Dismissal:** Escape, backdrop and close share one handler; Edit and New prompt before discarding changes. Focus returns to the opener, or to a visible list control if the opener is gone.
+- **URL:** the open record is in the URL (`?record=<id>`, plus `&mode=edit` when editing) so Refresh, Back and shared links reopen it.
+- Filters never use a drawer; they use an inline bar or popover (phones may use a bottom sheet).
+
+### Dialogs
+
+Only for destructive or irreversible actions that cannot be confirmed inline (restore a backup, permanent delete, bulk archive), and for tool search. Centered, paper, 2px corners, title + consequence first, destructive action on the right in coral. Never stacked on another dialog.
+
+### Feedback and states
+
+- Loading: layout-matched skeletons on first load; figures stay visible during refresh.
+- Refresh failure: keep the last data with a labelled "Showing the last available data" notice and Retry.
+- First-load failure: "Unavailable" with Retry, never zeros.
+- Empty: one sentence and, where useful, one next action.
+- Success: a toast for actions that leave the current view unchanged; inline confirmation otherwise.
+
+## Accessibility
+
+- Visible focus on every control; skip link to main content.
+- Semantic headings, lists, tables, `details` and live regions for refresh and scan results.
+- Icon-only controls labelled; full names available for truncated text.
+- 44px targets below 768px. Reduced motion respected on portals as well as page content.
+- Both themes meet 4.5:1 for text and 3:1 for control borders and focus rings.
+
+## CSS rules
+
+- Tokens live in one admin token file; components read tokens, never raw hex values.
+- No doubled selectors (`[x][x]`, `.a.a`) and no `!important` to win specificity. If a rule needs one, the layering is wrong.
+- Page CSS files hold layout only (grids, column tracks). Color, type, borders and states come from shared components.
+- No positional selectors for meaningful elements (`>button:last-child`); use named slots or data attributes.
+- New JSX keeps one element or prop group per line; avoid single-line components wider than ~120 characters.
+
+## Migration
+
+| Phase | Work |
+|---|---|
+| 0 | This document and WORKFLOWS.md. |
+| 1 | One admin token file; delete the doubled-selector overrides, the `!important`s and `refined-drawers.css`; one tab style. |
+| 2 | New navigation and routes with redirects; distinct icons; Email deliveries as a Notifications tab. |
+| 3 | Shell: slim top bar, account controls in the sidebar footer. |
+| 3.5 | Drawers: View/Edit/New variants, three sizes, shared inner pieces, inline confirmations, URL state, named close slot. |
+| 4 | The five page layouts as shared components. |
+| 5 | Role-specific dashboard. |
+| 6 | Page passes: Circulation, Reservations, Clearance, Users, Catalog, then the rest. |
+
+Phase 1 touches every page at once and ships as one change.
 
 ## Verification
 
-Reservations uses the same compact panels and semantic colors. Default to Needs action (Pending + Ready), with status counts independent of the selected filter and URL-backed search/filter/page/archive state. Ready pickup deadlines lead the queue, followed by the oldest pending requests. Closed records are collapsed. Primary row actions use maroon; ready is a tinted green state, pending amber and expiry coral. Cancellation lives in the overflow menu and requires a recorded reason. Bulk preparation/cancellation and archive-all-closed retain server validation and report partial failures. Label request dates “Reserved,” use relative pickup deadlines with exact timestamps in tooltips/details, and never invent availability or missing counts. Read-only details show contact and existing notes; this API does not provide a complete event timeline.
-
-Build and architecture checks, dashboard state/permission tests, and sidebar/navigation regressions accompany this baseline. Check light/dark at 1366×768, tablet, and 390px mobile, including long descriptions and large currency amounts. At 1366×768, actions, outstanding panels, and daily totals should be visible without scrolling.
-
-The isolated preview supports `?previewScenario=stress` for large values/long descriptions and `?previewScenario=empty` for zero values/empty transactions. Use `?previewScenario=default` to restore ordinary fixtures. Role previews remain available through `?previewRole=staff`, `admin`, or `super_admin`; these fixtures never forward requests to the real backend.
-
-Reservations refinements: summary tiles filter Ready, Pending and expiry attention; the broad filter strip contains Needs action, Closed and All. Selected tiles retain a visible outline. Non-zero expiry attention gets a coral surface in both themes; zero counts stay neutral. Keep status and relative deadline inline, escalate at 24 hours and six hours, and flag pending requests after seven days. Share fixed column tracks across groups and clamp book titles to two lines with the complete title available on hover. Copy availability is factual; preparation is disabled with an accessible explanation when unavailable or unknown. Selection checkboxes use the card surface and checked maroon, with a sticky action bar. Closed work starts collapsed and exposes Archive all closed in its header. Pickup passes the prepared copy identifier and patron to the desk; checkout still checks clearance and the current copy state. Request history lists recorded request/deadline fields and current status, without inventing lifecycle timestamps.
-
-## Shared operational components
-
-`AdminDeskSystem.tsx` provides the header, summary tiles, page tabs, filter chips, status badges, row menus, selection checkboxes, empty states and detail drawer. Dashboard, Reservations, circulation History and Clearance adopt these patterns. Use 28px page titles, 16px section titles, 13-14px interface text, 16px panel padding, 24px section gaps and tabular totals. Keep styles scoped to adopted pages and portals.
-
-Headers group Updated with Refresh and page-specific outline actions, without a divider. Navigation tabs use underlines, icons and attention badges. Only the Borrow/Return mode uses a filled segment. Counted filter chips put All last. Use canonical tab, mode and filter URL parameters; continue reading older status parameters. Summary tiles select filters, highlight selection and use neutral surfaces for valid zeros. Missing data remains unavailable. Semantic badges share coral for blocked/overdue/expired, amber for pending/fines only, green for ready/returned/cleared and blue for active loans. Brand maroon belongs to primary actions. One visible primary action per row; secondary actions use outlines and rare/destructive actions use the menu.
-
-Use formatPeso for currency, including thousands separators. Preserve cached records during refresh failures and provide Retry. Do not substitute missing counts with zero. Drawer details and exports must use recorded fields rather than fabricated histories.
-
-## Clearance desk workflow
-
-Review queue is the default page tab, with Blocked first and Fines only second, amount ordered. Counts and search apply before server pagination. Tiles are the sole queue filters: Blocked, Fines only and All (last). Do not repeat these counts in chips below. All stays neutral and includes the aggregate unpaid balance as secondary information. The selected tile uses a semantic border; keyboard focus has a separate focus-visible ring. At tablet and mobile widths, stack summary tiles to preserve currency readability. Queue row names open a detail drawer; Review patron opens the full record.
-
-A single patron card contains clearance status, overdue returns and outstanding balance with an explicit checklist. Items and fines share a two-column desktop layout. Overdue items link directly to the return desk using the stored copy identifier. Hide irrelevant reservations. Fine rows include recorded dates, status and administrator-only adjustment/waiver menus. Reasons are required and existing ledger/audit records are retained. Empty clearance activity starts collapsed; populated activity identifies the processor and receipt.
-
-Record full payment always opens a confirmation showing patron, outstanding balance, exact amount and the receipt notice. Record only cash already received. Partial payment uses the same confirmed receipt workflow. Submission is guarded against repeat clicks and the server rejects changed balances or overpayments before writing. Payment allocations, receipt, audit and notifications commit atomically. Staff may record payments; adjustments and transaction corrections remain administrator-only. No database schema changes are required.
-
-## Users and shared record drawers
-
-Users uses the operational header, a slim patron count and actionable attention link, counted Active/Inactive/Archived/All chips, role/access filters and live search. Search, filter, role, access, sort and page live in the URL. Borrowing totals use current loans and the same fine calculation/ledger as Clearance. Needs attention links to the review queue. Status and role counts are calculated before pagination; missing counts are unavailable. Inactive explains disabled access or a missing/expired student term. Rows show initials, identity, role badge and clearance links. Program is omitted from the list. Selection supports exporting selected records; full Export respects the current filters.
-
-AdminDetailDrawer is the shared record pattern for Users, Reservations, circulation history and Clearance details. Use a maroon header with a 44px close target, an independently scrolling sectioned body and an optional fixed footer. Escape and backdrop dismissal use the same close handler; editable records prompt before discarding unsaved changes. Restore focus to the opener. Users groups Identity, Academic (Student only), Contact, Account and Remarks. Required fields identify the library card/sign-in ID separately from the university student number. Existing staff identifiers remain compatible; operational staff no longer require student academic fields.
-
-Users hides edit password fields until Reset password is requested; canceling reset clears both inputs. Password reset and any permitted role change require confirmation when saving. A new password requires change at next sign-in. Existing server role hierarchy remains authoritative: no operator can grant their own role or elevate beyond permitted roles. Read-only accounts keep borrowing information available. No reset-link action is shown because this application has no reset-link delivery endpoint.
-
-Archive lives in a danger zone, separate from Save changes and QR identity. Show open loans, unpaid fines and active reservation blockers; the server validates them atomically again. Unsaved edits must be saved or discarded before archival. QR belongs in the record header and opens an accessible dialog with Escape/backdrop support. Receipts, account changes and existing audit behavior remain intact.
-
-### Shared page navigation tabs
-
-Use AdminPageTabs for page navigation: transparent, left-aligned icon tabs over one full-width hairline, with a 2px red underline for the active tab. Active text follows the foreground (white in dark mode); inactive text is muted and brightens on hover. Keep 16px between the tab row and the first panel. Count badges default to neutral, including zero; opt into attention red only for an actionable non-zero count, such as overdue loans or blocked patrons. Reserve filled segmented controls for Borrow/Return mode and counted chips for list filters.
-
-Borrow & Return always shows its title and stable subtitle above the tabs. History adds Updated, Refresh, View archive and Export to the right of that header and shows summary tiles inside its panel. Desk keeps its scanner flow and mode switch without history tools.
-
-### When summary tiles earn their place
-
-Use tiles for the Dashboard overview and actionable work queues (Reservations, circulation History and Clearance Review queue). Queue tiles must filter or navigate and add information beyond filters below; never repeat the same chip counts. Prefer one filtering control when counts overlap. Keep Desk free of tiles so scanning and confirmation stay primary. Users uses a compact count line and attention link rather than summary tiles. Money totals alone are neutral; color expresses urgency, not numerical size.
-
-## Catalog records and holdings
-
-Catalog is an inventory workspace, not an urgency tile dashboard. Keep Records and Holdings as shared bookmark-ribbon page tabs, a header with Updated/Refresh/Export/Import/Add record, counted Active/Needs holdings/Archived/All filter chips and a full-width live ISBN/title/author search. Material and loan policy are compact filters. Counts are calculated before pagination; unavailable totals remain unavailable. Rows use neutral initial covers, material in the author subline, one semantic status, Add accession number when preparation is needed, and Manage copies for prepared books. Selection supports filtered export, selected export and physical-copy QR labels.
-
-The shared record drawer uses bookmark-ribbon tabs, an operational status strip, independently scrolling fields and a fixed Save changes/Cancel footer. Core identifies the record, Description groups bibliographic detail, and Additional contributors is collapsed with a populated-entry count. Preserve configurable schema fields and material scopes. Circulation explains the policy and links a read-only physical count to Copies. Metadata updates omit copies; only explicit creation, addition, retirement and restore workflows change physical inventory. Additional copies are added atomically under the book lock with an audit event. Theses stay reference-only.
-
-Archive lives in a separate danger zone. Known loans and active reservations disable archive; unsaved edits must be resolved. The existing transaction also checks outstanding fines and active reservations/loans before archival. Escape/backdrop/X dismissal prompts before discarding edits, including the holding editor guard. CSV import previews and validates schema headers, required fields, material, active policy IDs and copy counts before creating records. Each row is saved separately; partial successes are retained and retries skip successful rows. Export respects filters across every page and escapes formula-leading cells. QR labels use real copy identifiers; never invent accession numbers.
-
-Catalog controls share one row (count chips, live search, Filters popover). Needs holdings has an amber count and uses `?filter=needs-holdings`; Holdings links back to it. Holdings uses counted copy-state chips, conditional course/location columns, semantic state badges and explicit non-good condition text. Bulk archive confirms first and retains server blockers; bulk holdings preparation opens selected records for explicit accession assignment.
-
-Within a record, Copies is the sole physical inventory workspace: list state/accession/condition/location, Add copy, accession editing, retirement/restore and printing. Details links its read-only count to Copies. Page Holdings stays a global inventory view with its existing URL filters, optional `bookId` scope, caching and exports. Selecting a row opens that exact copy directly in one focused drawer. Edit record details replaces the drawer content after checking unsaved edits; drawers never stack. Do not reintroduce a Holdings drawer tab, duplicate Edit holdings action, or View in Holdings detour. Add accession number selects the first active, non-voided incomplete copy; zero-copy records open Add copies, and successful addition expands a newly created copy.
-
-Reuse the same controlled accession editor in both contexts. Save holding stays on the copy; Save and next advances only after success. Manual Previous/Next checks unsaved edits. Record navigation follows the displayed copy order; global Holdings snapshots the current results page at entry, even if saving removes a row from the filter. Label this scope, disable boundaries, and never wrap or silently fetch another page. Missing copies show a recoverable state rather than substituting a different copy. Preserve permanent accession locks, retired-copy editing rules, super-admin void permissions, confirmations and all existing holding fields.
-
-The catalog controller owns drawer mode, selected copy, page queue and list origin. Closing restores list filters, page, scroll and focus, falling back to a visible list control when the original row has disappeared. Record drafts survive copy editing of the same title. Check both record and holding drafts before leaving through an editor link or saving and closing the record; disable conflicting actions during a save. Keep the browser unload warning. All navigation is transient frontend state; there are no new endpoints or inventory rules.
-
-### Attendance
-Today uses actionable Inside now / Arrivals / Departures tiles instead of duplicate filter chips. Counts cover all matching visits, not the loaded page. Poll every 30 seconds while foregrounded and briefly highlight new rows; preserve cached records on refresh failure. History is one row per visit, paired before pagination, with a compact summary and URL-backed live search, type, purpose and preset date range. Historical missing exits say “Time out missing”; only current-day open visits say “In library”. Hide empty scanner/purpose columns and single-page pagination. Patron names open the Users drawer. Manual entries use scanner validation; bulk time-out requires confirmation and skips visits changed since the confirmation snapshot. CSV exports include the entire filtered result.
-
-## Notifications workflow
-
-Use a title-only shared header with Updated, Refresh, Export and New notification. Announcements and System alerts use underline tabs. Manual, Automatic, Failed and All (last) are counted chips above a full-width search; remove informational tiles. Server filters and grouping precede pagination. Compact rows open the complete message; repeated automatic alerts group by type, day and delivery state. Their drawer exposes individual-message actions. Read counts and delivery labels use recorded data; Available does not imply receipt by an offline device.
-
-Compose in the shared drawer with a fixed footer, audience segments and live active-recipient counts. Broadcast confirmation repeats the count. Keep the patron preview, counters, destination selection and shared calendar/time controls within the form. Scheduling uses the existing server delivery queue. Resend, Duplicate and Expire are row menus; expiration confirms cancellation of a scheduled message. Patron names link to the Users record. Hide pagination for a single page.
-
-## Analytics
-
-Use the shared title-only header, Updated/Refresh/Export, one preset/custom date picker and icon underline tabs. Selected dates govern all activity charts and AI evidence; inventory and operational position remain current snapshots. KPIs link to their views and show daily sparklines only when comparison is available. Otherwise one shared line explains the required preceding period. The Overview includes oldest overdue balances linked to Clearance, and operational links carry arrows. Overview and Collection share amber/red finding badges. Compare only when the entire preceding equal-length period falls within recorded history; otherwise use one comparison note. Calendar labels preserve reporting dates in UTC+08; changed ranges load their own figures instead of showing previous-range charts.
-
-Daily counts use straight lines or bars, sparse readable date ticks, exact-value tooltips and integer axes. Zero totals replace plots with compact empty states. Reservation totals explicitly count lifecycle events, and visitor totals keep page hits separate from daily unique visitors. Borrowed/Created are blue, Returned/Fulfilled green and Overdue red. Currency axes use Philippine pesos. Status proportions use a stacked bar; role distributions scale to the largest group and include percentages. Replace a single-condition distribution with a sentence. Collection gaps link to actual Catalog filters.
-
-Arrivals are entry/exit-purpose check-ins. Scans count check-ins, check-outs and borrowing scans. Inside now is the separate current open-visit count. Website period visitor totals sum daily unique visitors. Registered-user role counts include all non-deleted accounts; borrowing demand counts loans by borrowed date. All outstanding fines use the same live-accrual ledger calculation as Dashboard and Clearance. Fine collections sum payments, legacy credits and reversals by effective date.
-
-CSV and Print / PDF export only the current tab and selected range, labeling current snapshots separately and carrying the library, generator and time. The AI form shows its active range, keeps Generate beside the question field and avoids repeating the tab heading. AI reports retain Markdown structure and peso formatting, generation time, verification links and explicit stale/loading/error states. Stale notices say whether the period or the question changed. Errors offer their one fix: an out-of-range date offers Use that date, a privacy refusal links Attendance History, and transient provider failures offer Try again. Figures the server cannot match to the evidence appear as a warning above the brief. Empty periods and dates are answered from recorded totals without an AI call. Save to reports stores up to 30 aggregate briefs on this device, surfaced in Reports & Records. Print / PDF opens a print-ready report for the browser's Save as PDF action. Recent questions are also local to the device.
-
-## Reports & Records
-
-Explore is a live cross-module lookup; Reports produces institutional outputs and retains Run for potentially expensive reports. Each type has its description immediately below a styled, grouped selector. Common search and date controls stay on the main bar; specific fields use one collapsed grid, an active count and removable chips. Preserve search/dates when changing type, reset type-specific values and announce the reset. Snapshot types retain dates for other types without applying them to inventory. Last semester uses configured completed academic-term dates only.
-
-Use compact 60px result rows with two-line titles, semantic badges and monospaced identifiers. Wide tables scroll horizontally with solid sticky first columns, a subtle edge shadow and column-edge snapping. The page handles vertical scrolling; a synchronized sticky heading stays outside the horizontal scroller. Show seven useful columns by default and offer the remaining columns in a picker. Sort across the full result before pagination. Show the record range and rows per page; hide Previous / Next for one page. Label export actions as All rows. Monetary fields use right-aligned pesos and Fines totals cover all matching rows, with dates filtering the charge date. Catalog and patron links open their existing drawers.
-
-CSV, Excel (.xls SpreadsheetML) and Print / PDF use the selected columns and all matching records, within the existing 10,000-row export limit. Excel and printable outputs carry the actual library name, period, generating administrator and filters. Administrator access and audit logging are enforced before releasing exported records. Print preview is logged as prepared, since opening it does not prove a PDF was saved. Reports mark changed filters as out of date until Run again and disable stale exports. Date presets and saved filters live inside the shared date picker. Saved briefs show their period, generator and generation time, with Open, Markdown Download, Print / PDF and confirmed Delete actions. Legacy briefs identify missing attribution honestly. Presets, recent report choices and recent-export history are local to the device; print history is labeled as a print view.
-
-## Academic Settings
-
-Academic Settings uses the full workspace width, the shared divider-free header, and four underline tabs: Academic terms, Programs / Courses, Holidays, and Departments. Counts load together. Each tab has one muted description and an Add action; occasional add and edit forms use AdminDetailDrawer with scoped save state, inline validation and unsaved-change protection.
-
-Programs and departments use Active / Archived chips, searchable lists above ten entries, secondary Edit, and a row menu for Archive and permanent Delete. Show Delete only without references and recheck on the server. References link to filtered Users and Catalog views and include archived records. Current and referenced terms are retained; term menus confirm Set as current. Dates are calendar strings, terms show month names and holiday rows show weekdays. Holiday changes affect new loan due dates only. National holiday import is a reviewed, atomic batch of verified 2026 dates from Proclamation 1006; separately proclaimed dates are added manually.
-
-## Book type policies
-
-Policies use read-only rows with full names, explicit loan units, two-decimal peso amounts and a fine preview. Search, counted Active / Archived / All chips and sorting sit above the list. Assigned-book references open the exact Catalog filter. On narrow screens, rows become labeled cards with 44px actions and reference links.
-
-Add and Edit open the shared drawer with associated labels, inline validation, scoped dirty state and a pinned Save/Cancel footer. Save is enabled only for valid edits; Enter submits and Escape guards unsaved work. Archive/Restore lives in the row menu. Delete is restricted to unused policies and rechecked under a database lock. Archive warns about borrowing, renewal and reservation eligibility. Policy changes and audit entries commit together; loan snapshots retain their recorded terms. Test-like names are tagged for review. Do not invent default-type, grace-period or fine-cap behavior without a product decision.
-
-## Catalog Configuration
-
-Use full-width read-only field rows with fixed columns for label/key, type, scope, status, public visibility and actions. Required is amber with an asterisk. System protection is one labeled lock indicator; custom protection is explicitly editable. Count system fields independently of custom locks. Scope tabs precede the sticky heading. Search, filters and optional collapsible scope groups preserve global positions and disable reordering; All fields without filters supports drag and keyboard ordering.
-
-Add/Edit uses one guarded drawer with an immutable key, type guidance, Applies to, option tags with usage counts, and a form preview. Immediate actions and ordering have Undo; drawer changes use Save. Risk confirmations describe missing values, narrowed scope, hidden display and removed options. Archive retains data; restore appends to the global order. Only unused archived custom definitions can be permanently deleted, and server checks and audit enqueue run in the schema transaction. Public catalog availability uses a green On switch with a count of affected books. Keep existing global ordering, searchable hidden values and always-public core identity explicit until product decisions change them.
-
-Catalog Configuration refinements keep All fields first, use equal-height Required/Optional and System/Custom chips, and distinguish outlined type chips from scope tints. Usage counts link to catalog records and support sorting. Filters combine with AND and remain sticky with the column headings; grouping/sorting are separate view controls. Edit links and named icon actions reduce repeated button weight. The drawer names its field, shows key/origin in the header, separates settings into sections, and displays live impact plus form/public previews. Immutable rules use lock explanations. Global keyboard reordering announces the new position and returns focus. Availability counts describe the current On/Off state and link to books using matching accession eligibility.
-
-The compact revision supersedes stacked status chips and sticky filters: only the column heading stays sticky, Optional is muted text, and requirement/origin share a line. Keep rows around 80px on desktop. Count links are underlined and only exist for non-zero usage. Search/filter controls scroll away; active filters are filled with a checkmark and counted Clear filters. View groups scope grouping and labeled sorting. Availability uses a blue setting switch, confirms both directions and supports Undo.
-
-The options drawer shows total usage, options in use and values outside configured choices. Persist retired choices separately from active options, support restore, warn before removing used choices and offer draft Undo. Bulk paste skips duplicates with feedback. Rename for future selections retains existing values and archives the original choice; bulk rewriting records requires a migration policy. Section links scroll only the drawer body. Historical archive dates and reasons must not be fabricated.
-
-## AI Recommendations
-
-Coverage cards show portions of one active-book total and explain overlapping measures. Check, warning and document icons identify matching readiness, any update and missing synopses. Cards filter the server-backed list and expose a clear active state. Keep the backfill summary short, with expandable lookup/reuse rules and the exact external-data disclosure.
-
-Preview scoped work before starting; show actual counts, a limit, failure retries and measured duration only when available. A running action is disabled, progress is announced and Cancel stops after the current book. Audit start/end and link each run to the log. Browser navigation is safe; process restarts interrupt execution and restore only the last audit snapshot. Do not imply durable resumable jobs or distributed locking.
-
-The list uses consistent icon/text status chips, combined search/filter controls, attention sorting, selection and record ranges. Manual synopsis entry uses the shared guarded drawer with scoped Save/Cancel and staff attribution. ISBNs are monospaced and full author lists remain available. Narrow screens use labeled rows with 44px controls; both themes retain readable states and focus indicators.
-
-## Audit Logs
-
-Audit Logs is an investigation feed with compact and comfortable density, actor-first rows, human action labels and sticky day headings. Controls scroll away. Show actual Before/After values, explicit sensitive redaction and honest missing-history labels. Details disclose stable event IDs, captured routes and request context. Preserve expansion while paging and refreshing; retain separate historical events unless correlation proves their relationship.
-
-Filters apply automatically, live in the URL and appear as removable chips. Use the shared date range picker, category-dependent actions, Actor/Record filters and High impact/Security shortcuts. Put ranges and page-size controls above and below the feed. Probe for new events without replacing the reader's current list. Record links open existing details; unavailable lookups must not be confused with deleted records.
-
-Exports use the same filters and redaction as the feed and must be audited before release. Keep the feed read-only and disclose actual retention, logging coverage and privacy rules. Never fabricate old values, IP addresses, locations or new-device status. Formal retention, extra security capture and broader export permissions require an approved policy.
-
-## Backup & Restore
-
-Keep this high-risk workspace calm: a shared header with Save snapshot as primary, a concise health card, explicit backup-file actions and readable snapshot rows. Snapshot means a cloud copy; Backup file means a portable downloaded copy. Use warning outlines for restore entry points and a destructive final confirmation. Review source, checksum, compatibility, record impact and active sessions before requiring RESTORE plus server-verified current credentials.
-
-Use the shared drawer for names/notes and opt-in schedules. Keep 30 unpinned rotating snapshots and protect pinned copies under row locks. Expose verification without implying it is a full staging restore. Announce real server phases and retain the safety-copy/audit references after sign-out. Guard peer backup changes during maintenance. Download warnings, local password protection and audit-before-release are part of the workflow.
-
-Show scheduling, storage and security facts explicitly. Never invent a restore-duration estimate, provider region, cloud encryption guarantee, online-user certainty or delivered/read notice guarantee. Failed jobs and stale backups need visible recovery actions. All new controls retain the existing super-admin restriction.
-
-### Audit Logs refinement
-
-Keep audit events immutable and derive clear display categories from the captured record route. A contradictory historical summary must not link to an unrelated record. Audit controls use one search/filter/view toolbar and one bottom pager; phone filters open in the shared drawer. Day headings alone remain sticky except a temporary counted new-event notice. Row summaries are keyboard buttons with aria-expanded; record links remain separate. Before/After diffs stack on phones, keep explicit minus/plus symbols and never reconstruct redacted or missing historical values. High impact carries a captured-change reason, rather than marking every policy event.
-
-### Backup & Restore refinement
-
-Health defaults to status and last snapshot; retention and session definitions live in a disclosure. Treat signed-in users, refresh sessions and active notice accounts as separate labelled counts. Saved copies require checksum verification before Restore is offered. A safety copy must be retrieved and verified before replacement proceeds. Restore review uses consequences first, affected table counts and explicit confirmation. The header and footer stay outside the scrolling body; mobile uses a full-height sheet with stacked impact rows and danger action above Cancel. Keep active navigation solid rather than fading it through a scroll mask. Exact restore-event links must use the canonical audit event ID.
+For every phase: existing tests and the build pass, and each touched page is checked in light and dark at 1366×768, tablet (768px) and 390px, including long names, long titles and large peso amounts. At 1366×768 the Dashboard's desk actions, outstanding items and today's totals are visible without scrolling. Role-filtered navigation is checked as staff, admin and super admin.
