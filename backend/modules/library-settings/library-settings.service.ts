@@ -335,7 +335,7 @@ const validateTerm = ({ name, startsOn, endsOn }: Pick<AcademicTermInput, "name"
   }
   const validDate=(value:string|Date)=>{const date=value instanceof Date?value.toISOString().slice(0,10):String(value);return /^\d{4}-\d{2}-\d{2}$/.test(date)&&!Number.isNaN(Date.parse(date+"T00:00:00Z"))&&new Date(date+"T00:00:00Z").toISOString().slice(0,10)===date;};
   if(!validDate(startsOn)||!validDate(endsOn))throw Object.assign(new Error("Choose valid term dates."),{status:400});
-  if (new Date(startsOn) > new Date(endsOn)) {
+  if (new Date(startsOn) >= new Date(endsOn)) {
     throw Object.assign(new Error("The end date must be after the start date"), { status: 400 });
   }
 };

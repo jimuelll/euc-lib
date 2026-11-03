@@ -499,7 +499,7 @@ const getAdminBorrowings = async ({ search = "", status, showArchived = false, p
     params,
   );
   const [rows] = await db.query<DataRow[]>(
-    `SELECT b.id, b.status, b.borrowed_at, b.due_date, b.returned_at, b.deleted_at, b.notes,
+    `SELECT b.id, b.status, b.borrowed_at, b.due_date, b.renewal_count, b.returned_at, b.deleted_at, b.notes,
             COALESCE(b.settled_amount, 0) AS settled_amount, b.settled_at, b.settled_by,
             bk.title AS book_title, bk.author AS book_author, bk.isbn,
             u.name AS user_name, u.student_employee_id, u.email AS user_email, bc.barcode AS copy_barcode,

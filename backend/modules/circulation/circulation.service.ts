@@ -10,6 +10,9 @@ const { calculateLoanDueDate } = require("../borrowing/loan-duration") as {
   calculateLoanDueDate: (from: Date, duration: { minutes: number; unit: string }, connection: PoolConnection) => Promise<Date | string>;
 };
 const fineLedger = require("../borrowing/fine-ledger.service");
+const clearance = require("../clearance/clearance.service") as { assertEligible: (userId: number, conn?: PoolConnection) => Promise<unknown> };
+
+const MAX_RENEWALS = 2;
 import { formatLibraryDeadline } from "../time/library-time";
 const notificationsService = require("../notifications/notifications.service");
 const { getClearanceProfile } = require("../clearance/clearance.service") as { getClearanceProfile: (studentEmployeeId: string) => Promise<unknown> };
@@ -93,6 +96,7 @@ const processReturn = async (borrowingId: number, returnedBy: number | null = nu
 };
 
 const processRenew = async ({ borrowingId, renewedBy = null }: ProcessRenewInput) => {
+  await syncOverdueBorrowings();
   const connection = await repository.getConnection();
   let dueDate: Date | string;
   try {
@@ -101,6 +105,9 @@ const processRenew = async ({ borrowingId, renewedBy = null }: ProcessRenewInput
     if (!row) throw createServiceError("Borrowing record not found", 404);
     if (row.status === "returned") throw createServiceError("Cannot renew a returned book", 409);
     if (!row.has_active_policy) throw createServiceError("This book needs an active loan policy before it can be renewed", 409);
+    if (Number(row.renewal_count) >= MAX_RENEWALS) throw createServiceError(`This loan has already been renewed ${MAX_RENEWALS} times, the maximum allowed. The book must be returned.`, 409);
+    if (await repository.countOtherOpenReservations(row.book_id, row.user_id, connection) > 0) throw createServiceError("Another patron has reserved this title, so it cannot be renewed. The book must be returned.", 409);
+    await clearance.assertEligible(row.user_id, connection);
     if (!Number.isInteger(Number(row.loan_duration_minutes)) || !["day", "hour"].includes(row.loan_duration_unit || "")) {
       throw createServiceError("This loan has no saved renewal duration. Ask an administrator to review the borrowing record.", 409);
     }

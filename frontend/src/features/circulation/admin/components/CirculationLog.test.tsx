@@ -7,7 +7,7 @@ import { createTestQueryClient } from "@/test-utils/query-client";
 import CirculationLog from "./CirculationLog";
 import * as api from "../circulation.api";
 
-vi.mock("../circulation.api", () => ({ getCirculationLog: vi.fn(), archiveBorrowing: vi.fn(), restoreBorrowing: vi.fn() }));
+vi.mock("../circulation.api", () => ({ getCirculationLog: vi.fn(), archiveBorrowing: vi.fn(), restoreBorrowing: vi.fn(), renewLoan: vi.fn() }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "staff" } }) }));
 configure({ asyncUtilTimeout: 5000 });
 const row: api.CirculationLogEntry = { id: 1, user_name: "Mika Santos", student_employee_id: "DEMO-REAL-004", book_title: "Library book", book_author: "Author", isbn: "9780123456789", copy_barcode: "COPY-1", borrowed_at: "2026-09-14T09:15:00", due_date: "2026-09-21T09:15:00", returned_at: null, fine_amount: 24, hours_overdue: 576, status: "overdue", issued_by_name: "Librarian", deleted_at: null };
@@ -74,5 +74,22 @@ describe("circulation history", () => {
     fireEvent.click(returnedDate.closest("li")!);
     expect(within(screen.getByRole("dialog")).getByText(/Sep 25, 2026/)).toBeTruthy();
     expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Return copy" })).toBeNull();
+  });
+  it("renews an active loan after confirmation and shows how many times it was renewed", async () => {
+    vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, renewal_count: 1 }], total: 10, page: 1, totalPages: 1, summary });
+    vi.mocked(api.renewLoan).mockResolvedValue({ message: "Book renewed successfully", dueDate: "2026-11-20T08:00:00.000Z" });
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Mika Santos" }));
+    const detail = screen.getByRole("dialog");
+    expect(within(detail).getByText("Renewed 1 time")).toBeTruthy();
+    fireEvent.click(within(detail).getByRole("button", { name: "Renew loan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Renew" }));
+    await waitFor(() => expect(vi.mocked(api.renewLoan).mock.calls[0]?.[0]).toBe(row.id));
+  });
+  it("does not offer renewal for a returned loan", async () => {
+    vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, status: "returned", returned_at: "2026-09-25T08:00:00.000Z" }], total: 10, page: 1, totalPages: 1, summary });
+    setup("/admin/circulation?tab=history&filter=returned");
+    fireEvent.click(await screen.findByRole("button", { name: "Mika Santos" }));
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Renew loan" })).toBeNull();
   });
 });

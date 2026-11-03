@@ -26,6 +26,14 @@ const recordScan = async ({ scannedId, type, scannedBy, ipAddress,expectedLogId 
   try {
     const lastLog = await repository.getLatestEntryExitLog(user.id, connection);
     if(expectedLogId!==undefined&&lastLog?.id!==expectedLogId)throw Object.assign(new Error("Visit changed since confirmation"),{status:409});
+    if (type === "check_out" && !lastLog) {
+      throw Object.assign(new Error(`${user.name} is not timed in for today.`), {
+        status: 409,
+        code: "NOT_TIMED_IN",
+        user: { id: user.id, name: user.name, student_employee_id: user.student_employee_id },
+        type,
+      });
+    }
     if (lastLog?.type === type) {
       const isCheckIn = type === "check_in";
       throw Object.assign(

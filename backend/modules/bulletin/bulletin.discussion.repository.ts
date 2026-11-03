@@ -17,10 +17,10 @@ export async function helpful(postId:number,commentId:number,userId:number,selec
 }
 export async function moderate(postId:number,commentId:number,actor:Actor,input:any){
  if(!staff(actor))fail('Forbidden',403);
- if(input.action==='hidden'&&input.value===false&&!['admin','super_admin'].includes(actor.role))fail('An administrator must review a hidden comment before restoring it.',403);
  if(!['hidden','pinned'].includes(input.action)||typeof input.value!=='boolean')fail('Invalid moderation action.');
  return transaction(async conn=>{await lockPost(conn,postId);
   const [[comment]]=await conn.query<RowDataPacket[]>('SELECT * FROM bulletin_comments WHERE id=? AND post_id=? AND deleted_at IS NULL FOR UPDATE',[commentId,postId]);if(!comment)fail('Comment not found',404);
+  if(input.action==='hidden'&&input.value===false&&!['admin','super_admin'].includes(actor.role)&&Number(comment.hidden_by)!==actor.id)fail('Only the staff member who hid a comment, or an administrator, can make it visible again.',403);
   if(input.action==='hidden'&&input.value===false&&Number(comment.user_id)===actor.id)fail('Another administrator must review your hidden comment before restoring it.',403);
   if(input.action==='pinned'&&comment.parent_id)fail('Only top-level comments can be pinned.');
   if(input.action==='hidden'&&comment.moderation_status==='pending')fail('Held comments must be reviewed in the moderation inbox.',409);

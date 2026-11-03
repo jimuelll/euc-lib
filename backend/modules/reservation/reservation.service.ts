@@ -51,6 +51,9 @@ const reserveBook = async (userId: number, bookId: number, hoursUntilExpiry = RE
     await conn.beginTransaction();
 
     await clearanceService.assertEligible(userId, conn);
+    if (await repository.isStudentTermExpired(userId, conn)) {
+      throw serviceError("Your academic term has ended. Revalidate your enrollment at the library before reserving a book.", 403);
+    }
 
     const book = await repository.findBookForReservation(bookId, conn);
     if (!book) throw serviceError("Book not found", 404);

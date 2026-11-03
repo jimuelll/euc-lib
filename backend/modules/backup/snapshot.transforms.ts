@@ -4,7 +4,7 @@ import type { SnapshotPayload, SnapshotRow } from "./snapshot.types";
 
 const { APPLICATION_TABLES } = registry;
 
-const SNAPSHOT_VERSION = 26;
+const SNAPSHOT_VERSION = 27;
 const LEGACY_METADATA_KEYS = Object.freeze([
   "category", "edition", "publication_year", "location", "thesis_program",
   "thesis_adviser", "academic_year", "thesis_abstract", "thesis_keywords", "accession_number",
@@ -432,6 +432,12 @@ function upgradeV25ToV26(backup: SnapshotPayload): SnapshotPayload {
  backup.tables.website_content_drafts=(backup.tables.website_content_drafts||[]).filter(row=>row.section!=='guide');
  backup.tableManifest=Object.keys(backup.tables).sort();backup.version=26;backup.integrity={algorithm:'sha256',checksum:payloadChecksum(backup)};return backup;
 }
+function upgradeV26ToV27(backup: SnapshotPayload): SnapshotPayload {
+  assertSnapshotIntegrity(backup);
+  // Renewals were not counted before this version.
+  for (const row of backup.tables.borrowings || []) row.renewal_count ??= 0;
+  backup.tableManifest = Object.keys(backup.tables).sort(); backup.version = 27; backup.integrity = { algorithm: 'sha256', checksum: payloadChecksum(backup) }; return backup;
+}
 const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => SnapshotPayload>([
   [3, upgradeV3ToV4],
   [4, upgradeV4ToV5],
@@ -456,6 +462,7 @@ const SNAPSHOT_TRANSFORMERS = new Map<number, (backup: SnapshotPayload) => Snaps
   [23, upgradeV23ToV24],
   [24, upgradeV24ToV25],
   [25, upgradeV25ToV26],
+  [26, upgradeV26ToV27],
 ]);
 
 function upgradeBackup(backup: SnapshotPayload): SnapshotPayload {

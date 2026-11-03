@@ -54,7 +54,7 @@ function ScannerStation() {
       setResult(entry);setSession(current=>({recent:[entry,...current.recent].slice(0,5),timeIns:current.timeIns+(data.type==="check_in"?1:0),timeOuts:current.timeOuts+(data.type==="check_out"?1:0)}));if(requestEpoch===epoch.current)setScanMode("success");
     } catch(error:unknown) {
       if(!alive.current||requestEpoch!==epoch.current)return;
-      if(error instanceof AttendanceScanError && ["ALREADY_TIMED_IN","ALREADY_TIMED_OUT"].includes(error.code||"") && error.user && error.type){setNotice({type:error.type,userName:error.user.name,studentId:error.user.student_employee_id,message:error.message});setScanMode("notice");}
+      if(error instanceof AttendanceScanError && ["ALREADY_TIMED_IN","ALREADY_TIMED_OUT","NOT_TIMED_IN"].includes(error.code||"") && error.user && error.type){setNotice({type:error.type,userName:error.user.name,studentId:error.user.student_employee_id,message:error.message});setScanMode("notice");}
       else{setErrorMsg(error instanceof Error?error.message:"An unexpected error occurred");setScanMode("error");}
     } finally {processing.current=false;}
   },[attendanceType,submitScan]);

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createTestQueryClient } from "@/test-utils/query-client";
 import AdminCirculation from "./AdminCirculation";
 import * as api from "./circulation.api";
-vi.mock("./circulation.api", () => ({ getCirculationLog: vi.fn(), lookupUser: vi.fn(), lookupCopy: vi.fn(), lookupReturnPreview: vi.fn(), processBorrow: vi.fn(), processReturn: vi.fn(), undoDeskTransaction: vi.fn(), searchCirculationBooks: vi.fn(), fetchCirculationBookCopies: vi.fn(), archiveBorrowing: vi.fn(), restoreBorrowing: vi.fn() }));
+vi.mock("./circulation.api", () => ({ getCirculationLog: vi.fn(), renewLoan: vi.fn(), lookupUser: vi.fn(), lookupCopy: vi.fn(), lookupReturnPreview: vi.fn(), processBorrow: vi.fn(), processReturn: vi.fn(), undoDeskTransaction: vi.fn(), searchCirculationBooks: vi.fn(), fetchCirculationBookCopies: vi.fn(), archiveBorrowing: vi.fn(), restoreBorrowing: vi.fn() }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "staff" } }) }));
 const summary = { total_records: 6, borrowed_count: 2, overdue_count: 4, returned_count: 0, unique_borrowers: 2, borrowed_today: 0, returned_today: 0, due_soon_count: 1, accrued_fines: 350 };
 function Location() { return <output data-testid="route">{useLocation().search}</output>; }

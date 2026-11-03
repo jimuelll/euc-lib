@@ -189,7 +189,7 @@ test("reservation creation and preparation stop when the book has no active poli
   const overdueCache = require.cache[overduePath];
   const clearanceCache = require.cache[clearancePath];
   const originals = {};
-  for (const key of ["getConnection", "syncExpired", "findReservationBookId", "findBookForReservation", "findReservationForReady", "findAvailableCopyForReservation", "markReady"]) originals[key] = reservationRepository[key];
+  for (const key of ["getConnection", "syncExpired", "findReservationBookId", "findBookForReservation", "findReservationForReady", "findAvailableCopyForReservation", "markReady", "isStudentTermExpired"]) originals[key] = reservationRepository[key];
   const tx = { async beginTransaction() {}, async commit() {}, async rollback() {}, release() {} };
   require.cache[overduePath] = { id: overduePath, filename: overduePath, loaded: true, exports: { syncOverdueBorrowings: async () => {} } };
   require.cache[clearancePath] = { id: clearancePath, filename: clearancePath, loaded: true, exports: { assertEligible: async () => {} } };
@@ -197,6 +197,7 @@ test("reservation creation and preparation stop when the book has no active poli
   const service = require("../modules/reservation/reservation.service");
   reservationRepository.getConnection = async () => tx;
   reservationRepository.syncExpired = async () => [];
+  reservationRepository.isStudentTermExpired = async () => false;
   reservationRepository.findReservationBookId = async () => ({ book_id: 4 });
   reservationRepository.findBookForReservation = async () => ({ id: 4, title: "Atlas", material_type: "book", has_active_policy: 0, registered_copy_count: 1 });
   reservationRepository.findReservationForReady = async () => ({ id: 8, book_id: 4, status: "pending", within_deadline: 1 });
@@ -216,28 +217,94 @@ test("reservation creation and preparation stop when the book has no active poli
   }
 });
 
-test("renewal is blocked for an active loan whose book no longer has a policy", async () => {
+async function renewalOutcome(row, { reservations = 0, eligible = async () => {} } = {}) {
   const circulationRepository = require("../modules/circulation/circulation.repository");
+  const overdueHelper = require("../modules/borrowing/overdue.helper");
+  const clearanceService = require("../modules/clearance/clearance.service");
   const servicePath = require.resolve("../modules/circulation/circulation.service");
   const serviceCache = require.cache[servicePath];
   const original = {
     getConnection: circulationRepository.getConnection,
     getBorrowingForRenewal: circulationRepository.getBorrowingForRenewal,
+    countOtherOpenReservations: circulationRepository.countOtherOpenReservations,
+    sync: overdueHelper.syncOverdueBorrowings,
+    assertEligible: clearanceService.assertEligible,
   };
   circulationRepository.getConnection = async () => ({
     async beginTransaction() {}, async commit() {}, async rollback() {}, release() {},
   });
-  circulationRepository.getBorrowingForRenewal = async () => ({ id: 12, status: "overdue", has_active_policy: 0 });
+  circulationRepository.getBorrowingForRenewal = async () => row;
+  circulationRepository.countOtherOpenReservations = async () => reservations;
+  overdueHelper.syncOverdueBorrowings = async () => {};
+  clearanceService.assertEligible = eligible;
   delete require.cache[servicePath];
   const service = require("../modules/circulation/circulation.service");
   try {
-    await assert.rejects(service.processRenew({ borrowingId: 12 }), { status: 409, message: "This book needs an active loan policy before it can be renewed" });
+    return await service.processRenew({ borrowingId: row.id }).then(() => null, error => error);
   } finally {
     circulationRepository.getConnection = original.getConnection;
     circulationRepository.getBorrowingForRenewal = original.getBorrowingForRenewal;
+    circulationRepository.countOtherOpenReservations = original.countOtherOpenReservations;
+    overdueHelper.syncOverdueBorrowings = original.sync;
+    clearanceService.assertEligible = original.assertEligible;
     delete require.cache[servicePath];
     if (serviceCache) require.cache[servicePath] = serviceCache;
   }
+}
+
+test("reservation is refused for a student whose academic term has ended", async () => {
+  const reservationRepository = require("../modules/reservation/reservation.repository");
+  const servicePath = require.resolve("../modules/reservation/reservation.service");
+  const overduePath = require.resolve("../modules/borrowing/overdue.helper");
+  const clearancePath = require.resolve("../modules/clearance/clearance.service");
+  const serviceCache = require.cache[servicePath];
+  const overdueCache = require.cache[overduePath];
+  const clearanceCache = require.cache[clearancePath];
+  const originals = {};
+  for (const key of ["getConnection", "syncExpired", "isStudentTermExpired", "findBookForReservation"]) originals[key] = reservationRepository[key];
+  require.cache[overduePath] = { id: overduePath, filename: overduePath, loaded: true, exports: { syncOverdueBorrowings: async () => {} } };
+  require.cache[clearancePath] = { id: clearancePath, filename: clearancePath, loaded: true, exports: { assertEligible: async () => {} } };
+  delete require.cache[servicePath];
+  const service = require("../modules/reservation/reservation.service");
+  reservationRepository.getConnection = async () => ({ async beginTransaction() {}, async commit() {}, async rollback() {}, release() {} });
+  reservationRepository.syncExpired = async () => [];
+  reservationRepository.isStudentTermExpired = async () => true;
+  let bookReads = 0;
+  reservationRepository.findBookForReservation = async () => { bookReads += 1; return null; };
+  try {
+    await assert.rejects(service.reserveBook(2, 4), { status: 403, message: /academic term has ended/ });
+    assert.equal(bookReads, 0);
+  } finally {
+    for (const [key, value] of Object.entries(originals)) reservationRepository[key] = value;
+    delete require.cache[servicePath];
+    if (serviceCache) require.cache[servicePath] = serviceCache;
+    if (overdueCache) require.cache[overduePath] = overdueCache; else delete require.cache[overduePath];
+    if (clearanceCache) require.cache[clearancePath] = clearanceCache; else delete require.cache[clearancePath];
+  }
+});
+
+test("renewal is blocked for an active loan whose book no longer has a policy", async () => {
+  const error = await renewalOutcome({ id: 12, status: "overdue", has_active_policy: 0 });
+  assert.equal(error.status, 409);
+  assert.equal(error.message, "This book needs an active loan policy before it can be renewed");
+});
+
+test("renewal is blocked once a loan reaches the renewal limit", async () => {
+  const error = await renewalOutcome({ id: 12, status: "borrowed", has_active_policy: 1, renewal_count: 2, book_id: 3, user_id: 4 });
+  assert.equal(error.status, 409);
+  assert.match(error.message, /renewed 2 times/);
+});
+
+test("renewal is blocked while another patron has reserved the title", async () => {
+  const error = await renewalOutcome({ id: 12, status: "borrowed", has_active_policy: 1, renewal_count: 0, book_id: 3, user_id: 4 }, { reservations: 1 });
+  assert.equal(error.status, 409);
+  assert.match(error.message, /reserved this title/);
+});
+
+test("renewal is blocked when the patron is no longer cleared", async () => {
+  const blocked = Object.assign(new Error("Clearance required: Overdue items"), { status: 409 });
+  const error = await renewalOutcome({ id: 12, status: "overdue", has_active_policy: 1, renewal_count: 0, book_id: 3, user_id: 4 }, { eligible: async () => { throw blocked; } });
+  assert.equal(error, blocked);
 });
 
 test("an active loan remains returnable after its book loses the current policy", async () => {

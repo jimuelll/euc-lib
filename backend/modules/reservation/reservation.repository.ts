@@ -546,7 +546,19 @@ async function archiveReservation(reservationId: number, deletedBy: number): Pro
   } finally { conn.release(); }
 }
 
+/** True when a student's assigned academic term is missing or has ended; other roles are never expired. */
+async function isStudentTermExpired(userId: number, conn: PoolConnection): Promise<boolean> {
+  const [rows] = await conn.query<Array<RowDataPacket & { role: string; ends_on: Date | string | null }>>(
+    `SELECT u.role, t.ends_on FROM users u LEFT JOIN academic_terms t ON t.id = u.academic_term_id WHERE u.id = ? LIMIT 1`,
+    [userId],
+  );
+  const user = rows[0];
+  if (!user || user.role !== "student") return false;
+  return !user.ends_on || new Date(user.ends_on) < new Date(new Date().toDateString());
+}
+
 export = {
+  isStudentTermExpired,
   getConnection,
   getReservationNotificationTarget,
   syncExpired,

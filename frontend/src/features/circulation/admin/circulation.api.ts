@@ -20,6 +20,7 @@ export interface CirculationLogEntry {
   is_legacy?: boolean | number;
   borrowed_at: string;
   due_date: string;
+  renewal_count?: number;
   returned_at: string | null;
   fine_amount: number;
   hours_overdue: number;
@@ -95,6 +96,11 @@ export const processBorrow = async (
 export const processReturn = async (copyBarcode: string) => {
   const res = await axiosInstance.post("/api/borrowing/scan/return", { copyBarcode });
   return res.data as { message: string; borrowingId: number; returnedAt: string; undoToken?: string; undoExpiresAt?: string };
+};
+
+export const renewLoan = async (borrowingId: number) => {
+  const res = await axiosInstance.post("/api/admin/circulation/renew", { borrowingId });
+  return res.data as { message: string; dueDate: string };
 };
 
 export const getCirculationLog = async (

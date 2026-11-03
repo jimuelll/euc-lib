@@ -441,6 +441,7 @@ CREATE TABLE `borrowings` (
   `loan_policy_name_snapshot` varchar(255) NOT NULL DEFAULT 'Unknown historical policy',
   `borrowed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `due_date` datetime NOT NULL,
+  `renewal_count` int(11) NOT NULL DEFAULT 0,
   `loan_duration_minutes` int(11) DEFAULT NULL,
   `loan_duration_unit` enum('day','hour') DEFAULT NULL,
   `fine_per_hour` decimal(10,2) DEFAULT NULL,

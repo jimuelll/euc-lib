@@ -13,7 +13,7 @@ test("restore upgrades the previous snapshot version and adds newly registered t
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 26);
+  assert.equal(upgraded.version, 27);
   assert.equal("user_guide_modules" in upgraded.tables, false);
   assert.deepEqual(upgraded.tables.departments, []);
   assert.deepEqual(upgraded.tables.fine_accounts, []);
@@ -39,7 +39,7 @@ test("restore drops the retired user guide table and its publishing draft from v
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 26);
+  assert.equal(upgraded.version, 27);
   assert.equal("user_guide_modules" in upgraded.tables, false);
   assert.deepEqual(upgraded.tables.website_content_drafts, [{ section: "events", revision: 1 }]);
   assert.equal(upgraded.tableManifest.includes("user_guide_modules"), false);
@@ -56,7 +56,7 @@ test("restore upgrades v11 with holdings defaults and preserves tables that alre
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 26);
+  assert.equal(upgraded.version, 27);
   assert.deepEqual(upgraded.tables.copy_holdings, []);
   assert.deepEqual(upgraded.tables.catalog_settings, [{ id: 1, show_unheld_in_opac: 1, updated_by: null }]);
   assert.deepEqual(upgraded.tables.delivery_outbox, []);
@@ -109,7 +109,7 @@ test("restore upgrades v12 loan provenance and preserves outbox, holdings, setti
   };
   backup.integrity = { algorithm: "sha256", checksum: payloadChecksum(backup) };
   const upgraded = upgradeBackup(backup);
-  assert.equal(upgraded.version, 26);
+  assert.equal(upgraded.version, 27);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_id_snapshot, null);
   assert.equal(upgraded.tables.borrowings[0].loan_policy_name_snapshot, "Unknown historical policy");
   assert.deepEqual(upgraded.tables.delivery_outbox, backup.tables.delivery_outbox);

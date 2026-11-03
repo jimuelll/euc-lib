@@ -48,30 +48,10 @@ const searchCatalogue: RequestHandler = async (req, res) => {
 
 /**
  * POST /borrowings/borrows/:bookId
- * Legacy numeric bookId path — picks any available copy automatically.
+ * Retired: checkouts are issued at the circulation desk against a scanned copy.
  */
 const borrowBook: RequestHandler = async (req, res) => {
-  try {
-    const bookId = parseInteger(req.params.bookId);
-    if (Number.isNaN(bookId) || bookId < 1) {
-      res.status(400).json({ message: "Invalid book ID" });
-      return;
-    }
-
-    const user = authUser(req);
-    const result = await service.borrowBook(
-      user.id,
-      bookId,
-      user.id,
-      { isCopyBarcode: false, ipAddress: req.ip, auditRoute: `/api/borrowing/borrows/${bookId}` },
-    );
-    res.locals.auditEnqueued = true;
-    res.status(201).json({ message: "Book borrowed successfully", ...result });
-  } catch (error: unknown) {
-    logError("[borrowing] borrowBook:", error);
-    const caught = requestError(error);
-    res.status(caught.status ?? 500).json({ message: caught.message ?? "Failed to borrow book" });
-  }
+  res.status(410).json({ message: "Checkouts must be processed by library staff at the circulation desk." });
 };
 
 const returnBook: RequestHandler = async (req, res) => {

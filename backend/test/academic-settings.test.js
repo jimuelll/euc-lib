@@ -4,7 +4,7 @@ const repository = require('../modules/library-settings/library-settings.reposit
 const service = require('../modules/library-settings/library-settings.service');
 
 test('term dates reject impossible dates and reversed ranges before any write', async () => {
-  for (const [startsOn,endsOn] of [['2026-02-30','2026-06-01'],['2026-07-01','2026-06-01'],['12/07/2026','2026-12-07']]) {
+  for (const [startsOn,endsOn] of [['2026-02-30','2026-06-01'],['2026-07-01','2026-06-01'],['12/07/2026','2026-12-07'],['2026-08-01','2026-08-01']]) {
     await assert.rejects(service.createAcademicTerm({name:'Term',startsOn,endsOn},1), {status:400});
   }
 });
