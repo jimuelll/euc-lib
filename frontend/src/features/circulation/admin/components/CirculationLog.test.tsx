@@ -76,7 +76,7 @@ describe("circulation history", () => {
     expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Return copy" })).toBeNull();
   });
   it("renews an active loan after confirmation and shows how many times it was renewed", async () => {
-    vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, renewal_count: 1 }], total: 10, page: 1, totalPages: 1, summary });
+    vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, status: "borrowed", due_date: "2099-01-01T08:00:00.000Z", hours_overdue: 0, renewal_count: 1 }], total: 10, page: 1, totalPages: 1, summary });
     vi.mocked(api.renewLoan).mockResolvedValue({ message: "Book renewed successfully", dueDate: "2026-11-20T08:00:00.000Z" });
     setup();
     fireEvent.click(await screen.findByRole("button", { name: "Mika Santos" }));
@@ -85,6 +85,12 @@ describe("circulation history", () => {
     fireEvent.click(within(detail).getByRole("button", { name: "Renew loan" }));
     fireEvent.click(await screen.findByRole("button", { name: "Renew" }));
     await waitFor(() => expect(vi.mocked(api.renewLoan).mock.calls[0]?.[0]).toBe(row.id));
+  });
+  it("offers Renew on the row but not for an overdue loan", async () => {
+    vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, id: 2, status: "borrowed", due_date: "2099-01-01T08:00:00.000Z", hours_overdue: 0 }, { ...row, id: 3, user_name: "Late Patron", status: "overdue" }], total: 2, page: 1, totalPages: 1, summary });
+    setup();
+    await screen.findByRole("button", { name: "Late Patron" });
+    expect(screen.getAllByRole("button", { name: "Renew" })).toHaveLength(1);
   });
   it("does not offer renewal for a returned loan", async () => {
     vi.mocked(api.getCirculationLog).mockResolvedValue({ rows: [{ ...row, status: "returned", returned_at: "2026-09-25T08:00:00.000Z" }], total: 10, page: 1, totalPages: 1, summary });
