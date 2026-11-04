@@ -39,7 +39,7 @@ type PolicyName =
   | "reportExport"
   | "backup";
 
-type Policy = { windowMs: number; limit: number; key: "ip" | "account" | "refreshAccount" | "loginIdentity" };
+type Policy = { windowMs: number; limit: number; key: "ip" | "account" | "accountOrIp" | "refreshAccount" | "loginIdentity" };
 
 // Every policy receives its own express-rate-limit memory store. Keep these
 // values in sync with the API protection table in the README.
@@ -53,7 +53,7 @@ const policies: Record<PolicyName, Policy> = {
   refreshAccount: { windowMs: 60_000, limit: 30, key: "refreshAccount" },
   bulletinPost: { windowMs: 10 * 60_000, limit: 10, key: "account" },
   bulletinComment: { windowMs: 5 * 60_000, limit: 20, key: "account" },
-  bulletinLike: { windowMs: 60_000, limit: 60, key: "account" },
+  bulletinLike: { windowMs: 60_000, limit: 60, key: "accountOrIp" },
   visit: { windowMs: 60_000, limit: 120, key: "ip" },
   adminNotification: { windowMs: 10 * 60_000, limit: 20, key: "account" },
   publicCatalogue: { windowMs: 60_000, limit: 300, key: "ip" },
@@ -103,6 +103,12 @@ function createLimiter(
         ])).digest("hex");
       }
       if (policy.key === "refreshAccount") return refreshAccountKey(req);
+      // Routes that allow anonymous callers: signed-in users keep a per-account budget,
+      // everyone else shares a per-IP budget instead of failing the request.
+      if (policy.key === "accountOrIp") {
+        const id = (req as RateLimitUserRequest).user?.id;
+        return Number.isSafeInteger(id) && Number(id) >= 1 ? `account:${id}` : `ip:${ipKeyGenerator(req.ip || "127.0.0.1", 56)}`;
+      }
       return accountKey(req);
     },
     skip: (req: Request) => req.method === "OPTIONS"

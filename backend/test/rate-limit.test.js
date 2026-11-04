@@ -62,6 +62,24 @@ test("central rate-limit policy values and account scopes match the documented p
   );
 });
 
+test("routes that allow anonymous callers fall back to a per-IP budget instead of failing", async () => {
+  const limiter = createLimiter("bulletinLike", { limit: 2, windowMs: 30_000 });
+  const app = express();
+  app.use((req, _res, next) => { const id = req.get("x-test-account"); if (id) req.user = { id: Number(id) }; next(); });
+  app.post("/snapshots", limiter, (_req, res) => res.sendStatus(204));
+
+  await withServer(app, async (baseUrl) => {
+    const request = (account) => fetch(`${baseUrl}/snapshots`, { method: "POST", headers: account ? { "x-test-account": String(account) } : {} });
+    assert.equal((await request()).status, 204, "anonymous callers are no longer rejected with a 500");
+    assert.equal((await request()).status, 204);
+    assert.equal((await request()).status, 429, "anonymous callers share a per-IP budget");
+    assert.equal((await request(51)).status, 204, "signed-in users keep a separate per-account budget");
+    assert.equal((await request(51)).status, 204);
+    assert.equal((await request(51)).status, 429);
+    assert.equal((await request(52)).status, 204, "accounts do not share budgets");
+  });
+});
+
 test("account budgets are shared across resource IDs and aliases, but isolated by account", async () => {
   const likeLimiter = createLimiter("bulletinLike", { limit: 2, windowMs: 30_000 });
   const app = express();
