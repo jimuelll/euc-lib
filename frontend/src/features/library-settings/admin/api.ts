@@ -47,12 +47,6 @@ export async function fetchLibrarySettings(holidayStatus: "active" | "archived" 
   return res.data;
 }
 
-export async function updateLibrarySettings(overdueFinePerHour: number) {
-  const res = await axiosInstance.put("/api/admin/library-settings", {
-    overdue_fine_per_hour: overdueFinePerHour,
-  });
-  return res.data;
-}
 
 export async function createLibraryHoliday(payload: HolidayInput) {
   const res = await axiosInstance.post("/api/admin/library-holidays", payload);

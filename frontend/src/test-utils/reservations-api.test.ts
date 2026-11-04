@@ -5,7 +5,7 @@ vi.mock("@/utils/AxiosInstance", () => ({
   default: { get, post: vi.fn(), delete: vi.fn(), patch: vi.fn() },
 }));
 
-import { getAdminReservations } from "@/features/reservations";
+import { getAdminReservations } from "@/features/reservations/admin/reservations.api";
 
 describe("getAdminReservations", () => {
   beforeEach(() => vi.clearAllMocks());

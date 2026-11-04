@@ -4,12 +4,10 @@ const read = require("./borrowing.read.service");
 const transaction = require("./borrowing.transaction.service");
 const admin = require("./borrowing.admin.service");
 const undo = require("./borrowing.undo.service");
-const payment = require("./borrowing.payment.service");
 
 export = {
   ...read,
   ...transaction,
   ...admin,
-  ...payment,
   ...undo,
 };

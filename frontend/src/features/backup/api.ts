@@ -13,8 +13,6 @@ export const downloadBackupSnapshot=async(id:number):Promise<BackupDownload> =>{
 const credentials=(password:string,word:string)=>({headers:{'x-restore-confirmation':'global-sign-out','x-restore-password':password,'x-restore-word':word}});
 export const restoreBackupSnapshot=async(id:number,password:string,word:string):Promise<RestoreResult> =>(await axiosInstance.post(`/api/admin/backup/snapshots/${id}/restore`,{},credentials(password,word))).data;
 export const restoreBackup=async(backup:unknown,password:string,word:string):Promise<RestoreResult> =>(await axiosInstance.post('/api/admin/backup/restore',backup,credentials(password,word))).data;
-export const checkBackupCompatibility=async(backup:unknown):Promise<Compatibility> =>(await axiosInstance.post('/api/admin/backup/compatibility',backup)).data;
-export const fetchSnapshotCompatibility=async(id:number,signal?:AbortSignal):Promise<Compatibility> =>(await axiosInstance.get(`/api/admin/backup/snapshots/${id}/compatibility`,{signal})).data;
 export const previewRestore=async(source:{id?:number;backup?:unknown}):Promise<Compatibility> =>(await axiosInstance.post(source.id?`/api/admin/backup/snapshots/${source.id}/preview`:'/api/admin/backup/preview',source.backup??{})).data;
 export const verifySnapshot=async(id:number):Promise<Compatibility> =>(await axiosInstance.post(`/api/admin/backup/snapshots/${id}/verify`)).data;
 export const updateSnapshot=async(id:number,details:{label?:string;notes?:string;pinned?:boolean})=>axiosInstance.patch(`/api/admin/backup/snapshots/${id}`,details);

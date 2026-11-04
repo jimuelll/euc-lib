@@ -41,7 +41,7 @@ const AdminModeration = lazy(() => import("@/features/moderation/AdminModeration
 const AdminNotifications = lazy(() => import("@/features/notifications/admin/AdminNotifications"));
 const AdminHolidays = lazy(() => import("@/features/library-settings/admin/AdminHolidays"));
 const AdminAuditLogs = lazy(() => import("@/features/analytics/admin/pages/AdminAuditLogs"));
-const AdminBookTypes = lazy(() => import("@/features/catalog/admin/AdminBookTypes"));
+const AdminBookTypes = lazy(() => import("@/features/catalog/admin/BookTypesSettings"));
 const AdminContentManagement = lazy(loadAdminContentManagement);
 const AdminUserGuide = lazy(() => import("@/features/user-guide/admin/AdminUserGuide"));
 

@@ -31,20 +31,15 @@ test('staff creation and direct pin service cannot change pins; admins can', asy
 test('direct and publisher archive/restore preserve moderation fields and media', async () => {
   const query = db.query, find = posts.findPostForDelete;
   const cloudinary = require('cloudinary').v2, destroy = cloudinary.uploader.destroy;
-  const subscriptions = require('../modules/subscriptions/subscriptions.service');
-  const resources = require('../modules/subscriptions/subscriptions.repository');
-  const remove = resources.deleteSubscription;
   const calls = [];
   let destroys = 0;
   const capture = async (sql, params) => { calls.push({sql, params}); return [{affectedRows: 1}]; };
   db.query = capture;
   posts.findPostForDelete = async () => ({author_id: 7, image_public_id: 'retained-image'});
-  resources.deleteSubscription = async () => {};
   cloudinary.uploader.destroy = async () => { destroys++; };
   try {
     await bulletin.deletePost(1, {id: 7, role: 'staff'});
     await bulletin.restorePost(1, {id: 7, role: 'staff'});
-    await subscriptions.deleteSubscription(1);
     const item = {id: 1, title: 'Post', content: 'Content', post_type: 'announcement', image_url: 'https://example.com/a.jpg', archived: false};
     await publisher.writeLive({query: capture}, 'bulletin', {items: [{...item, archived: true}]}, {items: [item]}, 7);
     await publisher.writeLive({query: capture}, 'bulletin', {items: [item]}, {items: [{...item, archived: true}]}, 7, '1');
@@ -54,29 +49,8 @@ test('direct and publisher archive/restore preserve moderation fields and media'
     assert(calls.some(({sql}) => /UPDATE bulletin_posts/.test(sql)));
   } finally {
     db.query = query; posts.findPostForDelete = find;
-    cloudinary.uploader.destroy = destroy; resources.deleteSubscription = remove;
+    cloudinary.uploader.destroy = destroy;
   }
-});
-
-test('resource image removal/replacement keeps assets even if the database update fails', async () => {
-  const service = require('../modules/subscriptions/subscriptions.service');
-  const controller = require('../modules/subscriptions/subscriptions.controller');
-  const get = service.getSubscriptionById, update = service.updateSubscription;
-  const cloudinary = require('cloudinary').v2, destroy = cloudinary.uploader.destroy;
-  let destroys = 0;
-  service.getSubscriptionById = async () => ({id: 1, image_url: 'old', image_public_id: 'old-image'});
-  cloudinary.uploader.destroy = async () => { destroys++; };
-  try {
-    for (const fails of [false, true]) for (const body of [{remove_image: true}, {image_url: 'new', image_public_id: 'new-image'}]) {
-      let saved;
-      service.updateSubscription = async (_id, input) => { saved = input; if (fails) throw new Error('simulated database failure'); return input; };
-      const res = {code: 200, status(code) {this.code = code; return this;}, json(body) {this.body = body; return this;}};
-      await controller.updateSubscription({params: {id: '1'}, body, user: {id: 8}}, res);
-      assert.equal(res.code, fails ? 500 : 200);
-      assert.equal(saved.image_public_id, body.remove_image ? null : 'new-image');
-    }
-    assert.equal(destroys, 0);
-  } finally { service.getSubscriptionById = get; service.updateSubscription = update; cloudinary.uploader.destroy = destroy; }
 });
 
 test('comments lock the active parent before insertion and roll back rejected or failed writes', async () => {
@@ -176,16 +150,3 @@ test('server awaits recovery before listening; periodic recovery checks never ov
   } finally { global.setInterval = interval; db.getConnection = getConnection; }
 });
 
-test('legacy patron returns report 410 without touching circulation or audits', async () => {
-  const controller = require('../modules/borrowing/borrowing.controller');
-  const service = require('../modules/borrowing/borrowing.service'), original = service.returnBook;
-  service.returnBook = async () => {throw new Error('must not mutate circulation');};
-  try {
-    for (const role of ['student', 'staff', 'admin', 'super_admin']) {
-      const res = {locals: {}, status(code) {this.code = code; return this;}, json(body) {this.body = body;}};
-      await controller.returnBook({params: {borrowingId: '1'}, user: {id: 7, role}}, res);
-      assert.equal(res.code, 410); assert.match(res.body.message, /circulation desk/);
-      assert.deepEqual(res.locals, {});
-    }
-  } finally { service.returnBook = original; }
-});

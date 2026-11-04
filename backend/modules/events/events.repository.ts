@@ -19,8 +19,4 @@ async function createEvent({ title, startsAt, endsAt, createdBy }: EventWrite, c
   return result.insertId;
 }
 
-async function deleteEvent(id: number): Promise<void> {
-  await db.query("DELETE FROM library_events WHERE id=?", [id]);
-}
-
-export = { listUpcomingEvents, createEvent, deleteEvent };
+export = { listUpcomingEvents, createEvent };

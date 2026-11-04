@@ -51,7 +51,7 @@ interface TransactionReversalInput {
 
 const createServiceError = (message: string, status: number, extra: Partial<ServiceError> = {}): ServiceError => Object.assign(new Error(message), { status, ...extra });
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", currencyDisplay: "narrowSymbol" });
-const roundCurrency = (value: unknown): number => Number((Number(value) || 0).toFixed(2));
+const { roundCurrency } = require("../borrowing/fine-calculation") as { roundCurrency: (value: unknown) => number };
 
 const buildStatus = async (userId: number, conn?: PoolConnection): Promise<ClearanceStatus> => {
   const overdueRows = await repository.findOverdueBorrowings(userId, conn);

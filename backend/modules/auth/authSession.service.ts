@@ -13,7 +13,6 @@ async function issueRefreshSession(userId: number, expiresAt: Date, rememberMe =
   return auth.signRefreshToken({ id: userId, jti, session_version: sessionVersion, remember_me: Boolean(rememberMe) });
 }
 
-const getActiveRefreshSession = (userId: number, jti: string) => repository.getActiveRefreshSession(userId, jti);
 const revokeRefreshSession = (userId: number, jti: string) => repository.revokeRefreshSession(userId, jti);
 
 async function rotateRefreshSession(userId: number, oldJti: string, nextExpiresAt: Date, rememberMe = false, sessionVersion = 0): Promise<string> {
@@ -42,7 +41,6 @@ const isUserAccessActive = (userId: number) => repository.isUserAccessActive(use
 
 export = {
   issueRefreshSession,
-  getActiveRefreshSession,
   revokeRefreshSession,
   rotateRefreshSession,
   revokeAllRefreshSessionsForUser,

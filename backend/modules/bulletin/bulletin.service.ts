@@ -40,7 +40,6 @@ const createPost = async (author: BulletinUser, {
   image_alt,
   gallery,
   is_pinned,
-  post_type,
   event_starts_at,
   event_ends_at,
   event_location,

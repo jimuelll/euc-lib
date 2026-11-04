@@ -91,31 +91,6 @@ const { availableToBorrow, hasAccession, hasActiveBookPolicy } = require("../cat
   hasActiveBookPolicy: (bookAlias: string) => string;
 };
 
-const findActiveBorrows = async (userId: number): Promise<BorrowingRecord[]> => {
-  const [rows] = await db.query<BorrowingRecord[]>(
-    `SELECT b.id, bk.title, bk.author,
-            b.borrowed_at, b.due_date, b.returned_at, b.status, b.notes,
-            COALESCE(b.settled_amount, 0) AS settled_amount,
-            bc.id AS copy_id, bc.barcode AS copy_barcode, h.accession_number, bc.condition AS copy_condition
-     FROM borrowings b
-     JOIN books bk ON bk.id = b.book_id
-     LEFT JOIN book_copies bc ON bc.id = b.copy_id
-     LEFT JOIN copy_holdings h ON h.copy_id = bc.id
-      WHERE b.user_id = ? AND b.deleted_at IS NULL AND b.status IN ('borrowed', 'overdue')
-     ORDER BY b.due_date ASC`,
-    [userId],
-  );
-  return rows;
-};
-
-const countBorrowHistory = async (userId: number): Promise<number> => {
-  const [[{ total }]] = await db.query<Array<RowDataPacket & { total: number | string }>>(
-    "SELECT COUNT(*) AS total FROM borrowings WHERE user_id = ? AND status = 'returned' AND deleted_at IS NULL",
-    [userId],
-  );
-  return Number(total);
-};
-
 const findBorrowHistory = async (userId: number, { limit, offset }: { limit?: number; offset?: number } = {}): Promise<DataRow[]> => {
   const paged = Number.isFinite(limit) && Number.isFinite(offset);
   const [rows] = await db.query<DataRow[]>(
@@ -538,17 +513,6 @@ const findUserForPayment = async (studentEmployeeId: string, conn: QueryConnecti
   return user ?? null;
 };
 
-const findUserForPaymentOverview = async (studentEmployeeId: string): Promise<DataRow | null> => {
-  const [[user]] = await db.query<DataRow[]>(
-    `SELECT id, name, role, student_employee_id, is_active
-       FROM users
-      WHERE student_employee_id = ? AND deleted_at IS NULL
-      LIMIT 1`,
-    [studentEmployeeId],
-  );
-  return user ?? null;
-};
-
 const findOverdueCandidates = async (conn: QueryConnection = db): Promise<BorrowingRecord[]> => {
   const [rows] = await conn.query<BorrowingRecord[]>(
     `SELECT
@@ -640,8 +604,6 @@ const reverseDeskTransaction = async (id: number, kind: string, actorId: number,
 
 module.exports = {
   lockDeskUndoCopy, isDeskUndoFineFree, reverseDeskTransaction,
-  countBorrowHistory,
-  findActiveBorrows,
   findActiveBorrowingByCopyBarcode,
   findReturnPreviewByIdentifier,
   findBorrowHistory,
@@ -674,7 +636,6 @@ module.exports = {
   restoreBorrowing,
   getAdminBorrowings,
   findUserForPayment,
-  findUserForPaymentOverview,
   findOverdueCandidates,
   markOverdue,
   markOverdueNotificationSent,

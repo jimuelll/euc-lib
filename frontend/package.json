@@ -1,5 +1,5 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "capstone-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,6 @@
     "test": "npm run test:architecture && npm run test:unit"
   },
   "dependencies": {
-    "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",

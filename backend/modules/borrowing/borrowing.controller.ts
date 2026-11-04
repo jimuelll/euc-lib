@@ -11,53 +11,6 @@ const routeText = (value: string | string[]): string => String(value);
 const parseInteger = (value: unknown): number => Number.parseInt(String(value), 10);
 const requestError = (error: unknown): RequestError => error as RequestError;
 
-const getActiveBorrows: RequestHandler = async (req, res) => {
-  try {
-    const rows = await service.getActiveBorrows(authUser(req).id);
-    res.json(rows);
-  } catch (error: unknown) {
-    logError("[borrowing] getActiveBorrows:", error);
-    res.status(500).json({ message: "Failed to fetch borrows" });
-  }
-};
-
-const getBorrowHistory: RequestHandler = async (req, res) => {
-  try {
-    const rows = await service.getBorrowHistory(authUser(req).id, { page: req.query.page, limit: req.query.limit });
-    res.json(rows);
-  } catch (error: unknown) {
-    logError("[borrowing] getBorrowHistory:", error);
-    res.status(500).json({ message: "Failed to fetch history" });
-  }
-};
-
-const searchCatalogue: RequestHandler = async (req, res) => {
-  try {
-    const query = req.query.query as string | undefined;
-    if (!query?.trim()) {
-      res.status(400).json({ message: "Search query is required" });
-      return;
-    }
-    const books = await service.searchCatalogueWithAvailability(query.trim());
-    res.json(books);
-  } catch (error: unknown) {
-    logError("[borrowing] searchCatalogue:", error);
-    res.status(500).json({ message: "Failed to search catalogue" });
-  }
-};
-
-/**
- * POST /borrowings/borrows/:bookId
- * Retired: checkouts are issued at the circulation desk against a scanned copy.
- */
-const borrowBook: RequestHandler = async (req, res) => {
-  res.status(410).json({ message: "Checkouts must be processed by library staff at the circulation desk." });
-};
-
-const returnBook: RequestHandler = async (req, res) => {
-  res.status(410).json({ message: "Returns must be processed by library staff at the circulation desk." });
-};
-
 /**
  * POST /borrowings/scan/borrow
  * Body: { userBarcode, copyBarcode, reservationId? }
@@ -90,7 +43,7 @@ const scanBorrow: RequestHandler = async (req, res) => {
       patron.id,
       copyBarcode.trim(),
       authUser(req).id,
-      { isCopyBarcode: true, ipAddress: req.ip, reservationId: parsedReservationId, auditRoute: "/api/borrowing/scan/borrow" },
+      { isCopyBarcode: true, reservationId: parsedReservationId, auditRoute: "/api/borrowing/scan/borrow" },
     );
     res.locals.auditEnqueued = true;
 
@@ -264,48 +217,7 @@ const adminRestoreBorrowing: RequestHandler = async (req, res) => {
   }
 };
 
-const getAdminPaymentOverview: RequestHandler = async (req, res) => {
-  try {
-    const limit = Math.min(100, Math.max(1, parseInteger(req.query.limit) || 20));
-    const page = req.query.page === undefined ? null : Math.max(1, parseInteger(req.query.page) || 1);
-    const result = await service.getAdminPaymentOverview({ page, limit });
-    res.json(result);
-  } catch (error: unknown) {
-    logError("[borrowing] getAdminPaymentOverview:", error);
-    const caught = requestError(error);
-    res.status(caught.status ?? 500).json({ message: caught.message ?? "Failed to fetch payment overview" });
-  }
-};
-
-const getUserPaymentOverview: RequestHandler = async (req, res) => {
-  try {
-    const studentEmployeeId = String(req.query.student_employee_id ?? "").trim();
-    if (!studentEmployeeId) {
-      res.status(400).json({ message: "student_employee_id is required" });
-      return;
-    }
-
-    const result = await service.getUserPaymentOverview(studentEmployeeId);
-    res.json(result);
-  } catch (error: unknown) {
-    logError("[borrowing] getUserPaymentOverview:", error);
-    const caught = requestError(error);
-    res.status(caught.status ?? 500).json({ message: caught.message ?? "Failed to fetch user payment overview" });
-  }
-};
-
-const settleUserPayments: RequestHandler = async (_req, res) => {
-  res.status(410).json({
-    message: "Payments are recorded through Clearance as a full cash settlement. Open the Clearance workspace to continue.",
-  });
-};
-
 export = {
-  getActiveBorrows,
-  getBorrowHistory,
-  searchCatalogue,
-  borrowBook,
-  returnBook,
   scanBorrow,
   scanReturn,
   undoDeskTransaction,
@@ -315,7 +227,4 @@ export = {
   adminGetBorrowings,
   adminDeleteBorrowing,
   adminRestoreBorrowing,
-  getAdminPaymentOverview,
-  getUserPaymentOverview,
-  settleUserPayments,
 };

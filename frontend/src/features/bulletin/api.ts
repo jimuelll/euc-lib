@@ -6,7 +6,6 @@ export interface BulletinListResponse { data: BulletinPostRecord[]; total: numbe
 export interface BulletinDetailResponse extends ApiPost { comments: ApiComment[]; }
 export interface BulletinLikeResponse { liked: boolean; total: number; }
 export interface BulletinLiker { id: number; name: string; role: string; created_at: string; }
-export interface BulletinEvent { id: number; title: string; starts_at: string; ends_at?: string | null; }
 
 export const fetchBulletinPosts = async (params: Record<string, unknown> = {}, signal?: AbortSignal): Promise<BulletinListResponse> =>
   (await axiosInstance.get<BulletinListResponse>("/api/bulletin", { params, signal })).data;
@@ -24,14 +23,11 @@ export const createBulletinPost = async (payload: { title: string; content: stri
 export const createBulletinComment = async (postId: number, text: string,parent_id?:number|null,client_request_id?:string): Promise<ApiComment> =>
   (await axiosInstance.post<ApiComment>(`/api/bulletin/${postId}/comments`, { text,parent_id,client_request_id })).data;
 export const deleteBulletinComment = async (postId: number, commentId: number): Promise<void> => { await axiosInstance.delete(`/api/bulletin/${postId}/comments/${commentId}`); };
-export const fetchBulletinLikers = async (postId: number, signal?: AbortSignal): Promise<BulletinLiker[]> =>
-  (await axiosInstance.get<{ data?: BulletinLiker[] }>(`/api/bulletin/${postId}/likes`, { signal })).data.data ?? [];
 
 export interface Page<T>{data:T[];page:number;hasMore:boolean;latest_id?:number;}
 export interface PostContent {title:string;content:string;image_url:string|null;image_public_id:string|null;image_alt:string|null;gallery:PostImage[];}
 export const editBulletinPost=async(id:number,payload:PostContent&{content_revision:number})=>(await axiosInstance.patch(`/api/bulletin/${id}`,payload)).data;
 export const fetchPostComments=async(id:number,parentId:number|null,page:number,signal?:AbortSignal,sort:CommentSort='helpful')=>(await axiosInstance.get<Page<ApiComment>>(`/api/bulletin/${id}/comments`,{params:{parentId,page,sort},signal})).data;
-export const setPostReaction=async(id:number,reaction:ReactionKind|null):Promise<ReactionSummary>=>(reaction?await axiosInstance.put<ReactionSummary>(`/api/bulletin/${id}/reaction`,{reaction}):await axiosInstance.delete<ReactionSummary>(`/api/bulletin/${id}/reaction`)).data;
 export const fetchPostReactors=async(id:number,reaction:ReactionKind|'all',page:number,signal?:AbortSignal)=>(await axiosInstance.get<Page<BulletinLiker&{reaction:ReactionKind}>>(`/api/bulletin/${id}/reactions`,{params:{reaction,page},signal})).data;
 
 export const reportBulletinComment=async(postId:number,commentId:number,input:{reason:string;details?:string}={reason:"other"}):Promise<void>=>{await axiosInstance.post(`/api/bulletin/${postId}/comments/${commentId}/report`,input);};

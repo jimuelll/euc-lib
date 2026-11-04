@@ -96,13 +96,6 @@ export interface NotificationUpdateInput {
   deliveryKey?: string | null;
 }
 
-export interface NotificationAdminStats extends RowDataPacket {
-  total_notifications: number | string | null;
-  created_today: number | string | null;
-  broadcast_notifications: number | string | null;
-  direct_notifications: number | string | null;
-}
-
 export interface NotificationCountRow extends RowDataPacket {
   total: number;
 }

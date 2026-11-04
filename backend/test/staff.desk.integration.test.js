@@ -70,7 +70,7 @@ test('staff desk features work through the application mounts while financial an
     const origin = `http://127.0.0.1:${server.address().port}`;
     const request = (path, method = 'GET', body, role = 'staff') => fetch(origin + '/api/admin' + path, { method, headers: { authorization: `Bearer ${role}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const allowed = [
-      ['/dashboard'], ['/users'], ['/circulation/log'], ['/catalog-schema'], ['/catalog-settings'], ['/book-types'], ['/academic-programs'],
+      ['/dashboard'], ['/users'], ['/catalog-schema'], ['/catalog-settings'], ['/book-types'], ['/academic-programs'],
       ['/books'], ['/holdings'], ['/books/1/copies'], ['/books/1/holdings'],
       ['/books', 'POST', { title: 'New title', author: 'Author', material_type: 'book', book_type_id: 1 }],
       ['/books/1', 'PUT', { title: 'Updated title' }], ['/books/1', 'DELETE'], ['/books/1/restore', 'POST'],

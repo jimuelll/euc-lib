@@ -71,7 +71,6 @@ export async function fetchHoldingOptions(accession = "", signal?: AbortSignal):
 export async function retireCatalogCopy(copyId: number): Promise<{ copies: number }> { return (await axiosInstance.post<{ copies: number }>(`api/admin/copies/${copyId}/retire`)).data; }
 export async function restoreCatalogCopy(copyId: number): Promise<{ copies: number; lendingEligible: boolean }> { return (await axiosInstance.post<{ copies: number; lendingEligible: boolean }>(`api/admin/copies/${copyId}/restore`)).data; }
 export type CatalogCopyDetails = CatalogCopy & { title?: string; author?: string; due_date?: string; borrower_name?: string; notes?: string };
-export async function fetchCatalogCopy(barcode: string, signal?: AbortSignal): Promise<CatalogCopyDetails> { return (await axiosInstance.get<CatalogCopyDetails>(`api/admin/copies/${encodeURIComponent(barcode)}`, { signal })).data; }
 export type CatalogSettings = { show_unheld_in_opac: boolean; updated_at?: string | null };
 export async function fetchCatalogSettings(signal?: AbortSignal): Promise<CatalogSettings> { return (await axiosInstance.get<CatalogSettings>("api/admin/catalog-settings", { signal })).data; }
 export async function saveCatalogSettings(showUnheldInOpac: boolean): Promise<CatalogSettings> { return (await axiosInstance.put<{ settings: CatalogSettings }>("api/admin/catalog-settings", { show_unheld_in_opac: showUnheldInOpac })).data.settings; }

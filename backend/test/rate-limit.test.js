@@ -231,7 +231,6 @@ test("API rate limits are attached after authentication and before protected han
     ["catalog/catalog.routes.ts", /"\/books\/isbn\/:isbn", requireCatalogRole, limiters\.isbnLookup/],
     ["catalog/catalog.routes.ts", /"\/books\/:id\/image", requireCatalogRole, limiters\.imageUpload, validateBookId, parseCatalogImage/],
     ["recommendations/recommendations.routes.ts", /"\/admin\/recommendations\/embeddings\/backfill", requireSuperAdminRole, limiters\.embeddingBackfill/],
-    ["borrowing/borrowing.routes.ts", /"\/borrows\/:bookId",\s*limiters\.studentTransaction/],
     ["borrowing/borrowing.routes.ts", /"\/scan\/borrow",\s*staffOrAbove, limiters\.deskTransaction/],
     ["reservation/reservation.routes.ts", /"\/:bookId",\s*limiters\.studentTransaction/],
     ["reservation/adminReservation.routes.ts", /"\/reservations\/:reservationId\/fulfill",\s*adminOnly, limiters\.deskTransaction/],

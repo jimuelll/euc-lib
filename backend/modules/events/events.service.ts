@@ -35,12 +35,4 @@ async function createEvent({ title, startsAt, endsAt, createdBy, notifyUsers }: 
   return {id:await repository.createEvent(record)};
 }
 
-async function deleteEvent(id: string | string[] | number): Promise<void> {
-  const numericId = Number(id);
-  if (!Number.isInteger(numericId) || numericId < 1) {
-    throw Object.assign(new Error("Invalid event ID"), { status: 400 });
-  }
-  await repository.deleteEvent(numericId);
-}
-
-export = { listUpcomingEvents, createEvent, deleteEvent };
+export = { listUpcomingEvents, createEvent };

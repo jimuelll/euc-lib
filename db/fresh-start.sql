@@ -83,7 +83,6 @@ DROP TABLE IF EXISTS
   `departments`,
   `backup_snapshots`,
   `backup_schedule`,
-  `user_guide_modules`,
   `users`;
 SET FOREIGN_KEY_CHECKS = 1;
 

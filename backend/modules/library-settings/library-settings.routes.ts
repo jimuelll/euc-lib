@@ -6,7 +6,6 @@ const router = express.Router();
 const adminOnly = authMiddleware(["admin", "super_admin"]);
 
 router.get("/library-settings", adminOnly, controller.getLibrarySettings);
-router.put("/library-settings", adminOnly, controller.updateLibrarySettings);
 router.post("/library-holidays/import", adminOnly, controller.importHolidays);
 router.post("/library-holidays", adminOnly, controller.createHoliday);
 router.put("/library-holidays/:holidayId", adminOnly, controller.updateHoliday);

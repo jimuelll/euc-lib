@@ -18,7 +18,6 @@ export interface QueryResults {
 }
 
 export const fetchAdminDashboard = async (signal?: AbortSignal): Promise<DashboardResponse> => (await axiosInstance.get<DashboardResponse>("/api/admin/dashboard", { signal })).data;
-export const searchAdminRecords = async (query: string): Promise<QueryResults> => (await axiosInstance.get<QueryResults>("/api/admin/query-tools", { params: { q: query } })).data;
 export const fetchUserBarcode = async (studentId: string): Promise<Blob> => (await axiosInstance.get<Blob>(`/api/admin/users/${encodeURIComponent(studentId)}/barcode-png`, { responseType: "blob" })).data;
 export const searchAdminUsers = async (query: string, signal?: AbortSignal): Promise<User[]> => {
   const response = await axiosInstance.get<User[] | { rows?: User[] }>("/api/admin/users", { params: { student_employee_id: query, name: query }, signal });

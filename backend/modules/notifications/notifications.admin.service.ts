@@ -82,7 +82,7 @@ export async function list(input: any) {
     const result = await repository.list({ tab, filter, search: String(input.q || '').trim().slice(0, 200), page, limit });
     return { notifications: result.rows, counts: result.counts, pagination: { page, limit, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / limit)) } };
 }
-export async function action(key: string, action: string, actor: number, input: any) {
+export async function action(key: string, action: string, _actor: number, input: any) {
     const record = await repository.get(key);
     if (!record)
         fail('Notification not found.', 404);

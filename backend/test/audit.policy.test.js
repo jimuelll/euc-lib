@@ -6,8 +6,6 @@ const { copyLabel, copyAuditDescription, enrichCopyAuditRows } = require("../mod
 test("staff and admin mutation routes resolve to an explicit audit policy", () => {
   const routes = [
     ["POST", "/api/attendance/scan/time-out-all", "affected_records"],
-    ["PUT", "/api/about", "field_changes"],
-    ["PUT", "/api/site-content", "field_changes"],
     ["PUT", "/api/admin/catalog-settings", "field_changes"],
     ["PUT", "/api/admin/catalog-schema", "field_changes"],
     ["POST", "/api/admin/book-types", "field_changes"],
@@ -32,7 +30,6 @@ test("staff and admin mutation routes resolve to an explicit audit policy", () =
     ["POST", "/api/borrowing/scan/return", "state_transition"],
     ["DELETE", "/api/borrowing/admin/borrows/88", "state_transition"],
     ["PATCH", "/api/borrowing/admin/borrows/88/restore", "state_transition"],
-    ["POST", "/api/borrowing/admin/payments/settle", "affected_records"],
     ["POST", "/api/reservations/12/cancel", "state_transition"],
     ["POST", "/api/admin/reservations/4/cancel", "state_transition"],
     ["POST", "/api/admin/reservations/4/ready", "state_transition"],
@@ -43,7 +40,6 @@ test("staff and admin mutation routes resolve to an explicit audit policy", () =
     ["POST", "/api/clearance/borrowings/4/adjust", "state_transition"],
     ["POST", "/api/clearance/transactions/9/reverse", "state_transition"],
     ["POST", "/api/events", "field_changes"],
-    ["DELETE", "/api/events/1", "field_changes"],
     ["POST", "/api/bulletin", "state_transition"],
     ["PATCH", "/api/bulletin/5/pin", "state_transition"],
     ["PATCH", "/api/bulletin/5/restore", "state_transition"],
@@ -53,11 +49,7 @@ test("staff and admin mutation routes resolve to an explicit audit policy", () =
     ["POST", "/api/admin/academic-programs", "field_changes"],
     ["POST", "/api/admin/departments", "field_changes"],
     ["POST", "/api/admin/library-holidays", "field_changes"],
-    ["PUT", "/api/admin/library-settings", "field_changes"],
-    ["POST", "/api/admin/subscriptions", "field_changes"],
     ["POST", "/api/reservations/17", "state_transition"],
-    ["PATCH", "/api/admin/subscriptions/reorder", "affected_records"],
-    ["PATCH", "/api/admin/subscriptions/1", "field_changes"],
     ["PUT", "/api/admin/recommendations/books/1/metadata", "field_changes"],
     ["POST", "/api/admin/recommendations/embeddings/backfill", "affected_records"],
     ["POST", "/api/admin/backup/snapshots", "affected_records"],
@@ -73,10 +65,10 @@ test("staff and admin mutation routes resolve to an explicit audit policy", () =
 });
 
 test("batch audit entries summarize the affected record type and count", () => {
-  const policy = audit.getAuditPolicy("PATCH", "/api/admin/subscriptions/reorder");
-  const metadata = audit.metadataFor("/api/admin/subscriptions/reorder", { ids: [2, 4, 9] }, null, null, null, false, policy, {});
+  const policy = audit.getAuditPolicy("POST", "/api/admin/recommendations/embeddings/backfill");
+  const metadata = audit.metadataFor("/api/admin/recommendations/embeddings/backfill", { ids: [2, 4, 9] }, null, null, null, false, policy, {});
   assert.equal(metadata.detail_status, "affected_record_summary");
-  assert.equal(metadata.affected_record_type, "subscriptions");
+  assert.equal(metadata.affected_record_type, "book embeddings");
   assert.equal(metadata.affected_record_count, 3);
   const snapshotPolicy = audit.getAuditPolicy("POST", "/api/admin/backup/snapshots");
   const snapshot = audit.metadataFor("/api/admin/backup/snapshots", {}, null, null, null, true, snapshotPolicy, {});

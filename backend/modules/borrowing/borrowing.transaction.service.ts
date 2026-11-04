@@ -31,7 +31,6 @@ interface BorrowCopy {
 }
 interface BorrowOptions {
   isCopyBarcode?: boolean;
-  ipAddress?: string | null;
   reservationId?: number | null;
   auditRoute?: string | null;
 }
@@ -61,7 +60,7 @@ const borrowBook = async (
   userId: number,
   bookIdOrCopyBarcode: number | string,
   issuedBy: number,
-  { isCopyBarcode = false, ipAddress = null, reservationId = null, auditRoute = null }: BorrowOptions = {},
+  { isCopyBarcode = false, reservationId = null, auditRoute = null }: BorrowOptions = {},
 ) => {
   await overdue.syncOverdueBorrowings();
   const conn: PoolConnection = await repository.getConnection();

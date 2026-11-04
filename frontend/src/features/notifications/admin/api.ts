@@ -41,12 +41,6 @@ export interface NotificationRecipient {
     employee_number: string | null;
     username: string | null;
 }
-export interface AdminNotificationStats {
-    total_notifications: number;
-    created_today: number;
-    broadcast_notifications: number;
-    direct_notifications: number;
-}
 export interface AdminNotificationsResponse {
     counts: {
         manual: number;

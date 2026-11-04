@@ -26,31 +26,6 @@ export const getAboutSettings = async (signal?: AbortSignal): Promise<AboutSetti
 };
 
 /** Admin-only — requires admin or super_admin role */
-export const getAboutSettingsAdmin = async (signal?: AbortSignal): Promise<AboutSettings> => {
-  const res = await axiosInstance.get("/api/admin/about", { signal });
-  return res.data;
-};
 
-export const updateAboutSettings = async (
-  payload: Omit<AboutSettings, "established"> & { established: number | null }
-): Promise<AboutSettings> => {
-  const res = await axiosInstance.put("/api/admin/about", payload);
-  return res.data.data;
-};
 
 /** Admin-only — upload a staff member photo directly to Cloudinary via the frontend */
-export const uploadStaffImage = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-  formData.append("folder", "library/staff");
-
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData }
-  );
-
-  if (!res.ok) throw new Error("Failed to upload staff image");
-  const data = await res.json();
-  return data.secure_url;
-};

@@ -1,6 +1,5 @@
 import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import type {
-  NotificationAdminStats,
   NotificationContext,
   NotificationCountRow,
   NotificationListAdminOptions,
@@ -194,18 +193,6 @@ const searchNotificationRecipients = async (query: string): Promise<Notification
   return rows;
 };
 
-const findActiveNotificationRecipient = async (userId: number): Promise<NotificationRecipient | null> => {
-  const [[row]] = await db.query<NotificationRecipient[]>(
-    `SELECT id, name, role, student_employee_id, library_card_number,
-            student_number, employee_number, username
-       FROM users
-      WHERE id = ? AND deleted_at IS NULL AND is_active = 1
-      LIMIT 1`,
-    [userId],
-  );
-  return row ?? null;
-};
-
 const listAdminNotifications = async ({ page, limit }: NotificationListAdminOptions) => {
   const [[{ total }]] = await db.query<NotificationCountRow[]>("SELECT COUNT(*) AS total FROM notifications");
   const [rows] = await db.query<NotificationRecord[]>(
@@ -224,17 +211,6 @@ const listAdminNotifications = async ({ page, limit }: NotificationListAdminOpti
   return { rows, total: Number(total), page, limit };
 };
 
-const getAdminStats = async (): Promise<NotificationAdminStats | null> => {
-  const [[row]] = await db.query<NotificationAdminStats[]>(
-    `SELECT COUNT(*) AS total_notifications,
-            SUM(CASE WHEN created_at >= CURDATE() THEN 1 ELSE 0 END) AS created_today,
-            SUM(CASE WHEN audience_type = 'all' THEN 1 ELSE 0 END) AS broadcast_notifications,
-            SUM(CASE WHEN audience_type IN ('user','users') THEN 1 ELSE 0 END) AS direct_notifications
-       FROM notifications`,
-  );
-  return row ?? null;
-};
-
 export = {
   listForUser,
   getUnreadCountForUser,
@@ -248,7 +224,5 @@ export = {
   createNotificationWithDeliveryKey,
   getUserRole,
   searchNotificationRecipients,
-  findActiveNotificationRecipient,
   listAdminNotifications,
-  getAdminStats,
 };

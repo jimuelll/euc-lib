@@ -31,20 +31,6 @@ const getLibrarySettings: RequestHandler = async (req, res) => {
   }
 };
 
-const updateLibrarySettings: RequestHandler = async (req, res) => {
-  try {
-    const settings = await service.updateSettings(
-      { overdueFinePerHour: req.body?.overdue_fine_per_hour },
-      userId(req),
-    );
-    res.locals.auditEnqueued = true;
-    res.json({ message: "Library settings updated successfully", settings });
-  } catch (error: unknown) {
-    logError("[library-settings] updateLibrarySettings:", error);
-    sendError(res, error, "Failed to update settings");
-  }
-};
-
 const createHoliday: RequestHandler = async (req, res) => {
   try {
     const holiday = await service.createHoliday({
@@ -285,7 +271,6 @@ const setCurrentAcademicTerm: RequestHandler = async (req, res) => {
 
 export = {
   getLibrarySettings,
-  updateLibrarySettings,
   createHoliday,
   importHolidays,
   updateHoliday,

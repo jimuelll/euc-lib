@@ -30,13 +30,8 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/academic-programs", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/departments", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/admin/library-holidays", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
-  { prefix: "/api/admin/library-settings", methods: ["PUT"], type: "field_changes" },
-  { prefix: "/api/site-content", methods: ["PUT"], type: "field_changes" },
-  { prefix: "/api/about", methods: ["PUT"], type: "field_changes" },
-  { prefix: "/api/admin/about", methods: ["PUT"], type: "field_changes" },
-  { prefix: "/api/events", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
+  { prefix: "/api/events", methods: ["POST"], type: "field_changes" },
   { prefix: "/api/admin/notifications", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
-  { prefix: "/api/admin/subscriptions", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "field_changes" },
   { prefix: "/api/bulletin", methods: ["POST", "PUT", "PATCH", "DELETE"], type: "state_transition", exclude: /\/(?:like|comments|comment-snapshots|reaction|helpful|interest|save)(?:\/|$)/ },
   { prefix: "/api/attendance/scan/time-out-all", methods: ["POST"], type: "affected_records" },
   { prefix: "/api/attendance/scan", methods: ["POST"], type: "state_transition" },
@@ -51,8 +46,6 @@ const AUDIT_ROUTE_POLICIES = [
   { prefix: "/api/admin/backup", methods: ["POST"], type: "affected_records", exclude: /\/(?:compatibility|preview)$/ },
   { prefix: "/api/admin/recommendations/books", methods: ["PUT", "PATCH"], type: "field_changes" },
   { prefix: "/api/admin/recommendations/embeddings/backfill", methods: ["POST"], type: "affected_records" },
-  { prefix: "/api/admin/subscriptions/reorder", methods: ["PATCH"], type: "affected_records" },
-  { prefix: "/api/borrowing/admin/payments/settle", methods: ["POST"], type: "affected_records" },
 ];
 
 function getAuditPolicy(method: string, path: string): any {
@@ -170,7 +163,7 @@ function catalogFieldLabels(before: any, after: any): Map<string, string> {
   return new Map((Array.isArray(rows) ? rows : []).map((field) => [field.key, field.label]));
 }
 
-function parseJson(value: any, _fallback?: any): any {
+function parseJson(value: any): any {
   if (typeof value !== "string") return value;
   try { return JSON.parse(value); } catch { return value; }
 }
@@ -508,8 +501,6 @@ function affectedRecordType(path: string): string {
   if (path.includes("/backup/") && path.includes("restore")) return "database records from snapshot";
   if (path.includes("/backup/snapshots")) return "backup snapshot";
   if (path.includes("/recommendations/embeddings/backfill")) return "book embeddings";
-  if (path.includes("/subscriptions/reorder")) return "subscriptions";
-  if (path.includes("/payments/settle")) return "payments";
   return "records";
 }
 

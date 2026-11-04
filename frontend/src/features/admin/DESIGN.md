@@ -2,9 +2,9 @@
 
 The single visual reference for every page under `/admin`, the admin shell and anything those pages open (drawers, dialogs, menus, popovers). Direction: **compact desk + paper** — warm paper colors and university identity, with the density and plain type staff need for fast, repetitive work.
 
-Behavior, data and permission rules per page live in [WORKFLOWS.md](WORKFLOWS.md). The repository-level [DESIGN.md](../../../../DESIGN.md) governs public pages and kiosks only.
+Behavior, data and permission rules per page live in [WORKFLOWS.md](WORKFLOWS.md). The public pages and kiosks follow their own design rules and are out of scope here.
 
-> **Status: target, not yet built.** The code still runs on the older stacked layers (`admin-theme.css`, `compact-admin.css`, `admin-workspaces.css`, `library-design.css`, `refined-drawers.css`). Each section below is the rule to build toward; [Migration](#migration) lists the order. Until a page is migrated, do not add new styling to the old layers.
+> **Status: target, not yet built.** The code still runs on the older stacked layers (`admin-theme.css`, `compact-admin.css`, `admin-workspaces.css`, `library-design.css`). Each section below is the rule to build toward; [Migration](#migration) lists the order. Until a page is migrated, do not add new styling to the old layers.
 
 ## Principles
 
@@ -243,7 +243,7 @@ Only for destructive or irreversible actions that cannot be confirmed inline (re
 | Phase | Work |
 |---|---|
 | 0 | This document and WORKFLOWS.md. |
-| 1 | One admin token file; delete the doubled-selector overrides, the `!important`s and `refined-drawers.css`; one tab style. |
+| 1 | One admin token file; delete the doubled-selector overrides, the `!important`s; one tab style. |
 | 2 | New navigation and routes with redirects; distinct icons; Email Deliveries in the sidebar. |
 | 3 | Shell: slim top bar, account controls in the sidebar footer. |
 | 3.5 | Drawers: View/Edit/New variants, three sizes, shared inner pieces, inline confirmations, URL state, named close slot. |

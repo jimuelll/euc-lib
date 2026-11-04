@@ -113,7 +113,6 @@ app.use("/api/admin", circulationRoutes);
 app.use("/api/borrowing", borrowingRoutes);
 app.use("/api/reservations", reservationRoutes);
 app.use("/api/admin", adminReservationRoutes);
-app.use("/api/admin/about", aboutRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api", subscriptionsRoutes);
 app.use("/api", myLibraryRoutes);

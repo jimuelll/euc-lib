@@ -32,27 +32,3 @@ export interface SubscriptionPage {
     totalPages: number;
   };
 }
-
-export interface CreateSubscriptionInput {
-  title: string;
-  url: string;
-  description?: string | null;
-  category?: string | null;
-  image_url?: string | null;
-  image_public_id?: string | null;
-  is_active?: boolean;
-  sort_order?: number;
-  created_by?: number | null;
-}
-
-export interface UpdateSubscriptionInput {
-  title?: string;
-  url?: string;
-  description?: string | null;
-  category?: string | null;
-  image_url?: string | null;
-  image_public_id?: string | null;
-  is_active?: boolean;
-  sort_order?: number;
-  updated_by?: number | null;
-}

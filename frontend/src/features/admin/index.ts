@@ -5,8 +5,6 @@ export * from "./components/AdminDeskSystem";
 export * from "./components/SegmentedNavigation";
 export * from "./components/useAdminConfirmDialog";
 export * from "./api";
-export { default as AdminLayout } from "./layout/Index";
-export { default as AdminManage } from "./manage/Index";
 
 export * from "./hooks/useAdminUrlState";
 export * from "./hooks/useAdminFilters";

@@ -27,14 +27,4 @@ const createEvent: RequestHandler = async (req, res) => {
   }
 };
 
-const deleteEvent: RequestHandler = async (req, res) => {
-  try {
-    await service.deleteEvent(req.params.id);
-    res.status(204).end();
-  } catch (err) {
-    const error = err as ServiceError;
-    res.status(error.status || 500).json({ message: error.message || "Could not delete event" });
-  }
-};
-
-export = { listEvents, createEvent, deleteEvent };
+export = { listEvents, createEvent };

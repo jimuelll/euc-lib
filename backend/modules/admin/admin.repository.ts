@@ -97,11 +97,6 @@ const findUserByIdForAudit = async (userId: number, conn: QueryConnection = db):
   return rows[0] ?? null;
 };
 
-const findActiveUser = async (studentEmployeeId: string): Promise<AdminUserRow | null> => {
-  const [users] = await db.query<AdminUserRow[]>("SELECT * FROM users WHERE student_employee_id = ? AND deleted_at IS NULL", [studentEmployeeId]);
-  return users[0] ?? null;
-};
-
 const findActiveUserBarcode = async (studentEmployeeId: string): Promise<(RowDataPacket & { barcode: string | null }) | null> => {
   const [rows] = await db.query<Array<RowDataPacket & { barcode: string | null }>>(
     "SELECT COALESCE(NULLIF(TRIM(barcode), ''), student_employee_id) AS barcode FROM users WHERE student_employee_id = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1",
@@ -203,4 +198,4 @@ const queryToolsSearch = async (term: string, allowedRoles: string[]) => {
   return { users: users[0], books: books[0], borrowings: borrowings[0], reservations: reservations[0], notifications: notifications[0] };
 };
 
-export = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findAllBorrowingIdsForUser, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findUserByIdForAudit, findActiveUser, findActiveUserBarcode, updateUser, searchUsers, queryToolsSearch };
+export = { getConnection, findActiveProgram, findActiveDepartment, findExistingUser, findAcademicTerm, findCurrentAcademicTerm, createUser, findUserForUpdate, findActiveBorrowings, findAllBorrowingIdsForUser, findActiveReservations, deactivateUser, findArchivedUser, restoreUser, findUserByIdForAudit, findActiveUserBarcode, updateUser, searchUsers, queryToolsSearch };

@@ -20,11 +20,6 @@ function parseProviderPayload(provider: string, payload: Record<string, any>): P
   };
 }
 
-/** Kept for callers that only need the text. */
-function parseReportText(provider: string, payload: Record<string, any>): string {
-  return parseProviderPayload(provider, payload).text;
-}
-
 const HEADING_NAMES = Object.values(SUMMARY_HEADINGS) as string[];
 const headingPattern = new RegExp(String.raw`^\s*(?:#{1,6}\s*)?(?:\*\*|__)?\s*(${HEADING_NAMES.join("|")})\s*:?\s*(?:\*\*|__)?\s*:?\s*$`, "i");
 
@@ -99,4 +94,4 @@ function findUnverifiedFigures(text: string, facts: unknown): string[] {
   return [...unverified];
 }
 
-export = { allowedFigures, findUnverifiedFigures, normalizeMarkdown, parseProviderPayload, parseReportText };
+export = { allowedFigures, findUnverifiedFigures, normalizeMarkdown, parseProviderPayload };

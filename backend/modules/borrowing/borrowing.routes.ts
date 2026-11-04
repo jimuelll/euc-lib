@@ -9,15 +9,6 @@ const adminOnly      = authMiddleware(["admin", "super_admin"]);
 
 // All routes sit under /borrowing (mounted in app.js after authMiddleware)
 
-// ─── Catalogue ────────────────────────────────────────────────────────────────
-router.get("/catalogue/search",               limiters.authenticatedCatalogue, controller.searchCatalogue);
-
-// ─── Student-facing borrows ───────────────────────────────────────────────────
-router.get ("/borrows/active",                controller.getActiveBorrows);
-router.get ("/borrows/history",               controller.getBorrowHistory);
-router.post("/borrows/:bookId",               limiters.studentTransaction, controller.borrowBook);
-router.post("/borrows/:borrowingId/return",   controller.returnBook);
-
 // ─── Barcode scan — book copy preview ────────────────────────────────────────
 router.get ("/scan/copy/:barcode",            staffOrAbove, controller.getCopyByBarcode);
 router.get("/scan/user",                      staffOrAbove, controller.lookupUser);
@@ -32,8 +23,5 @@ router.get ("/scan/return-preview/:identifier", staffOrAbove, controller.getRetu
 router.get   ("/admin/borrows",                          staffOrAbove, controller.adminGetBorrowings);
 router.delete("/admin/borrows/:borrowingId",             adminOnly, controller.adminDeleteBorrowing);
 router.patch ("/admin/borrows/:borrowingId/restore",     adminOnly, controller.adminRestoreBorrowing);
-router.get   ("/admin/payments",                         adminOnly, controller.getAdminPaymentOverview);
-router.get   ("/admin/payments/user",                    adminOnly, controller.getUserPaymentOverview);
-router.post  ("/admin/payments/settle",                  adminOnly, controller.settleUserPayments);
 
 module.exports = router;

@@ -1,24 +1,9 @@
 import overdue = require("./overdue.helper");
 import clearance = require("../clearance/clearance.service");
-import pagination = require("./borrowing.helpers");
 import catalogSettings = require("../catalog/catalog.settings.service");
 import loanDuration = require("./loan-duration");
 
 const repository = require("./borrowing.repository");
-
-const getActiveBorrows = async (userId: number) => {
-  await overdue.syncOverdueBorrowings();
-  return overdue.mapBorrowingsWithFineDetails(await repository.findActiveBorrows(userId));
-};
-
-const getBorrowHistory = async (userId: number, { page, limit }: { page?: unknown; limit?: unknown } = {}) => {
-  const { paged, safePage, safeLimit, offset } = pagination.getPagination({ page, limit });
-  const total = paged ? await repository.countBorrowHistory(userId) : 0;
-  const rows = await repository.findBorrowHistory(userId, paged ? { limit: safeLimit, offset } : {});
-  return paged
-    ? { rows, pagination: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } }
-    : rows;
-};
 
 const searchCatalogueWithAvailability = async (query: string) => {
   await overdue.syncOverdueBorrowings();
@@ -52,8 +37,6 @@ const lookupUserWithBorrows = async (studentEmployeeId: string) => {
 };
 
 export = {
-  getActiveBorrows,
-  getBorrowHistory,
   searchCatalogueWithAvailability,
   resolveUserByBarcode,
   resolveCopyByBarcode,

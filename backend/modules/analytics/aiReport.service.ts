@@ -7,8 +7,7 @@ const { buildReportPrompt, correctionNote } = require("./aiReport.prompt.service
 const { classifyAmbiguousQuestion, generateReportText } = require("./aiReport.providers");
 const { findUnverifiedFigures, normalizeMarkdown } = require("./aiReport.response.service");
 const {
-  IRRELEVANT_QUESTION_CODE, IRRELEVANT_QUESTION_MESSAGE, assessQuestion, classifyReportQuestion, cleanQuestion,
-  extractMentionedDate, isIdentitySeekingQuestion, isReportRelevantQuestion, normalizeDateRange, requestError,
+  IRRELEVANT_QUESTION_CODE, IRRELEVANT_QUESTION_MESSAGE, assessQuestion, cleanQuestion, requestError,
 } = require("./aiReport.question.service");
 
 type Mode = "summary" | "answer";
@@ -111,4 +110,4 @@ async function unrecordedAnswer(question: string, periods: Array<{ dateFrom: str
   return `No recorded library activity was found on ${days.map(dateLabel).join(", ")} (UTC+08): no borrowings, returns, reservations, check-ins, website visits, fine collections or new accounts were recorded.`;
 }
 
-export = { buildAiReportEvidence, classifyAmbiguousQuestion, classifyReportQuestion, createAiAnalyticsReport, extractMentionedDate, isIdentitySeekingQuestion, isReportRelevantQuestion, normalizeDateRange };
+export = { createAiAnalyticsReport };

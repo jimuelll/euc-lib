@@ -35,7 +35,6 @@ test("repository-backed services delegate persistence to repositories", () => {
     ["modules/auth/auth.service.ts", "modules/auth/auth.repository.ts"],
     ["modules/auth/authSession.service.ts", "modules/auth/auth-session.repository.ts"],
     ["modules/borrowing/borrowing.admin.service.ts", "modules/borrowing/borrowing.repository.ts"],
-    ["modules/borrowing/borrowing.payment.service.ts", "modules/borrowing/borrowing.repository.ts"],
     ["modules/borrowing/borrowing.transaction.service.ts", "modules/borrowing/borrowing.repository.ts"],
     ["modules/circulation/circulation.service.ts", "modules/circulation/circulation.repository.ts"],
     ["modules/analytics/analytics.visitor.service.ts", "modules/analytics/analytics.repository.ts"],

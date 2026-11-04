@@ -12,19 +12,8 @@ const compact = (filters: QueryFilters) => Object.fromEntries(Object.entries(fil
 
 export async function fetchQueryMeta(signal?: AbortSignal) { return (await axiosInstance.get<QueryMeta>("/api/admin/query/meta", { signal })).data; }
 export async function fetchQuery(filters: QueryFilters, signal?: AbortSignal) { return (await axiosInstance.get<QueryResult>("/api/admin/query", { params: compact(filters), signal })).data; }
-export async function fetchQueryPreview(filters: QueryFilters, signal?: AbortSignal) { return (await axiosInstance.get<QueryResult>("/api/admin/query/export", { params: { ...compact(filters), format: "preview" }, signal })).data; }
-export async function downloadQueryCsv(filters: QueryFilters) {
-  const response = await axiosInstance.get("/api/admin/query/export", { params: compact(filters), responseType: "blob" });
-  const url = URL.createObjectURL(response.data as Blob); const link = document.createElement("a");
-  link.href = url; link.download = `${filters.dataset}-query.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-}
 
 export type ReportFilters = Record<string, string | number | undefined> & { report: QueryReport; page?: number; limit?: number };
 export type ReportResult = Omit<QueryResult, "dataset"> & { report: QueryReport };
 const compactReport = (filters: ReportFilters) => Object.fromEntries(Object.entries(filters).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]).filter(([, value]) => value !== undefined && value !== "" && value !== "all"));
 export async function fetchReport(filters: ReportFilters, signal?: AbortSignal) { return (await axiosInstance.get<ReportResult>("/api/admin/query/reports", { params: compactReport(filters), signal })).data; }
-export async function fetchReportPreview(filters: ReportFilters, signal?: AbortSignal) { return (await axiosInstance.get<ReportResult>("/api/admin/query/reports/export", { params: { ...compactReport(filters), format: "preview" }, signal })).data; }
-export async function downloadReportCsv(filters: ReportFilters) {
-  const response = await axiosInstance.get("/api/admin/query/reports/export", { params: compactReport(filters), responseType: "blob" });
-  const url = URL.createObjectURL(response.data as Blob); const link = document.createElement("a"); link.href = url; link.download = `${filters.report}-report.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-}

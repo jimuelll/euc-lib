@@ -25,8 +25,6 @@ export const EMPTY_FORM: UserFormState = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export const formatRole = (role: string) =>
-  role.replace("_", " ").toUpperCase();
 
 export const getAllowedRoles = (userRole: string): UserRole[] =>
   (ROLE_HIERARCHY[userRole] ?? []).filter((role) =>

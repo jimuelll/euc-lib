@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AdminIcon } from "@/features/admin";
+import { AdminIcon, formatPeso } from "@/features/admin";
 import { lookupUser, type LookupUserResult } from "../circulation.api";
 import { circulationKeys } from "../circulation.keys";
-const money = (value: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
+const money = formatPeso;
 export default function CirculationPatronCard({ patron, returnPatronId }: { patron?: LookupUserResult; returnPatronId?: string }) {
   const query = useQuery({ queryKey: circulationKeys.user(returnPatronId || ""), queryFn: ({ signal }) => lookupUser(returnPatronId!, signal), enabled: Boolean(returnPatronId), staleTime: 0 });
   const data = returnPatronId ? query.data : patron;

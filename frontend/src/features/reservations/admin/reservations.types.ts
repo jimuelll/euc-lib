@@ -1,4 +1,3 @@
-import { Clock, CheckCircle2, XCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type ReservationStatus =
@@ -61,42 +60,6 @@ export interface StatusConfig {
   icon: LucideIcon;
 }
 
-export const RESERVATION_STATUS_CONFIG: Record<ReservationStatus, StatusConfig> = {
-  pending: {
-    label: "Pending",
-    className: "border-warning/30 bg-warning/10 text-warning",
-    icon: Clock,
-  },
-  ready: {
-    label: "Ready",
-    className: "border-success/30 bg-success/10 text-success",
-    icon: CheckCircle2,
-  },
-  fulfilled: {
-    label: "Fulfilled",
-    className: "border-info/30 bg-info/10 text-info",
-    icon: CheckCircle2,
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "border-muted/30 bg-muted/10 text-muted-foreground",
-    icon: XCircle,
-  },
-  expired: {
-    label: "Expired",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
-    icon: XCircle,
-  },
-};
 
-export const FILTER_OPTIONS: { value: string; label: string }[] = [
-  { value: "needs_action", label: "Needs action" },
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "ready", label: "Ready" },
-  { value: "fulfilled", label: "Fulfilled" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "expired", label: "Expired" },
-];
 
 export const PAGE_SIZE = 15;

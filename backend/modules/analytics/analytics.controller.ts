@@ -94,7 +94,7 @@ async function handleGetAuditLog(req: AnalyticsRequest, res: Response) {
   }
 }
 
-async function handleGetAuditLogMeta(req: AnalyticsRequest, res: Response) {
+async function handleGetAuditLogMeta(_req: AnalyticsRequest, res: Response) {
   try {
     const result = await getAuditLogMeta();
     res.json(result);

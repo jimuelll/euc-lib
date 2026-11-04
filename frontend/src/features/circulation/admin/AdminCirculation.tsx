@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AdminIcon, CompactPanel, useAdminUrlState, AdminPageHeader, AdminPageTabs } from "@/features/admin";
+import { AdminIcon, CompactPanel, useAdminUrlState, AdminPageHeader, AdminPageTabs, formatPeso } from "@/features/admin";
 import { TabsContent } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCirculationLog } from "./circulation.api";
@@ -21,7 +21,7 @@ import "./circulation.css";
 import { formatLibraryDateTime, formatLibraryTime } from "@/utils/libraryTime";
 
 const date = (value: string) => formatLibraryDateTime(value);
-const currency = (value: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(value);
+const currency = formatPeso;
 
 export default function AdminCirculation() {
   const location = useLocation();

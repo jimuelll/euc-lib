@@ -61,7 +61,7 @@ No delivery webhooks or bulk-email controls are implemented. Delivery logs conta
 
 Run backend `npm test` / `npm run build`, and frontend `npm test` / `npm run build` / `npm run lint`. Optional database tests require `RUN_DB_INTEGRATION=1`, a dedicated database whose name ends in `_test`, and the current schema. Never point fixture tests at a live library database. Live Brevo tests require real credentials and consume quota.
 
-Email appearance is rendered locally by `renderEmail()` in `email.provider.ts`, using the shared cream, maroon and gold layout in `email.template.ts`. Account emails, recovery codes, manual notifications and loan summaries use real delivery data, escaped before insertion, with a plain-text alternative. No Brevo-hosted template setup is required. Rebuild and restart the backend (or deploy it) to apply template changes. To regenerate local sample HTML without sending email, run `node artifacts/email-templates/build-previews.cjs` from the repository root. Generated preview HTML and screenshots are temporary and are not retained.
+Email appearance is rendered locally by `renderEmail()` in `email.provider.ts`, using the shared cream, maroon and gold layout in `email.template.ts`. Account emails, recovery codes, manual notifications and loan summaries use real delivery data, escaped before insertion, with a plain-text alternative. No Brevo-hosted template setup is required. Rebuild and restart the backend (or deploy it) to apply template changes.
 
 
 ### Delivery workspaces

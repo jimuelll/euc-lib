@@ -47,9 +47,6 @@ const getUnreadCountForUser = ({ userId, role }: NotificationContext): Promise<n
 
 const searchNotificationRecipients = (query: string): Promise<NotificationRecipient[]> =>
   repository.searchNotificationRecipients(query);
-const findActiveNotificationRecipient = (userId: number): Promise<NotificationRecipient | null> =>
-  repository.findActiveNotificationRecipient(userId);
-
 const getByIdForUser = async ({ notificationId, userId, role }: NotificationContext & { notificationId: number }) => {
   const row = await repository.getByIdForUser({ notificationId, userId, role });
   return row ? normaliseNotification(row) : null;
@@ -177,26 +174,14 @@ const listAdminNotifications = async ({ page = 1, limit = DEFAULT_LIMIT }: { pag
   };
 };
 
-const getAdminStats = async () => {
-  const row = await repository.getAdminStats();
-  return {
-    total_notifications: Number(row?.total_notifications ?? 0),
-    created_today: Number(row?.created_today ?? 0),
-    broadcast_notifications: Number(row?.broadcast_notifications ?? 0),
-    direct_notifications: Number(row?.direct_notifications ?? 0),
-  };
-};
-
 export = {
   listForUser,
   getUnreadCountForUser,
   searchNotificationRecipients,
-  findActiveNotificationRecipient,
   getByIdForUser,
   markAsRead,
   markAllAsRead,
   createNotification,
   enqueueNotification,
   listAdminNotifications,
-  getAdminStats,
 };

@@ -3,9 +3,7 @@ interface PaginationInput {
   limit?: unknown;
 }
 
-function roundCurrency(value: unknown): number {
-  return Number((Number(value) || 0).toFixed(2));
-}
+const { roundCurrency } = require("./fine-calculation") as { roundCurrency: (value: unknown) => number };
 
 function getPagination({ page, limit }: PaginationInput, defaultLimit = 20, maxLimit = 100): {
   paged: boolean;
