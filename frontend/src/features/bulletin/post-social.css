@@ -674,7 +674,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .post-image-viewer *,
+  .post-image-viewer * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .post-drawer-toolbar {
