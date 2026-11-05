@@ -28,7 +28,7 @@
 .subscription-filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
 .subscription-filters button { min-height:44px; padding:0 16px; border:1px solid hsl(var(--border)); background:hsl(var(--card)); color:inherit; }
 .service-inner-page[data-library-design][data-library-design] .subscription-filters button[aria-pressed=true] { border-color:var(--library-gold); background:var(--library-maroon); color:#fff; }
-.subscription-row { display:grid; grid-template-columns:180px minmax(0,1fr) 190px; align-items:center; gap:28px; padding:26px 0; border-bottom:1px solid hsl(var(--border)); }
+.subscription-row { display:grid; grid-template-columns:180px minmax(0,1fr) 200px; align-items:center; gap:28px; padding:26px 0; border-bottom:1px solid hsl(var(--border)); }
 .service-inner-page[data-library-design][data-library-design] .subscription-logo { display:grid; place-items:center; aspect-ratio:16/10; border:1px solid hsl(var(--foreground)); background:var(--subscription-color); color:#fff; box-shadow:4px 5px 0 #1b141622; font:700 28px "Fraunces",Georgia,serif; letter-spacing:.02em; }
 .subscription-logo span { max-width:100%; padding:12px; text-align:center; overflow-wrap:anywhere; }
 .subscription-logo.is-long span { font-size:22px; }
@@ -36,8 +36,8 @@
 .subscription-copy { min-width:0; }
 .service-inner-page[data-library-design][data-library-design] .subscription-copy h2 { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:0 0 8px; font:700 28px/1.15 "Fraunces",Georgia,serif; text-wrap:wrap; overflow-wrap:anywhere; }
 .subscription-copy p { margin:10px 0 0; max-width:62ch; color:hsl(var(--muted-foreground)); overflow-wrap:anywhere; }
-.subscription-action { display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0; }
-.subscription-action .service-button { overflow-wrap:anywhere; padding:8px 16px; }
+.subscription-action { display:flex; flex-direction:column; align-items:stretch; gap:6px; width:200px; min-width:0; }
+.subscription-action .service-button { white-space:nowrap; padding:8px 16px; }
 .subscription-action small { text-align:center; color:hsl(var(--muted-foreground)); }
 .service-inner-page[data-library-design][data-library-design] .reservation-tabs { display:inline-flex; width:auto; max-width:100%; height:auto; justify-content:start; margin-bottom:24px; padding:0; border:1px solid hsl(var(--foreground)); border-radius:0; background:hsl(var(--card)); }
 .service-inner-page[data-library-design][data-library-design] .reservation-tabs button { display:inline-flex; gap:10px; min-height:46px; padding:0 22px; border:0; border-radius:0; background:transparent; color:hsl(var(--foreground)); font:700 15px "DM Sans",system-ui,sans-serif; box-shadow:none; }
@@ -83,7 +83,7 @@
 .service-inner-page .reservation-held:focus, .service-inner-page :is(a,button,input,[role=tab]):focus-visible { outline:2px solid var(--library-gold); outline-offset:2px; }
 .dark .service-inner-page .subscription-logo { box-shadow:4px 5px 0 #000a; }
 .dark .service-inner-page .reservation-sidebar { box-shadow:5px 6px 0 #000a; }
-@media(max-width:900px) { .reservation-layout { grid-template-columns:minmax(0,1fr); } .reservation-sidebar { position:static !important; order:-1; } .reservation-layout.is-selected .reservation-sidebar { order:0; } .subscription-row { grid-template-columns:140px minmax(0,1fr); } .subscription-action { grid-column:1/-1; } }
+@media(max-width:900px) { .reservation-layout { grid-template-columns:minmax(0,1fr); } .reservation-sidebar { position:static !important; order:-1; } .reservation-layout.is-selected .reservation-sidebar { order:0; } .subscription-row { grid-template-columns:140px minmax(0,1fr); } .subscription-action { grid-column:1/-1; width:auto; max-width:240px; } }
 @media(max-width:640px) { .subscription-row { grid-template-columns:minmax(0,1fr); } .subscription-logo { width:100%; max-width:240px; } .reservation-book { grid-template-columns:52px minmax(0,1fr); } .reservation-book > button { grid-column:2; justify-self:start; } .reservation-history-row { grid-template-columns:minmax(0,1fr); } }
 @media(prefers-reduced-motion:reduce) { .service-inner-page * { transition:none !important; } }
 
