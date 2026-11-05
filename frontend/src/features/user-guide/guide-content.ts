@@ -295,7 +295,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
         { id: "tabs", kind: "tabs", label: "Tabs", items: ["Today", "History"] },
         { id: "tiles", kind: "tiles", label: "Summary", items: ["Inside now", "Arrivals", "Departures"] },
         { id: "search", kind: "search", label: "Search name or library ID" },
-        { id: "list", kind: "list", label: "Attendance visits", items: ["Patron", "Purpose", "Time in", "Duration", "Time out"] },
+        { id: "list", kind: "list", label: "Attendance visits", items: ["Patron", "Time in", "Duration", "Time out"] },
       ],
       callouts: [
         { region: "head", title: "Manual entry and Time out all", body: "Manual entry records a visit for a patron who cannot use the scanner, with the same scanner rules. Time out all ends every open visit at once, for closing time; you are asked to confirm." },
@@ -304,12 +304,11 @@ export const guideContent: Record<string, GuideTopicContent> = {
       ],
     }],
     tasks: [
-      { title: "Log a visitor manually", steps: ["Select Manual entry in the page header.", "Type the patron’s library ID.", "Choose the purpose: Library visit or Borrowing.", "Select Record attendance."], result: "The visit appears under Inside now." },
+      { title: "Log a visitor manually", steps: ["Select Manual entry in the page header.", "Type the patron’s library ID.", "Choose Time in or Time out.","Select Record attendance."], result: "The visit appears under Inside now." },
       { title: "Close the library for the day", steps: ["Check Inside now for anyone still listed.", "Select Time out all and confirm."], result: "Open visits end with the current time, so History shows a duration for each." },
-      { title: "Pull last month’s visits", steps: ["Open History.", "Set the date range and, if needed, Type and Purpose filters.", "Select Export."] },
+      { title: "Pull last month’s visits", steps: ["Open History.", "Set the date range and, if needed, the Type filter.", "Select Export."] },
     ],
     terms: [
-      { term: "Borrowing scan", meaning: "A check-in recorded because the patron came to borrow, separate from an ordinary visit." },
       { term: "Time out missing", meaning: "The visit was never closed with a scan out or Time out." },
     ],
     related: ["analytics", "reports"],

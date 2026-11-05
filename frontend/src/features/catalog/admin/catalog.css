@@ -157,3 +157,6 @@
   .catalog-row-actions { grid-column:2/4; grid-row:3; justify-content:space-between; }
   .catalog-row-actions > button:first-child, .catalog-row-actions > a:first-child { flex:1; min-width:0; }
 }
+.catalog-qr { display:block; flex:none; background:#fff; border:1px solid hsl(var(--border)); padding:2px; object-fit:contain; }
+.catalog-qr-placeholder { display:flex; align-items:center; justify-content:center; font-size:10px; color:hsl(var(--muted-foreground)); background:hsl(var(--muted) / .4); }
+.catalog-qr-cell { width:56px; }

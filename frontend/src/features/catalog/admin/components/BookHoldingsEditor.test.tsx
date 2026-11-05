@@ -6,11 +6,11 @@ import { MemoryRouter } from "react-router-dom";
 import BookHoldingsEditor from "./BookHoldingsEditor";
 import type { CatalogHolding } from "../catalog.api";
 import type { AcademicProgram } from "@/features/library-settings";
-import { fetchBookHoldings, fetchHoldingOptions, voidCopyAccession, updateCatalogCopyCondition } from "../catalog.api";
+import { fetchBookHoldings, fetchHoldingOptions, voidCopyAccession, updateCatalogCopyCondition, fetchCatalogBarcode } from "../catalog.api";
 import { fetchAcademicPrograms } from "@/features/library-settings";
 import { createTestQueryClientWrapper } from "@/test-utils/query-client";
 
-vi.mock("../catalog.api", () => ({ fetchBookHoldings: vi.fn(), fetchHoldingOptions: vi.fn().mockResolvedValue({nextAccession:"1",claimed:false,locations:[]}), saveCopyHolding: vi.fn(), voidCopyAccession: vi.fn(), updateCatalogCopyCondition: vi.fn() }));
+vi.mock("../catalog.api", () => ({ fetchCatalogBarcode: vi.fn().mockResolvedValue("blob:qr"), fetchBookHoldings: vi.fn(), fetchHoldingOptions: vi.fn().mockResolvedValue({nextAccession:"1",claimed:false,locations:[]}), saveCopyHolding: vi.fn(), voidCopyAccession: vi.fn(), updateCatalogCopyCondition: vi.fn() }));
 vi.mock("@/features/library-settings", () => ({ fetchAcademicPrograms: vi.fn() }));
 vi.mock("@/components/ui/sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -29,6 +29,7 @@ const renderEditor = (isSuperAdmin = false) => render(
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(fetchBookHoldings).mockResolvedValue(copies);
+  vi.mocked(fetchCatalogBarcode).mockResolvedValue("blob:qr");
   vi.mocked(fetchHoldingOptions).mockResolvedValue({nextAccession:"1",claimed:false,locations:[]});
   vi.mocked(fetchAcademicPrograms).mockResolvedValue([{ id: 2, name: "Library Science" } as AcademicProgram]);
   vi.mocked(voidCopyAccession).mockResolvedValue({ accessionNumber: "ACC-1" });

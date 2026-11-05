@@ -3,8 +3,10 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Barcode, Loader2, Lock, ShieldAlert } from "@/components/ui/library-glyphs";
+import { ArrowRight, Loader2, Lock, ShieldAlert } from "@/components/ui/library-glyphs";
 import { Button } from "@/components/ui/button";
+import CopyQrImage from "./CopyQrImage";
+import { printCatalogLabels } from "../catalog.labels";
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -217,8 +219,8 @@ export default function BookHoldingsEditor({ bookId, bookTitle, initialCopyId = 
         </select>
       </div>}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-border bg-muted/20 px-3 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2"><Barcode className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="shrink-0 text-xs font-medium text-foreground">{copyLabel(current)}</span><span className="break-all font-mono text-xs text-muted-foreground">{current.barcode}</span><span className="text-xs text-muted-foreground">{current.accession_number ? `Accession ${current.accession_number}` : "No accession number"}</span></div>
-        <span className={`text-xs font-medium ${current.borrow_eligible ? "text-success" : "text-muted-foreground"}`}>{lendingStatus(current)} · {current.condition}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-3"><CopyQrImage code={current.barcode} size={72} label={`QR code for ${copyLabel(current)}`} /><span className="shrink-0 text-xs font-medium text-foreground">{copyLabel(current)}</span><span className="text-xs text-muted-foreground">{current.accession_number ? `Accession ${current.accession_number}` : "No accession number"}</span></div>
+        <div className="flex items-center gap-3"><span className={`text-xs font-medium ${current.borrow_eligible ? "text-success" : "text-muted-foreground"}`}>{lendingStatus(current)} · {current.condition}</span><Button type="button" size="sm" variant="outline" onClick={() => void printCatalogLabels([current.barcode])}>Print label</Button></div>
       </div>
       <div className="mt-3 border border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">Loan policy: <span className="font-medium text-foreground">{current.book_type || "Not assigned"}</span>{current.borrower_name ? ` · Borrowed by ${current.borrower_name}` : ""}{current.due_date ? ` · Due ${formatLibraryDate(current.due_date)}` : ""}</div></>}
 
