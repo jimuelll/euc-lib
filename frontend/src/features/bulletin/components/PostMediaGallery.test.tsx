@@ -6,7 +6,7 @@ import PostMediaGallery from './PostMediaGallery';
 afterEach(cleanup);
 const images=Array.from({length:7},(_,i)=>({url:`https://example.test/image-${i+1}.jpg`,alt:`Poster ${i+1}`}));
 it('opens every tile at its own position and navigates the entire collection',async()=>{
- render(<PostMediaGallery images={images} title="Notice"/>);
+ render(<PostMediaGallery images={images} title="Notice"><p>Body</p></PostMediaGallery>);
  expect(screen.getAllByRole('button',{name:/Open image/})).toHaveLength(5);
  fireEvent.click(screen.getByRole('button',{name:'Open image 3 of 7: Poster 3'}));
  const viewer=within(await screen.findByRole('dialog'));
@@ -21,18 +21,23 @@ it('opens every tile at its own position and navigates the entire collection',as
  await waitFor(()=>expect(screen.getByRole('button',{name:'Open image 3 of 7: Poster 3'})).toHaveFocus());
 },15000);
 it('offers recovery when a selected image fails',async()=>{
- render(<PostMediaGallery images={images.slice(0,2)} title="Notice"/>);fireEvent.click(screen.getByRole('button',{name:'Open image 2 of 2: Poster 2'}));
+ render(<PostMediaGallery images={images.slice(0,2)} title="Notice"><p>Body</p></PostMediaGallery>);fireEvent.click(screen.getByRole('button',{name:'Open image 2 of 2: Poster 2'}));
  const viewer=within(await screen.findByRole('dialog'));fireEvent.error(viewer.getByRole('img',{name:'Poster 2'}));
  expect(viewer.getByRole('alert')).toHaveTextContent('could not be loaded');expect(viewer.getByRole('link',{name:'Open original image'})).toHaveAttribute('href',images[1].url);
 });
 
 it('reaches every image in a maximum-size gallery, including images beyond the grid',async()=>{
  const all=Array.from({length:9},(_,i)=>({url:`https://example.test/full-${i+1}.jpg`,alt:`Page ${i+1}`}));
- render(<PostMediaGallery images={all} title="Notice"/>);fireEvent.click(screen.getByRole('button',{name:'Open image 5 of 9: Page 5'}));const viewer=within(await screen.findByRole('dialog'));
+ render(<PostMediaGallery images={all} title="Notice"><p>Body</p></PostMediaGallery>);fireEvent.click(screen.getByRole('button',{name:'Open image 5 of 9: Page 5'}));const viewer=within(await screen.findByRole('dialog'));
  for(let i=0;i<all.length;i++){fireEvent.click(viewer.getByRole('button',{name:`View image ${i+1}`}));expect(viewer.getByRole('img',{name:all[i].alt})).toHaveAttribute('src',all[i].url);expect(viewer.getByRole('link',{name:'Download selected image'})).toHaveAttribute('href',all[i].url);}
 },15000);
 
-it('uses a quiet compact row for long posts without per-image instruction labels',()=>{
- render(<PostMediaGallery images={images} title="Notice" compact/>);
- expect(screen.getAllByRole('button',{name:/Open image/})).toHaveLength(4);expect(screen.getByText('+3')).toBeInTheDocument();expect(screen.queryByText('View image')).not.toBeInTheDocument();
+it('leads with a hero image, a thumbnail row, and a count on the last tile',()=>{
+ render(<PostMediaGallery images={images} title="Notice"><p>Body</p></PostMediaGallery>);
+ expect(screen.getAllByRole('button',{name:/Open image/})).toHaveLength(5);expect(screen.getByText('1 of 7')).toBeInTheDocument();expect(screen.getByText('+2')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:/Open image 1 of 7/}).compareDocumentPosition(screen.getByText('Body'))&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+it('renders only the body when a post has no images',()=>{
+ render(<PostMediaGallery images={[]} title="Notice"><p>Body</p></PostMediaGallery>);
+ expect(screen.getByText('Body')).toBeInTheDocument();expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });

@@ -1,6 +1,6 @@
 import repository = require("./bulletin.repository");
 import * as social from "./bulletin.social.repository";
-import {normalizePostContent,validateImageDescriptions} from "./bulletin.content";
+import {normalizePostContent} from "./bulletin.content";
 import {publishWithNotice} from "../notifications/publication-notification.service";
 import type {
   BulletinFilters,
@@ -52,7 +52,6 @@ const createPost = async (author: BulletinUser, {
     throw Object.assign(new Error("title and content are required"), { status: 400 });
   }
   const normalized=normalizePostContent({title,content,image_url,image_public_id,image_alt,gallery});
-  validateImageDescriptions(normalized);
   const postType: string = "announcement";
   const sqlDate = (value: unknown): string | null => value ? String(value).replace("T", " ") : null;
   if(notifyUsers && !ADMIN_ROLES.includes(author.role)) throw Object.assign(new Error("Forbidden"),{status:403});

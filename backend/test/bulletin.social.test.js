@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const db=require('../db');
 const social=require('../modules/bulletin/bulletin.social.repository');
-const {normalizePostContent,contentChanged,validateImageDescriptions}=require('../modules/bulletin/bulletin.content');
+const {normalizePostContent,contentChanged}=require('../modules/bulletin/bulletin.content');
 const audit=require('../modules/analytics/transactional-audit');
 const snapshots=require('../modules/backup/snapshot.transforms');
 if(require.main===module)test.after(()=>db.end());
@@ -106,14 +106,11 @@ test('post edit routes restrict roles and reaction writes require an active logi
  }finally{jwt.verifyAccessToken=original.verify;sessions.isAccessTokenCurrent=original.current;sessions.isUserAccessActive=original.active;for(const[path,value]of cache){if(value)require.cache[path]=value;else delete require.cache[path];}}
 });
 
-test('new image attachments require descriptions in public and Website Content publishing',()=>{
- const image={title:'Notice',content:'Body',image_url:'https://example.test/poster.jpg',image_alt:'',gallery:[]};
- assert.throws(()=>validateImageDescriptions(image),/description/);
- assert.doesNotThrow(()=>validateImageDescriptions({...image,image_alt:'Opening hours poster'}));
- assert.doesNotThrow(()=>validateImageDescriptions(image,image));
- assert.throws(()=>validateImageDescriptions({...image,gallery:[{url:'https://example.test/new.jpg',alt:'   '}]},image),/description/);
+test('image descriptions are optional in public and Website Content publishing',()=>{
+ const image={title:'Notice',content:'Body',image_url:'https://example.test/poster.jpg',image_alt:'',gallery:[{url:'https://example.test/new.jpg',alt:'   '}]};
+ assert.equal(normalizePostContent(image).image_alt,'');
  const {validatePublished}=require('../modules/publishing/publishing.validation');
- assert.throws(()=>validatePublished('bulletin',{items:[{...image,post_type:'announcement'}]},{items:[]}),/description/);
+ assert.doesNotThrow(()=>validatePublished('bulletin',{items:[{...image,post_type:'announcement'}]},{items:[]}));
 });
 test('comment reports verify the active post and persist an audit event in the same transaction',async()=>{
  const original=db.getConnection,oldAudit=audit.enqueueTransactionalAudit;let exists=true,event,commits=0,rollbacks=0;

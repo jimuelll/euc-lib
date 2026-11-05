@@ -16,14 +16,3 @@ export function normalizePostContent(input:any){
  const alt=(value:any)=>{if(value!=null&&(typeof value!=='string'||value.length>500))fail('Image descriptions must be 500 characters or fewer.');return value?.trim()||'';};
  return {title:input.title.trim(),content:input.content.trim(),image_url:imageUrl(input.image_url),image_public_id:typeof input.image_public_id==='string'?input.image_public_id.slice(0,512):null,image_alt:alt(input.image_alt),gallery:images.map((image:any)=>{if(!image||!image.url)fail('Choose an image for every gallery entry.');return {url:imageUrl(image.url),alt:alt(image.alt),...(typeof image.public_id==='string'?{public_id:image.public_id.slice(0,512)}:{})};})};
 }
-
-// Existing undescribed images remain readable; every newly attached image needs author-supplied text.
-export function validateImageDescriptions(input:any,previous?:any) {
- const oldImages=[...(previous?.image_url?[{url:previous.image_url,alt:previous.image_alt}]:[]),...gallery(previous?.gallery)];
- const images=[...(input.image_url?[{url:input.image_url,alt:input.image_alt}]:[]),...gallery(input.gallery)];
- for(const image of images) {
-  if(typeof image.alt==='string'&&image.alt.trim())continue;
-  if(oldImages.some((old:any)=>old.url===image.url&&!old.alt?.trim()))continue;
-  fail('Add a description for each new image before publishing.');
- }
-}

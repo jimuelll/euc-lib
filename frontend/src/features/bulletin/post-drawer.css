@@ -72,3 +72,24 @@
   @keyframes post-drawer-out { to { transform: translateX(40px); opacity: 0; } }
 }
 @media (prefers-reduced-motion: reduce) { .bulletin-post-drawer { animation: none !important; transition: none !important; } }
+
+/* Media: a lone portrait image sits beside the text; galleries lead the post with a hero and a thumbnail row. */
+.post-media { margin: 22px 40px 0; }
+.post-media button { position: relative; display: block; width: 100%; padding: 0; overflow: hidden; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: inherit; cursor: zoom-in; }
+.post-media img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.post-media-hero { aspect-ratio: 16/9; }
+.post-media-pill { position: absolute; left: 10px; bottom: 10px; padding: 4px 10px; background: #000b; color: #fff; font-size: 12px; font-weight: 700; }
+.post-media-thumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.post-media-thumbs button { aspect-ratio: 4/3; }
+.post-media-thumbs img { object-fit: cover; }
+.post-drawer-split { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 28px; align-items: start; padding: 0 40px; }
+.post-drawer-split .post-drawer-body { padding-left: 0; padding-right: 0; max-width: none; }
+.post-media-side { position: sticky; top: 72px; margin: 24px 0; }
+.post-media-side button { height: auto; }
+.post-media-side img { height: auto; max-height: calc(100dvh - 160px); }
+@media (max-width: 720px) {
+  .post-media { margin-left: 20px; margin-right: 20px; }
+  .post-drawer-split { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 20px; }
+  .post-media-side { position: static; order: -1; margin: 22px 0 0; }
+  .post-media-side img { max-height: 55dvh; }
+}

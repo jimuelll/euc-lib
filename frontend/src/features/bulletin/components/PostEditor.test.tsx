@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import {cleanup,fireEvent,render,screen} from '@testing-library/react';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {createTestQueryClientWrapper} from '@/test-utils/query-client';
@@ -21,8 +21,8 @@ it('reuses the editor for existing posts and preserves edits on a conflict',asyn
  expect(api.createBulletinPost).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'Reload latest post'})).toBeInTheDocument();
 },15000);
 
-it('requires an author description before an image can be published',async()=>{
+it('lets an image be published without a description',async()=>{
  render(<CreatePostModal open post={post} onClose={()=>{}} onCreated={()=>{}}/>,{wrapper:createTestQueryClientWrapper()});
- const description=screen.getAllByLabelText('Image description (required)')[0];expect(description).toBeRequired();fireEvent.change(description,{target:{value:'   '}});
- fireEvent.submit(screen.getByLabelText('Title').closest('form')!);await screen.findByText('Add a description for each image before publishing.');expect(api.editBulletinPost).not.toHaveBeenCalled();
+ const description=screen.getAllByLabelText('Image description (optional)')[0];expect(description).not.toBeRequired();fireEvent.change(description,{target:{value:''}});
+ fireEvent.submit(screen.getByLabelText('Title').closest('form')!);await waitFor(()=>expect(api.editBulletinPost).toHaveBeenCalled());
 });

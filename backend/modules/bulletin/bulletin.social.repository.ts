@@ -1,5 +1,5 @@
 import type {Pool,PoolConnection,RowDataPacket,ResultSetHeader} from 'mysql2/promise';
-import {contentChanged,normalizePostContent,validateImageDescriptions} from './bulletin.content';
+import {contentChanged,normalizePostContent} from './bulletin.content';
 import {bulletinName,publicComment} from './bulletin.identity';
 import {visibleComments} from './bulletin.visibility';
 import {screenComment} from './bulletin.moderation.rules';
@@ -15,7 +15,6 @@ export async function editPost(id:number,actor:{id:number;role:string},input:any
  return transaction(async conn=>{const before=await lockPost(conn,id);
   if(!['admin','super_admin'].includes(actor.role)&&!(actor.role==='staff'&&Number(before.author_id)===actor.id))fail('Forbidden',403);
   if(Number(before.content_revision)!==input.content_revision)fail('This post was edited by someone else. Reload the latest post before saving.',409);
-  validateImageDescriptions(content,before);
   const after={...before,...content};if(!contentChanged(before,after))return {id,content_revision:before.content_revision,edited_at:before.edited_at};
   await conn.query('UPDATE bulletin_posts SET title=?,excerpt=?,content=?,image_url=?,image_public_id=?,image_alt=?,gallery=?,edited_at=UTC_TIMESTAMP(3),content_revision=content_revision+1 WHERE id=?',[content.title,content.content.slice(0,500),content.content,content.image_url,content.image_public_id,content.image_alt||null,JSON.stringify(content.gallery),id]);
   await audit.enqueueTransactionalAudit(conn,{actorId:actor.id,route:`/api/bulletin/${id}`,category:'content',description:`Edited bulletin post ${id}`,before,after});
