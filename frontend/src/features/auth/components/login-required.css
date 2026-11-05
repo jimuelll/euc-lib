@@ -1,0 +1,17 @@
+/* Sign-in prompt. Same paper, ink, maroon and gold as the sign-in page. */
+[data-library-design][data-library-design].login-required { max-width:420px; padding:28px 28px 22px; gap:0; border:1px solid hsl(var(--foreground)); border-top:6px solid var(--library-maroon); background:hsl(var(--card)); box-shadow:8px 9px 0 #1b141633; overflow:visible; }
+.dark [data-library-design][data-library-design].login-required { box-shadow:8px 9px 0 #000a; }
+.login-required-kicker { display:flex; align-items:center; gap:12px; font:700 11px var(--font-body); letter-spacing:.18em; text-transform:uppercase; color:hsl(var(--warning)); }
+.login-required-kicker::before { content:""; width:32px; height:2px; background:var(--library-gold); }
+[data-library-design][data-library-design] .login-required-title { margin:12px 0 8px; font:700 26px/1.15 var(--font-heading); letter-spacing:-.01em; color:hsl(var(--foreground)); }
+[data-library-design][data-library-design] .login-required-message { margin:0 0 22px; font-size:15px; line-height:1.55; color:hsl(var(--muted-foreground)); }
+.login-required-actions { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
+.login-required-submit { flex:1 1 160px; display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; padding:0 20px; border:1px solid var(--library-maroon); background:var(--library-maroon); color:#fff; font:700 16px var(--font-body); box-shadow:inset 0 -3px 0 var(--library-gold); }
+.login-required-submit svg { width:16px; height:16px; }
+.login-required-submit:hover { background:hsl(var(--card)); color:var(--library-maroon); }
+.dark .login-required-submit:hover { color:var(--library-gold); }
+.login-required-dismiss { min-height:48px; padding:0 18px; border:1px solid hsl(var(--border)); background:transparent; color:hsl(var(--foreground)); font:600 15px var(--font-body); cursor:pointer; }
+.login-required-dismiss:hover { border-color:hsl(var(--foreground)); }
+.login-required-foot { margin:18px 0 0; padding-top:12px; border-top:1px solid hsl(var(--border)); font-size:13px; color:hsl(var(--muted-foreground)); }
+.login-required :is(a,button):focus-visible { outline:2px solid var(--library-gold); outline-offset:3px; }
+@media (max-width:480px) { [data-library-design][data-library-design].login-required { padding:22px 18px 18px; } .login-required-actions > * { flex-basis:100%; } }

@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, GraduationCap } from "@/components/ui/library-gly
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useLoginRequired } from "@/features/auth/components/LoginRequired";
 import "@/components/layout/library-pages.css";
 
 const services = [
@@ -14,6 +15,7 @@ const steps = [["Sign in", "Use your library account"], ["Find a book", "Search 
 
 export default function Services() {
   const { isLoggedIn } = useAuth();
+  const { requireLogin } = useLoginRequired();
   return <div className="min-h-screen bg-background">
     <Navbar />
     <main data-library-design className="library-information-page"><div className="library-information-inner">
@@ -22,7 +24,9 @@ export default function Services() {
       <div className="library-service-list">{services.map(({ icon: Icon, title, description, link }) => <article className="library-service-row" key={title}>
         <div className="library-service-plate" aria-hidden="true"><Icon /></div>
         <div><h2>{title}</h2><p>{description}</p></div>
-        <Link to={isLoggedIn ? link : loginDestination(link)} className="library-information-button" aria-label={`${isLoggedIn ? "Open" : "Sign in to open"} ${title}`}>{isLoggedIn ? "Open" : "Sign in to open"}<ArrowRight aria-hidden="true" /></Link>
+        {isLoggedIn
+          ? <Link to={link} className="library-information-button" aria-label={`Open ${title}`}>Open<ArrowRight aria-hidden="true" /></Link>
+          : <button type="button" className="library-information-button" aria-label={`Sign in to open ${title}`} onClick={() => requireLogin({ title: `Sign in to open ${title}`, message: description, returnTo: link })}>Sign in to open<ArrowRight aria-hidden="true" /></button>}
       </article>)}</div>
       <section className="library-borrowing-guide" aria-labelledby="borrowing-guide-title">
         <h2 id="borrowing-guide-title" className="library-information-section-title">How borrowing works</h2>

@@ -103,7 +103,15 @@ describe("catalogue recommendation action", () => {
 
 
 describe("catalogue reservation links", () => {
+  it("hides reservation from signed-out visitors in list and grid views", async () => {
+    renderCatalogue("book");
+    await screen.findByRole("button", { name: "Sample catalogue title" });
+    expect(screen.queryByRole("link", { name: /^Reserve/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Grid view" }));
+    expect(screen.queryByRole("link", { name: /^Reserve/ })).not.toBeInTheDocument();
+  });
   it("carries the exact book ID in list and grid views", async () => {
+    authState.role = "student";
     renderCatalogue("book");
     const link = await screen.findByRole("link", { name: "Reserve Sample catalogue title" });
     expect(link).toHaveAttribute("href", "/services/borrowing?bookId=14");

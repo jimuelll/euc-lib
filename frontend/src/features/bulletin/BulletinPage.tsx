@@ -1,17 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
-import { Link, useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { ChevronLeft, ChevronRight, Plus, Lock, Search, ArrowRight } from "@/components/ui/library-glyphs";
+import { ChevronLeft, ChevronRight, Plus, Search } from "@/components/ui/library-glyphs";
 import { useAuth } from "@/context/AuthContext";
 import { useDebounce } from "@/hooks/use-debounce";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useLoginRequired } from "@/features/auth/components/LoginRequired";
 import { fetchBulletinPost } from "./api";
 import { toPost } from "./utils";
 import { PostCard } from "./components/PostCard";
@@ -66,7 +60,7 @@ export function BulletinPage() {
   const linkedPost=params.get("post");
   useEffect(()=>{if(!linkedPost)return;let active=true;setLinkedError(false);if(!/^[1-9][0-9]*$/.test(linkedPost)){setLinkedError(true);return;}fetchBulletinPost(Number(linkedPost)).then(post=>{if(active)setSelectedPost(toPost(post));}).catch(()=>{if(active)setLinkedError(true);});return()=>{active=false;};},[linkedPost]);
   const [showCreate, setShowCreate] = useState(false);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const { requireLogin } = useLoginRequired();
   const debouncedSearch = useDebounce(search, 300);
 
   const handleLikeToggle = useCallback((postId: number, liked: boolean, total: number) => {
@@ -95,8 +89,8 @@ export function BulletinPage() {
   }, [removePost]);
 
   const openLoginPrompt = useCallback(() => {
-    setShowLoginPrompt(true);
-  }, []);
+    requireLogin({ title: "Sign in to join in", message: "Reacting and commenting on bulletin posts needs your library account. You can keep reading without one." });
+  }, [requireLogin]);
 
   const featuredPost = !debouncedSearch.trim() && currentPage === 1
     ? posts.find((post) => post.is_pinned)
@@ -178,67 +172,6 @@ export function BulletinPage() {
           setCurrentPage(1);
         }}
       />
-
-      <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
-        <DialogContent className="max-w-md overflow-hidden border-border p-0 gap-0">
-          <div className="bg-primary relative overflow-hidden px-5 py-5">
-            <div className="absolute inset-x-0 top-0 h-[3px] bg-warning" />
-            <div className="absolute inset-y-0 left-0 w-[3px] bg-warning" />
-            <div
-              className="absolute inset-0 opacity-[0.04] pointer-events-none"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(180deg, transparent, transparent 18px, white 18px, white 19px)",
-              }}
-            />
-            <div className="relative z-10 flex items-start gap-3">
-              <Lock className="mt-0.5 h-4 w-4 text-warning" />
-              <DialogHeader className="text-left">
-                <p
-                  className="text-xs font-bold uppercase tracking-[0.28em] text-warning"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Requires Login
-                </p>
-                <DialogTitle
-                  className="pt-2 text-lg font-bold text-primary-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Sign in to interact with posts
-                </DialogTitle>
-                <DialogDescription className="text-sm text-primary-foreground/65">
-                  Likes and comments are available after you log in to your library account.
-                </DialogDescription>
-              </DialogHeader>
-            </div>
-          </div>
-
-          <div className="space-y-4 px-5 py-5">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              You can still browse public bulletin posts, but reacting and joining the discussion needs an authenticated session.
-            </p>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setShowLoginPrompt(false)}
-                className="border border-border px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Maybe later
-              </button>
-              <Link
-                to="/login"
-                onClick={() => setShowLoginPrompt(false)}
-                className="inline-flex items-center justify-center gap-2 bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-primary-foreground transition-colors hover:bg-primary/90"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Login now
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Footer />
     </div>

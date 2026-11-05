@@ -47,7 +47,7 @@ export default function CatalogueResult({ book, schema, expanded, onToggle, onCl
     return value == null || value === "" ? [] : [{ label: field.label, value: Array.isArray(value) ? value.join(", ") : String(value) }];
   });
   const control = { "aria-expanded": expanded, "aria-controls": `recommendations-${book.id}` };
-  const reserve = !isOperationsRole(user?.role) && !reference && Number(book.canReserve) === 1 && Number(book.available) > 0 ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null;
+  const reserve = !!user && !isOperationsRole(user?.role) && !reference && Number(book.canReserve) === 1 && Number(book.available) > 0 ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null;
   if (grid) return <CatalogueCompactCard book={book} expanded={expanded} footerAction={reserve} coverAction={<button type="button" className="catalogue-cover-similar" aria-label={`View books similar to ${book.title}`} {...control} onClick={event => onToggle(event.currentTarget)}><Sparkles aria-hidden="true" /></button>} />;
   return <article className={"catalogue-record " + (expanded ? "is-expanded" : "")}>
     <CatalogueCover book={book} />

@@ -105,7 +105,7 @@ export function RecommendationStrip({ materialType, seedBookId, personal = false
         titleHref={`/catalogue?q=${encodeURIComponent(book.title)}`}
         reason={specificRecommendationReason(book.reason)}
         coverBadge={book.source === "ai" ? <span className="catalogue-ai-marker" aria-label="AI recommendation" title="AI recommendation"><LibraryIcon name="ai" aria-hidden="true" /><span>AI</span></span> : undefined}
-        footerAction={!isOperationsRole(user?.role) && book.canReserve && availabilityLabel(book) === "Available" ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null}
+        footerAction={!!user && !isOperationsRole(user?.role) && book.canReserve && availabilityLabel(book) === "Available" ? <Link className="catalogue-primary catalogue-reserve-action" to={`/services/borrowing?bookId=${book.id}`} aria-label={`Reserve ${book.title}`}>Reserve</Link> : null}
       /> : <article key={book.id} className="group relative flex min-w-0 flex-col border border-border bg-card transition-colors hover:border-primary/50 hover:bg-muted/20">
         <Link to={`/catalogue?q=${encodeURIComponent(book.title)}`} className="flex min-w-0 flex-1 items-start gap-3 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning">
           <RecommendationCover book={book} />

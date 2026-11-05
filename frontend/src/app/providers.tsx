@@ -10,6 +10,7 @@ import { NotificationsProvider } from "@/context/NotificationsContext";
 import PasswordChangeGate from "@/features/auth/components/PasswordChangeGate";
 import TermRevalidationNotice from "@/features/auth/components/TermRevalidationNotice";
 import SiteVisitTracker from "@/features/analytics/components/SiteVisitTracker";
+import { LoginRequiredProvider } from "@/features/auth/components/LoginRequired";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AppRoutes } from "./routes";
 import { loadAcademicSubscriptions, loadAdminCatalog, loadAdminContentManagement, loadAdminHome, loadAdminLayout, loadAdminManage, loadLibraryServices, loadStudentDashboard } from "./route-loaders";
@@ -55,7 +56,7 @@ export default function AppProviders() {
                 <LibraryDesignProvider><PasswordChangeGate /><TermRevalidationNotice /></LibraryDesignProvider>
                 <EmailVerificationNotice />
                 <SiteVisitTracker />
-                <AppRoutes />
+                <LoginRequiredProvider><AppRoutes /></LoginRequiredProvider>
               </NotificationsProvider>
             </AuthProvider>
           </BrowserRouter>

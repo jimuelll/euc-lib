@@ -1,6 +1,5 @@
-import { loginDestination } from "@/utils/authDestination";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useLoginRequired } from "@/features/auth/components/LoginRequired";
 import { Search } from "@/components/ui/library-glyphs";
 import { Skeleton } from "@/components/ui/skeleton";
 import ServiceInnerLayout from "@/components/layout/ServiceInnerLayout";
@@ -10,6 +9,7 @@ import { SubscriptionGrid } from "./components/SubscriptionGrid";
 
 export default function AcademicSubscriptions() {
   const { isLoggedIn, loading: authLoading } = useAuth();
+  const { requireLogin } = useLoginRequired();
   const { subscriptions, status, error, refetch } = useSubscriptions(isLoggedIn);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function AcademicSubscriptions() {
   const loading = authLoading || (isLoggedIn && (status === "loading" || status === "idle"));
   return <ServiceInnerLayout title="Academic subscriptions" description="Access the library's academic databases and research platforms with your student or employee credentials.">
     {loading ? <div className="service-loading" role="status" aria-label="Loading databases">{[0, 1, 2].map(id => <Skeleton key={id} className="h-32 w-full" />)}</div> : !isLoggedIn ?
-      <div className="service-notice"><p>Sign in to view the library's academic database subscriptions and access links.</p><Link to={loginDestination("/services/subscriptions")} className="service-button">Sign in to access</Link></div> : status === "error" ?
+      <div className="service-notice"><p>Sign in to view the library's academic database subscriptions and access links.</p><button type="button" className="service-button" onClick={() => requireLogin({ title: "Sign in to see the databases", message: "Academic database links are available to signed-in students and employees.", returnTo: "/services/subscriptions" })}>Sign in to access</button></div> : status === "error" ?
       <div className="service-error" role="alert"><p>{error}</p><button className="service-link" onClick={() => void refetch()}>Try again</button></div> : <>
         <div className="subscription-summary"><span>{subscriptions.length} active database{subscriptions.length === 1 ? "" : "s"}</span>{query.trim() || category ? <span>{filtered.length} matching</span> : null}</div>
         {subscriptions.length > 3 && <>
