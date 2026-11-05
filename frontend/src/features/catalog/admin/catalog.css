@@ -160,3 +160,6 @@
 .catalog-qr { display:block; flex:none; background:#fff; border:1px solid hsl(var(--border)); padding:2px; object-fit:contain; }
 .catalog-qr-placeholder { display:flex; align-items:center; justify-content:center; font-size:10px; color:hsl(var(--muted-foreground)); background:hsl(var(--muted) / .4); }
 .catalog-qr-cell { width:56px; }
+.admin-record-header:has(.admin-record-media) { position:relative; padding-right:132px !important; }
+.admin-record-media { position:absolute; top:52px; right:18px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+@media(max-width:560px) { .admin-record-header:has(.admin-record-media) { padding-right:18px !important; } .admin-record-media { position:static; flex-direction:row; margin-top:10px; gap:12px; } }

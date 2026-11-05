@@ -51,14 +51,14 @@ it("opens the exact Holdings copy directly and keeps page order after saved rows
   fireEvent.change(drawer.getByLabelText(/Accession number/),{target:{value:"ACC-1"}});
   await waitFor(()=>expect(drawer.getByRole("button",{name:"Save and next"})).toBeEnabled());
   fireEvent.click(drawer.getByRole("button",{name:"Save and next"}));
-  await drawer.findByText(/LIB-000001-002/);
+  await drawer.findByText(/Copy 2 · /);
   expect(drawer.getByRole("heading",{name:"Book Two"})).toBeTruthy();
   expect(drawer.getByText("Copy 2 of 3 · 2 need accession")).toBeTruthy();
   expect(api.saveCopyHolding).toHaveBeenCalledTimes(1);
   fireEvent.click(drawer.getByRole("button",{name:"Next copy"}));
   const discardPrefill = await screen.findByRole("alertdialog", {}, {timeout:1000}).catch(()=>null);
   if (discardPrefill) fireEvent.click(within(discardPrefill).getByRole("button",{name:"Discard changes"}));
-  await drawer.findByText(/LIB-000001-003/);
+  await drawer.findByText(/Copy 3 · /);
   expect(drawer.getByRole("button",{name:"Next copy"}).hasAttribute("disabled")).toBe(true);
   expect(drawer.getByRole("button",{name:"Save and next"}).hasAttribute("disabled")).toBe(true);
   expect(screen.getByTestId("route").textContent).toBe("?tab=holdings&completion=missing&hq=LIB&hpage=2");

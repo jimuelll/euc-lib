@@ -41,9 +41,8 @@ export type AdminDrawerSize = "sm" | "md" | "lg";
 const drawerModeLabel: Record<AdminDrawerVariant, string | null> = { view: null, edit: "Editing", new: "New" };
 
 /** One record drawer: View reads a record, Edit changes it, New creates one. Sizes: sm 480, md 640, lg 880px. */
-export function AdminDetailDrawer({ open, onClose, title, description, children, footer, headerActions, onAfterClose, className = "", variant = "view", size = "md", dirty = false }: {
-  open: boolean; onClose: () => void; title: string; description: ReactNode; children: ReactNode; footer?: ReactNode; headerActions?: ReactNode;
-  onAfterClose?: () => void; className?: string; variant?: AdminDrawerVariant; size?: AdminDrawerSize; dirty?: boolean;
+export function AdminDetailDrawer({ open, onClose, title, description, children, footer, headerActions, headerMedia, onAfterClose, className = "", variant = "view", size = "md", dirty = false }: {
+  open: boolean; onClose: () => void; title: string; description: ReactNode; children: ReactNode; footer?: ReactNode; headerActions?: ReactNode; headerMedia?: ReactNode;  onAfterClose?: () => void; className?: string; variant?: AdminDrawerVariant; size?: AdminDrawerSize; dirty?: boolean;
 }) {
   const mode = drawerModeLabel[variant];
   const confirmId = useId();
@@ -62,6 +61,7 @@ export function AdminDetailDrawer({ open, onClose, title, description, children,
         <SheetTitle>{title}</SheetTitle>
         <SheetDescription>{description}</SheetDescription>
         {headerActions && <div className="admin-record-header-actions">{headerActions}</div>}
+        {headerMedia && <div className="admin-record-media">{headerMedia}</div>}
       </SheetHeader>
       <div className="admin-record-body">{children}</div>
       {pending ? <footer className="admin-record-footer admin-record-confirm" data-tone={pending.options.tone} role="alertdialog" aria-labelledby={`${confirmId}-title`} aria-describedby={`${confirmId}-description`}>
