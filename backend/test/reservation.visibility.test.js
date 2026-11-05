@@ -52,6 +52,7 @@ test("pending and pickup keep their deadlines while unavailable copies and a sec
     Object.assign(reservationRepository, {
       getConnection: async () => tx,
       syncExpired: async () => {},
+      isStudentTermExpired: async () => false,
       findBookForReservation: async () => ({ id: 4, title: "Naruto", material_type: "book", has_active_policy: 1, registered_copy_count: 1 }),
       findActiveReservationByUser: async () => null,
       findActiveBorrowingByUserBook: async () => null,
