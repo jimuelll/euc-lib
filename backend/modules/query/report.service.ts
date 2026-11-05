@@ -43,7 +43,7 @@ const columns: Record<ReportName, ReportColumn[]> = {
   resource_usage: [["title", "Book", "text"], ["bookType", "Book type", "text"], ["borrowings", "Borrowings", "number"], ["uniqueBorrowers", "Unique borrowers", "number"]],
   holdings_inventory: [
     ["copyId", "Copy ID", "number"], ["title", "Title", "text"], ["author", "Author", "text"], ["materialType", "Material type", "text"],
-    ["isbn", "ISBN", "text"], ["barcode", "Copy barcode", "text"], ["accessionNumber", "Accession number", "text"], ["accessionStatus", "Accession status", "text"],
+    ["isbn", "ISBN", "text"], ["barcode", "Copy QR", "text"], ["accessionNumber", "Accession number", "text"], ["accessionStatus", "Accession status", "text"],
     ["price", "Price (PHP)", "number"], ["program", "Program / course", "text"], ["courseCode", "Course code", "text"],
     ["location", "Location", "text"], ["dateAcquired", "Date acquired", "date"], ["distributor", "Distributor", "text"],
     ["invoiceReference", "Invoice reference", "text"], ["condition", "Condition", "text"], ["active", "Active", "text"],

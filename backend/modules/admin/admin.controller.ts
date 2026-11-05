@@ -72,7 +72,7 @@ const handleQueryToolsSearch: RequestHandler = async (req, res) => {
 const handleGetBarcodePng: RequestHandler = async (req, res) => {
   try {
     const user = await repository.findActiveUserBarcode(String(req.params.student_employee_id));
-    if (!user?.barcode) return void res.status(404).json({ message: "User or barcode not found" });
+    if (!user?.barcode) return void res.status(404).json({ message: "User or QR not found" });
     const png = await renderQrPng(user.barcode);
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "private, no-store");

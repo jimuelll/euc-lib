@@ -77,7 +77,7 @@ function prepareAccessionRestore(tables: SnapshotTables, live: LiveAccessionData
   const currentClaimByBarcode = new Map<string, RestoreRow>();
   for (const [key, claims] of claimsByBarcode) {
     const current = claims.filter((claim) => !voided.has(accessionKey(claim.accession_number)));
-    if (current.length !== 1) throw conflict(`Copy barcode ${claims[0].copy_barcode} has an ambiguous accession history.`);
+    if (current.length !== 1) throw conflict(`Copy QR ${claims[0].copy_barcode} has an ambiguous accession history.`);
     currentClaimByBarcode.set(key, current[0]);
   }
 
@@ -85,14 +85,14 @@ function prepareAccessionRestore(tables: SnapshotTables, live: LiveAccessionData
   const copiesById = new Map<number, RestoreRow>();
   for (const copy of tables.book_copies ?? []) {
     const key = barcodeKey(copy.barcode);
-    if (!key || copiesByBarcode.has(key)) throw conflict("The snapshot contains duplicate or blank copy barcodes.");
+    if (!key || copiesByBarcode.has(key)) throw conflict("The snapshot contains duplicate or blank copy QR codes.");
     copiesByBarcode.set(key, copy);
     copiesById.set(Number(copy.id), copy);
   }
   for (const claim of combinedClaims.values()) {
     const restoredCopy = copiesByBarcode.get(barcodeKey(claim.copy_barcode));
     if (restoredCopy && Number(restoredCopy.book_id) !== Number(claim.book_id)) {
-      throw conflict(`Barcode ${claim.copy_barcode} belongs to a different book in this snapshot; the accession claim cannot be reassigned.`);
+      throw conflict(`QR ${claim.copy_barcode} belongs to a different book in this snapshot; the accession claim cannot be reassigned.`);
     }
   }
 
@@ -120,7 +120,7 @@ function prepareAccessionRestore(tables: SnapshotTables, live: LiveAccessionData
     const snapshotHolding = snapshotHoldingByBarcode.get(key);
     const source = liveHolding || snapshotHolding || { accession_number: claim.accession_number };
     if (liveHolding && Number(liveHolding.book_id) !== Number(copy.book_id)) {
-      throw conflict(`Barcode ${claim.copy_barcode} resolves to another book after restore.`);
+      throw conflict(`QR ${claim.copy_barcode} resolves to another book after restore.`);
     }
     restoredHoldings.push(Object.fromEntries(holdingColumns.map((column) => [
       column,

@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/sonner";
 export function holdingPrintRows(holding:CatalogHolding):[string,string][] {
  const rows:[string,unknown][] = [
   ["Title",holding.title],["Author",holding.author],["ISBN",holding.isbn],
-  ["Copy ID",holding.copy_id],["Barcode",holding.barcode],["Accession number",holding.accession_number],
+  ["Copy ID",holding.copy_id],["QR",holding.barcode],["Accession number",holding.accession_number],
   ["Accession status",holding.accession_voided?"Voided":holding.accession_number?"Assigned":"Not assigned"],
   ["Condition",holding.condition],["Copy status",holding.is_active?"Active":"Inactive"],
   ["Circulation status",holding.circulation_status],["Loan policy",holding.book_type],
@@ -33,7 +33,7 @@ export function holdingCardCanvas(holding:CatalogHolding):HTMLCanvasElement {
   return lines;
  };
  // Omit empty fields (except identifying ones) so the card is only as tall as its data.
- const alwaysShow=new Set(["Title","Copy ID","Barcode","Accession number","Circulation status"]);
+ const alwaysShow=new Set(["Title","Copy ID","QR","Accession number","Circulation status"]);
  const rows=holdingPrintRows(holding).filter(([label,value])=>alwaysShow.has(label)||value!=="—").map(([label,value])=>({label:wrap(label,labelWidth-8),value:wrap(value,width-2*padding-labelWidth-8)}));
  const heights=rows.map(row=>Math.max(row.label.length,row.value.length)*lineHeight+6);
  const height=54+heights.reduce((sum,value)=>sum+value,0)+32;

@@ -71,7 +71,7 @@ const borrowBook = async (
     let copy: BorrowCopy;
     if (isCopyBarcode) {
       const identity = await repository.findCopyBookIdentityForBorrow(bookIdOrCopyBarcode, conn);
-      if (!identity) throw Object.assign(new Error("Copy barcode or accession number not found"), { status: 404 });
+      if (!identity) throw Object.assign(new Error("Copy QR or accession number not found"), { status: 404 });
       // Lock in the same order as count changes and reservation preparation:
       // book first, then the physical copy.
       const book = await repository.findBookForBorrow(identity.book_id, conn);
@@ -79,7 +79,7 @@ const borrowBook = async (
       if (book.material_type === "thesis") throw Object.assign(new Error("Theses are reference-only and cannot be borrowed"), { status: 409 });
       if (!book.loan_duration_minutes) throw Object.assign(new Error("This book has no active loan policy"), { status: 409 });
       const candidate = await repository.findCopyForBorrow(bookIdOrCopyBarcode, conn);
-      if (!candidate) throw Object.assign(new Error("Copy barcode not found"), { status: 404 });
+      if (!candidate) throw Object.assign(new Error("Copy QR not found"), { status: 404 });
       if (!candidate.has_active_policy) throw Object.assign(new Error("This book needs an active loan policy before it can be borrowed"), { status: 409 });
       if (Number(candidate.book_id) !== Number(book.id)) {
         throw Object.assign(new Error("The copy identifier resolved to another catalog record. Reload and try again."), { status: 409 });

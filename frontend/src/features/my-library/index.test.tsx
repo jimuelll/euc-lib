@@ -160,7 +160,7 @@ describe("My Library workspace", () => {
     await screen.findByText("Current loan");
     fireEvent.click(screen.getByText("Loan details"));
     expect(screen.getByText("Main library")).toBeInTheDocument();
-    expect(screen.queryByText(/Copy barcode|LIB-000051-001|ACC-PRIVATE-1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Copy QR|LIB-000051-001|ACC-PRIVATE-1/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "History" }));
     await screen.findByText("86—Eighty-Six, Vol. 1");
     expect(screen.getByText("Borrowed:")).toBeInTheDocument();

@@ -74,7 +74,7 @@ const DATASETS: Record<string, DatasetDefinition> = {
   borrowings: {
     label: "Borrowings",
     dateField: "b.borrowed_at",
-    columns: [["borrower", "Borrower"], ["studentEmployeeId", "Student / employee ID"], ["borrowerRole", "Borrower role"], ["title", "Book"], ["bookType", "Loan policy at checkout"], ["barcode", "Copy barcode"], ["status", "Status"], ["borrowedAt", "Borrowed"], ["dueDate", "Due"], ["returnedAt", "Returned"], ["issuedBy", "Issued by"]],
+    columns: [["borrower", "Borrower"], ["studentEmployeeId", "Student / employee ID"], ["borrowerRole", "Borrower role"], ["title", "Book"], ["bookType", "Loan policy at checkout"], ["barcode", "Copy QR"], ["status", "Status"], ["borrowedAt", "Borrowed"], ["dueDate", "Due"], ["returnedAt", "Returned"], ["issuedBy", "Issued by"]],
     from: "FROM borrowings b LEFT JOIN users u ON u.id = b.user_id LEFT JOIN books bk ON bk.id = b.book_id LEFT JOIN book_copies bc ON bc.id = b.copy_id LEFT JOIN users issuer ON issuer.id = b.issued_by",
     select: "COALESCE(u.name, 'Deleted patron') AS borrower, u.student_employee_id AS studentEmployeeId, u.role AS borrowerRole, COALESCE(bk.title, 'Deleted book') AS title, COALESCE(NULLIF(b.loan_policy_name_snapshot, ''), 'Unknown historical policy') AS bookType, bc.barcode, b.status, b.borrowed_at AS borrowedAt, b.due_date AS dueDate, b.returned_at AS returnedAt, COALESCE(issuer.name, 'System') AS issuedBy",
     base: "b.id IS NOT NULL",

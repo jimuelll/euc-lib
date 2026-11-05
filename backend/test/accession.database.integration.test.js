@@ -359,7 +359,7 @@ test("database: barcode retained by an orphaned claim cannot be reused by anothe
   );
 });
 
-test("database: checkout and exact-copy return resolve accession and QR barcode", {
+test("database: checkout and exact-copy return resolve accession and QR", {
   skip: enabled ? false : "requires RUN_DB_INTEGRATION=1 and DB_NAME ending in _test",
 }, async () => {
   const runId = randomUUID().replaceAll("-", "").slice(0, 12);

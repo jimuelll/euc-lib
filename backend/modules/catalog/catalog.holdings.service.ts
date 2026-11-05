@@ -48,7 +48,7 @@ const parseDate = (value: unknown): string | null => {
 const normaliseHolding = async (body: HoldingBody = {}, conn: PoolConnection, existingProgramId: number | null): Promise<NormalizedHolding> => {
   const accessionNumber = cleanText(body.accession_number, 64, "Accession number");
   if (accessionNumber && /^LIB-\d{6}-\d{3}$/i.test(accessionNumber)) {
-    throw Object.assign(new Error("Accession number cannot use the internal copy barcode format"), { status: 400 });
+    throw Object.assign(new Error("Accession number cannot use the internal copy QR format"), { status: 400 });
   }
   const rawPrice = body.price;
   let price = null;

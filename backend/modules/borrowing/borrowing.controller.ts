@@ -35,7 +35,7 @@ const scanBorrow: RequestHandler = async (req, res) => {
 
     const patron = await service.resolveUserByBarcode(userBarcode.trim());
     if (!patron) {
-      res.status(404).json({ message: "User barcode not recognised" });
+      res.status(404).json({ message: "User QR not recognised" });
       return;
     }
 
@@ -135,7 +135,7 @@ const getCopyByBarcode: RequestHandler = async (req, res) => {
     res.json(copy);
   } catch (error: unknown) {
     logError("[borrowing] getCopyByBarcode:", error);
-    res.status(500).json({ message: "Failed to resolve barcode" });
+    res.status(500).json({ message: "Failed to resolve QR" });
   }
 };
 

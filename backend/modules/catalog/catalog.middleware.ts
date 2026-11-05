@@ -220,7 +220,7 @@ const validateBookId = (req: CatalogRequest, res: Response, next: NextFunction):
 
 const validateBarcode = (req: CatalogRequest, res: Response, next: NextFunction): Response | void => {
   if (!BARCODE_REGEX.test(String(req.params.barcode))) {
-    return res.status(400).json({ message: "Invalid barcode format" });
+    return res.status(400).json({ message: "Invalid QR format" });
   }
   next();
 };

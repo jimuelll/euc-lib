@@ -173,7 +173,7 @@ body.admin-workspace { caret-color: hsl(var(--action)); }
   .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody td { display: block; width: 100%; max-width: none; padding: 6px 0; overflow-wrap: anywhere; }
   .admin-workspace :is(.admin-stack-copies, .admin-stack-policies) tbody td::before { display: block; margin-bottom: 4px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; }
   .admin-workspace .admin-stack-copies td:nth-child(1)::before { content: "Copy"; }
-  .admin-workspace .admin-stack-copies td:nth-child(2)::before { content: "Barcode / accession"; }
+  .admin-workspace .admin-stack-copies td:nth-child(2)::before { content: "QR / accession"; }
   .admin-workspace .admin-stack-copies td:nth-child(3)::before { content: "Status"; }
   .admin-workspace .admin-stack-copies td:nth-child(4)::before { content: "Condition"; }
   .admin-workspace .admin-stack-copies td:nth-child(5)::before { content: "Borrower / notes"; }

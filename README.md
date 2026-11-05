@@ -17,9 +17,9 @@ Features span public discovery, patron services, daily desk work, and library ad
 ### My Library and patron self-service
 
 - View a personal dashboard showing active loans, overdue and due-soon items, outstanding fines, and pending or ready reservations.
-- Check loan due dates, copy barcodes, shelf locations, and current fine amounts; review completed borrowing and reservation history.
+- Check loan due dates, copy QR codes, shelf locations, and current fine amounts; review completed borrowing and reservation history.
 - Place and cancel eligible book reservations, track their status and expiry, and receive notices when materials are ready for collection.
-- View attendance sessions, display a personal library barcode, access academic subscription links, and read account notifications.
+- View attendance sessions, display a personal library QR, access academic subscription links, and read account notifications.
 - Manage email verification, email changes, and passwords from the account page. Other patron identity changes are handled by authorized library staff.
 
 ### Book and thesis cataloguing
@@ -32,7 +32,7 @@ Features span public discovery, patron services, daily desk work, and library ad
 
 ### Physical copies, holdings, and accessions
 
-- Manage individual physical copies separately from title records, with unique copy barcodes and printable labels.
+- Manage individual physical copies separately from title records, with unique copy QR codes and printable labels.
 - Maintain copy-level holdings such as accession number, programme, location, price, acquisition date, distributor, and invoice reference; print individual holdings records.
 - Track good, damaged, lost, weeded, and discarded conditions, and retire or restore physical copies while retaining their history.
 - Distinguish copies that are available, on loan, reserved, inactive, or awaiting accession. Lending eligibility considers accession status, condition, loan policy, and existing commitments.
@@ -40,7 +40,7 @@ Features span public discovery, patron services, daily desk work, and library ad
 
 ### Circulation and lending policies
 
-- Find patrons and physical copies by identifier or barcode, preview account eligibility and item status, and process checkout, return, and renewal transactions at the desk.
+- Find patrons and physical copies by identifier or QR, preview account eligibility and item status, and process checkout, return, and renewal transactions at the desk.
 - Review circulation activity and active, overdue, and returned loans, with the exact copy associated with each transaction.
 - Configure loan durations, fine rates, charging intervals, and initial charges through super administrator loan policies. Loans retain their saved policy terms when settings change later.
 - Calculate due dates with library holiday handling, synchronize overdue loans in the background, and offer a guarded undo workflow for eligible desk transactions.

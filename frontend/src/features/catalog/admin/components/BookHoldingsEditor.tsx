@@ -28,7 +28,7 @@ const asDraft = (holding: CatalogHolding): Draft => ({
 const copyLabel = (copy: Pick<CatalogHolding, "copy_id" | "barcode">): string => {
   const sequence = copy.barcode.match(/-(\d+)$/)?.[1];
   if (sequence && Number(sequence) > 0) return `Copy ${Number(sequence)}`;
-  return copy.barcode ? `Barcode ${copy.barcode}` : `Copy ID ${copy.copy_id}`;
+  return copy.barcode ? `QR ${copy.barcode}` : `Copy ID ${copy.copy_id}`;
 };
 const labelClass = "mb-1.5 block text-xs font-medium text-muted-foreground";
 const EMPTY_HOLDINGS: CatalogHolding[] = [];

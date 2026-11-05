@@ -17,7 +17,7 @@ function copyLabel(copy: CopyLike = {}): string {
   const barcode = typeof copy.barcode === "string" ? copy.barcode.trim() : "";
   const sequence = barcode.match(/-(\d+)$/)?.[1];
   if (sequence && Number(sequence) > 0) return `Copy ${Number(sequence)}`;
-  if (barcode) return `Barcode ${barcode}`;
+  if (barcode) return `QR ${barcode}`;
   return copy.id != null ? `Copy ID ${copy.id}` : "Copy";
 }
 

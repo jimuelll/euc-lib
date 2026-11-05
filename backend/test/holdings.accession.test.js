@@ -84,7 +84,7 @@ test("existing accession cannot change while a copy is loaned or prepared", asyn
   }
 });
 
-test("copy resolution accepts an accession or the existing QR barcode, and returns the exact copy loan", async () => {
+test("copy resolution accepts an accession or the existing QR, and returns the exact copy loan", async () => {
   const originalQuery = db.query;
   const statements = [];
   db.query = async (sql, params) => {

@@ -137,7 +137,7 @@ export const guideTopics: GuideTopicIndex[] = [
     quickTips: [
       "A record describes the title; copies are the physical books that can be lent.",
       "Needs holdings lists titles with no lendable, accessioned copy yet.",
-      "Scan an ISBN into the search box to find a title instantly.",
+      "Type or paste an ISBN into the search box to find a title instantly.",
     ],
     tabTips: {
       records: { label: "Records", tips: ["Open a record to edit details or manage its copies.", "Add record can fill details from an ISBN lookup."] },

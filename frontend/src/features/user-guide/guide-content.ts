@@ -144,7 +144,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
           { id: "session", kind: "list", label: "Recently processed this session", items: ["Patron borrowed Title", "Undo"] },
         ],
         callouts: [
-          { region: "mode", title: "Borrow or Return", body: "Choose the transaction first. The page focuses the right scan box for you, so a barcode scanner can be used straight away." },
+          { region: "mode", title: "Borrow or Return", body: "Choose the transaction first. The page focuses the right scan box for you, so a QR scanner can be used straight away." },
           { region: "patron", title: "Step 1: Patron", body: "Scan the library ID, use the camera button, or type a name and pick a suggestion. The card shows real active loans, unpaid balance and whether clearance allows borrowing." },
           { region: "copy", title: "Step 2: Copy", body: "Scan the accession number. Not sure which copy? Search the catalog, then View copies. Each copy shows if it is Available, On loan, Reserved, Reference only or missing an accession or policy." },
           { region: "summary", title: "Transaction summary", body: "Shows who, what and the estimated due date from the book’s loan policy. Blockers appear here in plain words, with Open clearance when the patron owes items or fines." },
@@ -383,7 +383,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
           header("Catalog", ["Export", "Import", "Add record"]),
           { id: "tabs", kind: "tabs", label: "Tabs", items: ["Records", "Holdings"] },
           { id: "chips", kind: "chips", label: "Status", items: ["Active", "Needs holdings", "Archived", "All"], tone: "attention" },
-          { id: "search", kind: "search", label: "Scan ISBN or search title and author" },
+          { id: "search", kind: "search", label: "Search by ISBN, title or author" },
           { id: "filters", kind: "pill", label: "Filters: Material · Loan policy" },
           { id: "list", kind: "list", label: "Catalogue records", items: ["☐", "Title and author", "Identifier", "Holdings", "Manage copies"] },
         ],
@@ -391,7 +391,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
           { region: "head", title: "Add, Import, Export", body: "Add record creates one title and its first copies. Import takes a CSV and shows a validated preview before anything is saved. Export downloads the current list." },
           { region: "tabs", title: "Records vs Holdings", body: "Records lists titles. Holdings lists every physical copy across the catalog, for stock checks and label printing." },
           { region: "chips", title: "Needs holdings", body: "Titles with no lendable copy: no copies, no accession number, or no loan policy. Work this list down to zero." },
-          { region: "search", title: "Search", body: "Scan an ISBN barcode straight into the box, or type a title or author. Results update as you type." },
+          { region: "search", title: "Search", body: "Type or paste an ISBN, title or author into the box. Results update as you type." },
           { region: "list", title: "Select and act", body: "Tick rows to Archive, Assign policy or Print copy labels in bulk. Manage copies opens the record on its Copies tab." },
         ],
       },
@@ -403,7 +403,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
         regions: [
           { id: "title", kind: "header", label: "Book title", items: ["Print holdings record"] },
           { id: "tabs", kind: "tabs", label: "Sections", items: ["Details", "Copies", "Image", "Circulation"] },
-          { id: "body", kind: "panel", label: "Copies", items: ["Accession · Condition · Location · State", "Add copy", "Print QR barcode label"] },
+          { id: "body", kind: "panel", label: "Copies", items: ["Accession · Condition · Location · State", "Add copy", "Print QR label"] },
           { id: "footer", kind: "button", label: "Save changes", tone: "primary" },
         ],
         callouts: [
@@ -416,7 +416,7 @@ export const guideContent: Record<string, GuideTopicContent> = {
     tasks: [
       { title: "Add a new book", steps: ["Select Add record.", "Enter the ISBN to fill details automatically, or type them.", "Choose the material type and loan policy.", "Add the initial copies with their accession numbers.", "Save. Use Add record and add another for a pile of new books."], result: "If the ISBN already exists you are offered to add a copy to that record instead." },
       { title: "Make a title lendable", when: "It appears under Needs holdings.", steps: ["Select the Needs holdings chip.", "Open the record and go to Copies.", "Add a copy, or give the existing copy an accession number.", "Make sure the record has a loan policy (Assign policy).", "Save the copy."], result: "The title leaves Needs holdings and can be borrowed." },
-      { title: "Print spine or QR labels", steps: ["Tick the records on the Records tab (or open a single record).", "Select Print copy labels, or Print QR barcode label from the copy.", "Allow pop-ups if your browser asks."] },
+      { title: "Print spine or QR labels", steps: ["Tick the records on the Records tab (or open a single record).", "Select Print copy labels, or Print QR label from the copy.", "Allow pop-ups if your browser asks."] },
       { title: "Retire a title", steps: ["Open the record.", "Go to the danger zone and choose Archive."], result: "Blocked while copies are on loan or reserved. Archived records can be restored." },
     ],
     terms: [

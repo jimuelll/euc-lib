@@ -180,7 +180,7 @@ test("copy audit summaries identify the book and stable barcode sequence", () =>
   assert.deepEqual(failedCapture.changes, []);
   assert.equal(copyAuditDescription("/api/admin/copies/61", before), "Updated condition for “86—Eighty-Six, Vol. 1” · Copy 2");
   assert.equal(copyAuditDescription("/api/admin/copies/61/holding", before), "Updated holdings for “86—Eighty-Six, Vol. 1” · Copy 2");
-  assert.equal(copyLabel({ id: 61, barcode: "legacy-qr" }), "Barcode legacy-qr");
+  assert.equal(copyLabel({ id: 61, barcode: "legacy-qr" }), "QR legacy-qr");
   assert.equal(copyAuditDescription("/api/admin/copies/61", { id: 61 }), "Updated condition · Copy ID 61");
 });
 
