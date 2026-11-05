@@ -32,7 +32,9 @@ export function holdingCardCanvas(holding:CatalogHolding):HTMLCanvasElement {
   }
   return lines;
  };
- const rows=holdingPrintRows(holding).map(([label,value])=>({label:wrap(label,labelWidth-8),value:wrap(value,width-2*padding-labelWidth-8)}));
+ // Omit empty fields (except identifying ones) so the card is only as tall as its data.
+ const alwaysShow=new Set(["Title","Copy ID","Barcode","Accession number","Circulation status"]);
+ const rows=holdingPrintRows(holding).filter(([label,value])=>alwaysShow.has(label)||value!=="—").map(([label,value])=>({label:wrap(label,labelWidth-8),value:wrap(value,width-2*padding-labelWidth-8)}));
  const heights=rows.map(row=>Math.max(row.label.length,row.value.length)*lineHeight+6);
  const height=54+heights.reduce((sum,value)=>sum+value,0)+32;
  canvas.width=width*scale;canvas.height=height*scale;
