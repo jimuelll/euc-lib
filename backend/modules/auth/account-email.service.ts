@@ -100,7 +100,7 @@ export async function verifyRecovery(value:unknown,code:unknown) {
   if (!result) throw fail();return result;
 }
 export function validatePassword(value:unknown) {
-  if(typeof value!=='string' || value.length<8 || Buffer.byteLength(value)>72) throw Object.assign(new Error('Use a password of at least 8 characters and no more than 72 UTF-8 bytes'),{status:400});
+  if(typeof value!=='string' || value.length<8 || Buffer.byteLength(value)>72) throw Object.assign(new Error('Use a password of at least 8 characters.'),{status:400});
   return value;
 }
 export async function securityNotice(conn:PoolConnection,user:RowDataPacket,purpose:string,message:string,address=user.email,oldVerifiedAddress=false) {
