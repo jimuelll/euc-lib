@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 
-const qr = require("qrcode");
+import { renderQrPng } from "../shared/qr-code";
 const service = require("./catalog.service");
 const holdingsService = require("./catalog.holdings.service");
 const catalogSettingsService = require("./catalog.settings.service");
@@ -314,12 +314,7 @@ const updateCatalogSettings = async (req: CatalogHttpRequest, res: Response) => 
  */
 const getBarcodePng = async (req: CatalogHttpRequest, res: Response) => {
   try {
-    const png = await qr.toBuffer(String(req.params.barcode), {
-      type: "png",
-      width: 300,        // explicit pixel size instead of scale
-      margin: 2,         // quiet zone around the QR
-      errorCorrectionLevel: "M",  // H = more robust but denser, L = smaller
-    });
+    const png = await renderQrPng(String(req.params.barcode));
 
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");

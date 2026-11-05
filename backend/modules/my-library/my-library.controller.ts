@@ -4,19 +4,14 @@ import logger = require("../../logger");
 
 const { logError } = logger;
 type AuthenticatedRequest = Request & { user: { id: number } };
-const qr = require("qrcode");
+import { renderQrPng } from "../shared/qr-code";
 
 const getBarcodePng: RequestHandler = async (req, res) => {
   try {
     const barcode = await service.getUserBarcode((req as AuthenticatedRequest).user.id);
     if (!barcode) return res.status(404).json({ message: "Library QR code not found" });
 
-    const png = await qr.toBuffer(barcode, {
-      type: "png",
-      width: 300,
-      margin: 2,
-      errorCorrectionLevel: "M",
-    });
+    const png = await renderQrPng(barcode);
 
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "private, no-store");

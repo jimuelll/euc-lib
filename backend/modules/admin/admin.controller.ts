@@ -3,7 +3,7 @@ import service = require("./admin.service");
 import repository = require("./admin.repository");
 import type { UserSearchQuery } from "./admin.types";
 const { logError } = require("../../logger") as { logError: (...values: unknown[]) => void };
-const qr = require("qrcode") as { toBuffer: (value: string, options: { type: "png"; width: number; margin: number; errorCorrectionLevel: "M" }) => Promise<Buffer> };
+import { renderQrPng } from "../shared/qr-code";
 type AuthenticatedRequest = Request & { user: { id: number; role: string } };
 type AdminServiceError = Error & { status?: number; outstandingAmount?: number; affectedLoans?: number; fieldErrors?: Record<string,string> };
 const sendMutationError = (res: Response, error: unknown): void => {
@@ -73,7 +73,7 @@ const handleGetBarcodePng: RequestHandler = async (req, res) => {
   try {
     const user = await repository.findActiveUserBarcode(String(req.params.student_employee_id));
     if (!user?.barcode) return void res.status(404).json({ message: "User or barcode not found" });
-    const png = await qr.toBuffer(user.barcode, { type: "png", width: 300, margin: 2, errorCorrectionLevel: "M" });
+    const png = await renderQrPng(user.barcode);
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "private, no-store");
     res.send(png);
