@@ -49,7 +49,7 @@ export default function AdminUserGuide() {
   useEffect(() => {
     const target = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
     if (target) target.scrollIntoView({ block: "start" });
-    else window.scrollTo({ top: 0 });
+    else document.getElementById("admin-main")?.scrollTo({ top: 0 });
   }, [requested, location.hash]);
 
   const position = topic ? topics.indexOf(topic) : -1;
