@@ -25,7 +25,10 @@ const getReturnPreviewByIdentifier = async (identifier: string) => {
   return repository.findReturnPreviewByIdentifier(identifier.trim());
 };
 
-const lookupUserWithBorrows = async (studentEmployeeId: string) => {
+const lookupUserWithBorrows = async (scannedValue: string) => {
+  // Accept the attendance QR value (users.barcode) as well as the student/employee ID.
+  const patron = await repository.findUserByBarcode(scannedValue);
+  const studentEmployeeId = patron?.student_employee_id ?? scannedValue;
   const result = await repository.findUserWithActiveBorrows(studentEmployeeId);
   if (!result) return null;
   const clearanceProfile = await clearance.getClearanceProfile(studentEmployeeId);
